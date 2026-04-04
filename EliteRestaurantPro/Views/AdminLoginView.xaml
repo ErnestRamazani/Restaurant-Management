@@ -1,0 +1,99 @@
+<UserControl x:Class="EliteRestaurantPro.Views.AdminLoginView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolVis"/>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="#FF0D0D1A" Offset="0"/>
+                <GradientStop Color="#FF0A0A15" Offset="1"/>
+            </LinearGradientBrush>
+        </Grid.Background>
+
+        <!-- Ambient glow -->
+        <Ellipse Width="500" Height="500" Opacity="0.04"
+                 HorizontalAlignment="Center" VerticalAlignment="Center">
+            <Ellipse.Fill>
+                <RadialGradientBrush>
+                    <GradientStop Color="#FFD4AF37" Offset="0"/>
+                    <GradientStop Color="Transparent" Offset="1"/>
+                </RadialGradientBrush>
+            </Ellipse.Fill>
+        </Ellipse>
+
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="380">
+
+            <!-- Logo + Title -->
+            <StackPanel HorizontalAlignment="Center" Margin="0,0,0,36">
+                <Border Width="56" Height="56" CornerRadius="16"
+                        HorizontalAlignment="Center" Margin="0,0,0,22">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#FFD4AF37" Offset="0"/>
+                            <GradientStop Color="#FFAA8B22" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="24" ShadowDepth="0"
+                                          Color="#FFD4AF37" Opacity="0.45"/>
+                    </Border.Effect>
+                    <TextBlock Text="&#xE734;" FontFamily="Segoe MDL2 Assets" FontSize="28"
+                               Foreground="#FF0D0D1A"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+
+                <TextBlock Text="Admin Portal" HorizontalAlignment="Center"
+                           Style="{StaticResource HeadingLarge}" FontSize="30"/>
+                <TextBlock Text="Sign in with your administrator credentials"
+                           HorizontalAlignment="Center" Margin="0,8,0,0"
+                           Style="{StaticResource BodyText}" FontSize="13"
+                           TextAlignment="Center"/>
+            </StackPanel>
+
+            <!-- Login Card -->
+            <Border Style="{StaticResource GlassCard}" Padding="32,28">
+                <StackPanel>
+
+                    <!-- Admin ID -->
+                    <TextBlock Text="ADMIN ID" Style="{StaticResource HeadingSmall}"
+                               Margin="0,0,0,8"/>
+                    <TextBox Text="{Binding AdminId, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource EliteTextBox}"/>
+
+                    <!-- Password -->
+                    <TextBlock Text="PASSWORD" Style="{StaticResource HeadingSmall}"
+                               Margin="0,22,0,8"/>
+                    <PasswordBox x:Name="PasswordInput"
+                                 Style="{StaticResource ElitePasswordBox}"
+                                 PasswordChanged="PasswordBox_PasswordChanged"/>
+
+                    <!-- Error message -->
+                    <Border Visibility="{Binding HasError, Converter={StaticResource BoolVis}}"
+                            Background="#22F44336" CornerRadius="8" Padding="12,8" Margin="0,14,0,0">
+                        <TextBlock Text="{Binding ErrorMessage}"
+                                   Foreground="#FFF44336"
+                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                   FontSize="12" TextWrapping="Wrap"/>
+                    </Border>
+
+                    <!-- Login button -->
+                    <Button Content="Sign In" Margin="0,24,0,0"
+                            Command="{Binding LoginCommand}"
+                            Style="{StaticResource GoldPrimaryButton}"/>
+
+                    <!-- Back link -->
+                    <Button Content="← Back to Role Selection"
+                            Margin="0,12,0,0"
+                            Command="{Binding BackCommand}"
+                            Style="{StaticResource GhostButton}"/>
+
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </Grid>
+</UserControl>

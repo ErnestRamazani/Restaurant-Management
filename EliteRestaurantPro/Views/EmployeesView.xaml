@@ -1,0 +1,466 @@
+<UserControl x:Class="EliteRestaurantPro.Views.EmployeesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:components="clr-namespace:EliteRestaurantPro.Views.Components">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="230"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <components:AdminSidebar Grid.Column="0"/>
+
+        <Grid Grid.Column="1" Background="{StaticResource BackgroundMediumBrush}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" Margin="32,24,32,20">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Row="0" Grid.Column="0">
+                    <TextBlock Style="{StaticResource HeadingLarge}" FontSize="26">
+                        <Run Text="Employee" Foreground="{StaticResource TextPrimaryBrush}"/>
+                        <Run Text=" Management" Foreground="{StaticResource GoldAccentBrush}"/>
+                    </TextBlock>
+                    <TextBlock Text="Manage staff access, roles, and secure pin codes."
+                               Style="{StaticResource BodyText}"
+                               FontSize="13"
+                               Margin="0,5,0,0"/>
+                </StackPanel>
+
+                <Button Grid.Row="0" Grid.Column="1"
+                        Width="170"
+                        Content="Add New Employee"
+                        Command="{Binding OpenAddDialogCommand}"
+                        Style="{StaticResource GoldPrimaryButton}"/>
+
+                <TextBox Grid.Row="1" Grid.ColumnSpan="2"
+                         Margin="0,16,0,0"
+                         Style="{StaticResource EliteTextBox}"
+                         Height="42"
+                         MinHeight="42"
+                         FontSize="13"
+                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Search by name, role, PIN, sign-in ID, system ID, phone, or status"/>
+            </Grid>
+
+            <ScrollViewer Grid.Row="1"
+                          Margin="24,0,24,24"
+                          VerticalScrollBarVisibility="Auto"
+                          Style="{StaticResource EliteScrollViewer}">
+                <ItemsControl ItemsSource="{Binding Employees}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Style="{StaticResource GlassCard}" Margin="0,0,0,14" Padding="0">
+                                <Expander Background="Transparent" BorderThickness="0">
+                                    <Expander.Header>
+                                        <Grid Margin="18,14">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Name}"
+                                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                                           FontFamily="Segoe UI Variable Display, Segoe UI"
+                                                           FontSize="22"
+                                                           FontWeight="SemiBold"/>
+                                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                                    <Border Background="#22D4AF37" CornerRadius="8" Padding="10,4" Margin="0,0,8,0">
+                                                        <TextBlock Text="{Binding Role}" Foreground="{StaticResource GoldAccentBrush}" FontSize="11"/>
+                                                    </Border>
+                                                    <Border Background="#152196F3" CornerRadius="8" Padding="10,4" Margin="0,0,8,0">
+                                                        <TextBlock Text="{Binding PinCode, StringFormat=PIN {0}}" Foreground="{StaticResource StatBlueBrush}" FontSize="11"/>
+                                                    </Border>
+                                                    <Border Background="#331E88E5" CornerRadius="8" Padding="10,4" Margin="0,0,8,0">
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding SignInId, TargetNullValue=''}" Value="">
+                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+                                                        <TextBlock Text="{Binding SignInId, StringFormat=Sign-in {0}}" Foreground="#FF64B5F6" FontSize="11"/>
+                                                    </Border>
+                                                    <Border Background="#22FFFFFF" CornerRadius="8" Padding="10,4">
+                                                        <TextBlock Text="{Binding EmploymentStatus}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="11"/>
+                                                    </Border>
+                                                </StackPanel>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1"
+                                                       Text="▼"
+                                                       Foreground="{StaticResource GoldAccentBrush}"
+                                                       FontFamily="Segoe UI"
+                                                       FontSize="20"
+                                                       VerticalAlignment="Center"
+                                                       Margin="12,0,0,0"/>
+                                        </Grid>
+                                    </Expander.Header>
+
+                                    <Grid Margin="18,0,18,18">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="170"/>
+                                            <ColumnDefinition Width="16"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel Grid.Column="0">
+                                            <Border Width="160" Height="180" CornerRadius="12" BorderBrush="#55D4AF37" BorderThickness="1">
+                                                <Grid>
+                                                    <Image Source="{Binding ProfileImagePath}" Stretch="UniformToFill"/>
+                                                    <Border Background="#55070A13">
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding ProfileImagePath, TargetNullValue=''}" Value="">
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+                                                    </Border>
+                                                    <TextBlock Text="{Binding Initials}"
+                                                               HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center"
+                                                               Foreground="{StaticResource GoldAccentBrush}"
+                                                               FontSize="42"
+                                                               FontWeight="SemiBold">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding ProfileImagePath, TargetNullValue=''}" Value="">
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </Grid>
+                                            </Border>
+
+                                            <TextBlock Text="Notes" Style="{StaticResource HeadingSmall}" Margin="0,14,0,6"/>
+                                            <Border Background="#22000000" CornerRadius="10" Padding="10" BorderBrush="#33FFFFFF" BorderThickness="1">
+                                                <ScrollViewer Height="120" VerticalScrollBarVisibility="Auto" Style="{StaticResource EliteScrollViewer}">
+                                                    <TextBlock Text="{Binding Notes, TargetNullValue=No notes yet.}"
+                                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                                               FontSize="12"
+                                                               TextWrapping="Wrap"/>
+                                                </ScrollViewer>
+                                            </Border>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="Employee Profile" Foreground="{StaticResource GoldAccentBrush}" FontSize="18" FontWeight="SemiBold"/>
+                                            <WrapPanel Margin="0,10,0,0">
+                                                <Border Background="#22FFFFFF" CornerRadius="10" Padding="12,8" Margin="0,0,8,8">
+                                                    <TextBlock Text="{Binding PhoneNumber, StringFormat=Phone {0}, TargetNullValue=Phone N/A}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
+                                                </Border>
+                                                <Border Background="#22FFFFFF" CornerRadius="10" Padding="12,8" Margin="0,0,8,8">
+                                                    <TextBlock Text="{Binding HourlyRate, StringFormat=Rate $ {0:N2}/h}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
+                                                </Border>
+                                                <Button Content="Open in Money"
+                                                        Margin="0,0,8,8"
+                                                        Padding="10,6"
+                                                        Command="{Binding DataContext.NavigateToMoneyCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        Style="{StaticResource SapphireButton}"/>
+                                                <Border Background="#22FFFFFF" CornerRadius="10" Padding="12,8" Margin="0,0,8,8">
+                                                    <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="12">
+                                                        <Run Text="System ID "/>
+                                                        <Run Text="{Binding UniqueId, Mode=OneWay}" Foreground="{StaticResource TextMutedBrush}"/>
+                                                    </TextBlock>
+                                                </Border>
+                                                <Border Background="#22FFFFFF" CornerRadius="10" Padding="12,8" Margin="0,0,8,8">
+                                                    <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="12">
+                                                        <Run Text="Sign-in ID "/>
+                                                        <Run Text="{Binding SignInId, Mode=OneWay, TargetNullValue=—}" Foreground="{StaticResource GoldAccentBrush}"/>
+                                                    </TextBlock>
+                                                </Border>
+                                                <Border Background="#22FFFFFF" CornerRadius="10" Padding="12,8" Margin="0,0,8,8">
+                                                    <TextBlock Text="{Binding JoinDate, StringFormat=Joined {0:yyyy-MM-dd}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
+                                                </Border>
+                                                <Border Background="#22FFFFFF" CornerRadius="10" Padding="12,8" Margin="0,0,8,8">
+                                                    <TextBlock Text="{Binding DaysSinceJoined, StringFormat=Tenure {0} day(s)}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
+                                                </Border>
+                                            </WrapPanel>
+
+                                            <TextBlock Text="Performance" Foreground="{StaticResource GoldAccentBrush}" FontSize="18" FontWeight="SemiBold" Margin="0,10,0,8"/>
+                                            <WrapPanel>
+                                                <Border Background="#152196F3" CornerRadius="10" Padding="14,8" Margin="0,0,8,8">
+                                                    <TextBlock Text="{Binding TotalOrdersServed, StringFormat=Total Orders Served: {0}}" Foreground="{StaticResource StatBlueBrush}" FontSize="13"/>
+                                                </Border>
+                                                <Border Background="#224CAF50" CornerRadius="10" Padding="14,8" Margin="0,0,8,8">
+                                                    <TextBlock Text="{Binding TotalSalesGenerated, StringFormat=Total Sales Generated: $ {0:N2}}" Foreground="{StaticResource StatGreenBrush}" FontSize="13"/>
+                                                </Border>
+                                            </WrapPanel>
+
+                                            <TextBlock Text="Attendance (Today)" Foreground="{StaticResource GoldAccentBrush}" FontSize="18" FontWeight="SemiBold" Margin="0,10,0,8"/>
+                                            <WrapPanel>
+                                                <Border Background="#22FFFFFF" CornerRadius="10" Padding="12,8" Margin="0,0,8,8">
+                                                    <TextBlock Text="{Binding TodayClockInText, StringFormat=Clock In: {0}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
+                                                </Border>
+                                                <Border Background="#22FFFFFF" CornerRadius="10" Padding="12,8" Margin="0,0,8,8">
+                                                    <TextBlock Text="{Binding TodayClockOutText, StringFormat=Clock Out: {0}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
+                                                </Border>
+                                                <Border Background="#22D4AF37" CornerRadius="10" Padding="12,8" Margin="0,0,8,8">
+                                                    <TextBlock Text="{Binding PendingSalaryToday, StringFormat=Pending Salary Today: $ {0:N2}}" Foreground="{StaticResource GoldAccentBrush}" FontSize="12"/>
+                                                </Border>
+                                            </WrapPanel>
+
+                                            <TextBlock Text="Work Schedule" Foreground="{StaticResource GoldAccentBrush}" FontSize="18" FontWeight="SemiBold" Margin="0,10,0,8"/>
+                                            <Border Background="#22FFFFFF" CornerRadius="10" Padding="12,8" Margin="0,0,8,8">
+                                                <TextBlock Text="{Binding WorkScheduleSummary}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap"/>
+                                            </Border>
+
+                                            <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                                <TextBlock Text="Attendance Status:"
+                                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                                           FontSize="12"
+                                                           VerticalAlignment="Center"
+                                                           Margin="0,0,8,0"/>
+                                                <Border CornerRadius="10" Padding="12,6">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Background" Value="#22FFFFFF"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding CanClockOut}" Value="True">
+                                                                    <Setter Property="Background" Value="#224CAF50"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <TextBlock FontSize="12" FontWeight="SemiBold">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+                                                                <Setter Property="Text" Value="Not Active"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding CanClockOut}" Value="True">
+                                                                        <Setter Property="Foreground" Value="{StaticResource StatGreenBrush}"/>
+                                                                        <Setter Property="Text" Value="Active"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </Border>
+                                            </StackPanel>
+
+                                            <Grid Margin="0,14,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Button Grid.Column="0"
+                                                        Width="120"
+                                                        Margin="0,0,10,0"
+                                                        Content="Edit Profile"
+                                                        Command="{Binding DataContext.EditEmployeeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}"
+                                                        Style="{StaticResource SapphireButton}"/>
+                                                <Button Grid.Column="1"
+                                                        Width="120"
+                                                        Margin="0,0,10,0"
+                                                        Content="Shift History"
+                                                        Command="{Binding DataContext.ShowShiftHistoryCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}"
+                                                        Style="{StaticResource GhostButton}"/>
+                                                <Button Grid.Column="2"
+                                                        Width="120"
+                                                        Content="Delete"
+                                                        Command="{Binding DataContext.DeleteEmployeeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}"
+                                                        Style="{StaticResource DangerButton}"/>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Grid>
+                                </Expander>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <Grid Grid.RowSpan="2"
+                  Background="#88070A13"
+                  Visibility="{Binding IsDialogOpen, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Border Style="{StaticResource DialogCard}"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Width="520">
+                    <Grid MaxHeight="680">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0"
+                                   Text="{Binding DialogTitle}"
+                                   Style="{StaticResource HeadingMedium}"
+                                   FontSize="22"/>
+
+                        <ScrollViewer Grid.Row="1"
+                                      Margin="0,18,0,0"
+                                      VerticalScrollBarVisibility="Auto"
+                                      Style="{StaticResource EliteScrollViewer}">
+                            <StackPanel>
+                                <TextBlock Text="EMPLOYEE NAME" Style="{StaticResource HeadingSmall}" Margin="0,4,0,8"/>
+                                <TextBox Text="{Binding EmployeeName, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource EliteTextBox}"/>
+
+                                <TextBlock Text="ROLE" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                                <ComboBox ItemsSource="{Binding Roles}"
+                                          SelectedItem="{Binding SelectedRole}"
+                                          Style="{StaticResource EliteComboBox}"
+                                          ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
+
+                                <TextBlock Style="{StaticResource HeadingSmall}" Margin="0,18,0,8">
+                                    <Run Text="SIGN-IN ID"/>
+                                    <Run Text=" (required for floor + kitchen tablets)" Foreground="{StaticResource TextMutedBrush}" FontSize="10"/>
+                                </TextBlock>
+                                <TextBox Text="{Binding SignInId, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource EliteTextBox}"
+                                         ToolTip="Short ID for tablet login with PIN (letters, numbers, - or _). Not the long system Unique ID."/>
+
+                                <TextBlock Text="PIN CODE" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                                <TextBox Text="{Binding PinCode, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource EliteTextBox}"/>
+
+                                <TextBlock Text="PHONE NUMBER" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                                <TextBox Text="{Binding PhoneNumber, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource EliteTextBox}"/>
+
+                                <TextBlock Text="HOURLY RATE (USD)" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                                <TextBox Text="{Binding HourlyRateText, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource EliteTextBox}"/>
+
+                                <TextBlock Text="MONTHLY SALARY (USD) — PAYROLL" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                                <TextBox Text="{Binding MonthlySalaryUsdText, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource EliteTextBox}"
+                                         ToolTip="Fixed monthly salary used for attendance-based net pay. Leave 0 if not on monthly payroll."/>
+
+                                <TextBlock Text="JOIN DATE (YYYY-MM-DD)" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                                <TextBox Text="{Binding JoinDateText, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource EliteTextBox}"/>
+
+                                <TextBlock Text="EMPLOYMENT STATUS" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                                <ComboBox ItemsSource="{Binding EmploymentStatuses}"
+                                          SelectedItem="{Binding SelectedEmploymentStatus}"
+                                          Style="{StaticResource EliteComboBox}"
+                                          ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
+
+                                <TextBlock Text="PROFILE IMAGE (OPTIONAL)" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Grid.Column="0"
+                                             Text="{Binding SelectedImageFileName, Mode=OneWay}"
+                                             IsReadOnly="True"
+                                             Style="{StaticResource EliteTextBox}"/>
+                                    <Button Grid.Column="1"
+                                            Width="96"
+                                            Margin="10,0,0,0"
+                                            Content="Browse"
+                                            Command="{Binding BrowseProfileImageCommand}"
+                                            Style="{StaticResource SapphireButton}"/>
+                                </Grid>
+
+                                <TextBlock Text="NOTES" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                                <TextBox Text="{Binding EmployeeNotes, UpdateSourceTrigger=PropertyChanged}"
+                                         Height="110"
+                                         TextWrapping="Wrap"
+                                         AcceptsReturn="True"
+                                         VerticalScrollBarVisibility="Auto"
+                                         Foreground="{StaticResource TextPrimaryBrush}"
+                                         Background="#FF0D0D1A"
+                                         BorderBrush="{StaticResource BorderSubtleBrush}"
+                                         BorderThickness="1"
+                                         Padding="10"/>
+
+                                <TextBlock Text="WEEKLY WORK SCHEDULE" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,8,10">
+                                        <TextBlock Text="MONDAY" Style="{StaticResource HeadingSmall}" Margin="0,0,0,6"/>
+                                        <ComboBox ItemsSource="{Binding ShiftOptions}" SelectedItem="{Binding MondayShift}" Style="{StaticResource EliteComboBox}" ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="0" Grid.Column="1" Margin="8,0,0,10">
+                                        <TextBlock Text="TUESDAY" Style="{StaticResource HeadingSmall}" Margin="0,0,0,6"/>
+                                        <ComboBox ItemsSource="{Binding ShiftOptions}" SelectedItem="{Binding TuesdayShift}" Style="{StaticResource EliteComboBox}" ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,8,10">
+                                        <TextBlock Text="WEDNESDAY" Style="{StaticResource HeadingSmall}" Margin="0,0,0,6"/>
+                                        <ComboBox ItemsSource="{Binding ShiftOptions}" SelectedItem="{Binding WednesdayShift}" Style="{StaticResource EliteComboBox}" ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="1" Grid.Column="1" Margin="8,0,0,10">
+                                        <TextBlock Text="THURSDAY" Style="{StaticResource HeadingSmall}" Margin="0,0,0,6"/>
+                                        <ComboBox ItemsSource="{Binding ShiftOptions}" SelectedItem="{Binding ThursdayShift}" Style="{StaticResource EliteComboBox}" ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,0,8,10">
+                                        <TextBlock Text="FRIDAY" Style="{StaticResource HeadingSmall}" Margin="0,0,0,6"/>
+                                        <ComboBox ItemsSource="{Binding ShiftOptions}" SelectedItem="{Binding FridayShift}" Style="{StaticResource EliteComboBox}" ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="2" Grid.Column="1" Margin="8,0,0,10">
+                                        <TextBlock Text="SATURDAY" Style="{StaticResource HeadingSmall}" Margin="0,0,0,6"/>
+                                        <ComboBox ItemsSource="{Binding ShiftOptions}" SelectedItem="{Binding SaturdayShift}" Style="{StaticResource EliteComboBox}" ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Row="3" Grid.Column="0" Margin="0,0,8,0">
+                                        <TextBlock Text="SUNDAY" Style="{StaticResource HeadingSmall}" Margin="0,0,0,6"/>
+                                        <ComboBox ItemsSource="{Binding ShiftOptions}" SelectedItem="{Binding SundayShift}" Style="{StaticResource EliteComboBox}" ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <Grid Grid.Row="2" Margin="0,18,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0"
+                                    Content="Cancel"
+                                    Margin="0,0,8,0"
+                                    Command="{Binding CancelDialogCommand}"
+                                    Style="{StaticResource GhostButton}"/>
+                            <Button Grid.Column="1"
+                                    Content="Save Employee"
+                                    Margin="8,0,0,0"
+                                    Command="{Binding SaveEmployeeCommand}"
+                                    Style="{StaticResource GoldPrimaryButton}"/>
+                        </Grid>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

@@ -1,0 +1,72 @@
+<Window x:Class="EliteRestaurantPro.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="EliteRestaurantPro"
+        Width="1280" Height="780"
+        MinWidth="1024" MinHeight="680"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResizeWithGrip">
+
+    <Window.Resources>
+        <!-- Clip window to rounded rect -->
+        <Style TargetType="Window">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Window">
+                        <Border Background="Transparent">
+                            <ContentPresenter/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <!-- Root border: rounded corners + dark background -->
+    <Border CornerRadius="16" ClipToBounds="True">
+        <Border.Background>
+            <SolidColorBrush Color="#FF0D0D1A"/>
+        </Border.Background>
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="40" ShadowDepth="8"
+                              Direction="270" Color="#CC000000" Opacity="0.7"/>
+        </Border.Effect>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="40"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Title bar drag strip -->
+            <Grid Grid.Row="0" x:Name="TitleBar"
+                  MouseLeftButtonDown="TitleBar_MouseLeftButtonDown"
+                  Background="Transparent">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                            VerticalAlignment="Center" Margin="0,0,4,0">
+                    <Button Style="{StaticResource ChromeButton}"
+                            Content="&#xE921;"
+                            Click="MinimizeButton_Click"
+                            ToolTip="Minimize"/>
+                    <Button Style="{StaticResource ChromeButton}"
+                            Content="&#xE922;"
+                            Click="MaximizeButton_Click"
+                            x:Name="MaximizeBtn"
+                            ToolTip="Maximize"/>
+                    <Button Style="{StaticResource ChromeCloseButton}"
+                            Content="&#xE8BB;"
+                            Click="CloseButton_Click"
+                            ToolTip="Close"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- Main navigation shell: binds to CurrentViewModel -->
+            <ContentControl Grid.Row="1"
+                            Content="{Binding CurrentViewModel}"
+                            Focusable="False"/>
+        </Grid>
+    </Border>
+</Window>

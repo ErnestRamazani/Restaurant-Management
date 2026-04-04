@@ -1,0 +1,771 @@
+<UserControl x:Class="EliteRestaurantPro.Views.AdminOrdersView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:components="clr-namespace:EliteRestaurantPro.Views.Components">
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="230"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <components:AdminSidebar Grid.Column="0"/>
+
+        <Grid Grid.Column="1" Background="{StaticResource BackgroundMediumBrush}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0" Margin="32,24,32,12">
+                <TextBlock Style="{StaticResource HeadingLarge}" FontSize="26">
+                    <Run Text="Order" Foreground="{StaticResource TextPrimaryBrush}"/>
+                    <Run Text=" Management" Foreground="{StaticResource GoldAccentBrush}"/>
+                </TextBlock>
+                <TextBlock Text="Active list includes kitchen stages through Served. Cashier completes only after the server marks served (Pick up &amp; serve). Use View order for full lines and notes."
+                           Style="{StaticResource BodyText}" FontSize="13" Margin="0,5,0,0" TextWrapping="Wrap"/>
+            </StackPanel>
+
+            <Border Grid.Row="1" Margin="32,0,32,12" Padding="14,10" CornerRadius="10"
+                    Background="#3327AE60"
+                    Visibility="{Binding ReadyPickupBannerVisible, Converter={StaticResource BoolToVisibilityConverter}}">
+                <TextBlock Text="{Binding ReadyPickupBannerText}"
+                           Foreground="#FFB2DFDB" FontSize="13" TextWrapping="Wrap"/>
+            </Border>
+
+            <Border Grid.Row="2" Margin="32,0,32,14" Style="{StaticResource GlassCard}" Padding="14"
+                    Visibility="{Binding ShowPendingCashierSection, Converter={StaticResource BoolToVisibilityConverter}}">
+                <StackPanel>
+                    <TextBlock Text="{Binding PendingCashierSectionTitle}"
+                               Foreground="{StaticResource GoldAccentBrush}" FontSize="15" FontWeight="SemiBold"/>
+                    <TextBlock Text="Server tablets send tickets here first. Release to deduct stock and send to the kitchen, or cancel."
+                               Foreground="{StaticResource TextMutedBrush}" FontSize="12" Margin="0,4,0,10" TextWrapping="Wrap"/>
+                    <ItemsControl ItemsSource="{Binding PendingCashierOrders}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,0,0,10" CornerRadius="10" Padding="12,10" Background="#FF1A1A2E">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding OrderCode}" Foreground="{StaticResource GoldAccentBrush}"
+                                                       FontWeight="SemiBold" FontSize="14"/>
+                                            <TextBlock Text="{Binding TableLabel}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,4,0,0"/>
+                                            <TextBlock Text="{Binding ServerName, StringFormat=Server: {0}}" Foreground="{StaticResource StatBlueBrush}" FontSize="11" Margin="0,2,0,0"/>
+                                            <TextBlock Text="{Binding CreatedAtText}" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,2,0,0"/>
+                                            <TextBlock Text="{Binding LinesSummary}" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,6,0,0" TextWrapping="Wrap" MaxHeight="40" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding GrandTotalText}" Foreground="{StaticResource GoldAccentBrush}" FontSize="16" Margin="0,6,0,0"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
+                                            <Button Content="View order" Margin="0,0,0,8"
+                                                    Command="{Binding DataContext.ViewOrderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Style="{StaticResource SapphireButton}"/>
+                                            <Button Content="Release to kitchen" Margin="0,0,0,8"
+                                                    Command="{Binding DataContext.ReleasePendingCashierCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Style="{StaticResource GoldPrimaryButton}"/>
+                                            <Button Content="Cancel ticket"
+                                                    Command="{Binding DataContext.CancelPendingCashierCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Style="{StaticResource DangerButton}"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <Grid Grid.Row="3" Margin="24,0,24,24">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Style="{StaticResource GlassCard}" Padding="0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <Border Grid.Row="0" CornerRadius="15,15,0,0" Padding="18,14">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                    <GradientStop Color="#33FF9800" Offset="0"/>
+                                    <GradientStop Color="#11FF9800" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <Grid>
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="8" Height="8" CornerRadius="4"
+                                            Background="{StaticResource StatOrangeBrush}"
+                                            VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <TextBlock Text="Active Orders" Foreground="{StaticResource TextPrimaryBrush}"
+                                               FontFamily="Segoe UI Variable Text, Segoe UI"
+                                               FontSize="14" FontWeight="SemiBold"/>
+                                </StackPanel>
+                                <Border HorizontalAlignment="Right" VerticalAlignment="Center"
+                                        Background="{StaticResource StatOrangeBrush}" CornerRadius="10" Padding="8,3">
+                                    <TextBlock Text="{Binding ActiveOrders.Count}" Foreground="White"
+                                               FontFamily="Segoe UI Variable Text, Segoe UI"
+                                               FontSize="12" FontWeight="SemiBold"/>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                                      Style="{StaticResource EliteScrollViewer}" Padding="12,8">
+                            <ItemsControl ItemsSource="{Binding ActiveOrders}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Margin="0,0,0,8" CornerRadius="10" Padding="14,12"
+                                                Background="#FF1A1A2E">
+                                            <StackPanel>
+                                                <Grid>
+                                                    <TextBlock Text="{Binding OrderId}"
+                                                               Foreground="{StaticResource GoldAccentBrush}"
+                                                               FontFamily="Segoe UI Variable Text, Segoe UI"
+                                                               FontSize="14" FontWeight="SemiBold"/>
+                                                    <Border HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                            Background="{Binding StatusColor}"
+                                                            CornerRadius="6" Padding="7,3" Opacity="0.9">
+                                                        <TextBlock Text="{Binding Status}" Foreground="White"
+                                                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                                                   FontSize="10" FontWeight="SemiBold"/>
+                                                    </Border>
+                                                </Grid>
+                                                <TextBlock Text="{Binding TableNumber}"
+                                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                                           FontFamily="Segoe UI Variable Text, Segoe UI"
+                                                           FontSize="12" Margin="0,5,0,4"/>
+                                                <TextBlock Text="{Binding ServerName, StringFormat=Server: {0}}"
+                                                           Foreground="{StaticResource StatBlueBrush}"
+                                                           FontFamily="Segoe UI Variable Text, Segoe UI"
+                                                           FontSize="11" Margin="0,0,0,4"/>
+                                                <TextBlock Text="{Binding Items}"
+                                                           Foreground="{StaticResource TextMutedBrush}"
+                                                           FontFamily="Segoe UI Variable Text, Segoe UI"
+                                                           FontSize="11" TextWrapping="Wrap"
+                                                           TextTrimming="CharacterEllipsis" MaxHeight="34"/>
+
+                                                <Button Margin="0,12,0,0"
+                                                        Content="View order"
+                                                        Command="{Binding DataContext.ViewOrderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}"
+                                                        Style="{StaticResource SapphireButton}"/>
+                                                <Grid Margin="0,8,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Button Grid.Column="0"
+                                                            Margin="0,0,6,0"
+                                                            Content="Advance"
+                                                            Command="{Binding DataContext.AdvanceOrderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}"
+                                                            Style="{StaticResource SapphireButton}"
+                                                            Visibility="{Binding ShowAdvanceInOrders, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                    <Button Grid.Column="1"
+                                                            Margin="6,0,6,0"
+                                                            Content="Complete"
+                                                            Command="{Binding DataContext.CompleteOrderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}"
+                                                            Style="{StaticResource GoldPrimaryButton}"
+                                                            Visibility="{Binding ShowCompleteInOrders, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                    <Button Grid.Column="2"
+                                                            Margin="6,0,0,0"
+                                                            Content="Cancel"
+                                                            Command="{Binding DataContext.CancelOrderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}"
+                                                            Style="{StaticResource DangerButton}"/>
+                                                </Grid>
+                                                <Button Margin="0,8,0,0"
+                                                        Content="View ticket"
+                                                        Command="{Binding DataContext.PrintTicketCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}"
+                                                        Style="{StaticResource GhostButton}"
+                                                        Visibility="{Binding ShowViewTicketInOrders, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="2" Style="{StaticResource GlassCard}" Padding="0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <Border Grid.Row="0" CornerRadius="15,15,0,0" Padding="18,14">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                    <GradientStop Color="#334CAF50" Offset="0"/>
+                                    <GradientStop Color="#114CAF50" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <Grid>
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="8" Height="8" CornerRadius="4"
+                                            Background="{StaticResource StatGreenBrush}"
+                                            VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <TextBlock Text="Past Orders" Foreground="{StaticResource TextPrimaryBrush}"
+                                               FontFamily="Segoe UI Variable Text, Segoe UI"
+                                               FontSize="14" FontWeight="SemiBold"/>
+                                </StackPanel>
+                                <Border HorizontalAlignment="Right" VerticalAlignment="Center"
+                                        Background="{StaticResource StatGreenBrush}" CornerRadius="10" Padding="8,3">
+                                    <TextBlock Text="{Binding PastOrders.Count}" Foreground="White"
+                                               FontFamily="Segoe UI Variable Text, Segoe UI"
+                                               FontSize="12" FontWeight="SemiBold"/>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                                      Style="{StaticResource EliteScrollViewer}" Padding="12,8">
+                            <ItemsControl ItemsSource="{Binding PastOrderDayGroups}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Expander Margin="0,0,0,10"
+                                                  IsExpanded="{Binding IsExpanded}">
+                                            <Expander.Header>
+                                                <DockPanel LastChildFill="False">
+                                                    <TextBlock Text="{Binding DayText}"
+                                                               Foreground="{StaticResource GoldAccentBrush}"
+                                                               FontFamily="Segoe UI Variable Text, Segoe UI"
+                                                               FontSize="13"
+                                                               FontWeight="SemiBold"/>
+                                                    <TextBlock Text="{Binding Count, StringFormat= ({0} orders)}"
+                                                               Margin="8,0,0,0"
+                                                               Foreground="{StaticResource TextMutedBrush}"
+                                                               FontSize="12"/>
+                                                </DockPanel>
+                                            </Expander.Header>
+
+                                            <ItemsControl ItemsSource="{Binding Orders}" Margin="0,8,0,0">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Margin="0,0,0,8" CornerRadius="10" Padding="14,12"
+                                                                Background="#FF1A1A2E">
+                                                            <StackPanel>
+                                                                <Grid>
+                                                                    <StackPanel Orientation="Horizontal">
+                                                                        <TextBlock Text="{Binding OrderId}"
+                                                                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                                                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                                                                   FontSize="13" FontWeight="SemiBold"/>
+                                                                        <TextBlock Margin="10,0,0,0"
+                                                                                   Foreground="{StaticResource GoldAccentBrush}"
+                                                                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                                                                   FontSize="13" FontWeight="SemiBold">
+                                                                            <Run Text="$ "/><Run Text="{Binding Total, StringFormat=N2}"/>
+                                                                        </TextBlock>
+                                                                    </StackPanel>
+                                                                    <Border HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                                            Background="{Binding StatusColor}"
+                                                                            CornerRadius="6" Padding="7,3" Opacity="0.9">
+                                                                        <TextBlock Text="{Binding Status}" Foreground="White"
+                                                                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                                                                   FontSize="10" FontWeight="SemiBold"/>
+                                                                    </Border>
+                                                                </Grid>
+                                                                <Grid Margin="0,5,0,4">
+                                                                    <TextBlock Text="{Binding TableNumber}"
+                                                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                                                               FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="12"/>
+                                                                    <TextBlock Text="{Binding Time}" HorizontalAlignment="Right"
+                                                                               Foreground="{StaticResource TextMutedBrush}"
+                                                                               FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="12"/>
+                                                                </Grid>
+                                                                <TextBlock Text="{Binding ServerName, StringFormat=Server: {0}}"
+                                                                           Foreground="{StaticResource StatBlueBrush}"
+                                                                           FontFamily="Segoe UI Variable Text, Segoe UI"
+                                                                           FontSize="11" Margin="0,0,0,4"/>
+                                                                <TextBlock Text="{Binding Items}"
+                                                                           Foreground="{StaticResource TextMutedBrush}"
+                                                                           FontFamily="Segoe UI Variable Text, Segoe UI"
+                                                                           FontSize="11" TextWrapping="Wrap"
+                                                                           TextTrimming="CharacterEllipsis" MaxHeight="34"/>
+                                                                <Button Margin="0,8,0,0"
+                                                                        Content="View ticket"
+                                                                        Command="{Binding DataContext.PrintTicketCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Style="{StaticResource GhostButton}"
+                                                                        Visibility="{Binding ShowViewTicketInOrders, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </Expander>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+
+            </Grid>
+
+            <components:OrderDetailPanelView Grid.Row="0" Grid.RowSpan="4"
+                                             Panel.ZIndex="5"
+                                             DataContext="{Binding OrderDetail}"/>
+
+            <Grid Grid.Row="0" Grid.RowSpan="4"
+                  Panel.ZIndex="4"
+                  Background="#AA05070F"
+                  Visibility="{Binding IsTicketPreviewOpen, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Border HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Width="520"
+                        CornerRadius="18"
+                        BorderBrush="#66D4AF37"
+                        BorderThickness="1"
+                        Background="#FF151515"
+                        Padding="22">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0">
+                            <TextBlock Text="ELITE RESTAURANT PRO"
+                                       Foreground="{StaticResource GoldAccentBrush}"
+                                       FontFamily="Segoe UI Variable Display, Segoe UI"
+                                       FontSize="20"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,0">
+                                <Run Text="Date: "/><Run Text="{Binding TicketDateTime, StringFormat={}{0:dd MMM yyyy}}"/>
+                                <Run Text="    Time: "/><Run Text="{Binding TicketDateTime, StringFormat={}{0:HH:mm}}"/>
+                            </TextBlock>
+                            <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0">
+                                <Run Text="Order: "/><Run Text="{Binding TicketOrderId}"/>
+                                <Run Text="    Status: "/><Run Text="{Binding TicketStatus}"/>
+                            </TextBlock>
+                            <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0">
+                                <Run Text="Table: "/><Run Text="{Binding TicketTable}"/>
+                            </TextBlock>
+                            <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,8">
+                                <Run Text="Server: "/><Run Text="{Binding TicketServer}"/>
+                            </TextBlock>
+                            <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,2">
+                                <Run Text="Equivalent FC: "/><Run Text="{Binding TicketEquivalentFcText}"/>
+                            </TextBlock>
+                            <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,8">
+                                <Run Text="Collected: "/><Run Text="{Binding TicketPaymentText}"/>
+                            </TextBlock>
+                            <TextBlock Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,2" FontSize="11"
+                                       Text="{Binding TicketPaidBreakdownText}"/>
+                            <TextBlock Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,8" FontSize="11"
+                                       Text="{Binding TicketChangeBreakdownText}"/>
+                            <Separator Background="#55D4AF37"/>
+                        </StackPanel>
+
+                        <Grid Grid.Row="1" Margin="0,10,0,10">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <Grid Grid.Row="0" Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="40"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="95"/>
+                                    <ColumnDefinition Width="95"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="QTY" Foreground="{StaticResource GoldAccentBrush}" FontWeight="SemiBold"/>
+                                <TextBlock Grid.Column="1" Text="ITEM" Foreground="{StaticResource GoldAccentBrush}" FontWeight="SemiBold"/>
+                                <TextBlock Grid.Column="2" Text="UNIT PRICE" Foreground="{StaticResource GoldAccentBrush}" HorizontalAlignment="Right" FontWeight="SemiBold"/>
+                                <TextBlock Grid.Column="3" Text="TOTAL" Foreground="{StaticResource GoldAccentBrush}" HorizontalAlignment="Right" FontWeight="SemiBold"/>
+                            </Grid>
+
+                            <ScrollViewer Grid.Row="1" Height="220" VerticalScrollBarVisibility="Auto" Style="{StaticResource EliteScrollViewer}">
+                                <ItemsControl ItemsSource="{Binding TicketLines}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,0,0,6">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="40"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="95"/>
+                                                    <ColumnDefinition Width="95"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="{Binding Quantity}" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding Name}" Foreground="{StaticResource TextPrimaryBrush}" TextWrapping="Wrap"/>
+                                                <TextBlock Grid.Column="2" Text="{Binding UnitPrice, StringFormat=$ {0:N2}}" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Right"/>
+                                                <TextBlock Grid.Column="3" Text="{Binding LineTotal, StringFormat=$ {0:N2}}" Foreground="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Right"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+
+                            <StackPanel Grid.Row="2" Margin="0,10,0,0">
+                                <Separator Background="#55D4AF37"/>
+                                <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,5,0,0">
+                                    <Run Text="Subtotal: $ "/><Run Text="{Binding TicketSubtotal, StringFormat={}{0:N2}}"/>
+                                </TextBlock>
+                                <TextBlock HorizontalAlignment="Right" Foreground="#E57373" Margin="0,2,0,0"
+                                           Text="{Binding TicketDiscountLineText}"
+                                           Visibility="{Binding TicketShowDiscount, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource TextSecondaryBrush}">
+                                    <Run Text="TVA (7%): $ "/><Run Text="{Binding TicketTaxAmount, StringFormat={}{0:N2}}"/>
+                                </TextBlock>
+                                <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource TextSecondaryBrush}">
+                                    <Run Text="Service (10%): $ "/><Run Text="{Binding TicketServiceAmount, StringFormat={}{0:N2}}"/>
+                                </TextBlock>
+                                <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource GoldAccentBrush}" FontSize="20" FontWeight="SemiBold" Margin="0,4,0,0">
+                                    <Run Text="GRAND TOTAL USD: $ "/><Run Text="{Binding TicketGrandTotal, StringFormat={}{0:N2}}"/>
+                                </TextBlock>
+                                <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0">
+                                    <Run Text="Equivalent FC: "/><Run Text="{Binding TicketEquivalentFcText}"/>
+                                </TextBlock>
+                                <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource StatBlueBrush}" Margin="0,2,0,0">
+                                    <Run Text="Collected: "/><Run Text="{Binding TicketPaymentText}"/>
+                                </TextBlock>
+                                <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" FontSize="11"
+                                           Text="{Binding TicketPaidBreakdownText}"/>
+                                <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" FontSize="11"
+                                           Text="{Binding TicketChangeBreakdownText}"/>
+                                <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,6,0,0"
+                                           Text="{Binding TicketVerification, StringFormat=Verification: {0}}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Grid.Row="2" Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0"
+                                    Content="Close"
+                                    Margin="0,0,6,0"
+                                    Command="{Binding CloseTicketPreviewCommand}"
+                                    Style="{StaticResource GhostButton}"/>
+                            <Button Grid.Column="1"
+                                    Content="Print Client Ticket"
+                                    Margin="6,0,6,0"
+                                    Command="{Binding ExportClientTicketPdfCommand}"
+                                    Style="{StaticResource GhostButton}"/>
+                            <Button Grid.Column="2"
+                                    Content="Print Payment Receipt"
+                                    Margin="6,0,0,0"
+                                    Command="{Binding ExportTicketPdfCommand}"
+                                    Style="{StaticResource GoldPrimaryButton}"/>
+                        </Grid>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <Grid Grid.Row="0" Grid.RowSpan="4"
+                  Panel.ZIndex="6"
+                  Background="#AA05070F"
+                  Visibility="{Binding IsPaymentModalOpen, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Border HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Width="760"
+                        CornerRadius="18"
+                        BorderBrush="#66D4AF37"
+                        BorderThickness="1"
+                        Background="#FF151515"
+                        Padding="22">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0">
+                            <TextBlock Text="Complete Order Payment"
+                                       Foreground="{StaticResource GoldAccentBrush}"
+                                       FontFamily="Segoe UI Variable Display, Segoe UI"
+                                       FontSize="22"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Margin="0,6,0,0" Foreground="{StaticResource TextSecondaryBrush}">
+                                <Run Text="Order: "/><Run Text="{Binding PendingCompleteOrderCode, Mode=OneWay}"/>
+                            </TextBlock>
+                            <TextBlock Margin="0,2,0,0" Foreground="{StaticResource TextSecondaryBrush}">
+                                <Run Text="Amount due: "/><Run Text="{Binding PaymentDueUsd, Mode=OneWay, StringFormat=$ {0:N2}}"/>
+                                <Run Text="  ("/><Run Text="{Binding PaymentDueFc, Mode=OneWay, StringFormat=FC {0:N0}}"/><Run Text=")"/>
+                            </TextBlock>
+                            <Separator Margin="0,10,0,8" Background="#55D4AF37"/>
+                        </StackPanel>
+
+                        <Grid Grid.Row="1" Margin="0,4,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="240"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Grid Grid.Column="0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <Grid Grid.Row="0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="140"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="USD + FC" Foreground="{StaticResource GoldAccentBrush}" FontSize="28" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBox Text="{Binding PaidUsdInput, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}" Height="42"/>
+                                        <Button Content="Edit Paid USD" Margin="0,6,0,0" Command="{Binding SelectNumpadTargetCommand}" CommandParameter="PaidUsd" Style="{StaticResource GhostButton}"/>
+                                        <TextBox Text="{Binding PaidFcInput, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}" Height="42" Margin="0,8,0,0"/>
+                                        <Button Content="Edit Paid FC" Margin="0,6,0,0" Command="{Binding SelectNumpadTargetCommand}" CommandParameter="PaidFc" Style="{StaticResource GhostButton}"/>
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid Grid.Row="1" Margin="0,16,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0" Margin="0,0,8,0" Padding="10" CornerRadius="8" Background="#18FFFFFF">
+                                        <StackPanel>
+                                            <TextBlock Text="Due" Foreground="{StaticResource GoldAccentBrush}" FontSize="17" FontWeight="Bold"/>
+                                            <TextBlock Foreground="{StaticResource TextPrimaryBrush}" FontSize="20" FontWeight="Bold"
+                                                       Text="{Binding PaymentDueUsd, Mode=OneWay, StringFormat=$ {0:N2}}"/>
+                                            <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="17" FontWeight="SemiBold"
+                                                       Text="{Binding PaymentDueFc, Mode=OneWay, StringFormat=FC {0:N0}}"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="1" Margin="4,0" Padding="10" CornerRadius="8" Background="#18FFFFFF">
+                                        <StackPanel>
+                                            <TextBlock Text="Remaining" Foreground="{StaticResource StatBlueBrush}" FontSize="17" FontWeight="Bold"/>
+                                            <TextBlock Foreground="{StaticResource TextPrimaryBrush}" FontSize="20" FontWeight="Bold"
+                                                       Text="{Binding RemainingUsd, Mode=OneWay, StringFormat=$ {0:N2}}"/>
+                                            <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="17" FontWeight="SemiBold"
+                                                       Text="{Binding RemainingUsdInFc, Mode=OneWay, StringFormat=FC {0:N0}}"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="2" Margin="8,0,0,0" Padding="10" CornerRadius="8" Background="#18FFFFFF">
+                                        <StackPanel>
+                                            <TextBlock Text="Change" Foreground="{StaticResource StatGreenBrush}" FontSize="17" FontWeight="Bold"/>
+                                            <TextBlock Foreground="{StaticResource TextPrimaryBrush}" FontSize="20" FontWeight="Bold"
+                                                       Text="{Binding ChangeUsd, Mode=OneWay, StringFormat=$ {0:N2}}"/>
+                                            <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="17" FontWeight="SemiBold"
+                                                       Text="{Binding ChangeUsdInFc, Mode=OneWay, StringFormat=FC {0:N0}}"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+
+                                <TextBlock Grid.Row="2" Margin="0,12,0,0" Foreground="{StaticResource TextMutedBrush}" FontSize="11"
+                                           Text="Use the numpad to enter Paid USD and Paid FC. If one currency is not used, leave it at 0."/>
+                            </Grid>
+
+                            <UniformGrid Grid.Column="1" Columns="3" Rows="4" Margin="16,0,0,0">
+                                <Button Content="7" Command="{Binding NumpadDigitCommand}" CommandParameter="7" Style="{StaticResource SapphireButton}"/>
+                                <Button Content="8" Command="{Binding NumpadDigitCommand}" CommandParameter="8" Style="{StaticResource SapphireButton}"/>
+                                <Button Content="9" Command="{Binding NumpadDigitCommand}" CommandParameter="9" Style="{StaticResource SapphireButton}"/>
+                                <Button Content="4" Command="{Binding NumpadDigitCommand}" CommandParameter="4" Style="{StaticResource SapphireButton}"/>
+                                <Button Content="5" Command="{Binding NumpadDigitCommand}" CommandParameter="5" Style="{StaticResource SapphireButton}"/>
+                                <Button Content="6" Command="{Binding NumpadDigitCommand}" CommandParameter="6" Style="{StaticResource SapphireButton}"/>
+                                <Button Content="1" Command="{Binding NumpadDigitCommand}" CommandParameter="1" Style="{StaticResource SapphireButton}"/>
+                                <Button Content="2" Command="{Binding NumpadDigitCommand}" CommandParameter="2" Style="{StaticResource SapphireButton}"/>
+                                <Button Content="3" Command="{Binding NumpadDigitCommand}" CommandParameter="3" Style="{StaticResource SapphireButton}"/>
+                                <Button Content="." Command="{Binding NumpadDotCommand}" Style="{StaticResource GhostButton}"/>
+                                <Button Content="0" Command="{Binding NumpadDigitCommand}" CommandParameter="0" Style="{StaticResource SapphireButton}"/>
+                                <Button Content="⌫" Command="{Binding NumpadBackspaceCommand}" Style="{StaticResource GhostButton}"/>
+                            </UniformGrid>
+                        </Grid>
+
+                        <Grid Grid.Row="2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0"
+                                    Content="Cancel"
+                                    Margin="0,0,8,0"
+                                    Command="{Binding CancelPaymentCommand}"
+                                    Style="{StaticResource GhostButton}"/>
+                            <Button Grid.Column="1"
+                                    Content="Go to change"
+                                    Margin="8,0,0,0"
+                                    Command="{Binding GoToChangeCommand}"
+                                    Style="{StaticResource GoldPrimaryButton}"/>
+                        </Grid>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <Grid Grid.Row="0" Grid.RowSpan="4"
+                  Panel.ZIndex="7"
+                  Background="#AA05070F"
+                  Visibility="{Binding IsChangeModalOpen, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Border HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Width="760"
+                        CornerRadius="18"
+                        BorderBrush="#66D4AF37"
+                        BorderThickness="1"
+                        Background="#FF151515"
+                        Padding="22">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0">
+                            <TextBlock Text="Change Allocation"
+                                       Foreground="{StaticResource GoldAccentBrush}"
+                                       FontFamily="Segoe UI Variable Display, Segoe UI"
+                                       FontSize="22"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Margin="0,6,0,0" Foreground="{StaticResource TextSecondaryBrush}">
+                                <Run Text="Order: "/><Run Text="{Binding PendingCompleteOrderCode, Mode=OneWay}"/>
+                            </TextBlock>
+                            <TextBlock Margin="0,2,0,0" Foreground="{StaticResource TextSecondaryBrush}">
+                                <Run Text="Change required: "/><Run Text="{Binding ChangeUsd, Mode=OneWay, StringFormat=$ {0:N2}}"/>
+                                <Run Text="  ("/><Run Text="{Binding ChangeUsdInFc, Mode=OneWay, StringFormat=FC {0:N0}}"/><Run Text=")"/>
+                            </TextBlock>
+                            <Separator Margin="0,10,0,8" Background="#55D4AF37"/>
+                        </StackPanel>
+
+                        <Grid Grid.Row="1" Margin="0,4,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="240"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" CornerRadius="10" Background="#18FFFFFF" Padding="14">
+                                <StackPanel>
+                                    <TextBlock Text="Allocate Change"
+                                               Foreground="{StaticResource GoldAccentBrush}"
+                                               FontSize="20"
+                                               FontWeight="Bold"/>
+
+                                    <Grid Margin="0,12,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="150"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Grid.Column="0" Text="USD change"
+                                                   Style="{StaticResource HeadingSmall}" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="1" Margin="0,0,10,0"
+                                                   Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"
+                                                   Text="{Binding ChangeUsd, Mode=OneWay, StringFormat=Due $ {0:N2}}"/>
+                                        <TextBox Grid.Column="2" Height="42"
+                                                 Text="{Binding ChangeUsdInput, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{StaticResource EliteTextBox}"/>
+                                    </Grid>
+
+                                    <Button Content="Edit USD change" Margin="0,6,0,0" HorizontalAlignment="Right" Width="170"
+                                            Command="{Binding SelectNumpadTargetCommand}" CommandParameter="ChangeUsd"
+                                            Style="{StaticResource GhostButton}"/>
+
+                                    <Grid Margin="0,12,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="150"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Grid.Column="0" Text="FC change"
+                                                   Style="{StaticResource HeadingSmall}" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="1" Margin="0,0,10,0"
+                                                   Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"
+                                                   Text="{Binding ChangeUsdInFc, Mode=OneWay, StringFormat=Due FC {0:N0}}"/>
+                                        <TextBox Grid.Column="2" Height="42"
+                                                 Text="{Binding ChangeFcInput, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{StaticResource EliteTextBox}"/>
+                                    </Grid>
+
+                                    <Button Content="Edit FC change" Margin="0,6,0,0" HorizontalAlignment="Right" Width="170"
+                                            Command="{Binding SelectNumpadTargetCommand}" CommandParameter="ChangeFc"
+                                            Style="{StaticResource GhostButton}"/>
+
+                                    <Border Margin="0,14,0,0" Padding="10" CornerRadius="8" Background="#1FFFFFFF">
+                                        <StackPanel>
+                                            <TextBlock Foreground="{StaticResource StatBlueBrush}" FontWeight="Bold" FontSize="18">
+                                                <Run Text="Remaining to allocate: "/>
+                                                <Run Text="{Binding RemainingChangeUsdToAllocate, Mode=OneWay, StringFormat=$ {0:N2}}"/>
+                                            </TextBlock>
+                                            <TextBlock Margin="0,2,0,0"
+                                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                                       FontWeight="SemiBold"
+                                                       FontSize="16"
+                                                       Text="{Binding RemainingChangeFcToAllocate, Mode=OneWay, StringFormat=FC {0:N0}}"/>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+
+                            <UniformGrid Grid.Column="1" Columns="3" Rows="4" Margin="16,0,0,0">
+                                <Button Content="7" Command="{Binding NumpadDigitCommand}" CommandParameter="7" Style="{StaticResource SapphireButton}"/>
+                                <Button Content="8" Command="{Binding NumpadDigitCommand}" CommandParameter="8" Style="{StaticResource SapphireButton}"/>
+                                <Button Content="9" Command="{Binding NumpadDigitCommand}" CommandParameter="9" Style="{StaticResource SapphireButton}"/>
+                                <Button Content="4" Command="{Binding NumpadDigitCommand}" CommandParameter="4" Style="{StaticResource SapphireButton}"/>
+                                <Button Content="5" Command="{Binding NumpadDigitCommand}" CommandParameter="5" Style="{StaticResource SapphireButton}"/>
+                                <Button Content="6" Command="{Binding NumpadDigitCommand}" CommandParameter="6" Style="{StaticResource SapphireButton}"/>
+                                <Button Content="1" Command="{Binding NumpadDigitCommand}" CommandParameter="1" Style="{StaticResource SapphireButton}"/>
+                                <Button Content="2" Command="{Binding NumpadDigitCommand}" CommandParameter="2" Style="{StaticResource SapphireButton}"/>
+                                <Button Content="3" Command="{Binding NumpadDigitCommand}" CommandParameter="3" Style="{StaticResource SapphireButton}"/>
+                                <Button Content="." Command="{Binding NumpadDotCommand}" Style="{StaticResource GhostButton}"/>
+                                <Button Content="0" Command="{Binding NumpadDigitCommand}" CommandParameter="0" Style="{StaticResource SapphireButton}"/>
+                                <Button Content="⌫" Command="{Binding NumpadBackspaceCommand}" Style="{StaticResource GhostButton}"/>
+                            </UniformGrid>
+                        </Grid>
+
+                        <Grid Grid.Row="2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0"
+                                    Content="Cancel"
+                                    Margin="0,0,8,0"
+                                    Command="{Binding CancelChangeCommand}"
+                                    Style="{StaticResource GhostButton}"/>
+                            <Button Grid.Column="1"
+                                    Content="Confirm Complete"
+                                    Margin="8,0,0,0"
+                                    Command="{Binding ConfirmChangeCommand}"
+                                    Style="{StaticResource GoldPrimaryButton}"/>
+                        </Grid>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <Border Background="#70000000"
+                    CornerRadius="10"
+                    Padding="14,10"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}">
+                <TextBlock Text="Loading orders..."
+                           Foreground="{StaticResource TextPrimaryBrush}"
+                           FontSize="14"
+                           FontWeight="SemiBold"/>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

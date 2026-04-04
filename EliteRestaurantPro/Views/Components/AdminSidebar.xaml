@@ -1,0 +1,416 @@
+<UserControl x:Class="EliteRestaurantPro.Views.Components.AdminSidebar"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Border Background="{StaticResource SidebarBrush}"
+            BorderBrush="{StaticResource BorderSubtleBrush}"
+            BorderThickness="0,0,1,0">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="20,24,20,28">
+                <Border Width="36" Height="36" CornerRadius="10" Margin="0,0,12,0">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#FFD4AF37" Offset="0"/>
+                            <GradientStop Color="#FFAA8B22" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                    <TextBlock Text="&#xE93C;" FontFamily="Segoe MDL2 Assets" FontSize="18"
+                               Foreground="#FF0D0D1A"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="EliteResto"
+                               Foreground="{StaticResource GoldAccentBrush}"
+                               FontFamily="Segoe UI Variable Display, Segoe UI Light"
+                               FontSize="15"
+                               FontWeight="SemiBold"/>
+                    <TextBlock Text="PRO"
+                               Foreground="{StaticResource TextMutedBrush}"
+                               FontFamily="Segoe UI Variable, Segoe UI"
+                               FontSize="9"
+                               Margin="1,-1,0,0"/>
+                </StackPanel>
+            </StackPanel>
+
+            <StackPanel Grid.Row="1" Margin="0,4,0,0">
+                <TextBlock Text="NAVIGATION"
+                           Margin="24,0,0,8"
+                           Foreground="{StaticResource TextMutedBrush}"
+                           FontFamily="Segoe UI Variable, Segoe UI"
+                           FontSize="10"
+                           FontWeight="SemiBold"/>
+
+                <Button x:Name="DashboardButton"
+                        Command="{Binding NavigateToDashboardCommand}"
+                        Style="{StaticResource SidebarNavButton}"
+                        Foreground="{StaticResource TextSecondaryBrush}"
+                        Visibility="{Binding ShowFullAdminNav, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <StackPanel Orientation="Horizontal" Margin="16,0">
+                        <TextBlock Text="&#xE80F;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="16"
+                                   Width="22"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                        <TextBlock Text="Dashboard"
+                                   Margin="10,0,0,0"
+                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                   FontSize="13"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                    </StackPanel>
+                </Button>
+
+                <Button x:Name="EmployeesButton"
+                        Command="{Binding NavigateToEmployeesCommand}"
+                        Style="{StaticResource SidebarNavButton}"
+                        Foreground="{StaticResource TextSecondaryBrush}"
+                        Visibility="{Binding ShowFullAdminNav, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <StackPanel Orientation="Horizontal" Margin="16,0">
+                        <TextBlock Text="&#xE716;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="16"
+                                   Width="22"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                        <TextBlock Text="Employees"
+                                   Margin="10,0,0,0"
+                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                   FontSize="13"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                    </StackPanel>
+                </Button>
+
+                <Button x:Name="MenuButton"
+                        Command="{Binding NavigateToMenuCommand}"
+                        Style="{StaticResource SidebarNavButton}"
+                        Foreground="{StaticResource TextSecondaryBrush}">
+                    <StackPanel Orientation="Horizontal" Margin="16,0">
+                        <TextBlock Text="&#xE8FD;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="16"
+                                   Width="22"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                        <TextBlock Text="Menu"
+                                   Margin="10,0,0,0"
+                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                   FontSize="13"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                    </StackPanel>
+                </Button>
+
+                <Button x:Name="InventoryButton"
+                        Command="{Binding NavigateToInventoryCommand}"
+                        Style="{StaticResource SidebarNavButton}"
+                        Foreground="{StaticResource TextSecondaryBrush}"
+                        Visibility="{Binding ShowInventorySidebarNav, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <StackPanel Orientation="Horizontal" Margin="16,0">
+                        <TextBlock Text="&#xE719;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="16"
+                                   Width="22"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                        <TextBlock Text="Inventory"
+                                   Margin="10,0,0,0"
+                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                   FontSize="13"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                    </StackPanel>
+                </Button>
+
+                <Button x:Name="AttendanceButton"
+                        Command="{Binding NavigateToAttendanceCommand}"
+                        Style="{StaticResource SidebarNavButton}"
+                        Foreground="{StaticResource TextSecondaryBrush}"
+                        Visibility="{Binding ShowFullAdminNav, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <StackPanel Orientation="Horizontal" Margin="16,0">
+                        <TextBlock Text="&#xE823;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="16"
+                                   Width="22"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                        <TextBlock Text="Attendance"
+                                   Margin="10,0,0,0"
+                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                   FontSize="13"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                    </StackPanel>
+                </Button>
+
+                <Button x:Name="KitchenQueueButton"
+                        Command="{Binding NavigateToKitchenQueueCommand}"
+                        Style="{StaticResource SidebarNavButton}"
+                        Foreground="{StaticResource TextSecondaryBrush}"
+                        Visibility="{Binding ShowKitchenQueueNav, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <StackPanel Orientation="Horizontal" Margin="16,0">
+                        <TextBlock Text="&#xE976;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="16"
+                                   Width="22"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                        <TextBlock Text="Kitchen queue"
+                                   Margin="10,0,0,0"
+                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                   FontSize="13"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                    </StackPanel>
+                </Button>
+
+                <Button x:Name="TablesButton"
+                        Command="{Binding NavigateToTablesCommand}"
+                        Style="{StaticResource SidebarNavButton}"
+                        Foreground="{StaticResource TextSecondaryBrush}"
+                        Visibility="{Binding ShowTablesAndTakeOrderNav, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <StackPanel Orientation="Horizontal" Margin="16,0">
+                        <TextBlock Text="&#xE14C;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="16"
+                                   Width="22"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                        <TextBlock Text="Tables"
+                                   Margin="10,0,0,0"
+                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                   FontSize="13"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                    </StackPanel>
+                </Button>
+
+                <Button x:Name="ServerPickupButton"
+                        Command="{Binding NavigateToServerPickupCommand}"
+                        Style="{StaticResource SidebarNavButton}"
+                        Foreground="{StaticResource TextSecondaryBrush}"
+                        Visibility="{Binding ShowServerPickupNav, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <StackPanel Orientation="Horizontal" Margin="16,0">
+                        <TextBlock Text="&#xE8F1;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="16"
+                                   Width="22"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                        <TextBlock Text="Pick up &amp; serve"
+                                   Margin="10,0,0,0"
+                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                   FontSize="13"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                    </StackPanel>
+                </Button>
+
+                <Button x:Name="OrdersButton"
+                        Command="{Binding NavigateToOrdersCommand}"
+                        Style="{StaticResource SidebarNavButton}"
+                        Foreground="{StaticResource TextSecondaryBrush}"
+                        Visibility="{Binding ShowStaffOrdersNav, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <StackPanel Orientation="Horizontal" Margin="16,0">
+                        <TextBlock Text="&#xE8B5;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="16"
+                                   Width="22"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                        <TextBlock Text="Orders"
+                                   Margin="10,0,0,0"
+                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                   FontSize="13"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                    </StackPanel>
+                </Button>
+
+                <Button x:Name="CreateOrderButton"
+                        Command="{Binding NavigateToCreateOrderCommand}"
+                        Style="{StaticResource SidebarNavButton}"
+                        Foreground="{StaticResource TextSecondaryBrush}"
+                        Visibility="{Binding ShowTablesAndTakeOrderNav, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <StackPanel Orientation="Horizontal" Margin="16,0">
+                        <TextBlock Text="&#xE710;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="16"
+                                   Width="22"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                        <TextBlock Text="{Binding SidebarCreateOrderLabel}"
+                                   Margin="10,0,0,0"
+                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                   FontSize="13"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                    </StackPanel>
+                </Button>
+
+                <Button x:Name="MoneyButton"
+                        Command="{Binding NavigateToMoneyCommand}"
+                        Style="{StaticResource SidebarNavButton}"
+                        Foreground="{StaticResource TextSecondaryBrush}"
+                        Visibility="{Binding ShowFullAdminNav, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <StackPanel Orientation="Horizontal" Margin="16,0">
+                        <TextBlock Text="&#xE1D3;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="16"
+                                   Width="22"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                        <TextBlock Text="Money"
+                                   Margin="10,0,0,0"
+                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                   FontSize="13"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                    </StackPanel>
+                </Button>
+
+                <Button x:Name="SalaryButton"
+                        Command="{Binding MapsSalaryCommand}"
+                        Style="{StaticResource SidebarNavButton}"
+                        Foreground="{StaticResource TextSecondaryBrush}"
+                        Visibility="{Binding ShowFullAdminNav, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <StackPanel Orientation="Horizontal" Margin="16,0">
+                        <TextBlock Text="&#xE8C7;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="16"
+                                   Width="22"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                        <TextBlock Text="Salary"
+                                   Margin="10,0,0,0"
+                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                   FontSize="13"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                    </StackPanel>
+                </Button>
+
+                <Button x:Name="ReportsButton"
+                        Command="{Binding NavigateToReportsCommand}"
+                        Style="{StaticResource SidebarNavButton}"
+                        Foreground="{StaticResource TextSecondaryBrush}"
+                        Visibility="{Binding ShowFullAdminNav, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <StackPanel Orientation="Horizontal" Margin="16,0">
+                        <TextBlock Text="&#xE9D9;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="16"
+                                   Width="22"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                        <TextBlock Text="Reports"
+                                   Margin="10,0,0,0"
+                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                   FontSize="13"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                    </StackPanel>
+                </Button>
+
+                <Button x:Name="AppearanceButton"
+                        Command="{Binding NavigateToAppearanceCommand}"
+                        Style="{StaticResource SidebarNavButton}"
+                        Foreground="{StaticResource TextSecondaryBrush}">
+                    <StackPanel Orientation="Horizontal" Margin="16,0">
+                        <TextBlock Text="&#xE790;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="16"
+                                   Width="22"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                        <TextBlock Text="Appearance"
+                                   Margin="10,0,0,0"
+                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                   FontSize="13"
+                                   VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+
+            <StackPanel Grid.Row="2" Margin="0,0,0,20">
+                <Separator Background="{StaticResource BorderSubtleBrush}"
+                           Margin="16,0,16,16"
+                           Height="1"/>
+
+                <StackPanel Orientation="Horizontal" Margin="20,0,20,14">
+                    <Grid Width="36" Height="36">
+                        <Border Width="36" Height="36" CornerRadius="18" ClipToBounds="True"
+                                BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SidebarAvatarHasPhoto}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <Image Source="{Binding SidebarAvatarImage}"
+                                   Stretch="UniformToFill"/>
+                        </Border>
+                        <Border Width="36" Height="36" CornerRadius="18"
+                                Background="{StaticResource GoldAccentBrush}">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding SidebarAvatarHasPhoto}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <TextBlock Text="{Binding SidebarAvatarLetter}"
+                                       FontFamily="Segoe UI Variable Display, Segoe UI"
+                                       FontSize="16"
+                                       FontWeight="SemiBold"
+                                       Foreground="#FF0D0D1A"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"/>
+                        </Border>
+                    </Grid>
+
+                    <StackPanel VerticalAlignment="Center" Margin="12,0,0,0">
+                        <TextBlock Text="{Binding SidebarUserDisplayName}"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding SidebarRoleDisplay}"
+                                   Foreground="{StaticResource GoldAccentBrush}"
+                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                   FontSize="11"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <Button Command="{Binding LogoutCommand}"
+                        Style="{StaticResource LogoutButton}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE8FB;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="13"
+                                   Margin="0,0,8,0"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Text="Logout"
+                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                   FontSize="12"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

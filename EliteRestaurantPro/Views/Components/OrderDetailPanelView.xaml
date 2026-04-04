@@ -1,0 +1,107 @@
+<UserControl x:Class="EliteRestaurantPro.Views.Components.OrderDetailPanelView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Visibility="{Binding IsOpen, Converter={StaticResource BoolToVisibilityConverter}}">
+        <Button Command="{Binding CloseCommand}"
+                Background="#AA05070F"
+                BorderThickness="0"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch"
+                Cursor="Hand">
+            <Button.Template>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="{TemplateBinding Background}"/>
+                </ControlTemplate>
+            </Button.Template>
+        </Button>
+
+        <Border HorizontalAlignment="Right" Width="420" Margin="0,0,0,0"
+                Background="#FF12121F"
+                BorderBrush="#55D4AF37"
+                BorderThickness="1,0,0,0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" Padding="20,18" BorderBrush="#33FFFFFF" BorderThickness="0,0,0,1">
+                    <Grid>
+                        <StackPanel>
+                            <TextBlock Text="View order" Foreground="{StaticResource GoldAccentBrush}"
+                                       FontSize="18" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding OrderCode}" Foreground="{StaticResource TextPrimaryBrush}"
+                                       FontSize="15" FontWeight="SemiBold" Margin="0,6,0,0"/>
+                            <TextBlock Text="{Binding TableLabel}" Foreground="{StaticResource TextSecondaryBrush}"
+                                       FontSize="12" Margin="0,4,0,0"/>
+                            <TextBlock Foreground="{StaticResource StatBlueBrush}" FontSize="11" Margin="0,4,0,0">
+                                <Run Text="Server: "/><Run Text="{Binding ServerName, Mode=OneWay}"/>
+                            </TextBlock>
+                            <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                <Border Background="#332196F3" CornerRadius="6" Padding="8,3">
+                                    <TextBlock Text="{Binding Status}" Foreground="White" FontSize="11" FontWeight="SemiBold"/>
+                                </Border>
+                                <TextBlock Text="{Binding CreatedText}" Foreground="{StaticResource TextMutedBrush}"
+                                           FontSize="11" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <Button Content="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                                HorizontalAlignment="Right" VerticalAlignment="Top"
+                                Command="{Binding CloseCommand}"
+                                Style="{StaticResource GhostButton}" Width="36" Height="36" Padding="0"/>
+                    </Grid>
+                </Border>
+
+                <ScrollViewer Grid.Row="1" Style="{StaticResource EliteScrollViewer}" Padding="16,12">
+                    <StackPanel>
+                        <TextBlock Text="Lines" Foreground="{StaticResource GoldAccentBrush}" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,8"/>
+                        <ItemsControl ItemsSource="{Binding Lines}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="0,0,0,10" Padding="10,8" CornerRadius="8" Background="#FF1A1A2E">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{Binding Quantity}" Foreground="{StaticResource TextPrimaryBrush}"
+                                                       FontWeight="SemiBold" Margin="0,0,10,0"/>
+                                            <StackPanel Grid.Column="1">
+                                                <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextPrimaryBrush}"
+                                                           TextWrapping="Wrap" FontSize="13"/>
+                                                <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,4,0,0">
+                                                    <Run Text="Station: "/><Run Text="{Binding Station, Mode=OneWay}"/>
+                                                </TextBlock>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="2" Text="{Binding LineTotalText}"
+                                                       Foreground="{StaticResource GoldAccentBrush}" FontWeight="SemiBold"
+                                                       VerticalAlignment="Top"
+                                                       Visibility="{Binding DataContext.ShowPricing, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock Text="Customer notes" Foreground="{StaticResource GoldAccentBrush}" FontWeight="SemiBold" FontSize="12" Margin="0,16,0,6"/>
+                        <TextBlock Text="{Binding CustomerNotes}" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" FontSize="12"/>
+                        <TextBlock Text="Allergy notes" Foreground="#FFE57373" FontWeight="SemiBold" FontSize="12" Margin="0,14,0,6"/>
+                        <TextBlock Text="{Binding AllergyNotes}" Foreground="#FFFFCDD2" TextWrapping="Wrap" FontSize="12"/>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <Border Grid.Row="2" Padding="16,12" BorderBrush="#33FFFFFF" BorderThickness="0,1,0,0">
+                    <StackPanel>
+                        <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource GoldAccentBrush}" FontSize="18" FontWeight="SemiBold"
+                                   Visibility="{Binding ShowPricing, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <Run Text="Total "/><Run Text="{Binding GrandTotalText, Mode=OneWay}"/>
+                        </TextBlock>
+                        <Button Content="Close" Command="{Binding CloseCommand}" Style="{StaticResource GhostButton}" Margin="0,10,0,0" HorizontalAlignment="Stretch"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

@@ -1,0 +1,74 @@
+<UserControl x:Class="EliteRestaurantPro.Views.StaffLoginView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolVis"/>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="#FF0D0D1A" Offset="0"/>
+                <GradientStop Color="#FF0A0A15" Offset="1"/>
+            </LinearGradientBrush>
+        </Grid.Background>
+
+        <Ellipse Width="500" Height="500" Opacity="0.04"
+                 HorizontalAlignment="Center" VerticalAlignment="Center">
+            <Ellipse.Fill>
+                <RadialGradientBrush>
+                    <GradientStop Color="#FFD4AF37" Offset="0"/>
+                    <GradientStop Color="Transparent" Offset="1"/>
+                </RadialGradientBrush>
+            </Ellipse.Fill>
+        </Ellipse>
+
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="400">
+
+            <StackPanel HorizontalAlignment="Center" Margin="0,0,0,28">
+                <TextBlock Text="{Binding PortalTitle}"
+                           HorizontalAlignment="Center"
+                           Style="{StaticResource HeadingLarge}" FontSize="28"/>
+                <TextBlock Text="{Binding Headline}"
+                           HorizontalAlignment="Center" Margin="0,10,0,0"
+                           Style="{StaticResource BodyText}" FontSize="14"
+                           TextAlignment="Center"/>
+                <TextBlock Text="{Binding Subtitle}"
+                           HorizontalAlignment="Center" Margin="0,8,0,0"
+                           Style="{StaticResource BodyText}" FontSize="12" Opacity="0.75"
+                           TextWrapping="Wrap" TextAlignment="Center"/>
+            </StackPanel>
+
+            <Border Style="{StaticResource GlassCard}" Padding="32,28">
+                <StackPanel>
+                    <TextBlock Text="SIGN-IN ID" Style="{StaticResource HeadingSmall}" Margin="0,0,0,8"/>
+                    <TextBox Text="{Binding StaffId, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource EliteTextBox}"
+                             ToolTip="Use the Sign-in ID from Admin → Employees (or your system Unique ID if none is set)."/>
+
+                    <TextBlock Text="PIN" Style="{StaticResource HeadingSmall}" Margin="0,22,0,8"/>
+                    <PasswordBox x:Name="PinInput"
+                                 Style="{StaticResource ElitePasswordBox}"
+                                 PasswordChanged="PinInput_OnPasswordChanged"/>
+
+                    <Border Visibility="{Binding HasError, Converter={StaticResource BoolVis}}"
+                            Background="#22F44336" CornerRadius="8" Padding="12,8" Margin="0,14,0,0">
+                        <TextBlock Text="{Binding ErrorMessage}"
+                                   Foreground="#FFF44336"
+                                   FontSize="12" TextWrapping="Wrap"/>
+                    </Border>
+
+                    <Button Content="Sign In" Margin="0,24,0,0"
+                            Command="{Binding LoginCommand}"
+                            Style="{StaticResource GoldPrimaryButton}"/>
+
+                    <Button Content="← Back to Role Selection"
+                            Margin="0,12,0,0"
+                            Command="{Binding BackCommand}"
+                            Style="{StaticResource GhostButton}"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </Grid>
+</UserControl>

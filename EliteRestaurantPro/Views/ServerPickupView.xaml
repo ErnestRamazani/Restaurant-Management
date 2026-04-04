@@ -1,0 +1,88 @@
+<UserControl x:Class="EliteRestaurantPro.Views.ServerPickupView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:components="clr-namespace:EliteRestaurantPro.Views.Components">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="230"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <components:AdminSidebar Grid.Column="0"/>
+
+        <Grid Grid.Column="1" Background="{StaticResource BackgroundMediumBrush}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0" Margin="32,24,32,16">
+                <TextBlock Style="{StaticResource HeadingLarge}" FontSize="26">
+                    <Run Text="Pick up" Foreground="{StaticResource TextPrimaryBrush}"/>
+                    <Run Text=" &amp; serve" Foreground="{StaticResource GoldAccentBrush}"/>
+                </TextBlock>
+                <TextBlock Text="Kitchen marked these Ready. Take them to the table, then confirm here so the order appears as Served for checkout."
+                           Style="{StaticResource BodyText}" FontSize="13" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                <Button Content="Refresh" HorizontalAlignment="Left" Margin="0,12,0,0" Width="100"
+                        Command="{Binding RefreshCommand}" Style="{StaticResource SapphireButton}"/>
+            </StackPanel>
+
+            <Border Grid.Row="1" Margin="24,0,24,24" Style="{StaticResource GlassCard}" Padding="0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Border Grid.Row="0" Padding="14,12" CornerRadius="14,14,0,0">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                <GradientStop Color="#334CAF50" Offset="0"/>
+                                <GradientStop Color="#114CAF50" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Ready for you" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold" FontSize="14"/>
+                            <Border Margin="10,0,0,0" Background="{StaticResource StatGreenBrush}" CornerRadius="8" Padding="8,2">
+                                <TextBlock Text="{Binding ReadyOrders.Count}" Foreground="White" FontSize="12" FontWeight="SemiBold"/>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                    <ScrollViewer Grid.Row="1" Style="{StaticResource EliteScrollViewer}" Padding="12,8">
+                        <ItemsControl ItemsSource="{Binding ReadyOrders}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="0,0,0,10" CornerRadius="10" Padding="14,12" Background="#FF1A1A2E">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding OrderId}" Foreground="{StaticResource GoldAccentBrush}" FontWeight="SemiBold" FontSize="14"/>
+                                            <TextBlock Text="{Binding TableNumber}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,4,0,0"/>
+                                            <TextBlock Text="{Binding Items}" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                                            <TextBlock Text="{Binding Total, StringFormat=$ {0:N2}}" Foreground="{StaticResource GoldAccentBrush}" Margin="0,6,0,8"/>
+                                            <Button Content="View order" Margin="0,0,0,8"
+                                                    Command="{Binding DataContext.ViewOrderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Style="{StaticResource SapphireButton}"/>
+                                            <Button Content="Mark served (guest has food)"
+                                                    Command="{Binding DataContext.MarkServedCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Style="{StaticResource GoldPrimaryButton}"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+
+            <components:OrderDetailPanelView Grid.Row="0" Grid.RowSpan="2"
+                                             Panel.ZIndex="10"
+                                             DataContext="{Binding OrderDetail}"/>
+
+            <Border Grid.Row="0" Grid.RowSpan="2" Panel.ZIndex="5" Background="#70000000" Padding="14,10"
+                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                    Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}">
+                <TextBlock Text="Loading…" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

@@ -1,0 +1,344 @@
+<UserControl x:Class="EliteRestaurantPro.Views.InventoryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:components="clr-namespace:EliteRestaurantPro.Views.Components">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="230"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <components:AdminSidebar Grid.Column="0"/>
+
+        <Grid Grid.Column="1" Background="{StaticResource BackgroundMediumBrush}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" Margin="32,24,32,20">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Row="0" Grid.Column="0">
+                    <TextBlock Style="{StaticResource HeadingLarge}" FontSize="26">
+                        <Run Text="Inventory" Foreground="{StaticResource TextPrimaryBrush}"/>
+                        <Run Text=" Items" Foreground="{StaticResource GoldAccentBrush}"/>
+                    </TextBlock>
+                    <TextBlock Text="Single food/ingredient records with unique IDs."
+                               Style="{StaticResource BodyText}"
+                               FontSize="13"
+                               Margin="0,5,0,0"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
+                    <Button Width="168"
+                            Margin="0,0,10,0"
+                            Command="{Binding ToggleExpirationViewCommand}"
+                            ToolTip="Sort by expiry date (most urgent first) and show red / orange / blue on each card. Click again to return to alphabetical list.">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
+                                <Setter Property="Padding" Value="16,10"/>
+                                <Setter Property="Content" Value="By expiration"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ExpirationViewActive}" Value="True">
+                                        <Setter Property="BorderBrush" Value="{StaticResource GoldAccentBrush}"/>
+                                        <Setter Property="BorderThickness" Value="1"/>
+                                        <Setter Property="Content" Value="By expiration ✓"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <Button Width="150"
+                            Content="Add Inventory"
+                            Command="{Binding OpenAddDialogCommand}"
+                            Style="{StaticResource GoldPrimaryButton}"
+                            Visibility="{Binding ShowInventoryManagementChrome, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                </StackPanel>
+
+                <TextBox Grid.Row="1" Grid.ColumnSpan="2"
+                         Margin="0,16,0,0"
+                         Style="{StaticResource EliteTextBox}"
+                         Height="42"
+                         MinHeight="42"
+                         FontSize="13"
+                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Search by name, ID, unit, stock, notes, or expiry"/>
+
+                <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Margin="0,10,0,0"
+                            Visibility="{Binding ExpirationViewActive, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="12" TextWrapping="Wrap">
+                        <Run Text="Color key: " FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        <Run Text="Red" Foreground="{StaticResource StatRedBrush}" FontWeight="SemiBold"/>
+                        <Run Text=" — expired or ≤7 days  ·  " Foreground="{StaticResource TextMutedBrush}"/>
+                        <Run Text="Orange" Foreground="{StaticResource StatOrangeBrush}" FontWeight="SemiBold"/>
+                        <Run Text=" — 8–14 days  ·  " Foreground="{StaticResource TextMutedBrush}"/>
+                        <Run Text="Blue" Foreground="{StaticResource StatBlueBrush}" FontWeight="SemiBold"/>
+                        <Run Text=" — 15+ days  ·  " Foreground="{StaticResource TextMutedBrush}"/>
+                        <Run Text="Neutral" Foreground="#8899AABB" FontWeight="SemiBold"/>
+                        <Run Text=" — no expiry date set" Foreground="{StaticResource TextMutedBrush}"/>
+                    </TextBlock>
+                </StackPanel>
+            </Grid>
+
+            <ScrollViewer Grid.Row="1" Margin="24,0,24,24" VerticalScrollBarVisibility="Auto" Style="{StaticResource EliteScrollViewer}">
+                <ItemsControl ItemsSource="{Binding InventoryItems}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Margin="0,0,0,12" CornerRadius="12" SnapsToDevicePixels="True">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="BorderBrush" Value="Transparent"/>
+                                        <Setter Property="BorderThickness" Value="0"/>
+                                        <Style.Triggers>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding DataContext.ExpirationViewActive, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"/>
+                                                    <Condition Binding="{Binding ExpirationStatus, Mode=OneWay}" Value="Expired"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="BorderBrush" Value="{StaticResource StatRedBrush}"/>
+                                                <Setter Property="BorderThickness" Value="6,0,0,0"/>
+                                            </MultiDataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding DataContext.ExpirationViewActive, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"/>
+                                                    <Condition Binding="{Binding ExpirationStatus, Mode=OneWay}" Value="Critical"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="BorderBrush" Value="{StaticResource StatRedBrush}"/>
+                                                <Setter Property="BorderThickness" Value="6,0,0,0"/>
+                                            </MultiDataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding DataContext.ExpirationViewActive, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"/>
+                                                    <Condition Binding="{Binding ExpirationStatus, Mode=OneWay}" Value="Bad"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="BorderBrush" Value="{StaticResource StatOrangeBrush}"/>
+                                                <Setter Property="BorderThickness" Value="6,0,0,0"/>
+                                            </MultiDataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding DataContext.ExpirationViewActive, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"/>
+                                                    <Condition Binding="{Binding ExpirationStatus, Mode=OneWay}" Value="Good"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="BorderBrush" Value="{StaticResource StatBlueBrush}"/>
+                                                <Setter Property="BorderThickness" Value="6,0,0,0"/>
+                                            </MultiDataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding DataContext.ExpirationViewActive, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"/>
+                                                    <Condition Binding="{Binding ExpirationStatus, Mode=OneWay}" Value="No Expiry"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="BorderBrush" Value="#668899AA"/>
+                                                <Setter Property="BorderThickness" Value="6,0,0,0"/>
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <Border Style="{StaticResource GlassCard}" Padding="16" CornerRadius="12">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="17"/>
+                                        <TextBlock Text="{Binding UniqueId}" Foreground="{StaticResource TextMutedBrush}" FontFamily="Consolas" FontSize="11" Margin="0,2,0,0"/>
+                                        <TextBlock Foreground="{StaticResource StatBlueBrush}" FontSize="12" Margin="0,6,0,0">
+                                            <Run Text="Stock: "/>
+                                            <Run Text="{Binding StockQuantity, StringFormat={}{0:0.##}}"/>
+                                            <Run Text=" "/>
+                                            <Run Text="{Binding Unit}"/>
+                                        </TextBlock>
+                                        <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,4,0,0">
+                                            <Run Text="Expires: "/>
+                                            <Run Text="{Binding ExpirationDate, StringFormat={}{0:yyyy-MM-dd}, TargetNullValue=N/A}"/>
+                                        </TextBlock>
+                                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0" VerticalAlignment="Center">
+                                            <TextBlock Text="⌛"
+                                                       Foreground="{StaticResource TextMutedBrush}"
+                                                       FontSize="12"
+                                                       Margin="0,0,8,0"
+                                                       VerticalAlignment="Center"/>
+                                            <Border Width="100" Height="10" CornerRadius="5" BorderBrush="#22FFFFFF" BorderThickness="1" VerticalAlignment="Center">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="{StaticResource StatBlueBrush}"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding ExpirationStatus, Mode=OneWay}" Value="Good">
+                                                                <Setter Property="Background" Value="{StaticResource StatBlueBrush}"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding ExpirationStatus, Mode=OneWay}" Value="Bad">
+                                                                <Setter Property="Background" Value="{StaticResource StatOrangeBrush}"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding ExpirationStatus, Mode=OneWay}" Value="Critical">
+                                                                <Setter Property="Background" Value="{StaticResource StatRedBrush}"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding ExpirationStatus, Mode=OneWay}" Value="Expired">
+                                                                <Setter Property="Background" Value="#FF0A0A0A"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                            </Border>
+                                            <TextBlock FontSize="11" Margin="8,0,0,0" VerticalAlignment="Center">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="{StaticResource StatBlueBrush}"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding ExpirationStatus, Mode=OneWay}" Value="Bad">
+                                                                <Setter Property="Foreground" Value="{StaticResource StatOrangeBrush}"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding ExpirationStatus, Mode=OneWay}" Value="Critical">
+                                                                <Setter Property="Foreground" Value="{StaticResource StatRedBrush}"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding ExpirationStatus, Mode=OneWay}" Value="Expired">
+                                                                <Setter Property="Foreground" Value="#FF666666"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                                <Run Text="{Binding ExpirationStatus, Mode=OneWay}"/>
+                                                <Run Text=" · "/>
+                                                <Run Text="{Binding DaysUntilExpiration, Mode=OneWay, StringFormat={}{0} day(s), TargetNullValue=No timer}"/>
+                                            </TextBlock>
+                                        </StackPanel>
+                                        <Border BorderBrush="#22FFFFFF" BorderThickness="1" CornerRadius="6" Margin="0,6,0,0" Padding="6">
+                                            <ScrollViewer Height="48" VerticalScrollBarVisibility="Auto" Style="{StaticResource EliteScrollViewer}">
+                                                <TextBlock Text="{Binding Notes, TargetNullValue=No notes}"
+                                                           Foreground="{StaticResource TextMutedBrush}"
+                                                           FontSize="11"
+                                                           TextWrapping="Wrap"/>
+                                            </ScrollViewer>
+                                        </Border>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="12,0,8,0"
+                                                Visibility="{Binding DataContext.ShowInventoryManagementChrome, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <Button Width="90" Margin="0,0,8,0"
+                                                Content="Edit"
+                                                Command="{Binding DataContext.EditItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                Style="{StaticResource SapphireButton}"/>
+                                        <Button Width="90"
+                                                Content="Add/Deduct"
+                                                Command="{Binding DataContext.OpenAdjustDialogCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                Style="{StaticResource GoldPrimaryButton}"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="2" Width="90"
+                                            Content="Delete"
+                                            Command="{Binding DataContext.DeleteItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"
+                                            Style="{StaticResource DangerButton}"
+                                            Visibility="{Binding DataContext.ShowInventoryManagementChrome, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                </Grid>
+                                </Border>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <Grid Grid.RowSpan="2"
+                  Background="#88070A13"
+                  Visibility="{Binding IsDialogOpen, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Border Style="{StaticResource DialogCard}" HorizontalAlignment="Center" VerticalAlignment="Center" Width="440">
+                    <StackPanel>
+                        <TextBlock Text="{Binding DialogTitle}" Style="{StaticResource HeadingMedium}" FontSize="22"/>
+                        <TextBlock Text="ITEM NAME" Style="{StaticResource HeadingSmall}" Margin="0,22,0,8"/>
+                        <TextBox Text="{Binding ItemName, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
+                        <TextBlock Text="UNIT" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                        <TextBox Text="{Binding Unit, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
+                        <StackPanel Margin="0,18,0,0">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsEditingExistingItem}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <TextBlock Text="STOCK QUANTITY" Style="{StaticResource HeadingSmall}" Margin="0,0,0,8"/>
+                            <TextBox Text="{Binding StockText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
+                        </StackPanel>
+                        <TextBlock Text="EXPIRATION DATE (YYYY-MM-DD)" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                        <TextBox Text="{Binding ExpirationDateText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
+                        <TextBlock Text="NOTES" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                        <TextBox Text="{Binding Notes, UpdateSourceTrigger=PropertyChanged}"
+                                 Height="90"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"
+                                 VerticalScrollBarVisibility="Auto"
+                                 Foreground="{StaticResource TextPrimaryBrush}"
+                                 Background="#FF0D0D1A"
+                                 BorderBrush="{StaticResource BorderSubtleBrush}"
+                                 BorderThickness="1"
+                                 Padding="10"/>
+
+                        <Grid Margin="0,24,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" Content="Cancel" Margin="0,0,8,0" Command="{Binding CancelDialogCommand}" Style="{StaticResource GhostButton}"/>
+                            <Button Grid.Column="1" Content="Save Item" Margin="8,0,0,0" Command="{Binding SaveItemCommand}" Style="{StaticResource GoldPrimaryButton}"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <Grid Grid.RowSpan="2"
+                  Background="#88070A13"
+                  Visibility="{Binding IsAdjustmentDialogOpen, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Border Style="{StaticResource DialogCard}" HorizontalAlignment="Center" VerticalAlignment="Center" Width="460">
+                    <StackPanel>
+                        <TextBlock Text="Manual Inventory Deduction" Style="{StaticResource HeadingMedium}" FontSize="22"/>
+                        <TextBlock Text="{Binding AdjustmentItemName}" Foreground="{StaticResource TextMutedBrush}" Margin="0,6,0,0"/>
+
+                        <TextBlock Text="DEDUCT QUANTITY" Style="{StaticResource HeadingSmall}" Margin="0,22,0,8"/>
+                        <ComboBox ItemsSource="{Binding AdjustmentTypes}"
+                                  SelectedItem="{Binding SelectedAdjustmentType}"
+                                  Style="{StaticResource EliteComboBox}"
+                                  ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
+
+                        <TextBlock Text="QUANTITY" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                        <TextBox Text="{Binding AdjustmentQuantityText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
+
+                        <TextBlock Text="COMMENT (required)" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                        <TextBox Text="{Binding AdjustmentComment, UpdateSourceTrigger=PropertyChanged}"
+                                 Height="90"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"
+                                 VerticalScrollBarVisibility="Auto"
+                                 Foreground="{StaticResource TextPrimaryBrush}"
+                                 Background="#FF0D0D1A"
+                                 BorderBrush="{StaticResource BorderSubtleBrush}"
+                                 BorderThickness="1"
+                                 Padding="10"/>
+
+                        <Grid Margin="0,24,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" Content="Cancel" Margin="0,0,8,0" Command="{Binding CancelAdjustmentDialogCommand}" Style="{StaticResource GhostButton}"/>
+                            <Button Grid.Column="1" Content="Apply Deduction" Margin="8,0,0,0" Command="{Binding ApplyAdjustmentCommand}" Style="{StaticResource GoldPrimaryButton}"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

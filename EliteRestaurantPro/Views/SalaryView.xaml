@@ -1,0 +1,514 @@
+<UserControl x:Class="EliteRestaurantPro.Views.SalaryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:sys="clr-namespace:System;assembly=mscorlib"
+             xmlns:components="clr-namespace:EliteRestaurantPro.Views.Components">
+    <UserControl.Resources>
+        <Style x:Key="SalaryPayrollChip" TargetType="Border">
+            <Setter Property="Background" Value="#22FFFFFF"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Padding" Value="14,10"/>
+            <Setter Property="Margin" Value="0,0,10,10"/>
+        </Style>
+        <Style x:Key="SalaryConfirmButtonActive" TargetType="Button" BasedOn="{StaticResource GoldPrimaryButton}">
+            <Setter Property="Content" Value="Confirm payroll"/>
+            <Setter Property="Padding" Value="18,10"/>
+            <Setter Property="MinWidth" Value="160"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding AlreadyPaid}" Value="True">
+                    <Setter Property="Content" Value="Confirmed"/>
+                    <Setter Property="IsEnabled" Value="False"/>
+                    <Setter Property="Background" Value="{StaticResource StatGreenBrush}"/>
+                    <Setter Property="Foreground" Value="#FFF1FFF4"/>
+                    <Setter Property="BorderBrush" Value="#FF2E7D32"/>
+                </DataTrigger>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding AlreadyPaid}" Value="False"/>
+                        <Condition Binding="{Binding CanConfirmPayroll}" Value="False"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="IsEnabled" Value="False"/>
+                    <Setter Property="Background" Value="#FF353540"/>
+                    <Setter Property="Foreground" Value="#FF7A7A88"/>
+                    <Setter Property="BorderBrush" Value="#55484858"/>
+                </MultiDataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="SalaryConfirmButtonTable" TargetType="Button" BasedOn="{StaticResource SalaryConfirmButtonActive}">
+            <Setter Property="Content" Value="Confirm"/>
+            <Setter Property="MinWidth" Value="96"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+        <Style x:Key="SalaryGridColumnHeader" TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="#FF1C2238"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="BorderBrush" Value="#553A415E"/>
+            <Setter Property="BorderThickness" Value="0,0,1,1"/>
+            <Setter Property="Padding" Value="8,6"/>
+        </Style>
+        <Style x:Key="SalaryGridRowStyle" TargetType="DataGridRow">
+            <Setter Property="Background" Value="#FF131A2B"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="MinHeight" Value="36"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#FF1C2642"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="SalaryDataGridCellTextWrap" TargetType="TextBlock">
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+    </UserControl.Resources>
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="230"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <components:AdminSidebar Grid.Column="0"/>
+
+        <Grid Grid.Column="1" Background="{StaticResource BackgroundMediumBrush}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" Margin="32,24,32,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource HeadingLarge}" FontSize="28">
+                    <Run Text="Salary" Foreground="{StaticResource TextPrimaryBrush}"/>
+                    <Run Text=" &amp; Payroll" Foreground="{StaticResource GoldAccentBrush}"/>
+                </TextBlock>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Background="#22000000" CornerRadius="10" Padding="12,8" Margin="0,0,14,0" BorderBrush="#33FFFFFF" BorderThickness="1">
+                        <CheckBox Content="Simple table layout"
+                                  IsChecked="{Binding UseTableView, Mode=TwoWay}"
+                                  Foreground="{StaticResource TextSecondaryBrush}"
+                                  FontSize="14"
+                                  VerticalAlignment="Center"/>
+                    </Border>
+                    <Button Content="Refresh"
+                            Command="{Binding RefreshPayrollCommand}"
+                            Style="{StaticResource GhostButton}"
+                            Padding="14,10"
+                            FontSize="14"/>
+                </StackPanel>
+            </Grid>
+
+            <Border Grid.Row="1"
+                    Margin="24,0,24,12"
+                    Padding="14,12"
+                    CornerRadius="10"
+                    Background="#33C62828"
+                    BorderBrush="#88E57373"
+                    BorderThickness="1"
+                    Visibility="{Binding ShowPayrollOverdueWarning, Converter={StaticResource BoolToVisibilityConverter}}">
+                <StackPanel>
+                    <TextBlock Text="Payroll overdue"
+                               Foreground="#FFEF9A9A"
+                               FontWeight="SemiBold"
+                               FontSize="15"/>
+                    <TextBlock Text="{Binding PayrollOverdueWarningText}"
+                               Foreground="#FFE0E0E0"
+                               FontSize="14"
+                               Margin="0,6,0,0"
+                               TextWrapping="Wrap"/>
+                    <TextBlock Margin="0,4,0,0" FontSize="13" Foreground="#FFB0B0B0">
+                        <Run Text="Days past month end: "/>
+                        <Run Text="{Binding DaysPastPayDay, Mode=OneWay}" FontWeight="SemiBold"/>
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="2" Style="{StaticResource GlassCard}" Margin="24,0,24,12" Padding="18,18">
+                <StackPanel>
+                    <TextBlock Text="Salary advance" Foreground="{StaticResource GoldAccentBrush}" FontSize="19" FontWeight="SemiBold"/>
+                    <WrapPanel Margin="0,14,0,0">
+                        <TextBlock Text="Employee" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" FontSize="14" Margin="0,0,10,10"/>
+                        <ComboBox Width="260"
+                                  Margin="0,0,20,10"
+                                  ItemsSource="{Binding AdvanceEmployees}"
+                                  SelectedItem="{Binding SelectedAdvanceEmployee}"
+                                  Style="{StaticResource EliteComboBox}"
+                                  ItemContainerStyle="{StaticResource ComboBoxItemStyle}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <TextBlock Text="Amount (USD)" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" FontSize="14" Margin="0,0,10,10"/>
+                        <TextBox Width="110"
+                                 Margin="0,0,20,10"
+                                 VerticalAlignment="Center"
+                                 FontSize="14"
+                                 Text="{Binding AdvanceAmountText, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource EliteTextBox}"/>
+                        <TextBlock Text="Note" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" FontSize="14" Margin="0,0,10,10"/>
+                        <TextBox MinWidth="200"
+                                 Width="280"
+                                 Margin="0,0,16,10"
+                                 VerticalAlignment="Center"
+                                 FontSize="14"
+                                 Text="{Binding AdvanceNoteText, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource EliteTextBox}"/>
+                        <Button Content="Record advance"
+                                Command="{Binding RecordSalaryAdvanceCommand}"
+                                Style="{StaticResource GoldPrimaryButton}"
+                                Margin="0,0,0,10"
+                                Padding="16,10"
+                                FontSize="14"
+                                VerticalAlignment="Center"/>
+                    </WrapPanel>
+                    <Button Content="Confirm all unpaid"
+                            Command="{Binding ConfirmAllPayrollCommand}"
+                            Style="{StaticResource GoldPrimaryButton}"
+                            HorizontalAlignment="Left"
+                            Margin="0,8,0,0"
+                            Padding="20,12"
+                            FontSize="15"/>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="3" Style="{StaticResource GlassCard}" Margin="24,0,24,12" Padding="16,14">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Pay period" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" FontSize="14" Margin="0,0,14,0"/>
+                        <TextBlock Text="Year" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14" Margin="0,0,8,0"/>
+                        <ComboBox Width="110"
+                                  ItemsSource="{Binding YearChoices}"
+                                  SelectedItem="{Binding SelectedPayrollYear}"
+                                  Style="{StaticResource EliteComboBox}"
+                                  ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
+                        <TextBlock Text="Month" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14" Margin="16,0,8,0"/>
+                        <ComboBox Width="100"
+                                  ItemsSource="{Binding MonthChoices}"
+                                  SelectedItem="{Binding SelectedPayrollMonth}"
+                                  Style="{StaticResource EliteComboBox}"
+                                  ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
+                        <TextBlock Text="{Binding PayrollPeriodLabel}"
+                                   VerticalAlignment="Center"
+                                   Foreground="{StaticResource GoldAccentBrush}"
+                                   FontWeight="SemiBold"
+                                   FontSize="17"
+                                   Margin="20,0,0,0"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                        <TextBlock Text="Show" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" FontSize="14" Margin="0,0,12,0"/>
+                        <RadioButton GroupName="SalaryEmployeeFilter"
+                                     Content="All employees"
+                                     IsChecked="{Binding FilterShowAllEmployees, Mode=TwoWay}"
+                                     Margin="0,0,18,0"
+                                     VerticalAlignment="Center"
+                                     Foreground="{StaticResource TextSecondaryBrush}"
+                                     FontSize="14"/>
+                        <RadioButton GroupName="SalaryEmployeeFilter"
+                                     Content="Paid only"
+                                     IsChecked="{Binding FilterShowPaidOnly, Mode=TwoWay}"
+                                     Margin="0,0,18,0"
+                                     VerticalAlignment="Center"
+                                     Foreground="{StaticResource TextSecondaryBrush}"
+                                     FontSize="14"/>
+                        <RadioButton GroupName="SalaryEmployeeFilter"
+                                     Content="Not paid yet"
+                                     IsChecked="{Binding FilterShowUnpaidOnly, Mode=TwoWay}"
+                                     VerticalAlignment="Center"
+                                     Foreground="{StaticResource TextSecondaryBrush}"
+                                     FontSize="14"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Grid Grid.Row="4" Margin="24,0,24,24">
+                <!-- Interactive cards -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              Style="{StaticResource EliteScrollViewer}"
+                              Visibility="{Binding UseInteractiveCards, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <ItemsControl ItemsSource="{Binding Rows}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource GlassCard}" Margin="0,0,0,14" Padding="0">
+                                    <Expander Background="Transparent" BorderThickness="0">
+                                        <Expander.Header>
+                                            <Grid Margin="18,16">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding EmployeeName}"
+                                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                                               FontFamily="Segoe UI Variable Display, Segoe UI"
+                                                               FontSize="26"
+                                                               FontWeight="SemiBold"/>
+                                                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                                        <Border Background="#22D4AF37" CornerRadius="8" Padding="10,5" Margin="0,0,8,0">
+                                                            <TextBlock Text="{Binding UniqueId}" Foreground="{StaticResource GoldAccentBrush}" FontSize="13"/>
+                                                        </Border>
+                                                        <Border CornerRadius="8" Padding="10,5" Margin="0,0,8,0">
+                                                            <Border.Style>
+                                                                <Style TargetType="Border">
+                                                                    <Setter Property="Background" Value="#224CAF50"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding AlreadyPaid}" Value="False">
+                                                                            <Setter Property="Background" Value="#33D4AF37"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Border.Style>
+                                                            <TextBlock FontSize="13">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Foreground" Value="{StaticResource StatGreenBrush}"/>
+                                                                        <Setter Property="Text" Value="Paid"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding AlreadyPaid}" Value="False">
+                                                                                <Setter Property="Foreground" Value="{StaticResource GoldAccentBrush}"/>
+                                                                                <Setter Property="Text" Value="Pending pay"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                        </Border>
+                                                        <Border Background="#152196F3" CornerRadius="8" Padding="10,5">
+                                                            <TextBlock Text="{Binding NetPay, StringFormat=Net $ {0:N2}}"
+                                                                       Foreground="{StaticResource StatBlueBrush}" FontSize="13"/>
+                                                        </Border>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="1"
+                                                           Text="▼"
+                                                           Foreground="{StaticResource GoldAccentBrush}"
+                                                           FontFamily="Segoe UI"
+                                                           FontSize="22"
+                                                           VerticalAlignment="Center"
+                                                           Margin="12,0,0,0"/>
+                                            </Grid>
+                                        </Expander.Header>
+
+                                        <StackPanel Margin="18,0,18,22">
+                                            <TextBlock Text="Schedule &amp; base" Foreground="{StaticResource GoldAccentBrush}" FontSize="19" FontWeight="SemiBold" Margin="0,0,0,12"/>
+                                            <WrapPanel>
+                                                <Border Style="{StaticResource SalaryPayrollChip}">
+                                                    <TextBlock Text="{Binding HourlyRateUsd, StringFormat=Hourly $ {0:N2}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
+                                                </Border>
+                                                <Border Style="{StaticResource SalaryPayrollChip}">
+                                                    <TextBlock Text="{Binding ScheduledHoursMonth, StringFormat=Scheduled hours {0:0.#}}"
+                                                               Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
+                                                </Border>
+                                                <Border Style="{StaticResource SalaryPayrollChip}">
+                                                    <TextBlock Text="{Binding ScheduledWorkdays, StringFormat=Workdays {0}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
+                                                </Border>
+                                                <Border Background="#22D4AF37" CornerRadius="10" Padding="14,10" Margin="0,0,10,10">
+                                                    <TextBlock Text="{Binding BaseGrossUsd, StringFormat=Base gross $ {0:N2}}" Foreground="{StaticResource GoldAccentBrush}" FontSize="14"/>
+                                                </Border>
+                                            </WrapPanel>
+
+                                            <TextBlock Text="Attendance" Foreground="{StaticResource GoldAccentBrush}" FontSize="19" FontWeight="SemiBold" Margin="0,16,0,12"/>
+                                            <WrapPanel>
+                                                <Border Style="{StaticResource SalaryPayrollChip}">
+                                                    <TextBlock Text="{Binding AbsenceDays, StringFormat=Absences {0}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
+                                                </Border>
+                                                <Border Style="{StaticResource SalaryPayrollChip}">
+                                                    <TextBlock Text="{Binding LateDays, StringFormat=Lates {0}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
+                                                </Border>
+                                                <Border Style="{StaticResource SalaryPayrollChip}">
+                                                    <TextBlock Text="{Binding LatePenaltyAbsences, StringFormat=Late → units {0}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
+                                                </Border>
+                                                <Border Style="{StaticResource SalaryPayrollChip}">
+                                                    <TextBlock Text="{Binding TotalDeductionUnits, StringFormat=Total units {0}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
+                                                </Border>
+                                                <Border Background="#152196F3" CornerRadius="10" Padding="14,10" Margin="0,0,10,10">
+                                                    <TextBlock Text="{Binding BaseAfterAttendanceUsd, StringFormat=After attendance $ {0:N2}}" Foreground="{StaticResource StatBlueBrush}" FontSize="14"/>
+                                                </Border>
+                                            </WrapPanel>
+
+                                            <TextBlock Text="Sales &amp; bonus" Foreground="{StaticResource GoldAccentBrush}" FontSize="19" FontWeight="SemiBold" Margin="0,16,0,12"/>
+                                            <WrapPanel>
+                                                <Border Style="{StaticResource SalaryPayrollChip}">
+                                                    <TextBlock Text="{Binding MoneyGeneratedUsd, StringFormat=Sales served $ {0:N2}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
+                                                </Border>
+                                                <Border Style="{StaticResource SalaryPayrollChip}">
+                                                    <TextBlock Text="{Binding BonusFivePercentUsd, StringFormat=5% bonus $ {0:N2}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
+                                                </Border>
+                                            </WrapPanel>
+
+                                            <TextBlock Text="Advance and Net Salary" Foreground="{StaticResource GoldAccentBrush}" FontSize="19" FontWeight="SemiBold" Margin="0,18,0,12"/>
+                                            <Border Background="#1A0D0D12" CornerRadius="14" Padding="20,18" BorderBrush="#44FF6B6B" BorderThickness="1" Margin="0,0,0,14">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="24"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0">
+                                                        <TextBlock Text="Advances (deducted)" Foreground="{StaticResource TextMutedBrush}" FontSize="14" Margin="0,0,0,6"/>
+                                                        <TextBlock Text="{Binding AdvancesDeductUsd, StringFormat=$ {0:N2}}"
+                                                                   Foreground="#FFFF6B6B"
+                                                                   FontSize="34"
+                                                                   FontWeight="Bold"/>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="2">
+                                                        <TextBlock Text="Net pay" Foreground="{StaticResource TextMutedBrush}" FontSize="14" Margin="0,0,0,6"/>
+                                                        <TextBlock Text="{Binding NetPay, StringFormat=$ {0:N2}}"
+                                                                   Foreground="#FF4ADE80"
+                                                                   FontSize="34"
+                                                                   FontWeight="Bold"/>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+
+                                            <Border Background="#22000000" CornerRadius="12" Padding="16,14" Margin="0,0,0,16" BorderBrush="#33FFFFFF" BorderThickness="1">
+                                                <StackPanel>
+                                                    <TextBlock TextWrapping="Wrap"
+                                                               Visibility="{Binding HasPaidReceiptDetail, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                        <Run Text="Paid " FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                                        <Run Text="{Binding PaidAmountDisplay, Mode=OneWay}" FontSize="26" FontWeight="Bold" Foreground="{StaticResource GoldAccentBrush}"/>
+                                                        <Run Text="  on  " FontSize="18" Foreground="{StaticResource TextMutedBrush}"/>
+                                                        <Run Text="{Binding PaidDateDisplay, Mode=OneWay}" FontSize="20" FontWeight="SemiBold" Foreground="#FFB8E6C1"/>
+                                                    </TextBlock>
+                                                    <TextBlock Text="{Binding StatusText}"
+                                                               TextWrapping="Wrap"
+                                                               Visibility="{Binding ShowPlainStatusLine, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+                                                                <Setter Property="FontSize" Value="16"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding AlreadyPaid}" Value="True">
+                                                                        <Setter Property="FontSize" Value="19"/>
+                                                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                                                        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </StackPanel>
+                                            </Border>
+
+                                            <Button HorizontalAlignment="Left"
+                                                    Command="{Binding DataContext.ConfirmSinglePayrollCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Style="{StaticResource SalaryConfirmButtonActive}"
+                                                    FontSize="15"/>
+                                        </StackPanel>
+                                    </Expander>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <!-- Table layout: DataGrid scrolls internally so column resize grips work; wrapping needs virtualization off -->
+                <DataGrid ItemsSource="{Binding Rows}"
+                          Visibility="{Binding UseTableView, Converter={StaticResource BoolToVisibilityConverter}}"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          HeadersVisibility="Column"
+                          CanUserResizeColumns="True"
+                          CanUserReorderColumns="True"
+                          CanUserResizeRows="True"
+                          ColumnHeaderStyle="{StaticResource SalaryGridColumnHeader}"
+                          RowStyle="{StaticResource SalaryGridRowStyle}"
+                          Background="#FF131A2B"
+                          Foreground="{StaticResource TextPrimaryBrush}"
+                          BorderBrush="#2BFFFFFF"
+                          RowBackground="#FF131A2B"
+                          AlternatingRowBackground="#FF1A2235"
+                          GridLinesVisibility="Horizontal"
+                          HorizontalGridLinesBrush="#223A415E"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Auto"
+                          MinHeight="200"
+                          MinWidth="640"
+                          HorizontalAlignment="Stretch"
+                          VerticalAlignment="Stretch"
+                          VirtualizingStackPanel.IsVirtualizing="False"
+                          RowHeight="{x:Static sys:Double.NaN}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Employee" Binding="{Binding EmployeeName}" Width="140" MinWidth="100">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource SalaryDataGridCellTextWrap}"/>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                        <DataGridTextColumn Header="ID" Binding="{Binding UniqueId}" Width="100" MinWidth="72">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource SalaryDataGridCellTextWrap}"/>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                        <DataGridTextColumn Header="Hourly" Binding="{Binding HourlyRateUsd, StringFormat=$ {0:N2}}" Width="78" MinWidth="64"/>
+                        <DataGridTextColumn Header="Hrs" Binding="{Binding ScheduledHoursMonth, StringFormat=F1}" Width="56" MinWidth="48"/>
+                        <DataGridTextColumn Header="Days" Binding="{Binding ScheduledWorkdays}" Width="52" MinWidth="44"/>
+                        <DataGridTextColumn Header="Base" Binding="{Binding BaseGrossUsd, StringFormat=$ {0:N2}}" Width="88" MinWidth="72"/>
+                        <DataGridTextColumn Header="Abs" Binding="{Binding AbsenceDays}" Width="44" MinWidth="40"/>
+                        <DataGridTextColumn Header="Late" Binding="{Binding LateDays}" Width="44" MinWidth="40"/>
+                        <DataGridTextColumn Header="L→U" Binding="{Binding LatePenaltyAbsences}" Width="48" MinWidth="40"/>
+                        <DataGridTextColumn Header="Units" Binding="{Binding TotalDeductionUnits}" Width="52" MinWidth="44"/>
+                        <DataGridTextColumn Header="After att." Binding="{Binding BaseAfterAttendanceUsd, StringFormat=$ {0:N2}}" Width="92" MinWidth="78"/>
+                        <DataGridTextColumn Header="Sales" Binding="{Binding MoneyGeneratedUsd, StringFormat=$ {0:N2}}" Width="88" MinWidth="72"/>
+                        <DataGridTextColumn Header="Bonus" Binding="{Binding BonusFivePercentUsd, StringFormat=$ {0:N2}}" Width="78" MinWidth="64"/>
+                        <DataGridTextColumn Header="Advances" Binding="{Binding AdvancesDeductUsd, StringFormat=$ {0:N2}}" Width="84" MinWidth="68"/>
+                        <DataGridTextColumn Header="Net" Binding="{Binding NetPay, StringFormat=$ {0:N2}}" Width="82" MinWidth="68"/>
+                        <DataGridTemplateColumn Header="Pay" Width="108" MinWidth="96">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Style="{StaticResource SalaryConfirmButtonTable}"
+                                            Command="{Binding DataContext.ConfirmSinglePayrollCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                            CommandParameter="{Binding}"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="Status" Width="*" MinWidth="220">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <StackPanel>
+                                        <TextBlock TextWrapping="Wrap"
+                                                   Margin="4,6"
+                                                   Visibility="{Binding HasPaidReceiptDetail, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <Run Text="Paid " FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            <Run Text="{Binding PaidAmountDisplay, Mode=OneWay}" FontSize="17" FontWeight="Bold" Foreground="{StaticResource GoldAccentBrush}"/>
+                                            <Run Text="  on  " FontSize="14" Foreground="{StaticResource TextMutedBrush}"/>
+                                            <Run Text="{Binding PaidDateDisplay, Mode=OneWay}" FontSize="15" FontWeight="SemiBold" Foreground="#FFB8E6C1"/>
+                                        </TextBlock>
+                                        <TextBlock Text="{Binding StatusText}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="4,6"
+                                                   Visibility="{Binding ShowPlainStatusLine, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+                                                    <Setter Property="FontSize" Value="13"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding AlreadyPaid}" Value="True">
+                                                            <Setter Property="FontSize" Value="15"/>
+                                                            <Setter Property="FontWeight" Value="SemiBold"/>
+                                                            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>
