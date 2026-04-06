@@ -28,7 +28,7 @@
     <!-- Root border: rounded corners + dark background -->
     <Border CornerRadius="16" ClipToBounds="True">
         <Border.Background>
-            <SolidColorBrush Color="#FF0D0D1A"/>
+            <SolidColorBrush Color="{StaticResource BackgroundDarkColor}"/>
         </Border.Background>
         <Border.Effect>
             <DropShadowEffect BlurRadius="40" ShadowDepth="8"
@@ -63,10 +63,21 @@
                 </StackPanel>
             </Grid>
 
-            <!-- Main navigation shell: binds to CurrentViewModel -->
-            <ContentControl Grid.Row="1"
-                            Content="{Binding CurrentViewModel}"
-                            Focusable="False"/>
+            <Grid Grid.Row="1">
+                <!-- Layer order matters for glass UI:
+                     background image (back) -> dim overlay -> content (front). -->
+                <Image Source="{Binding MenuBackgroundImage}"
+                       Opacity="{Binding MenuBackgroundImageOpacity}"
+                       Stretch="UniformToFill"
+                       IsHitTestVisible="False"
+                       Visibility="{Binding HasMenuBackgroundImage, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                <Border Background="#FF000000"
+                        Opacity="{Binding MenuBackgroundDimOpacity}"
+                        IsHitTestVisible="False"
+                        Visibility="{Binding HasMenuBackgroundImage, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                <ContentControl Content="{Binding CurrentViewModel}"
+                                Focusable="False"/>
+            </Grid>
         </Grid>
     </Border>
 </Window>

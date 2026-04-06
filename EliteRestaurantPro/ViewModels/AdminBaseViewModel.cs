@@ -11,6 +11,9 @@ public abstract class AdminBaseViewModel : BaseViewModel
 {
     private string _readyPickupBannerText = string.Empty;
     private readonly ImageSource? _sidebarAvatarImage;
+    private ImageSource? _businessLogoImage;
+    private string _businessName = "EliteResto";
+    private string _businessTagline = "PRO";
 
     protected readonly Action<BaseViewModel> NavigateAction;
 
@@ -30,6 +33,10 @@ public abstract class AdminBaseViewModel : BaseViewModel
     /// <summary>Tables and take order: admin, server, cashier.</summary>
     public bool ShowTablesAndTakeOrderNav =>
         ShowFullAdminNav || AppSession.IsServerTablet || AppSession.IsCashierTablet;
+
+    /// <summary>Reservations: admin + cashier.</summary>
+    public bool ShowReservationsNav =>
+        ShowFullAdminNav || AppSession.IsCashierTablet;
 
     /// <summary>Inventory in sidebar: admin + kitchen/bar tablet.</summary>
     public bool ShowInventorySidebarNav =>
@@ -56,6 +63,11 @@ public abstract class AdminBaseViewModel : BaseViewModel
 
     public string SidebarCreateOrderLabel =>
         AppSession.IsServerTablet || AppSession.IsCashierTablet ? "Take Order" : "Create Order";
+
+    public string SidebarBusinessName => _businessName;
+    public string SidebarBusinessTagline => _businessTagline;
+    public ImageSource? SidebarBusinessLogoImage => _businessLogoImage;
+    public bool SidebarHasBusinessLogo => _businessLogoImage is not null;
 
     /// <summary>Orders in Ready status relevant to this tablet (pickup reminder).</summary>
     public string ReadyPickupBannerText => _readyPickupBannerText;
@@ -114,6 +126,7 @@ public abstract class AdminBaseViewModel : BaseViewModel
     public ICommand NavigateToInventoryCommand { get; }
     public ICommand NavigateToAttendanceCommand { get; }
     public ICommand NavigateToTablesCommand { get; }
+    public ICommand NavigateToReservationsCommand { get; }
     public ICommand NavigateToOrdersCommand { get; }
     public ICommand NavigateToKitchenQueueCommand { get; }
     public ICommand NavigateToServerPickupCommand { get; }
@@ -129,6 +142,7 @@ public abstract class AdminBaseViewModel : BaseViewModel
 
     protected AdminBaseViewModel(Action<BaseViewModel> navigate)
     {
+        LoadBusinessProfileSettings();
         _sidebarAvatarImage = TryLoadProfileImage(AppSession.StaffEmployeeProfileImagePath)
             ?? TryLoadProfileImage(AppSession.AdminLoginProfileImagePath);
         NavigateAction = navigate;
@@ -138,6 +152,9 @@ public abstract class AdminBaseViewModel : BaseViewModel
         NavigateToInventoryCommand = new RelayCommand(_ => navigate(new InventoryViewModel(navigate)));
         NavigateToAttendanceCommand = new RelayCommand(_ => navigate(new AttendanceViewModel(navigate)));
         NavigateToTablesCommand = new RelayCommand(_ => navigate(new TablesViewModel(navigate)));
+        NavigateToReservationsCommand = new RelayCommand(
+            _ => navigate(new ReservationsViewModel(navigate)),
+            _ => ShowReservationsNav);
         NavigateToOrdersCommand = new RelayCommand(_ => navigate(new AdminOrdersViewModel(navigate)));
         NavigateToKitchenQueueCommand = new RelayCommand(_ => navigate(new KitchenOrdersViewModel(navigate)));
         NavigateToServerPickupCommand = new RelayCommand(_ => navigate(new ServerPickupViewModel(navigate)));
@@ -145,7 +162,9 @@ public abstract class AdminBaseViewModel : BaseViewModel
         NavigateToMoneyCommand = new RelayCommand(_ => navigate(new MoneyViewModel(navigate)));
         MapsSalaryCommand = new RelayCommand(_ => navigate(new SalaryViewModel(navigate)));
         NavigateToReportsCommand = new RelayCommand(_ => navigate(new ReportsViewModel(navigate)));
-        NavigateToAppearanceCommand = new RelayCommand(_ => navigate(new AppearanceSettingsViewModel(navigate)));
+        NavigateToAppearanceCommand = new RelayCommand(
+            _ => navigate(new AppearanceSettingsViewModel(navigate)),
+            _ => ShowFullAdminNav);
         LogoutCommand = new RelayCommand(_ =>
         {
             AppSession.Clear();
@@ -153,5 +172,22 @@ public abstract class AdminBaseViewModel : BaseViewModel
         });
         PlaceholderCommand = new RelayCommand(_ => { });
         RefreshReadyPickupBanner();
+    }
+
+    protected void RefreshBusinessProfileBindings()
+    {
+        LoadBusinessProfileSettings();
+        OnPropertyChanged(nameof(SidebarBusinessName));
+        OnPropertyChanged(nameof(SidebarBusinessTagline));
+        OnPropertyChanged(nameof(SidebarBusinessLogoImage));
+        OnPropertyChanged(nameof(SidebarHasBusinessLogo));
+    }
+
+    private void LoadBusinessProfileSettings()
+    {
+        var settings = SettingsManager.Load().BusinessProfile;
+        _businessName = string.IsNullOrWhiteSpace(settings.RestaurantName) ? "EliteResto" : settings.RestaurantName.Trim();
+        _businessTagline = "PRO";
+        _businessLogoImage = TryLoadProfileImage(settings.LogoPath);
     }
 }

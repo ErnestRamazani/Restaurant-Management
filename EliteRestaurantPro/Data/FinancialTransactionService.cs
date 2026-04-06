@@ -316,6 +316,14 @@ public static class FinancialTransactionService
     private static string BuildOrderReference(OrderRecord order)
     {
         var orderLabel = string.IsNullOrWhiteSpace(order.UniqueId) ? $"Order #{order.Id:000}" : order.UniqueId;
+        if (string.Equals(order.OrderSource, "Reservation", StringComparison.OrdinalIgnoreCase))
+        {
+            var reservationLabel = string.IsNullOrWhiteSpace(order.ReservationCode)
+                ? "Reservation"
+                : order.ReservationCode;
+            return $"Auto revenue from {orderLabel} (Reservation: {reservationLabel})";
+        }
+
         return $"Auto revenue from {orderLabel}";
     }
 }

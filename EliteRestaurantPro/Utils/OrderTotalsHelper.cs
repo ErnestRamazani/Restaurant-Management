@@ -2,8 +2,8 @@ namespace EliteRestaurantPro.Utils;
 
 public static class OrderTotalsHelper
 {
-    public const decimal TaxRate = 0.07m;
-    public const decimal ServiceRate = 0.10m;
+    public const decimal DefaultTaxRate = 0.07m;
+    public const decimal DefaultServiceRate = 0.10m;
 
     public static (decimal DiscountApplied, decimal TaxableSubtotal, decimal Tax, decimal Service, decimal GrandTotal) ComputeTotals(
         decimal lineItemsSubtotal,
@@ -24,10 +24,13 @@ public static class OrderTotalsHelper
         }
 
         discountApplied = Math.Min(discountApplied, lineItemsSubtotal);
-        var taxable = lineItemsSubtotal - discountApplied;
-        var tax = Math.Round(taxable * TaxRate, 2);
-        var service = Math.Round(taxable * ServiceRate, 2);
-        var grand = taxable + tax + service;
+        var settings = SettingsManager.Load().CurrencyPricing;
+        var taxRate = settings.TaxPercent > 0m ? settings.TaxPercent / 100m : DefaultTaxRate;
+        var serviceRate = settings.ServicePercent > 0m ? settings.ServicePercent / 100m : DefaultServiceRate;
+        var taxable = ApplyRounding(lineItemsSubtotal - discountApplied, settings.RoundingSubtotal);
+        var tax = ApplyRounding(taxable * taxRate, settings.RoundingLine);
+        var service = ApplyRounding(taxable * serviceRate, settings.RoundingLine);
+        var grand = ApplyRounding(taxable + tax + service, settings.RoundingGrandTotal);
         return (discountApplied, taxable, tax, service, grand);
     }
 
@@ -40,5 +43,17 @@ public static class OrderTotalsHelper
         if (string.Equals(discountMode, "Usd", StringComparison.OrdinalIgnoreCase))
             return $"Discount (${discountValue:N2} USD)";
         return "Discount";
+    }
+
+    private static decimal ApplyRounding(decimal value, string? roundingMode)
+    {
+        var mode = roundingMode?.Trim() ?? "Nearest";
+        if (string.Equals(mode, "Up", StringComparison.OrdinalIgnoreCase))
+            return Math.Ceiling(value * 100m) / 100m;
+        if (string.Equals(mode, "Down", StringComparison.OrdinalIgnoreCase))
+            return Math.Floor(value * 100m) / 100m;
+        if (string.Equals(mode, "None", StringComparison.OrdinalIgnoreCase))
+            return value;
+        return Math.Round(value, 2);
     }
 }

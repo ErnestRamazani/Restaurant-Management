@@ -41,4 +41,19 @@ public class InventoryItem
             return "Good";
         }
     }
+
+    [NotMapped]
+    public string QuantityStatus
+    {
+        get
+        {
+            if (StockQuantity <= 0)
+                return "Out";
+            if (StockQuantity <= 3)
+                return "Critical";
+            if (StockQuantity <= 10)
+                return "Low";
+            return "Healthy";
+        }
+    }
 }

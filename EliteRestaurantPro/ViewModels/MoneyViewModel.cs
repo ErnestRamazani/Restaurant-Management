@@ -690,6 +690,9 @@ public class MoneyViewModel : AdminBaseViewModel
                 order.Id.ToString(),
                 string.IsNullOrWhiteSpace(order.UniqueId) ? $"ORD-{order.Id:000}" : order.UniqueId,
                 order.CreatedAt.ToString("yyyy-MM-dd HH:mm"),
+                string.Equals(order.OrderSource, "Reservation", StringComparison.OrdinalIgnoreCase)
+                    ? $"Reservation ({(string.IsNullOrWhiteSpace(order.ReservationCode) ? "-" : order.ReservationCode)})"
+                    : "WalkIn",
                 order.Status,
                 order.TableCode,
                 order.ServerName,
@@ -697,7 +700,7 @@ public class MoneyViewModel : AdminBaseViewModel
             ])
             .ToList();
 
-        return (["Id", "OrderId", "Date", "Status", "Table", "Server", "Total"], rows);
+        return (["Id", "OrderId", "Date", "Source", "Status", "Table", "Server", "Total"], rows);
     }
 
     private static (IReadOnlyList<string> Headers, IReadOnlyList<IReadOnlyList<string>> Rows) BuildInventoryRows(AppDbContext db, DateTime fromDate, DateTime toExclusive)

@@ -45,7 +45,7 @@
                     <ItemsControl ItemsSource="{Binding PendingCashierOrders}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Margin="0,0,0,10" CornerRadius="10" Padding="12,10" Background="#FF1A1A2E">
+                                <Border Margin="0,0,0,10" CornerRadius="10" Padding="12,10" Background="{StaticResource CardBaseBrush}">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
@@ -127,7 +127,7 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <Border Margin="0,0,0,8" CornerRadius="10" Padding="14,12"
-                                                Background="#FF1A1A2E">
+                                                Background="{StaticResource CardBaseBrush}">
                                             <StackPanel>
                                                 <Grid>
                                                     <TextBlock Text="{Binding OrderId}"
@@ -260,7 +260,7 @@
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <Border Margin="0,0,0,8" CornerRadius="10" Padding="14,12"
-                                                                Background="#FF1A1A2E">
+                                                                Background="{StaticResource CardBaseBrush}">
                                                             <StackPanel>
                                                                 <Grid>
                                                                     <StackPanel Orientation="Horizontal">
@@ -335,7 +335,7 @@
                         CornerRadius="18"
                         BorderBrush="#66D4AF37"
                         BorderThickness="1"
-                        Background="#FF151515"
+                        Background="#C0151B2D"
                         Padding="22">
                     <Grid>
                         <Grid.RowDefinitions>
@@ -345,7 +345,7 @@
                         </Grid.RowDefinitions>
 
                         <StackPanel Grid.Row="0">
-                            <TextBlock Text="ELITE RESTAURANT PRO"
+                            <TextBlock Text="{Binding TicketRestaurantName}"
                                        Foreground="{StaticResource GoldAccentBrush}"
                                        FontFamily="Segoe UI Variable Display, Segoe UI"
                                        FontSize="20"
@@ -427,10 +427,10 @@
                                            Text="{Binding TicketDiscountLineText}"
                                            Visibility="{Binding TicketShowDiscount, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                 <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource TextSecondaryBrush}">
-                                    <Run Text="TVA (7%): $ "/><Run Text="{Binding TicketTaxAmount, StringFormat={}{0:N2}}"/>
+                                    <Run Text="{Binding TicketTaxLabel}"/><Run Text=": $ "/><Run Text="{Binding TicketTaxAmount, StringFormat={}{0:N2}}"/>
                                 </TextBlock>
                                 <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource TextSecondaryBrush}">
-                                    <Run Text="Service (10%): $ "/><Run Text="{Binding TicketServiceAmount, StringFormat={}{0:N2}}"/>
+                                    <Run Text="{Binding TicketServiceLabel}"/><Run Text=": $ "/><Run Text="{Binding TicketServiceAmount, StringFormat={}{0:N2}}"/>
                                 </TextBlock>
                                 <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource GoldAccentBrush}" FontSize="20" FontWeight="SemiBold" Margin="0,4,0,0">
                                     <Run Text="GRAND TOTAL USD: $ "/><Run Text="{Binding TicketGrandTotal, StringFormat={}{0:N2}}"/>
@@ -486,7 +486,7 @@
                         CornerRadius="18"
                         BorderBrush="#66D4AF37"
                         BorderThickness="1"
-                        Background="#FF151515"
+                        Background="#C0151B2D"
                         Padding="22">
                     <Grid>
                         <Grid.RowDefinitions>
@@ -623,7 +623,7 @@
                         CornerRadius="18"
                         BorderBrush="#66D4AF37"
                         BorderThickness="1"
-                        Background="#FF151515"
+                        Background="#C0151B2D"
                         Padding="22">
                     <Grid>
                         <Grid.RowDefinitions>

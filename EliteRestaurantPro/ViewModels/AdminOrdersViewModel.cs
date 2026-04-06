@@ -69,6 +69,9 @@ public class AdminOrdersViewModel : AdminBaseViewModel
     private string _ticketPaidBreakdownText = string.Empty;
     private string _ticketChangeBreakdownText = string.Empty;
     private string _ticketVerification = string.Empty;
+    private string _ticketRestaurantName = "ELITE RESTAURANT PRO";
+    private string _ticketTaxLabel = "TVA (7%)";
+    private string _ticketServiceLabel = "Service (10%)";
     private bool _isLoading;
     private bool _showPendingCashierSection;
     private bool _isPaymentModalOpen;
@@ -224,6 +227,24 @@ public class AdminOrdersViewModel : AdminBaseViewModel
     {
         get => _ticketVerification;
         set => SetField(ref _ticketVerification, value);
+    }
+
+    public string TicketRestaurantName
+    {
+        get => _ticketRestaurantName;
+        set => SetField(ref _ticketRestaurantName, value);
+    }
+
+    public string TicketTaxLabel
+    {
+        get => _ticketTaxLabel;
+        set => SetField(ref _ticketTaxLabel, value);
+    }
+
+    public string TicketServiceLabel
+    {
+        get => _ticketServiceLabel;
+        set => SetField(ref _ticketServiceLabel, value);
     }
 
     public bool IsLoading
@@ -872,7 +893,8 @@ public class AdminOrdersViewModel : AdminBaseViewModel
             return;
 
         var subtotal = selectedProducts.Sum(p => p.LineTotal);
-        var grandTotalUsd = subtotal + Math.Round(subtotal * 0.07m, 2) + Math.Round(subtotal * 0.10m, 2);
+        var totals = OrderTotalsHelper.ComputeTotals(subtotal, "None", 0m);
+        var grandTotalUsd = totals.GrandTotal;
 
         var order = new OrderRecord
         {
@@ -1317,6 +1339,12 @@ public class AdminOrdersViewModel : AdminBaseViewModel
         TicketChangeBreakdownText =
             $"Change USD: {CurrencyHelper.FormatAmount(order.ChangeGivenUsd, CurrencyHelper.Usd)} | Change FC: {CurrencyHelper.FormatAmount(order.ChangeGivenFc, CurrencyHelper.CongoleseFranc)}";
         TicketVerification = $"ERP-DB-{order.Id}-{order.UniqueId[..Math.Min(4, order.UniqueId.Length)]}";
+        var settings = SettingsManager.Load();
+        TicketRestaurantName = string.IsNullOrWhiteSpace(settings.BusinessProfile.RestaurantName)
+            ? "ELITE RESTAURANT PRO"
+            : settings.BusinessProfile.RestaurantName.ToUpperInvariant();
+        TicketTaxLabel = $"TVA ({settings.CurrencyPricing.TaxPercent:0.##}%)";
+        TicketServiceLabel = $"Service ({settings.CurrencyPricing.ServicePercent:0.##}%)";
 
         IsTicketPreviewOpen = true;
     }
@@ -1325,6 +1353,12 @@ public class AdminOrdersViewModel : AdminBaseViewModel
     {
         if (!TicketLines.Any())
             return;
+        var settings = SettingsManager.Load();
+        var business = settings.BusinessProfile;
+        var pricing = settings.CurrencyPricing;
+        var restaurantTitle = string.IsNullOrWhiteSpace(business.RestaurantName) ? "ELITE RESTAURANT PRO" : business.RestaurantName.ToUpperInvariant();
+        var footerText = string.IsNullOrWhiteSpace(business.TicketFooterText) ? "MERCI / THANK YOU" : business.TicketFooterText;
+        var legalInfo = business.TaxIdLegalInfo;
 
         var saveDialog = new SaveFileDialog
         {
@@ -1350,7 +1384,7 @@ public class AdminOrdersViewModel : AdminBaseViewModel
                 page.Content().Column(column =>
                 {
                     column.Spacing(4);
-                    column.Item().Text("ELITE RESTAURANT PRO").Bold().FontSize(16).FontColor("#D4AF37");
+                    column.Item().Text(restaurantTitle).Bold().FontSize(16).FontColor("#D4AF37");
                     column.Item().LineHorizontal(1).LineColor("#7A6231");
                     column.Item().Text($"Date: {TicketDateTime:dd MMM yyyy}    Time: {TicketDateTime:HH:mm}");
                     column.Item().Text($"Order: {TicketOrderId}    Status: {TicketStatus}");
@@ -1396,16 +1430,18 @@ public class AdminOrdersViewModel : AdminBaseViewModel
                             .FontColor("#C1B28A");
                     }
 
-                    column.Item().AlignRight().Text($"TVA (7%): $ {TicketTaxAmount:N2}");
-                    column.Item().AlignRight().Text($"Service (10%): $ {TicketServiceAmount:N2}");
+                    column.Item().AlignRight().Text($"TVA ({pricing.TaxPercent:0.##}%): $ {TicketTaxAmount:N2}");
+                    column.Item().AlignRight().Text($"Service ({pricing.ServicePercent:0.##}%): $ {TicketServiceAmount:N2}");
                     column.Item().AlignRight().Text($"GRAND TOTAL USD: $ {TicketGrandTotal:N2}").Bold().FontSize(14).FontColor("#D4AF37");
                     column.Item().AlignRight().Text($"Equivalent FC: {TicketEquivalentFcText}");
                     column.Item().AlignRight().Text($"Collected: {TicketPaymentText}");
                     column.Item().AlignRight().Text(TicketPaidBreakdownText).FontSize(9);
                     column.Item().AlignRight().Text(TicketChangeBreakdownText).FontSize(9);
                     column.Item().LineHorizontal(1).LineColor("#7A6231");
+                    if (!string.IsNullOrWhiteSpace(legalInfo))
+                        column.Item().Text(legalInfo).FontSize(9).FontColor("#C1B28A");
                     column.Item().Text($"Database Verification: {TicketVerification}").FontSize(9).FontColor("#C1B28A");
-                    column.Item().Text("MERCI / THANK YOU").Bold().FontColor("#D4AF37");
+                    column.Item().Text(footerText).Bold().FontColor("#D4AF37");
                 });
             });
         }).GeneratePdf(saveDialog.FileName);
@@ -1421,6 +1457,12 @@ public class AdminOrdersViewModel : AdminBaseViewModel
     {
         if (!TicketLines.Any())
             return;
+        var settings = SettingsManager.Load();
+        var business = settings.BusinessProfile;
+        var pricing = settings.CurrencyPricing;
+        var restaurantTitle = string.IsNullOrWhiteSpace(business.RestaurantName) ? "ELITE RESTAURANT PRO" : business.RestaurantName.ToUpperInvariant();
+        var footerText = string.IsNullOrWhiteSpace(business.TicketFooterText) ? "MERCI / THANK YOU" : business.TicketFooterText;
+        var legalInfo = business.TaxIdLegalInfo;
 
         var saveDialog = new SaveFileDialog
         {
@@ -1446,7 +1488,7 @@ public class AdminOrdersViewModel : AdminBaseViewModel
                 page.Content().Column(column =>
                 {
                     column.Spacing(4);
-                    column.Item().Text("ELITE RESTAURANT PRO").Bold().FontSize(16).FontColor("#D4AF37");
+                    column.Item().Text(restaurantTitle).Bold().FontSize(16).FontColor("#D4AF37");
                     column.Item().LineHorizontal(1).LineColor("#7A6231");
                     column.Item().Text($"Date: {TicketDateTime:dd MMM yyyy}    Time: {TicketDateTime:HH:mm}");
                     column.Item().Text($"Order: {TicketOrderId}");
@@ -1491,12 +1533,14 @@ public class AdminOrdersViewModel : AdminBaseViewModel
                             .FontSize(9)
                             .FontColor("#C1B28A");
                     }
-                    column.Item().AlignRight().Text($"TVA (7%): $ {TicketTaxAmount:N2}");
-                    column.Item().AlignRight().Text($"Service (10%): $ {TicketServiceAmount:N2}");
+                    column.Item().AlignRight().Text($"TVA ({pricing.TaxPercent:0.##}%): $ {TicketTaxAmount:N2}");
+                    column.Item().AlignRight().Text($"Service ({pricing.ServicePercent:0.##}%): $ {TicketServiceAmount:N2}");
                     column.Item().AlignRight().Text($"GRAND TOTAL USD: $ {TicketGrandTotal:N2}").Bold().FontSize(14).FontColor("#D4AF37");
                     column.Item().AlignRight().Text($"Equivalent FC: {TicketEquivalentFcText}");
                     column.Item().LineHorizontal(1).LineColor("#7A6231");
-                    column.Item().Text("MERCI / THANK YOU").Bold().FontColor("#D4AF37");
+                    if (!string.IsNullOrWhiteSpace(legalInfo))
+                        column.Item().Text(legalInfo).FontSize(9).FontColor("#C1B28A");
+                    column.Item().Text(footerText).Bold().FontColor("#D4AF37");
                 });
             });
         }).GeneratePdf(saveDialog.FileName);

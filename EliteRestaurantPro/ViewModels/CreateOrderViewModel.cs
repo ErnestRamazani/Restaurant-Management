@@ -25,6 +25,9 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
     {
         public string DraftLabel { get; set; } = string.Empty;
         public int SelectedTableId { get; set; }
+        public string SelectedOrderSource { get; set; } = "WalkIn";
+        public string SelectedDeliveryReference { get; set; } = string.Empty;
+        public string SelectedReservationCode { get; set; } = string.Empty;
         public string SelectedOrderStatus { get; set; } = "Waiting";
         public string SelectedOrderCategory { get; set; } = "All";
         public string SelectedOrderSubCategory { get; set; } = "All";
@@ -45,6 +48,15 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         string SubCategory,
         decimal Price);
 
+    private sealed record ArrivedReservationRow(
+        int Id,
+        string UniqueId,
+        string ReservationName,
+        string GuestName,
+        DateTime ReservedFor,
+        int? TableId,
+        string TableLabel);
+
     private sealed record SubmitSnapshot(
         int TableId,
         List<(int ProductId, int Quantity)> SelectedLines,
@@ -63,9 +75,13 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         string ChosenPaymentAmountText,
         string EstimatedPrepText,
         string SelectedOrderStatus,
+        string SelectedOrderSource,
+        string SourceReference,
         bool IsTabletStaffOrderFlow,
         int? ServerEmployeeId,
-        string ServerEmployeeName);
+        string ServerEmployeeName,
+        string ReservationCode,
+        string ReservationGuestName);
 
     private sealed record OpenCheckInfo(int? OrderId, string Code, string Status);
     private sealed record PhaseResult(bool Ok, string Caption, string Message, int TableNumber, string TableName, OpenCheckInfo OpenCheck);
@@ -79,6 +95,31 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         public override string ToString() => DisplayName;
     }
 
+    public sealed class ArrivedReservationOption
+    {
+        public int Id { get; init; }
+        public string UniqueId { get; init; } = string.Empty;
+        public string ReservationName { get; init; } = string.Empty;
+        public string GuestName { get; init; } = string.Empty;
+        public DateTime ReservedFor { get; init; }
+        public int? TableId { get; init; }
+        public string TableLabel { get; init; } = "-";
+        public string Label =>
+            $"{(string.IsNullOrWhiteSpace(ReservationName) ? GuestName : ReservationName)} • {ReservedFor:dd MMM HH:mm} • {TableLabel} • {UniqueId}";
+
+        public override string ToString() => Label;
+    }
+
+    private static ArrivedReservationOption NoneReservationOption => new()
+    {
+        Id = 0,
+        UniqueId = string.Empty,
+        GuestName = "None (Walk-in order)",
+        ReservedFor = DateTime.MinValue,
+        TableId = null,
+        TableLabel = "-"
+    };
+
     private static string LegacyDraftFilePath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "EliteRestaurantPro",
@@ -89,8 +130,10 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         "EliteRestaurantPro",
         "drafts",
         "create-order");
+    private static DraftEntry EmptyDraftOption => new() { FilePath = string.Empty, DisplayName = "None (empty slot)" };
 
     private int _selectedTableId;
+    private string _selectedOrderSource = "WalkIn";
     private string _selectedOrderStatus = "Waiting";
     private string _selectedOrderCategory = "All";
     private string _selectedOrderSubCategory = "All";
@@ -118,6 +161,8 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
     private string _openCheckStatus = string.Empty;
     private bool _suppressOpenCheckRefresh;
     private bool _suppressSelectionChanged;
+    private ArrivedReservationOption? _selectedArrivedReservation;
+    private string _selectedDeliveryReference = string.Empty;
 
     public override string ActivePage => "CreateOrder";
     public string PageTitle => "Create Order";
@@ -128,6 +173,10 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
 
     public bool IsTabletStaffOrderFlow => AppSession.IsServerTablet || AppSession.IsCashierTablet;
     public bool CanEditTablePicker => !AppSession.IsServerTablet || AvailableTables.Count > 1;
+    public bool CanEditTableForCurrentSource => !IsDeliverySource && CanEditTablePicker;
+    public bool IsWalkInSource => string.Equals(SelectedOrderSource, "WalkIn", StringComparison.OrdinalIgnoreCase);
+    public bool IsReservationSource => string.Equals(SelectedOrderSource, "Reservation", StringComparison.OrdinalIgnoreCase);
+    public bool IsDeliverySource => string.Equals(SelectedOrderSource, "Delivery", StringComparison.OrdinalIgnoreCase);
     public bool CanEditOrderStatusPicker => !AppSession.IsStaffTablet;
     public bool HasOpenCheckForTable => _openCheckOrderId.HasValue;
     public string OpenCheckBannerText =>
@@ -137,6 +186,7 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
     public string PrimaryActionLabel => IsTabletStaffOrderFlow ? "Send to cashier" : "Create Real Order";
 
     public ObservableCollection<ModelTable> AvailableTables { get; } = new();
+    public ObservableCollection<string> OrderSources { get; } = new(["WalkIn", "Reservation", "Delivery"]);
     public ObservableCollection<string> OrderStatuses { get; } = new(["Waiting", "In Kitchen", "Ready"]);
     public ObservableCollection<string> OrderCategories { get; } = new();
     public ObservableCollection<string> OrderSubCategories { get; } = new();
@@ -146,6 +196,24 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
     public ObservableCollection<ProductSelectionItemViewModel> FilteredProductSelections { get; } = new();
     public ObservableCollection<ProductSelectionItemViewModel> SelectedProductSelections { get; } = new();
     public ObservableCollection<DraftEntry> SavedDrafts { get; } = new();
+    public ObservableCollection<ArrivedReservationOption> ArrivedReservations { get; } = new();
+    public ObservableCollection<string> DeliveryReferences { get; } = new();
+
+    public string SelectedOrderSource
+    {
+        get => _selectedOrderSource;
+        set
+        {
+            if (!SetField(ref _selectedOrderSource, value))
+                return;
+
+            HandleOrderSourceChanged();
+            OnPropertyChanged(nameof(IsWalkInSource));
+            OnPropertyChanged(nameof(IsReservationSource));
+            OnPropertyChanged(nameof(IsDeliverySource));
+            OnPropertyChanged(nameof(CanEditTableForCurrentSource));
+        }
+    }
 
     public int SelectedTableId
     {
@@ -203,6 +271,23 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
     {
         get => _selectedDraft;
         set => SetField(ref _selectedDraft, value);
+    }
+
+    public ArrivedReservationOption? SelectedArrivedReservation
+    {
+        get => _selectedArrivedReservation;
+        set
+        {
+            if (!SetField(ref _selectedArrivedReservation, value))
+                return;
+            ApplyArrivedReservationSelection(value);
+        }
+    }
+
+    public string SelectedDeliveryReference
+    {
+        get => _selectedDeliveryReference;
+        set => SetField(ref _selectedDeliveryReference, value);
     }
 
     public string CustomerNotes
@@ -268,6 +353,23 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
     public decimal LiveGrandTotalFc => CurrencyHelper.ConvertUsdToFc(LiveGrandTotal);
     public string LiveGrandTotalUsdText => CurrencyHelper.FormatAmount(LiveGrandTotal, CurrencyHelper.Usd);
     public string LiveGrandTotalFcText => CurrencyHelper.FormatAmount(LiveGrandTotalFc, CurrencyHelper.CongoleseFranc);
+    public string LiveTaxRateLabel
+    {
+        get
+        {
+            var pct = SettingsManager.Load().CurrencyPricing.TaxPercent;
+            return $"TVA ({pct:0.##}%)";
+        }
+    }
+
+    public string LiveServiceRateLabel
+    {
+        get
+        {
+            var pct = SettingsManager.Load().CurrencyPricing.ServicePercent;
+            return $"Service ({pct:0.##}%)";
+        }
+    }
 
     public decimal LiveDiscountAmount
     {
@@ -338,6 +440,7 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
 
     public CreateOrderViewModel(Action<BaseViewModel> navigate) : base(navigate)
     {
+        SettingsManager.SettingsChanged += OnAppSettingsChanged;
         if (AppSession.IsServerTablet && AppSession.StaffEmployeeId is int sid)
         {
             _serverEmployeeId = sid;
@@ -355,6 +458,16 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
 
         RefreshSavedDrafts();
         LoadData();
+    }
+
+    private void OnAppSettingsChanged()
+    {
+        Application.Current?.Dispatcher.BeginInvoke(new Action(() =>
+        {
+            RecalculateTotals();
+            OnPropertyChanged(nameof(LiveTaxRateLabel));
+            OnPropertyChanged(nameof(LiveServiceRateLabel));
+        }));
     }
 
     private static Window? DialogOwner() =>
@@ -406,6 +519,34 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
                     string.IsNullOrWhiteSpace(p.SubCategory) ? "General" : p.SubCategory!,
                     p.Price))
                 .ToList();
+            var arrivedReservations = db.Reservations
+                .AsNoTracking()
+                .Include(r => r.Table)
+                .Where(r => r.Status == "Arrived")
+                .OrderBy(r => r.ReservedFor)
+                .Take(60)
+                .Select(r => new ArrivedReservationRow(
+                    r.Id,
+                    r.UniqueId,
+                    r.ReservationName,
+                    r.GuestName,
+                    r.ReservedFor,
+                    r.TableId,
+                    r.Table != null && !string.IsNullOrWhiteSpace(r.Table.Name)
+                        ? r.Table.Name
+                        : (r.TableId.HasValue ? $"Table #{r.TableId.Value}" : "-")))
+                .ToList();
+            var deliveryReferences = db.Orders
+                .AsNoTracking()
+                .Where(o => o.OrderSource == "Delivery")
+                .OrderByDescending(o => o.CreatedAt)
+                .Select(o => !string.IsNullOrWhiteSpace(o.ReservationGuestName)
+                    ? o.ReservationGuestName
+                    : (!string.IsNullOrWhiteSpace(o.TableName) ? o.TableName : o.UniqueId))
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Distinct()
+                .Take(40)
+                .ToList();
 
             AvailableTables.Clear();
             foreach (var t in tables)
@@ -439,6 +580,26 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
                 ProductSelections.Add(vm);
             }
 
+            ArrivedReservations.Clear();
+            ArrivedReservations.Add(NoneReservationOption);
+            foreach (var r in arrivedReservations)
+            {
+                ArrivedReservations.Add(new ArrivedReservationOption
+                {
+                    Id = r.Id,
+                    UniqueId = r.UniqueId,
+                    ReservationName = r.ReservationName,
+                    GuestName = r.GuestName,
+                    ReservedFor = r.ReservedFor,
+                    TableId = r.TableId,
+                    TableLabel = r.TableLabel
+                });
+            }
+
+            DeliveryReferences.Clear();
+            foreach (var d in deliveryReferences)
+                DeliveryReferences.Add(d);
+
             _suppressOpenCheckRefresh = true;
             try
             {
@@ -448,6 +609,9 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
             {
                 _suppressOpenCheckRefresh = false;
             }
+            SelectedArrivedReservation = ArrivedReservations.FirstOrDefault();
+            SelectedDeliveryReference = string.Empty;
+            SelectedOrderSource = "WalkIn";
 
             if (IsTabletStaffOrderFlow)
             {
@@ -472,6 +636,7 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
             RefreshReadyPickupBanner();
             OnPropertyChanged(nameof(CanEditOrderStatusPicker));
             OnPropertyChanged(nameof(CanEditTablePicker));
+            OnPropertyChanged(nameof(CanEditTableForCurrentSource));
         }
         catch (Exception ex)
         {
@@ -632,6 +797,8 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         OnPropertyChanged(nameof(LiveGrandTotalFc));
         OnPropertyChanged(nameof(LiveGrandTotalUsdText));
         OnPropertyChanged(nameof(LiveGrandTotalFcText));
+        OnPropertyChanged(nameof(LiveTaxRateLabel));
+        OnPropertyChanged(nameof(LiveServiceRateLabel));
         OnPropertyChanged(nameof(ChosenPaymentAmountText));
     }
 
@@ -667,12 +834,92 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
             ChosenPaymentAmountText,
             EstimatedPrepText,
             SelectedOrderStatus,
+            SelectedOrderSource,
+            IsDeliverySource ? (SelectedDeliveryReference ?? string.Empty).Trim() : string.Empty,
             IsTabletStaffOrderFlow,
             _serverEmployeeId,
-            _serverEmployeeName);
+            _serverEmployeeName,
+            SelectedArrivedReservation?.UniqueId ?? string.Empty,
+            SelectedArrivedReservation?.GuestName ?? string.Empty);
+
+    private void ApplyArrivedReservationSelection(ArrivedReservationOption? selected)
+    {
+        if (!IsReservationSource)
+        {
+            RemoveReservationMarkerFromNotes();
+            return;
+        }
+
+        if (selected is null || string.IsNullOrWhiteSpace(selected.UniqueId))
+        {
+            RemoveReservationMarkerFromNotes();
+            return;
+        }
+
+        if (selected.TableId is int tableId && tableId != 0)
+            SelectedTableId = tableId;
+
+        var marker = $"Reservation {selected.UniqueId}";
+        if (string.IsNullOrWhiteSpace(CustomerNotes))
+        {
+            CustomerNotes = marker;
+            return;
+        }
+
+        if (!CustomerNotes.Contains(marker, StringComparison.OrdinalIgnoreCase))
+            CustomerNotes = $"{marker}\n{CustomerNotes}";
+    }
+
+    private void HandleOrderSourceChanged()
+    {
+        if (IsWalkInSource)
+        {
+            SelectedArrivedReservation = ArrivedReservations.FirstOrDefault();
+            SelectedDeliveryReference = string.Empty;
+            if (SelectedTableId == 0)
+                SelectedTableId = AvailableTables.FirstOrDefault()?.Id ?? 0;
+            return;
+        }
+
+        if (IsReservationSource)
+        {
+            var firstActualReservation = ArrivedReservations.FirstOrDefault(r => !string.IsNullOrWhiteSpace(r.UniqueId));
+            SelectedArrivedReservation = firstActualReservation ?? ArrivedReservations.FirstOrDefault();
+            SelectedDeliveryReference = string.Empty;
+            return;
+        }
+
+        // Delivery
+        SelectedArrivedReservation = ArrivedReservations.FirstOrDefault();
+        SelectedTableId = 0;
+        RemoveReservationMarkerFromNotes();
+    }
+
+    private void RemoveReservationMarkerFromNotes()
+    {
+        if (string.IsNullOrWhiteSpace(CustomerNotes))
+            return;
+
+        var lines = CustomerNotes
+            .Split('\n')
+            .Where(l => !l.TrimStart().StartsWith("Reservation RSV-", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        CustomerNotes = string.Join(Environment.NewLine, lines).Trim();
+    }
 
     private PhaseResult LoadPhase1(SubmitSnapshot snap)
     {
+        if (string.Equals(snap.SelectedOrderSource, "Delivery", StringComparison.OrdinalIgnoreCase))
+        {
+            return new PhaseResult(
+                true,
+                "Create Order",
+                string.Empty,
+                0,
+                "Delivery",
+                new OpenCheckInfo(null, string.Empty, string.Empty));
+        }
+
         using var db = new AppDbContext();
         var table = db.Tables.Include(t => t.AssignedServer).SingleOrDefault(t => t.Id == snap.TableId);
         if (table is null || table.AssignedServerId is null || table.AssignedServer is null)
@@ -791,6 +1038,7 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
             existing.Status = "In Kitchen";
 
         SyncPaymentFields(existing, db);
+        ApplyReservationLink(existing, snap, db);
         table.Status = "Occupied";
         db.SaveChanges();
         AppDbContext.ReconcileTableStatusesWithOrders(db);
@@ -804,9 +1052,13 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
     {
         var discountRaw = ParseDiscount(snap.DiscountInput);
         using var db = new AppDbContext();
-        var table = db.Tables.Include(t => t.AssignedServer).SingleOrDefault(t => t.Id == snap.TableId);
-        if (table is null || table.AssignedServerId is null || table.AssignedServer is null)
-            return new SaveResult(false, "Create Order", "Selected table must have an assigned server.");
+        ModelTable? table = null;
+        if (!string.Equals(snap.SelectedOrderSource, "Delivery", StringComparison.OrdinalIgnoreCase))
+        {
+            table = db.Tables.Include(t => t.AssignedServer).SingleOrDefault(t => t.Id == snap.TableId);
+            if (table is null || table.AssignedServerId is null || table.AssignedServer is null)
+                return new SaveResult(false, "Create Order", "Selected table must have an assigned server.");
+        }
 
         var status = snap.IsTabletStaffOrderFlow ? OrderWorkflow.PendingCashier : snap.SelectedOrderStatus;
         var discountValue = string.Equals(snap.DiscountMode, "None", StringComparison.OrdinalIgnoreCase) ? 0m : discountRaw;
@@ -817,13 +1069,19 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         var order = new OrderRecord
         {
             UniqueId = UniqueIdGenerator.NewId("ORD"),
-            TableId = table.Id,
-            TableCode = $"Table {table.TableNumber}",
-            TableName = string.IsNullOrWhiteSpace(table.Name) ? $"Table {table.TableNumber}" : table.Name,
-            ServerId = AppSession.IsServerTablet ? snap.ServerEmployeeId : table.AssignedServerId,
-            ServerName = AppSession.IsServerTablet
-                ? (string.IsNullOrWhiteSpace(snap.ServerEmployeeName) ? table.AssignedServer.Name : snap.ServerEmployeeName)
-                : table.AssignedServer.Name,
+            TableId = table?.Id,
+            TableCode = table is null ? "Delivery" : $"Table {table.TableNumber}",
+            TableName = table is null
+                ? (string.IsNullOrWhiteSpace(snap.SourceReference) ? "Delivery" : snap.SourceReference)
+                : (string.IsNullOrWhiteSpace(table.Name) ? $"Table {table.TableNumber}" : table.Name),
+            ServerId = table is null
+                ? AppSession.StaffEmployeeId
+                : (AppSession.IsServerTablet ? snap.ServerEmployeeId : table.AssignedServerId),
+            ServerName = table is null
+                ? (string.IsNullOrWhiteSpace(snap.ServerEmployeeName) ? "Delivery desk" : snap.ServerEmployeeName)
+                : (AppSession.IsServerTablet
+                    ? (string.IsNullOrWhiteSpace(snap.ServerEmployeeName) ? table.AssignedServer!.Name : snap.ServerEmployeeName)
+                    : table.AssignedServer!.Name),
             Status = status,
             CustomerNotes = snap.CustomerNotes.Trim(),
             AllergyNotes = snap.AllergyNotes.Trim(),
@@ -861,15 +1119,56 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
                 return new SaveResult(false, "Insufficient Inventory", invErr);
         }
 
+        ApplyReservationLink(order, snap, db);
         db.Orders.Add(order);
-        table.Status = "Occupied";
+        if (table is not null)
+            table.Status = "Occupied";
         db.SaveChanges();
-        AppDbContext.ReconcileTableStatusesWithOrders(db);
-        db.SaveChanges();
+        if (table is not null)
+        {
+            AppDbContext.ReconcileTableStatusesWithOrders(db);
+            db.SaveChanges();
+        }
 
         return snap.IsTabletStaffOrderFlow
             ? new SaveResult(true, "Sent to cashier", $"Ticket {order.UniqueId} sent to the cashier.")
             : new SaveResult(true, "Create Order", $"Order {order.UniqueId} created.");
+    }
+
+    private static void ApplyReservationLink(OrderRecord order, SubmitSnapshot snap, AppDbContext db)
+    {
+        if (string.Equals(snap.SelectedOrderSource, "Delivery", StringComparison.OrdinalIgnoreCase))
+        {
+            order.OrderSource = "Delivery";
+            order.ReservationGuestName = snap.SourceReference;
+            return;
+        }
+
+        if (string.Equals(snap.SelectedOrderSource, "WalkIn", StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(snap.ReservationCode))
+        {
+            order.OrderSource = "WalkIn";
+            return;
+        }
+
+        order.OrderSource = "Reservation";
+        order.ReservationCode = snap.ReservationCode.Trim();
+        order.ReservationGuestName = snap.ReservationGuestName?.Trim() ?? string.Empty;
+
+        var reservation = db.Reservations.SingleOrDefault(r => r.UniqueId == order.ReservationCode);
+        if (reservation is null)
+            return;
+
+        order.ReservationBookingId = reservation.Id;
+        if (string.IsNullOrWhiteSpace(order.ReservationGuestName))
+            order.ReservationGuestName = reservation.GuestName;
+        if (reservation.TableId.HasValue && !order.TableId.HasValue)
+            order.TableId = reservation.TableId;
+
+        if (string.Equals(reservation.Status, "Arrived", StringComparison.OrdinalIgnoreCase))
+        {
+            reservation.Status = "Completed";
+            reservation.UpdatedAt = DateTime.Now;
+        }
     }
 
     private void CreateOrder()
@@ -878,9 +1177,24 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
             return;
 
         var selected = ProductSelections.Where(p => p.IsSelected).ToList();
-        if (SelectedTableId == 0 || selected.Count == 0)
+        if (selected.Count == 0)
         {
-            ShowDialog("Select a table and at least one menu item.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
+            ShowDialog("Select at least one menu item.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        if (!IsDeliverySource && SelectedTableId == 0)
+        {
+            ShowDialog("Select a table for this order source.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        if (IsReservationSource && (SelectedArrivedReservation is null || string.IsNullOrWhiteSpace(SelectedArrivedReservation.UniqueId)))
+        {
+            ShowDialog("Select a reservation for reservation mode.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        if (IsDeliverySource && string.IsNullOrWhiteSpace(SelectedDeliveryReference))
+        {
+            ShowDialog("Enter a delivery name/reference for delivery mode.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
@@ -895,7 +1209,7 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
                 return;
             }
 
-            if (phase.OpenCheck.OrderId is int openOrderId)
+            if (!IsDeliverySource && phase.OpenCheck.OrderId is int openOrderId)
             {
                 var choice = ShowDialog(
                     $"Table {phase.TableNumber} ({phase.TableName}) already has open check {phase.OpenCheck.Code} — status: {phase.OpenCheck.Status}.\n\n" +
@@ -943,8 +1257,14 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
                 ? $"\n{snap.LiveDiscountLabel}: -{CurrencyHelper.FormatAmount(snap.LiveDiscountAmount, CurrencyHelper.Usd)}"
                 : string.Empty;
 
+            var sourceLine = IsDeliverySource
+                ? $"Create delivery order ({(string.IsNullOrWhiteSpace(SelectedDeliveryReference) ? "No reference" : SelectedDeliveryReference)})"
+                : IsReservationSource
+                    ? $"Create reservation order for {SelectedArrivedReservation?.Label ?? "selected reservation"}"
+                    : $"Create walk-in order for Table {phase.TableNumber} ({phase.TableName})";
+
             var confirm = ShowDialog(
-                $"Create order for Table {phase.TableNumber} ({phase.TableName}) with {snap.SelectedLines.Count} selected item(s)?\n\n" +
+                $"{sourceLine} with {snap.SelectedLines.Count} selected item(s)?\n\n" +
                 $"Subtotal: {CurrencyHelper.FormatAmount(snap.LiveSubtotal, CurrencyHelper.Usd)}{discountLine}\n" +
                 $"Grand Total: {snap.LiveGrandTotalUsdText}\n" +
                 $"Equivalent FC: {snap.LiveGrandTotalFcText}\n" +
@@ -1008,9 +1328,13 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
 
     private void SaveDraft()
     {
-        Directory.CreateDirectory(DraftsFolderPath);
-        var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
-        var filePath = Path.Combine(DraftsFolderPath, $"{stamp}-{Guid.NewGuid():N}.json");
+        var ownerId = ResolveDraftOwnerEmployeeId();
+        if (!ownerId.HasValue)
+        {
+            ShowDialog("Drafts are available for signed-in server sessions only.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
         var table = AvailableTables.FirstOrDefault(t => t.Id == SelectedTableId);
         var selectedCount = ProductSelections.Where(p => p.IsSelected).Sum(p => p.Quantity);
         var tableLabel = table is null ? "No Table" : $"Table {table.TableNumber}";
@@ -1019,6 +1343,9 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         {
             DraftLabel = $"{DateTime.Now:dd MMM HH:mm:ss} | {tableLabel} | {selectedCount} items | {SelectedOrderStatus}",
             SelectedTableId = SelectedTableId,
+            SelectedOrderSource = SelectedOrderSource,
+            SelectedDeliveryReference = SelectedDeliveryReference,
+            SelectedReservationCode = SelectedArrivedReservation?.UniqueId ?? string.Empty,
             SelectedOrderStatus = SelectedOrderStatus,
             SelectedOrderCategory = SelectedOrderCategory,
             SelectedOrderSubCategory = SelectedOrderSubCategory,
@@ -1033,9 +1360,14 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
                 .ToList()
         };
 
-        File.WriteAllText(filePath, JsonSerializer.Serialize(draft, new JsonSerializerOptions { WriteIndented = true }));
+        var payloadJson = JsonSerializer.Serialize(draft);
+        var saved = SharedOrderDraftStore.SaveServerDraft(
+            ownerId.Value,
+            ResolveDraftOwnerName(),
+            draft.DraftLabel,
+            payloadJson);
         RefreshSavedDrafts();
-        SelectedDraft = SavedDrafts.FirstOrDefault(d => d.FilePath == filePath);
+        SelectedDraft = SavedDrafts.FirstOrDefault(d => d.FilePath == saved.Id) ?? EmptyDraftOption;
         ShowDialog("Draft saved.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
@@ -1047,24 +1379,42 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
 
     private bool LoadDraft(DraftEntry? entry, bool showMessage, bool autoDeleteAfterLoad)
     {
-        if (entry is null || string.IsNullOrWhiteSpace(entry.FilePath) || !File.Exists(entry.FilePath))
+        if (entry is null || string.IsNullOrWhiteSpace(entry.FilePath))
             return false;
 
-        var text = File.ReadAllText(entry.FilePath);
-        var draft = JsonSerializer.Deserialize<CreateOrderDraft>(text);
+        var ownerId = ResolveDraftOwnerEmployeeId();
+        if (!ownerId.HasValue)
+            return false;
+
+        var draftRow = SharedOrderDraftStore.ListServerDrafts(ownerId.Value)
+            .FirstOrDefault(d => string.Equals(d.Id, entry.FilePath, StringComparison.Ordinal));
+        if (draftRow is null)
+            return false;
+
+        var draft = JsonSerializer.Deserialize<CreateOrderDraft>(draftRow.PayloadJson);
         if (draft is null)
             return false;
 
+        SelectedOrderSource = string.IsNullOrWhiteSpace(draft.SelectedOrderSource) ? "WalkIn" : draft.SelectedOrderSource;
         SelectedTableId = draft.SelectedTableId;
         SelectedOrderStatus = string.IsNullOrWhiteSpace(draft.SelectedOrderStatus) ? "Waiting" : draft.SelectedOrderStatus;
-        SelectedOrderCategory = string.IsNullOrWhiteSpace(draft.SelectedOrderCategory) ? "All" : draft.SelectedOrderCategory;
-        SelectedOrderSubCategory = string.IsNullOrWhiteSpace(draft.SelectedOrderSubCategory) ? "All" : draft.SelectedOrderSubCategory;
-        ProductSearchText = draft.ProductSearchText ?? string.Empty;
+        // Keep full menu visible after loading a draft.
+        SelectedOrderCategory = "All";
+        SelectedOrderSubCategory = "All";
+        ProductSearchText = string.Empty;
         CustomerNotes = draft.CustomerNotes ?? string.Empty;
         AllergyNotes = draft.AllergyNotes ?? string.Empty;
         SelectedPaymentCurrency = string.IsNullOrWhiteSpace(draft.SelectedPaymentCurrency) ? CurrencyHelper.Usd : draft.SelectedPaymentCurrency;
         SelectedDiscountMode = string.IsNullOrWhiteSpace(draft.DiscountMode) ? "None" : draft.DiscountMode;
         DiscountInput = draft.DiscountInput ?? string.Empty;
+        SelectedDeliveryReference = draft.SelectedDeliveryReference ?? string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(draft.SelectedReservationCode))
+        {
+            SelectedArrivedReservation = ArrivedReservations.FirstOrDefault(r =>
+                                           string.Equals(r.UniqueId, draft.SelectedReservationCode, StringComparison.OrdinalIgnoreCase))
+                                       ?? ArrivedReservations.FirstOrDefault();
+        }
 
         var qtyByProduct = draft.Items.ToDictionary(i => i.ProductId, i => Math.Max(1, i.Quantity));
         _suppressSelectionChanged = true;
@@ -1095,9 +1445,9 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
 
         if (autoDeleteAfterLoad)
         {
-            try { File.Delete(entry.FilePath); } catch { }
+            SharedOrderDraftStore.DeleteServerDraft(ownerId.Value, entry.FilePath);
             RefreshSavedDrafts();
-            SelectedDraft = SavedDrafts.FirstOrDefault();
+            SelectedDraft = EmptyDraftOption;
         }
 
         if (showMessage)
@@ -1108,45 +1458,24 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
 
     private void RefreshSavedDrafts()
     {
+        var previousDraftId = SelectedDraft?.FilePath ?? string.Empty;
         SavedDrafts.Clear();
-        if (Directory.Exists(DraftsFolderPath))
+        SavedDrafts.Add(EmptyDraftOption);
+
+        var ownerId = ResolveDraftOwnerEmployeeId();
+        if (ownerId.HasValue)
         {
-            foreach (var path in Directory.GetFiles(DraftsFolderPath, "*.json").OrderByDescending(File.GetLastWriteTime))
-                SavedDrafts.Add(ReadDraft(path));
+            foreach (var row in SharedOrderDraftStore.ListServerDrafts(ownerId.Value))
+                SavedDrafts.Add(new DraftEntry { FilePath = row.Id, DisplayName = row.Label });
         }
 
-        if (SavedDrafts.Count == 0 && File.Exists(LegacyDraftFilePath))
-            SavedDrafts.Add(ReadDraft(LegacyDraftFilePath));
-
-        if (SelectedDraft is not null)
-        {
-            SelectedDraft = SavedDrafts.FirstOrDefault(d => d.FilePath == SelectedDraft.FilePath);
-            return;
-        }
-
-        SelectedDraft = SavedDrafts.FirstOrDefault();
-    }
-
-    private static DraftEntry ReadDraft(string path)
-    {
-        try
-        {
-            var text = File.ReadAllText(path);
-            var draft = JsonSerializer.Deserialize<CreateOrderDraft>(text);
-            var label = string.IsNullOrWhiteSpace(draft?.DraftLabel)
-                ? Path.GetFileNameWithoutExtension(path)
-                : draft.DraftLabel;
-            return new DraftEntry { FilePath = path, DisplayName = label };
-        }
-        catch
-        {
-            return new DraftEntry { FilePath = path, DisplayName = Path.GetFileNameWithoutExtension(path) };
-        }
+        SelectedDraft = SavedDrafts.FirstOrDefault(d => d.FilePath == previousDraftId)
+            ?? SavedDrafts.FirstOrDefault();
     }
 
     private void DeleteSelectedDraft()
     {
-        if (SelectedDraft is null)
+        if (SelectedDraft is null || string.IsNullOrWhiteSpace(SelectedDraft.FilePath))
         {
             ShowDialog("Select a draft to delete.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
@@ -1156,13 +1485,25 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         if (confirm != MessageBoxResult.Yes)
             return;
 
-        try { File.Delete(SelectedDraft.FilePath); } catch { }
+        var ownerId = ResolveDraftOwnerEmployeeId();
+        if (!ownerId.HasValue)
+            return;
+
+        SharedOrderDraftStore.DeleteServerDraft(ownerId.Value, SelectedDraft.FilePath);
         RefreshSavedDrafts();
     }
 
     private void DeleteAllDrafts()
     {
-        var hasDrafts = SavedDrafts.Count > 0 || File.Exists(LegacyDraftFilePath);
+        var ownerId = ResolveDraftOwnerEmployeeId();
+        if (!ownerId.HasValue)
+        {
+            ShowDialog("No drafts to delete.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var drafts = SharedOrderDraftStore.ListServerDrafts(ownerId.Value);
+        var hasDrafts = drafts.Count > 0;
         if (!hasDrafts)
         {
             ShowDialog("No drafts to delete.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -1173,20 +1514,51 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         if (confirm != MessageBoxResult.Yes)
             return;
 
-        if (Directory.Exists(DraftsFolderPath))
-        {
-            foreach (var path in Directory.GetFiles(DraftsFolderPath, "*.json"))
-            {
-                try { File.Delete(path); } catch { }
-            }
-        }
-
-        if (File.Exists(LegacyDraftFilePath))
-        {
-            try { File.Delete(LegacyDraftFilePath); } catch { }
-        }
+        foreach (var draft in drafts)
+            SharedOrderDraftStore.DeleteServerDraft(ownerId.Value, draft.Id);
 
         RefreshSavedDrafts();
+        SelectedDraft = EmptyDraftOption;
+    }
+
+    private int? ResolveDraftOwnerEmployeeId()
+    {
+        if (_serverEmployeeId.HasValue)
+            return _serverEmployeeId;
+        if (AppSession.StaffEmployeeId.HasValue)
+            return AppSession.StaffEmployeeId;
+
+        var candidateName = ResolveDraftOwnerName();
+        if (string.IsNullOrWhiteSpace(candidateName) || string.Equals(candidateName, "Server", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        try
+        {
+            using var db = new AppDbContext();
+            var employeeId = db.Employees.AsNoTracking()
+                .Where(e => e.EmploymentStatus == "Active")
+                .Where(e => e.Name == candidateName
+                            || e.SignInId == candidateName
+                            || e.UniqueId == candidateName)
+                .Select(e => (int?)e.Id)
+                .FirstOrDefault();
+            return employeeId;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private string ResolveDraftOwnerName()
+    {
+        if (!string.IsNullOrWhiteSpace(_serverEmployeeName))
+            return _serverEmployeeName;
+        if (!string.IsNullOrWhiteSpace(AppSession.StaffEmployeeName))
+            return AppSession.StaffEmployeeName;
+        if (!string.IsNullOrWhiteSpace(AppSession.AdminLoginDisplayName))
+            return AppSession.AdminLoginDisplayName;
+        return "Server";
     }
 }
 #if false

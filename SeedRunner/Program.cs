@@ -3,122 +3,129 @@ using EliteRestaurantPro.Models;
 using EliteRestaurantPro.Utils;
 using Microsoft.EntityFrameworkCore;
 
-if (File.Exists(AppDbContext.DatabasePath))
-    File.Delete(AppDbContext.DatabasePath);
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
-Console.WriteLine("Creating empty schema...");
 AppDbContext.Initialize();
-
 using var db = new AppDbContext();
-db.ChangeTracker.AutoDetectChangesEnabled = false;
 
-Console.WriteLine("Seeding master data...");
+var reduceArg = args.FirstOrDefault(a =>
+    a.StartsWith("--reduce-active-orders=", StringComparison.OrdinalIgnoreCase));
+if (!string.IsNullOrWhiteSpace(reduceArg))
+{
+    var value = reduceArg.Split('=', 2).LastOrDefault();
+    if (!int.TryParse(value, out var keepActiveCount) || keepActiveCount < 0)
+    {
+        Console.WriteLine("Invalid value. Use: --reduce-active-orders=<non-negative number>");
+        return;
+    }
 
+    ReduceActiveOrders(db, keepActiveCount);
+    return;
+}
+
+Console.WriteLine("Resetting PostgreSQL data...");
+db.Database.ExecuteSqlRaw("""
+    TRUNCATE TABLE
+        "OrderItems",
+        "Orders",
+        "ProductIngredients",
+        "InventoryItems",
+        "Tables",
+        "Products",
+        "EmployeeAttendances",
+        "AttendanceDayValidations",
+        "SalaryAdvances",
+        "PayrollPaymentRecords",
+        "Transactions",
+        "Employees"
+    RESTART IDENTITY CASCADE;
+    """);
+
+Console.WriteLine("Seeding requested staff (1 admin, 1 chef, 7 servers, 2 cashiers)...");
 var employees = new List<Employee>
 {
-    CreateEmployee("Ernest Cole", "Admin", "1024", 32m, "Morning Shift", "Morning Shift", "Morning Shift", "Morning Shift", "Morning Shift", "Off", "Off"),
-    CreateEmployee("Sophia Grant", "Manager", "2048", 28m, "Morning Shift", "Morning Shift", "Morning Shift", "Morning Shift", "Morning Shift", "Morning Shift", "Off"),
-    CreateEmployee("Marco Bellini", "Chef", "3301", 24m, "Morning Shift", "Morning Shift", "Morning Shift", "Morning Shift", "Morning Shift", "Night Shift", "Off"),
-    CreateEmployee("Nina Alvarez", "Barman", "4411", 18m, "Night Shift", "Night Shift", "Night Shift", "Night Shift", "Night Shift", "Night Shift", "Off"),
-    CreateEmployee("Liam Foster", "Server", "4042", 16m, "Morning Shift", "Morning Shift", "Morning Shift", "Morning Shift", "Night Shift", "Off", "Off"),
-    CreateEmployee("Emma Russo", "Server", "5560", 16m, "Night Shift", "Night Shift", "Night Shift", "Night Shift", "Morning Shift", "Morning Shift", "Off"),
-    CreateEmployee("Noah Rivers", "Server", "4100", 15m, "Morning Shift", "Off", "Morning Shift", "Off", "Morning Shift", "Night Shift", "Night Shift"),
-    CreateEmployee("Ava Moretti", "Server", "4200", 15m, "Night Shift", "Morning Shift", "Night Shift", "Morning Shift", "Night Shift", "Off", "Off"),
-    CreateEmployee("Lucas Bennett", "Cashier", "5102", 15m, "Morning Shift", "Morning Shift", "Morning Shift", "Morning Shift", "Morning Shift", "Off", "Off"),
-    CreateEmployee("Mia Chen", "Server", "5103", 16m, "Morning Shift", "Night Shift", "Morning Shift", "Night Shift", "Morning Shift", "Off", "Off")
+    CreateEmployee("Ernest Cole", "Admin", "ADM01", "1100", 32m, "Morning", "Morning", "Morning", "Morning", "Morning", "Off", "Off"),
+    CreateEmployee("Marco Bellini", "Chef", "CHF01", "2200", 24m, "Morning", "Morning", "Morning", "Morning", "Morning", "Evening", "Off"),
+
+    CreateEmployee("Liam Foster", "Server", "SRV01", "3101", 16m, "Morning", "Morning", "Morning", "Morning", "Evening", "Off", "Off"),
+    CreateEmployee("Emma Russo", "Server", "SRV02", "3102", 16m, "Evening", "Evening", "Evening", "Evening", "Morning", "Morning", "Off"),
+    CreateEmployee("Noah Rivers", "Server", "SRV03", "3103", 15m, "Morning", "Off", "Morning", "Off", "Morning", "Evening", "Evening"),
+    CreateEmployee("Ava Moretti", "Server", "SRV04", "3104", 15m, "Evening", "Morning", "Evening", "Morning", "Evening", "Off", "Off"),
+    CreateEmployee("Lucas Bennett", "Server", "SRV05", "3105", 16m, "Morning", "Evening", "Morning", "Evening", "Morning", "Off", "Off"),
+    CreateEmployee("Mia Chen", "Server", "SRV06", "3106", 16m, "Morning", "Morning", "Off", "Morning", "Evening", "Off", "Off"),
+    CreateEmployee("Daniel Carter", "Server", "SRV07", "3107", 15m, "Evening", "Evening", "Morning", "Morning", "Evening", "Off", "Off"),
+
+    CreateEmployee("Nora Diaz", "Cashier", "CSH01", "4101", 18m, "Morning", "Morning", "Morning", "Morning", "Morning", "Off", "Off"),
+    CreateEmployee("Owen Blake", "Cashier", "CSH02", "4102", 18m, "Evening", "Evening", "Evening", "Evening", "Evening", "Off", "Off")
 };
 db.Employees.AddRange(employees);
 db.SaveChanges();
 
 var servers = employees.Where(e => e.Role == "Server").ToList();
 var chef = employees.Single(e => e.Role == "Chef");
-var barman = employees.Single(e => e.Role == "Barman");
+var cashiers = employees.Where(e => e.Role == "Cashier").ToList();
 
+Console.WriteLine("Seeding inventory + products + 15 tables...");
 var inventoryItems = new List<InventoryItem>
 {
-    CreateInventory("Beef", "kg", 3200m, 14),
-    CreateInventory("Chicken", "kg", 2800m, 10),
-    CreateInventory("Salmon", "kg", 1800m, 7),
-    CreateInventory("Shrimp", "kg", 1600m, 6),
-    CreateInventory("Rice", "kg", 2500m, 180),
-    CreateInventory("Pasta", "kg", 2400m, 180),
-    CreateInventory("Potatoes", "kg", 2600m, 45),
-    CreateInventory("Tomatoes", "kg", 2200m, 8),
-    CreateInventory("Lettuce", "kg", 1400m, 5),
-    CreateInventory("Parmesan", "kg", 900m, 30),
-    CreateInventory("Mozzarella", "kg", 1100m, 25),
-    CreateInventory("Chocolate", "kg", 700m, 180),
-    CreateInventory("Vanilla", "kg", 200m, 180),
-    CreateInventory("Coffee Beans", "kg", 500m, 240),
-    CreateInventory("Milk", "l", 1800m, 10),
-    CreateInventory("Sparkling Water", "bottles", 4000m, 365),
-    CreateInventory("Orange Juice", "l", 2400m, 30),
-    CreateInventory("Mint", "kg", 300m, 7),
-    CreateInventory("Soda", "bottles", 3500m, 365),
-    CreateInventory("Gin", "bottles", 600m, 365),
-    CreateInventory("Vodka", "bottles", 600m, 365),
-    CreateInventory("Lemon", "pcs", 3000m, 12)
+    CreateInventory("Beef", "kg", 420m, 10),
+    CreateInventory("Chicken", "kg", 360m, 8),
+    CreateInventory("Rice", "kg", 500m, 160),
+    CreateInventory("Pasta", "kg", 470m, 150),
+    CreateInventory("Potatoes", "kg", 600m, 30),
+    CreateInventory("Tomatoes", "kg", 390m, 7),
+    CreateInventory("Lettuce", "kg", 210m, 4),
+    CreateInventory("Cheese", "kg", 220m, 20),
+    CreateInventory("Milk", "l", 340m, 7),
+    CreateInventory("Coffee Beans", "kg", 80m, 180),
+    CreateInventory("Orange Juice", "l", 280m, 25),
+    CreateInventory("Sparkling Water", "bottles", 680m, 300),
+    CreateInventory("Mint", "kg", 25m, 5),
+    CreateInventory("Chocolate", "kg", 70m, 200),
+    CreateInventory("Vanilla", "kg", 15m, 220)
 };
 db.InventoryItems.AddRange(inventoryItems);
 db.SaveChanges();
-
 var inventoryByName = inventoryItems.ToDictionary(i => i.Name, StringComparer.OrdinalIgnoreCase);
 
 var products = new List<Product>
 {
     CreateProduct("Truffle Arancini", "Starter/Appetizer", "Starter/Appetizer", 14.50m),
     CreateProduct("Bruschetta Trio", "Starter/Appetizer", "Starter/Appetizer", 12.00m),
-    CreateProduct("Calamari Fritti", "Starter/Appetizer", "Starter/Appetizer", 13.50m),
     CreateProduct("Caesar Salad", "Starter/Appetizer", "Salad", 10.00m),
-    CreateProduct("Greek Salad", "Starter/Appetizer", "Salad", 10.50m),
-    CreateProduct("Minestrone", "Starter/Appetizer", "Soup", 9.50m),
     CreateProduct("Filet Mignon", "Main", "Meat Meal", 34.00m),
     CreateProduct("Chicken Parmesan", "Main", "Meat Meal", 23.00m),
-    CreateProduct("Ribeye Steak", "Main", "Meat Meal", 33.00m),
-    CreateProduct("Grilled Salmon", "Main", "Seafood", 27.00m),
-    CreateProduct("Shrimp Risotto", "Main", "Seafood", 26.00m),
-    CreateProduct("Seafood Linguine", "Main", "Pasta", 24.00m),
     CreateProduct("Spaghetti Carbonara", "Main", "Pasta", 19.00m),
     CreateProduct("Penne Arrabbiata", "Main", "Pasta", 17.50m),
     CreateProduct("Margherita Pizza", "Main", "Pizza", 18.00m),
     CreateProduct("Pepperoni Pizza", "Main", "Pizza", 19.50m),
     CreateProduct("Veggie Burger", "Main", "Burger", 17.00m),
-    CreateProduct("Cheeseburger Deluxe", "Main", "Burger", 18.50m),
     CreateProduct("Creme Brulee", "Dessert", "Dessert", 9.50m),
     CreateProduct("Chocolate Lava Cake", "Dessert", "Dessert", 10.00m),
-    CreateProduct("Tiramisu", "Dessert", "Dessert", 9.50m),
     CreateProduct("Espresso", "Drink", "Coffee", 4.00m),
     CreateProduct("Cappuccino", "Drink", "Coffee", 5.00m),
     CreateProduct("Latte", "Drink", "Coffee", 5.50m),
-    CreateProduct("Iced Tea", "Drink", "Soft Drink", 4.75m),
     CreateProduct("Lemonade", "Drink", "Soft Drink", 4.50m),
     CreateProduct("Fresh Orange Juice", "Drink", "Juice", 5.25m),
-    CreateProduct("Sapphire Spritz", "Drink", "Cocktail", 11.00m),
-    CreateProduct("Mojito", "Drink", "Cocktail", 12.00m),
-    CreateProduct("Negroni", "Drink", "Cocktail", 13.00m),
-    CreateProduct("Margarita", "Drink", "Cocktail", 12.50m),
     CreateProduct("Virgin Mojito", "Drink", "Mocktail", 8.00m)
 };
 db.Products.AddRange(products);
 db.SaveChanges();
-
 var productByName = products.ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
 
-var tables = Enumerable.Range(1, 12)
+var tables = Enumerable.Range(1, 15)
     .Select(i => new Table
     {
         UniqueId = UniqueIdGenerator.NewId("TBL"),
         TableNumber = i,
         Name = $"Table {i}",
-        Capacity = i % 3 == 0 ? 6 : (i % 2 == 0 ? 4 : 2),
+        Capacity = i % 5 == 0 ? 8 : (i % 2 == 0 ? 4 : 2),
         Status = "Available",
         AssignedServerId = servers[(i - 1) % servers.Count].Id
     })
     .ToList();
 db.Tables.AddRange(tables);
 db.SaveChanges();
-
-Console.WriteLine("Seeding product ingredients...");
 
 void Link(string productName, string inventoryName, decimal qty)
 {
@@ -132,71 +139,52 @@ void Link(string productName, string inventoryName, decimal qty)
 
 Link("Truffle Arancini", "Rice", 0.15m);
 Link("Bruschetta Trio", "Tomatoes", 0.12m);
-Link("Bruschetta Trio", "Mozzarella", 0.05m);
-Link("Calamari Fritti", "Shrimp", 0.18m);
 Link("Caesar Salad", "Lettuce", 0.10m);
-Link("Greek Salad", "Tomatoes", 0.10m);
-Link("Greek Salad", "Lettuce", 0.08m);
-Link("Minestrone", "Tomatoes", 0.12m);
 Link("Filet Mignon", "Beef", 0.35m);
 Link("Filet Mignon", "Potatoes", 0.20m);
 Link("Chicken Parmesan", "Chicken", 0.30m);
-Link("Chicken Parmesan", "Parmesan", 0.04m);
-Link("Ribeye Steak", "Beef", 0.40m);
-Link("Grilled Salmon", "Salmon", 0.32m);
-Link("Shrimp Risotto", "Shrimp", 0.22m);
-Link("Shrimp Risotto", "Rice", 0.18m);
-Link("Seafood Linguine", "Shrimp", 0.18m);
-Link("Seafood Linguine", "Pasta", 0.22m);
 Link("Spaghetti Carbonara", "Pasta", 0.22m);
-Link("Penne Arrabbiata", "Pasta", 0.22m);
-Link("Penne Arrabbiata", "Tomatoes", 0.10m);
-Link("Margherita Pizza", "Mozzarella", 0.12m);
-Link("Margherita Pizza", "Tomatoes", 0.10m);
-Link("Pepperoni Pizza", "Mozzarella", 0.12m);
+Link("Penne Arrabbiata", "Pasta", 0.20m);
+Link("Penne Arrabbiata", "Tomatoes", 0.08m);
+Link("Margherita Pizza", "Cheese", 0.12m);
+Link("Margherita Pizza", "Tomatoes", 0.08m);
+Link("Pepperoni Pizza", "Cheese", 0.12m);
 Link("Veggie Burger", "Lettuce", 0.05m);
-Link("Cheeseburger Deluxe", "Beef", 0.20m);
-Link("Cheeseburger Deluxe", "Mozzarella", 0.04m);
 Link("Creme Brulee", "Vanilla", 0.02m);
 Link("Chocolate Lava Cake", "Chocolate", 0.08m);
-Link("Tiramisu", "Chocolate", 0.04m);
 Link("Espresso", "Coffee Beans", 0.02m);
 Link("Cappuccino", "Coffee Beans", 0.02m);
 Link("Cappuccino", "Milk", 0.20m);
 Link("Latte", "Coffee Beans", 0.02m);
 Link("Latte", "Milk", 0.25m);
-Link("Iced Tea", "Sparkling Water", 1.00m);
-Link("Lemonade", "Lemon", 2.00m);
+Link("Lemonade", "Sparkling Water", 1.00m);
 Link("Fresh Orange Juice", "Orange Juice", 0.30m);
-Link("Sapphire Spritz", "Sparkling Water", 1.00m);
-Link("Sapphire Spritz", "Gin", 0.10m);
-Link("Mojito", "Mint", 0.02m);
-Link("Mojito", "Soda", 1.00m);
-Link("Negroni", "Gin", 0.10m);
-Link("Margarita", "Vodka", 0.10m);
 Link("Virgin Mojito", "Mint", 0.02m);
-Link("Virgin Mojito", "Soda", 1.00m);
+Link("Virgin Mojito", "Sparkling Water", 1.00m);
 db.SaveChanges();
 
-Console.WriteLine("Seeding 6 months of activity...");
-
-var random = new Random(8808);
-var startDate = DateTime.Today.AddDays(-179);
+Console.WriteLine("Seeding exactly 2 months of activity...");
+var rng = new Random(20260405);
+var startDate = DateTime.Today.AddDays(-59);
+var ingredientByProduct = db.ProductIngredients.AsNoTracking()
+    .ToList()
+    .GroupBy(x => x.ProductId)
+    .ToDictionary(g => g.Key, g => g.ToList());
 
 for (var date = startDate; date <= DateTime.Today; date = date.AddDays(1))
 {
-    foreach (var employee in employees.Where(e => e.EmploymentStatus == "Active"))
+    foreach (var employee in employees)
     {
         var shift = GetShiftForDate(employee, date.DayOfWeek);
-        if (shift == "Off")
+        if (shift.Equals("Off", StringComparison.OrdinalIgnoreCase))
             continue;
 
-        var shiftStart = shift == "Night Shift" ? 18 : 12;
-        var shiftLength = shift == "Night Shift" ? 5 : 6;
-        var minuteOffset = random.Next(-8, 28);
+        var shiftStart = shift.Equals("Evening", StringComparison.OrdinalIgnoreCase) ? 17 : 10;
+        var shiftLength = shift.Equals("Evening", StringComparison.OrdinalIgnoreCase) ? 7 : 8;
+        var minuteOffset = rng.Next(-5, 24);
         var clockIn = date.Date.AddHours(shiftStart).AddMinutes(minuteOffset);
-        var clockOut = date.Date.AddHours(shiftStart + shiftLength).AddMinutes(random.Next(-12, 18));
-        var status = minuteOffset > 15 ? "Late" : minuteOffset < 0 ? "Early" : "On Time";
+        var clockOut = clockIn.AddHours(shiftLength).AddMinutes(rng.Next(-10, 15));
+        var status = minuteOffset > 12 ? "Late" : minuteOffset < 0 ? "Early" : "On Time";
 
         db.EmployeeAttendances.Add(new EmployeeAttendance
         {
@@ -209,15 +197,14 @@ for (var date = startDate; date <= DateTime.Today; date = date.AddDays(1))
         });
     }
 
-    var ordersToday = random.Next(8, 15);
+    var ordersToday = date.DayOfWeek is DayOfWeek.Friday or DayOfWeek.Saturday ? rng.Next(22, 30) : rng.Next(15, 24);
     for (var i = 0; i < ordersToday; i++)
     {
-        var table = tables[random.Next(tables.Count)];
-        var server = servers[random.Next(servers.Count)];
-        var createdAt = date.Date.AddHours(12 + random.Next(0, 10)).AddMinutes(random.Next(0, 60));
-        var completed = random.NextDouble() < 0.86;
-        var cancelled = !completed && random.NextDouble() < 0.35;
-        var status = completed ? "Completed" : cancelled ? "Cancelled" : "Ready";
+        var table = tables[rng.Next(tables.Count)];
+        var server = servers[rng.Next(servers.Count)];
+        var createdAt = date.Date.AddHours(11 + rng.Next(0, 11)).AddMinutes(rng.Next(0, 60));
+        var completed = rng.NextDouble() < 0.88;
+        var status = completed ? "Completed" : (rng.NextDouble() < 0.5 ? "Cancelled" : "Ready");
 
         var order = new OrderRecord
         {
@@ -230,72 +217,92 @@ for (var date = startDate; date <= DateTime.Today; date = date.AddDays(1))
             Status = status,
             CustomerNotes = string.Empty,
             AllergyNotes = string.Empty,
-            CreatedAt = createdAt
+            CreatedAt = createdAt,
+            CompletedAt = completed ? createdAt.AddMinutes(rng.Next(25, 95)) : null
         };
 
-        var itemCount = random.Next(1, 5);
-        decimal orderRevenue = 0m;
-
-        for (var line = 0; line < itemCount; line++)
+        decimal subtotal = 0m;
+        var lineCount = rng.Next(1, 5);
+        for (var line = 0; line < lineCount; line++)
         {
-            var product = products[random.Next(products.Count)];
-            var qty = random.Next(1, 4);
-            var isDrink = product.Category == "Drink";
-            var maker = isDrink ? barman : chef;
+            var product = products[rng.Next(products.Count)];
+            var qty = rng.Next(1, 4);
 
             order.Items.Add(new OrderItem
             {
                 ProductId = product.Id,
                 Quantity = qty,
-                PreparedByEmployeeId = maker.Id,
-                PreparedByRole = isDrink ? "Barman" : "Chef",
-                PreparedByName = maker.Name
+                PreparedByEmployeeId = chef.Id,
+                PreparedByRole = "Chef",
+                PreparedByName = chef.Name
             });
 
-            orderRevenue += product.Price * qty;
+            subtotal += product.Price * qty;
 
-            foreach (var ingredient in db.ProductIngredients.Local.Where(pi => pi.ProductId == product.Id))
+            if (ingredientByProduct.TryGetValue(product.Id, out var ingredients))
             {
-                var inventory = inventoryItems.First(i => i.Id == ingredient.InventoryItemId);
-                inventory.StockQuantity = Math.Max(0m, inventory.StockQuantity - ingredient.Quantity * qty);
+                foreach (var ingredient in ingredients)
+                {
+                    var inventory = inventoryItems.First(x => x.Id == ingredient.InventoryItemId);
+                    inventory.StockQuantity = Math.Max(0m, inventory.StockQuantity - (ingredient.Quantity * qty));
+                }
             }
         }
 
+        order.PaymentCurrencyCode = "USD";
+        order.ExchangeRateUsed = 2250m;
+        order.PaymentAmountUsd = decimal.Round(subtotal, 2);
+        order.PaymentAmountFc = decimal.Round(subtotal * order.ExchangeRateUsed, 2);
+        order.PaymentAmount = order.PaymentAmountUsd;
+        order.CustomerPaidUsd = order.PaymentAmountUsd;
+        order.CustomerPaidFc = 0m;
+        order.ChangeGivenUsd = 0m;
+        order.ChangeGivenFc = 0m;
+
         db.Orders.Add(order);
 
-        if (completed && orderRevenue > 0)
+        if (completed)
         {
             db.Transactions.Add(new MoneyTransaction
             {
-                Amount = Math.Round(orderRevenue, 2),
-                Date = createdAt,
+                Amount = order.PaymentAmountUsd,
+                AmountUsd = order.PaymentAmountUsd,
+                AmountFc = order.PaymentAmountFc,
+                Date = order.CompletedAt ?? createdAt,
                 Type = "Revenue",
                 Category = "Sale",
+                CurrencyCode = "USD",
+                ExchangeRateUsed = order.ExchangeRateUsed,
                 IsFixed = true,
-                Justification = $"Auto revenue from {order.UniqueId}"
+                Justification = $"Auto sale {order.UniqueId}"
             });
         }
     }
 
     if (date.DayOfWeek == DayOfWeek.Friday)
     {
-        foreach (var employee in employees.Where(e => e.EmploymentStatus == "Active"))
+        foreach (var employee in employees)
         {
+            var payroll = decimal.Round(employee.HourlyRate * 40m, 2);
             db.Transactions.Add(new MoneyTransaction
             {
-                Amount = Math.Round(employee.HourlyRate * 40m, 2),
-                Date = date.Date.AddHours(18),
+                Amount = payroll,
+                AmountUsd = payroll,
+                AmountFc = payroll * 2250m,
+                Date = date.Date.AddHours(20),
                 Type = "Expense",
                 Category = "Salary",
+                CurrencyCode = "USD",
+                ExchangeRateUsed = 2250m,
                 IsFixed = true,
-                Justification = $"Scheduled salary payout: {employee.UniqueId} ({employee.Name}) @ {date:yyyy-MM-dd}"
+                Justification = $"Weekly payroll: {employee.Name}"
             });
         }
     }
 
-    if ((date - startDate).Days % 14 == 0)
+    if ((date - startDate).Days % 10 == 0)
     {
-        Console.WriteLine($"Seeded through {date:yyyy-MM-dd}...");
+        Console.WriteLine($"Seeded through {date:yyyy-MM-dd}");
         db.SaveChanges();
     }
 }
@@ -304,11 +311,18 @@ foreach (var table in tables)
     table.Status = "Available";
 
 db.SaveChanges();
-Console.WriteLine("6 months of data seeded successfully.");
+Console.WriteLine("Done: 2 months of data seeded.");
+Console.WriteLine();
+Console.WriteLine("=== SIGN-IN CREDENTIALS ===");
+foreach (var employee in employees.OrderBy(e => e.Role).ThenBy(e => e.Name))
+{
+    Console.WriteLine($"{employee.Role,-8} | {employee.Name,-16} | ID: {employee.SignInId,-5} | PIN: {employee.PinCode}");
+}
 
 static Employee CreateEmployee(
     string name,
     string role,
+    string signInId,
     string pin,
     decimal hourlyRate,
     string monday,
@@ -322,12 +336,13 @@ static Employee CreateEmployee(
     return new Employee
     {
         UniqueId = UniqueIdGenerator.NewId("EMP"),
+        SignInId = signInId,
         Name = name,
         Role = role,
         PinCode = pin,
-        PhoneNumber = "+250 700 000 000",
+        PhoneNumber = "+1 555 000 0000",
         HourlyRate = hourlyRate,
-        JoinDate = DateTime.Today.AddMonths(-randomJoinMonths(role)),
+        JoinDate = DateTime.Today.AddMonths(-6),
         EmploymentStatus = "Active",
         MondayShift = monday,
         TuesdayShift = tuesday,
@@ -338,15 +353,6 @@ static Employee CreateEmployee(
         SundayShift = sunday
     };
 }
-
-static int randomJoinMonths(string role) => role switch
-{
-    "Admin" => 24,
-    "Manager" => 18,
-    "Chef" => 16,
-    "Barman" => 14,
-    _ => 10
-};
 
 static InventoryItem CreateInventory(string name, string unit, decimal stock, int expiryDays)
 {
@@ -386,4 +392,57 @@ static string GetShiftForDate(Employee employee, DayOfWeek dayOfWeek)
         DayOfWeek.Sunday => employee.SundayShift,
         _ => "Off"
     };
+}
+
+static void ReduceActiveOrders(AppDbContext db, int keepActiveCount)
+{
+    var activeStatuses = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "Waiting",
+        "In Kitchen",
+        "Ready",
+        "Served"
+    };
+
+    var activeOrders = db.Orders
+        .Include(o => o.Items)
+            .ThenInclude(i => i.Product)
+        .Where(o => activeStatuses.Contains(o.Status))
+        .OrderByDescending(o => o.CreatedAt)
+        .ToList();
+
+    if (activeOrders.Count <= keepActiveCount)
+    {
+        Console.WriteLine($"No change needed. Active orders: {activeOrders.Count}.");
+        return;
+    }
+
+    var toClose = activeOrders.Skip(keepActiveCount).ToList();
+    foreach (var order in toClose)
+    {
+        order.Status = "Completed";
+        order.CompletedAt ??= order.CreatedAt.AddMinutes(45);
+
+        if (order.PaymentAmountUsd <= 0m)
+        {
+            var subtotal = order.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
+            var amountUsd = decimal.Round(subtotal, 2);
+            order.PaymentCurrencyCode = "USD";
+            order.ExchangeRateUsed = order.ExchangeRateUsed <= 0m ? 2250m : order.ExchangeRateUsed;
+            order.PaymentAmount = amountUsd;
+            order.PaymentAmountUsd = amountUsd;
+            order.PaymentAmountFc = decimal.Round(amountUsd * order.ExchangeRateUsed, 2);
+            order.CustomerPaidUsd = amountUsd;
+            order.CustomerPaidFc = 0m;
+            order.ChangeGivenUsd = 0m;
+            order.ChangeGivenFc = 0m;
+        }
+    }
+
+    db.SaveChanges();
+    AppDbContext.ReconcileTableStatusesWithOrders(db);
+    db.SaveChanges();
+
+    var remainingActive = db.Orders.Count(o => activeStatuses.Contains(o.Status));
+    Console.WriteLine($"Active orders reduced from {activeOrders.Count} to {remainingActive}.");
 }

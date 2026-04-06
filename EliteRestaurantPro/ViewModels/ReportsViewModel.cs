@@ -322,9 +322,8 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             var menu = string.Join(", ",
                 order.Items.Select(i => $"{i.Product?.Name ?? "Unknown"} ×{i.Quantity}"));
             var subtotal = order.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
-            var taxAmount = Math.Round(subtotal * 0.07m, 2);
-            var serviceAmount = Math.Round(subtotal * 0.10m, 2);
-            var grandUsd = subtotal + taxAmount + serviceAmount;
+            var totals = OrderTotalsHelper.ComputeTotals(subtotal, "None", 0m);
+            var grandUsd = totals.GrandTotal;
             var payUsd = order.PaymentAmountUsd > 0m ? order.PaymentAmountUsd : grandUsd;
             var payFc = order.PaymentAmountFc > 0m ? order.PaymentAmountFc : CurrencyHelper.ConvertUsdToFc(payUsd);
             var paymentText = CurrencyHelper.FormatDualCurrency(payUsd, payFc);
@@ -527,6 +526,28 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             });
         }
 
+        var relatedReservations = db.Reservations
+            .AsNoTracking()
+            .Where(r => r.TableId == table.Id)
+            .OrderByDescending(r => r.UpdatedAt)
+            .Take(180)
+            .ToList();
+
+        foreach (var reservation in relatedReservations)
+        {
+            var name = string.IsNullOrWhiteSpace(reservation.ReservationName)
+                ? DisplayOrFallback(reservation.GuestName, reservation.UniqueId)
+                : reservation.ReservationName.Trim();
+            entries.Add(new ReportTimeEntryDto
+            {
+                EventTime = reservation.UpdatedAt,
+                EventType = "Reservation",
+                Summary = $"{name} ({reservation.Status})",
+                RelatedInfo = $"Reservation {reservation.UniqueId} | Guest: {DisplayOrFallback(reservation.GuestName, "-")} | Party: {reservation.PartySize}",
+                EntityContext = $"Table {table.TableNumber}"
+            });
+        }
+
         ApplyDayGroups(TableTimelineDays, entries);
 
         TableSummary =
@@ -726,6 +747,31 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             });
         }
 
+        var reservations = db.Reservations
+            .AsNoTracking()
+            .Include(r => r.Table)
+            .Where(r => r.UpdatedAt >= start && r.UpdatedAt < endExclusive)
+            .OrderByDescending(r => r.UpdatedAt)
+            .ToList();
+
+        foreach (var reservation in reservations)
+        {
+            var displayName = string.IsNullOrWhiteSpace(reservation.ReservationName)
+                ? DisplayOrFallback(reservation.GuestName, reservation.UniqueId)
+                : reservation.ReservationName.Trim();
+            var tableLabel = reservation.Table is not null
+                ? $"{reservation.Table.TableNumber} ({DisplayOrFallback(reservation.Table.Name, "-")})"
+                : "-";
+            entries.Add(new ReportTimeEntryDto
+            {
+                EventTime = reservation.UpdatedAt,
+                EventType = "Reservation",
+                Summary = $"Reservation {reservation.UniqueId} · {displayName} · {reservation.Status}",
+                RelatedInfo = $"Reserved for {reservation.ReservedFor:yyyy-MM-dd HH:mm} | Party: {reservation.PartySize} | Table: {tableLabel}",
+                EntityContext = "Reservations"
+            });
+        }
+
         var menuLines = db.OrderItems
             .AsNoTracking()
             .Include(oi => oi.Product)
@@ -808,7 +854,7 @@ public sealed class ReportsViewModel : AdminBaseViewModel
 
         ApplyDayGroups(DailyTimelineDays, entries);
         DailySummary =
-            $"Daily timeline {start:yyyy-MM-dd} → {ReportEndDate:yyyy-MM-dd}: {entries.Count} events (attendance, orders, inventory, salary/Money).";
+            $"Daily timeline {start:yyyy-MM-dd} → {ReportEndDate:yyyy-MM-dd}: {entries.Count} events (attendance, orders, reservations, inventory, salary/Money).";
     }
 
     private static void ApplyDayGroups(ObservableCollection<ReportDayGroupDto> target, IEnumerable<ReportTimeEntryDto> entries)
@@ -995,6 +1041,7 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         bool includeAttendance = reportType is "Daily" or "Employees";
         bool includeOrders = reportType is "Daily" or "Employees" or "Tables" or "Menu";
         bool includeInventory = reportType is "Daily" or "Inventory" or "Menu";
+        bool includeReservations = reportType is "Daily" or "Tables";
 
         if (includeAttendance)
         {
@@ -1147,6 +1194,35 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             }
         }
 
+        if (includeReservations)
+        {
+            var reservationRows = db.Reservations
+                .AsNoTracking()
+                .Where(r => r.UpdatedAt >= start && r.UpdatedAt < endExclusive)
+                .OrderBy(r => r.UpdatedAt)
+                .ThenBy(r => r.Id)
+                .ToList();
+
+            foreach (var reservation in reservationRows)
+            {
+                tablesById.TryGetValue(reservation.TableId ?? 0, out var table);
+                var reservationName = string.IsNullOrWhiteSpace(reservation.ReservationName)
+                    ? DisplayOrFallback(reservation.GuestName, reservation.UniqueId)
+                    : reservation.ReservationName.Trim();
+
+                rows.Add(BuildAnalyticalRow(
+                    eventTime: reservation.UpdatedAt,
+                    eventType: "Reservation",
+                    orderId: reservation.UniqueId,
+                    tableId: table?.UniqueId ?? string.Empty,
+                    tableName: table is null ? string.Empty : $"Table {table.TableNumber} - {table.Name}",
+                    productId: string.Empty,
+                    productName: reservationName,
+                    quantity: reservation.PartySize.ToString(CultureInfo.InvariantCulture),
+                    costOrPrice: reservation.DepositAmountUsd.ToString("0.00", CultureInfo.InvariantCulture)));
+            }
+        }
+
         rows = rows
             .OrderBy(r => r[0])
             .ThenBy(r => r[2])
@@ -1176,9 +1252,8 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             var menu = string.Join("; ",
                 order.Items.Select(i => $"{i.Product?.Name ?? "Unknown"} ×{i.Quantity}"));
             var subtotal = order.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
-            var taxAmount = Math.Round(subtotal * 0.07m, 2);
-            var serviceAmount = Math.Round(subtotal * 0.10m, 2);
-            var grandUsd = subtotal + taxAmount + serviceAmount;
+            var totals = OrderTotalsHelper.ComputeTotals(subtotal, "None", 0m);
+            var grandUsd = totals.GrandTotal;
             var payUsd = order.PaymentAmountUsd > 0m ? order.PaymentAmountUsd : grandUsd;
             var payFc = order.PaymentAmountFc > 0m ? order.PaymentAmountFc : CurrencyHelper.ConvertUsdToFc(payUsd);
 

@@ -58,6 +58,24 @@
                         </Button.Style>
                     </Button>
                     <Button Width="150"
+                            Margin="0,0,10,0"
+                            Command="{Binding ToggleQuantityViewCommand}"
+                            ToolTip="Sort by stock quantity (lowest first) and show stock urgency colors. Click again to return to alphabetical list.">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
+                                <Setter Property="Padding" Value="16,10"/>
+                                <Setter Property="Content" Value="By quantity"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding QuantityViewActive}" Value="True">
+                                        <Setter Property="BorderBrush" Value="{StaticResource GoldAccentBrush}"/>
+                                        <Setter Property="BorderThickness" Value="1"/>
+                                        <Setter Property="Content" Value="By quantity ✓"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <Button Width="150"
                             Content="Add Inventory"
                             Command="{Binding OpenAddDialogCommand}"
                             Style="{StaticResource GoldPrimaryButton}"
@@ -85,6 +103,18 @@
                         <Run Text=" — 15+ days  ·  " Foreground="{StaticResource TextMutedBrush}"/>
                         <Run Text="Neutral" Foreground="#8899AABB" FontWeight="SemiBold"/>
                         <Run Text=" — no expiry date set" Foreground="{StaticResource TextMutedBrush}"/>
+                    </TextBlock>
+                </StackPanel>
+                <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Margin="0,10,0,0"
+                            Visibility="{Binding QuantityViewActive, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="12" TextWrapping="Wrap">
+                        <Run Text="Color key: " FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        <Run Text="Red" Foreground="{StaticResource StatRedBrush}" FontWeight="SemiBold"/>
+                        <Run Text=" — out / critical stock (≤3)  ·  " Foreground="{StaticResource TextMutedBrush}"/>
+                        <Run Text="Orange" Foreground="{StaticResource StatOrangeBrush}" FontWeight="SemiBold"/>
+                        <Run Text=" — low stock (4–10)  ·  " Foreground="{StaticResource TextMutedBrush}"/>
+                        <Run Text="Blue" Foreground="{StaticResource StatBlueBrush}" FontWeight="SemiBold"/>
+                        <Run Text=" — healthy stock (11+)" Foreground="{StaticResource TextMutedBrush}"/>
                     </TextBlock>
                 </StackPanel>
             </Grid>
@@ -140,6 +170,38 @@
                                                 <Setter Property="BorderBrush" Value="#668899AA"/>
                                                 <Setter Property="BorderThickness" Value="6,0,0,0"/>
                                             </MultiDataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding DataContext.QuantityViewActive, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"/>
+                                                    <Condition Binding="{Binding QuantityStatus, Mode=OneWay}" Value="Out"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="BorderBrush" Value="{StaticResource StatRedBrush}"/>
+                                                <Setter Property="BorderThickness" Value="6,0,0,0"/>
+                                            </MultiDataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding DataContext.QuantityViewActive, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"/>
+                                                    <Condition Binding="{Binding QuantityStatus, Mode=OneWay}" Value="Critical"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="BorderBrush" Value="{StaticResource StatRedBrush}"/>
+                                                <Setter Property="BorderThickness" Value="6,0,0,0"/>
+                                            </MultiDataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding DataContext.QuantityViewActive, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"/>
+                                                    <Condition Binding="{Binding QuantityStatus, Mode=OneWay}" Value="Low"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="BorderBrush" Value="{StaticResource StatOrangeBrush}"/>
+                                                <Setter Property="BorderThickness" Value="6,0,0,0"/>
+                                            </MultiDataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding DataContext.QuantityViewActive, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"/>
+                                                    <Condition Binding="{Binding QuantityStatus, Mode=OneWay}" Value="Healthy"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="BorderBrush" Value="{StaticResource StatBlueBrush}"/>
+                                                <Setter Property="BorderThickness" Value="6,0,0,0"/>
+                                            </MultiDataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </Border.Style>
@@ -159,6 +221,32 @@
                                             <Run Text=" "/>
                                             <Run Text="{Binding Unit}"/>
                                         </TextBlock>
+                                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0"
+                                                    Visibility="{Binding DataContext.QuantityViewActive, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <TextBlock Text="Stock status: "
+                                                       Foreground="{StaticResource TextMutedBrush}"
+                                                       FontSize="11"/>
+                                            <TextBlock Text="{Binding QuantityStatus, Mode=OneWay}"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="{StaticResource StatBlueBrush}"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding QuantityStatus, Mode=OneWay}" Value="Out">
+                                                                <Setter Property="Foreground" Value="{StaticResource StatRedBrush}"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding QuantityStatus, Mode=OneWay}" Value="Critical">
+                                                                <Setter Property="Foreground" Value="{StaticResource StatRedBrush}"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding QuantityStatus, Mode=OneWay}" Value="Low">
+                                                                <Setter Property="Foreground" Value="{StaticResource StatOrangeBrush}"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </StackPanel>
                                         <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,4,0,0">
                                             <Run Text="Expires: "/>
                                             <Run Text="{Binding ExpirationDate, StringFormat={}{0:yyyy-MM-dd}, TargetNullValue=N/A}"/>

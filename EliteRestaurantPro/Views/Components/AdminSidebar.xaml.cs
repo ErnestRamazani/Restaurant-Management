@@ -28,12 +28,13 @@ public partial class AdminSidebar : UserControl
         ResetButton(AttendanceButton);
         ResetButton(KitchenQueueButton);
         ResetButton(TablesButton);
+        ResetButton(ReservationsButton);
         ResetButton(ServerPickupButton);
         ResetButton(OrdersButton);
         ResetButton(CreateOrderButton);
         ResetButton(MoneyButton);
         ResetButton(ReportsButton);
-        ResetButton(AppearanceButton);
+        ResetButton(SettingsButton);
 
         switch (viewModel.ActivePage)
         {
@@ -55,6 +56,9 @@ public partial class AdminSidebar : UserControl
             case "Tables":
                 ActivateButton(TablesButton);
                 break;
+            case "Reservations":
+                ActivateButton(ReservationsButton);
+                break;
             case "KitchenQueue":
                 ActivateButton(KitchenQueueButton);
                 break;
@@ -74,7 +78,7 @@ public partial class AdminSidebar : UserControl
                 ActivateButton(ReportsButton);
                 break;
             case "AppearanceSettings":
-                ActivateButton(AppearanceButton);
+                ActivateButton(SettingsButton);
                 break;
         }
     }

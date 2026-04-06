@@ -7,7 +7,6 @@ using System.Windows.Input;
 using EliteRestaurantPro.Data;
 using EliteRestaurantPro.Models;
 using EliteRestaurantPro.Utils;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace EliteRestaurantPro.ViewModels;
@@ -291,7 +290,7 @@ public class TablesViewModel : AdminBaseViewModel
             CloseDialog();
             LoadTables();
         }
-        catch (DbUpdateException ex) when (ex.InnerException is SqliteException sqliteEx && sqliteEx.SqliteErrorCode == 19)
+        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
         {
             MessageBox.Show(
                 "A table with this ID already exists. Table IDs must be unique.",
@@ -365,5 +364,12 @@ public class TablesViewModel : AdminBaseViewModel
         while (used.Contains(next))
             next++;
         return next;
+    }
+
+    private static bool IsUniqueConstraintViolation(DbUpdateException ex)
+    {
+        var message = ex.InnerException?.Message ?? ex.Message;
+        return message.Contains("unique", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("duplicate", StringComparison.OrdinalIgnoreCase);
     }
 }

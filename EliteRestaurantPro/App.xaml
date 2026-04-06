@@ -54,6 +54,10 @@
                 <views:TablesView/>
             </DataTemplate>
 
+            <DataTemplate DataType="{x:Type vm:ReservationsViewModel}">
+                <views:ReservationsView/>
+            </DataTemplate>
+
             <DataTemplate DataType="{x:Type vm:AdminOrdersViewModel}">
                 <views:AdminOrdersView/>
             </DataTemplate>

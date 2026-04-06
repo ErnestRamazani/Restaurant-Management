@@ -4,7 +4,17 @@ public static class CurrencyHelper
 {
     public const string Usd = "USD";
     public const string CongoleseFranc = "FC";
-    public const decimal FcPerUsd = 2250m;
+    public const decimal DefaultFcPerUsd = 2250m;
+
+    public static decimal FcPerUsd
+    {
+        get
+        {
+            var settings = SettingsManager.Load();
+            var rate = settings.CurrencyPricing.UsdToFcRate;
+            return rate > 0m ? rate : DefaultFcPerUsd;
+        }
+    }
 
     public static decimal ConvertUsdToFc(decimal usdAmount)
         => Math.Round(usdAmount * FcPerUsd, 2);
@@ -33,5 +43,12 @@ public static class CurrencyHelper
             : $"$ {amount:N2}";
 
     public static string FormatDualCurrency(decimal usdAmount, decimal fcAmount)
-        => $"{FormatAmount(usdAmount, Usd)} | {FormatAmount(fcAmount, CongoleseFranc)}";
+    {
+        var mode = SettingsManager.Load().CurrencyPricing.DefaultCurrencyDisplayMode;
+        if (string.Equals(mode, Usd, StringComparison.OrdinalIgnoreCase))
+            return FormatAmount(usdAmount, Usd);
+        if (string.Equals(mode, CongoleseFranc, StringComparison.OrdinalIgnoreCase))
+            return FormatAmount(fcAmount, CongoleseFranc);
+        return $"{FormatAmount(usdAmount, Usd)} | {FormatAmount(fcAmount, CongoleseFranc)}";
+    }
 }

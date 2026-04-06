@@ -97,16 +97,55 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="12"/>
                                     <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
 
                                 <StackPanel Grid.Column="0">
+                                    <TextBlock Text="ORDER SOURCE" Style="{StaticResource HeadingSmall}" Margin="0,0,0,8"/>
+                                    <ComboBox ItemsSource="{Binding OrderSources}"
+                                              SelectedItem="{Binding SelectedOrderSource}"
+                                              Style="{StaticResource EliteComboBox}"
+                                              ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="REFERENCE" Style="{StaticResource HeadingSmall}" Margin="0,0,0,8"/>
+                                    <ComboBox ItemsSource="{Binding ArrivedReservations}"
+                                              SelectedItem="{Binding SelectedArrivedReservation, Mode=TwoWay}"
+                                              DisplayMemberPath="Label"
+                                              Style="{StaticResource EliteComboBox}"
+                                              ItemContainerStyle="{StaticResource ComboBoxItemStyle}"
+                                              Visibility="{Binding IsReservationSource, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                    <ComboBox ItemsSource="{Binding DeliveryReferences}"
+                                              Text="{Binding SelectedDeliveryReference, UpdateSourceTrigger=PropertyChanged}"
+                                              IsEditable="True"
+                                              Style="{StaticResource EliteComboBox}"
+                                              ItemContainerStyle="{StaticResource ComboBoxItemStyle}"
+                                              Visibility="{Binding IsDeliverySource, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                    <TextBox Text="None"
+                                             IsReadOnly="True"
+                                             Style="{StaticResource EliteTextBox}"
+                                             Visibility="{Binding IsWalkInSource, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="4">
                                     <TextBlock Text="TABLE" Style="{StaticResource HeadingSmall}" Margin="0,0,0,8"/>
                                     <ComboBox ItemsSource="{Binding AvailableTables}"
                                               SelectedValue="{Binding SelectedTableId}"
                                               SelectedValuePath="Id"
-                                              IsEnabled="{Binding CanEditTablePicker}"
-                                              Style="{StaticResource EliteComboBox}"
+                                              IsEnabled="{Binding CanEditTableForCurrentSource}"
                                               ItemContainerStyle="{StaticResource ComboBoxItemStyle}">
+                                        <ComboBox.Style>
+                                            <Style TargetType="ComboBox" BasedOn="{StaticResource EliteComboBox}">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsDeliverySource}" Value="True">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ComboBox.Style>
                                         <ComboBox.ItemTemplate>
                                             <DataTemplate>
                                                 <TextBlock Foreground="{StaticResource TextPrimaryBrush}" TextWrapping="Wrap">
@@ -120,18 +159,13 @@
                                             </DataTemplate>
                                         </ComboBox.ItemTemplate>
                                     </ComboBox>
+                                    <TextBox Text="None / N-A"
+                                             IsReadOnly="True"
+                                             Style="{StaticResource EliteTextBox}"
+                                             Visibility="{Binding IsDeliverySource, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                 </StackPanel>
 
-                                <StackPanel Grid.Column="2">
-                                    <TextBlock Text="STATUS" Style="{StaticResource HeadingSmall}" Margin="0,0,0,8"/>
-                                    <ComboBox ItemsSource="{Binding OrderStatuses}"
-                                              SelectedItem="{Binding SelectedOrderStatus}"
-                                              IsEnabled="{Binding CanEditOrderStatusPicker}"
-                                              Style="{StaticResource EliteComboBox}"
-                                              ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
-                                </StackPanel>
-
-                                <StackPanel Grid.Column="4">
+                                <StackPanel Grid.Column="6">
                                     <TextBlock Text="MENU TYPE" Style="{StaticResource HeadingSmall}" Margin="0,0,0,8"/>
                                     <ComboBox ItemsSource="{Binding OrderCategories}"
                                               SelectedItem="{Binding SelectedOrderCategory}"
@@ -194,7 +228,7 @@
                             <ItemsControl ItemsSource="{Binding FilteredProductSelections}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Background="#FF1A1A2E" CornerRadius="10" Padding="12,10" Margin="0,0,0,8">
+                                        <Border Background="{StaticResource CardBaseBrush}" CornerRadius="10" Padding="12,10" Margin="0,0,0,8">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="Auto"/>
@@ -271,7 +305,7 @@
                                      AcceptsReturn="True"
                                      VerticalScrollBarVisibility="Auto"
                                      Foreground="{StaticResource TextPrimaryBrush}"
-                                     Background="#FF0D0D1A"
+                                     Background="{StaticResource CardBaseBrush}"
                                      BorderBrush="{StaticResource BorderSubtleBrush}"
                                      BorderThickness="1"
                                      Padding="8"/>
@@ -282,7 +316,7 @@
                                      AcceptsReturn="True"
                                      VerticalScrollBarVisibility="Auto"
                                      Foreground="{StaticResource TextPrimaryBrush}"
-                                     Background="#FF0D0D1A"
+                                     Background="{StaticResource CardBaseBrush}"
                                      BorderBrush="{StaticResource BorderSubtleBrush}"
                                      BorderThickness="1"
                                      Padding="8"/>
@@ -305,7 +339,7 @@
                                          Text="{Binding DiscountInput, UpdateSourceTrigger=PropertyChanged}"
                                          ToolTip="Percent (e.g. 10) or USD amount (e.g. 5.50)"
                                          Foreground="{StaticResource TextPrimaryBrush}"
-                                         Background="#FF0D0D1A"
+                                         Background="{StaticResource CardBaseBrush}"
                                          BorderBrush="{StaticResource BorderSubtleBrush}"
                                          BorderThickness="1"
                                          Padding="8,6"
@@ -346,10 +380,10 @@
                                 <Run Text="Subtotal (items): $ "/><Run Text="{Binding LiveSubtotal, Mode=OneWay, StringFormat={}{0:N2}}"/>
                             </TextBlock>
                             <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0">
-                                <Run Text="TVA (7%): $ "/><Run Text="{Binding LiveTaxAmount, Mode=OneWay, StringFormat={}{0:N2}}"/>
+                                <Run Text="{Binding LiveTaxRateLabel, Mode=OneWay}"/><Run Text=": $ "/><Run Text="{Binding LiveTaxAmount, Mode=OneWay, StringFormat={}{0:N2}}"/>
                             </TextBlock>
                             <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0">
-                                <Run Text="Service (10%): $ "/><Run Text="{Binding LiveServiceAmount, Mode=OneWay, StringFormat={}{0:N2}}"/>
+                                <Run Text="{Binding LiveServiceRateLabel, Mode=OneWay}"/><Run Text=": $ "/><Run Text="{Binding LiveServiceAmount, Mode=OneWay, StringFormat={}{0:N2}}"/>
                             </TextBlock>
                             <TextBlock Foreground="{StaticResource GoldAccentBrush}" FontSize="20" FontWeight="SemiBold" Margin="0,6,0,0">
                                 <Run Text="Grand Total: "/><Run Text="{Binding LiveGrandTotalUsdText, Mode=OneWay}"/>

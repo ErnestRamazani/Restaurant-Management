@@ -18,6 +18,7 @@ public static class ThemeManager
         {
             BackgroundDark = ReadHex("BackgroundDarkBrush", "#FF0F1322"),
             BackgroundMedium = ReadHex("BackgroundMediumBrush", "#FF151B2D"),
+            Sidebar = ReadHex("SidebarBrush", "#FF0C1120"),
             CardBase = ReadHex("CardBaseBrush", "#FF1A2236"),
             GoldAccent = ReadHex("GoldAccentBrush", "#FFD8B24A"),
             TextSecondary = ReadHex("TextSecondaryBrush", "#FFB3BCD3"),
@@ -48,9 +49,17 @@ public static class ThemeManager
 
     public static void ApplyPalette(ThemePalette palette)
     {
-        ApplyColor("BackgroundDarkColor", palette.BackgroundDark);
-        ApplyColor("BackgroundMediumColor", palette.BackgroundMedium);
-        ApplyColor("CardBaseColor", palette.CardBase);
+        // Keep "glass" translucency globally for all menus, even when users
+        // choose fully opaque custom colors in settings.
+        var backgroundDarkGlass = ForceAlpha(palette.BackgroundDark, 0xB3);
+        var backgroundMediumGlass = ForceAlpha(palette.BackgroundMedium, 0x7A);
+        var sidebarGlass = ForceAlpha(palette.Sidebar, 0x96);
+        var cardBaseGlass = ForceAlpha(palette.CardBase, 0x88);
+
+        ApplyColor("BackgroundDarkColor", backgroundDarkGlass);
+        ApplyColor("BackgroundMediumColor", backgroundMediumGlass);
+        ApplyColor("SidebarColor", sidebarGlass);
+        ApplyColor("CardBaseColor", cardBaseGlass);
         ApplyColor("GoldAccentColor", palette.GoldAccent);
         ApplyColor("TextSecondaryColor", palette.TextSecondary);
         ApplyColor("BorderSubtleColor", palette.BorderSubtle);
@@ -58,9 +67,10 @@ public static class ThemeManager
         ApplyColor("StatGreenColor", palette.StatGreen);
         ApplyColor("StatRedColor", palette.StatRed);
 
-        ApplyBrush("BackgroundDarkBrush", palette.BackgroundDark);
-        ApplyBrush("BackgroundMediumBrush", palette.BackgroundMedium);
-        ApplyBrush("CardBaseBrush", palette.CardBase);
+        ApplyBrush("BackgroundDarkBrush", backgroundDarkGlass);
+        ApplyBrush("BackgroundMediumBrush", backgroundMediumGlass);
+        ApplyBrush("SidebarBrush", sidebarGlass);
+        ApplyBrush("CardBaseBrush", cardBaseGlass);
         ApplyBrush("GoldAccentBrush", palette.GoldAccent);
         ApplyBrush("TextSecondaryBrush", palette.TextSecondary);
         ApplyBrush("BorderSubtleBrush", palette.BorderSubtle);
@@ -169,6 +179,15 @@ public static class ThemeManager
             trimmed = "#FF" + trimmed[1..];
 
         return trimmed.ToUpper(CultureInfo.InvariantCulture);
+    }
+
+    private static string ForceAlpha(string value, byte alpha)
+    {
+        var normalized = NormalizeHex(value);
+        if (!TryParseColor(normalized, out var color))
+            return normalized;
+
+        return Color.FromArgb(alpha, color.R, color.G, color.B).ToString();
     }
 
     private static bool TryGetResourceOwner(object key, out ResourceDictionary owner)

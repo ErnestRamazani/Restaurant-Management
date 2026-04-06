@@ -1,9 +1,8 @@
-using System.IO;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using EliteRestaurantPro.Models;
 using EliteRestaurantPro.Utils;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace EliteRestaurantPro.Data;
@@ -11,6 +10,15 @@ namespace EliteRestaurantPro.Data;
 public class AppDbContext : DbContext
 {
     private static readonly bool BootstrapSampleData = false;
+
+    public AppDbContext()
+    {
+    }
+
+    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
+    {
+    }
+
     public DbSet<Employee> Employees => Set<Employee>();
     public DbSet<Product> Products => Set<Product>();
     public DbSet<Table> Tables => Set<Table>();
@@ -23,8 +31,12 @@ public class AppDbContext : DbContext
     public DbSet<SalaryAdvance> SalaryAdvances => Set<SalaryAdvance>();
     public DbSet<PayrollPaymentRecord> PayrollPaymentRecords => Set<PayrollPaymentRecord>();
     public DbSet<MoneyTransaction> Transactions => Set<MoneyTransaction>();
+    public DbSet<CustomerProfile> CustomerProfiles => Set<CustomerProfile>();
+    public DbSet<ReservationBooking> Reservations => Set<ReservationBooking>();
+    public DbSet<WaitlistEntry> WaitlistEntries => Set<WaitlistEntry>();
+    public DbSet<SharedOrderDraft> SharedOrderDrafts => Set<SharedOrderDraft>();
 
-    public static string DatabasePath
+    public static string LegacySqlitePath
     {
         get
         {
@@ -39,27 +51,33 @@ public class AppDbContext : DbContext
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
-        var csb = new SqliteConnectionStringBuilder
+        if (optionsBuilder.IsConfigured)
+            return;
+
+        if (TryGetPostgreSqlConnectionString(out var postgresConnectionString))
         {
-            DataSource = DatabasePath,
-            Mode = SqliteOpenMode.ReadWriteCreate,
-            Cache = SqliteCacheMode.Shared,
-            DefaultTimeout = 30
-        };
-        optionsBuilder.UseSqlite(csb.ToString());
+            optionsBuilder.UseNpgsql(
+                postgresConnectionString,
+                npgsql => npgsql.EnableRetryOnFailure(5));
+            return;
+        }
+
+        throw new InvalidOperationException(
+            "PostgreSQL is required but no connection string was found. " +
+            "Set ELITE_POSTGRES_CONNECTION + ELITE_DB_PROVIDER=PostgreSql " +
+            "or configure Database.PostgreSqlConnectionString in app settings.");
     }
 
     public static void Initialize()
     {
         using var db = new AppDbContext();
         db.Database.EnsureCreated();
-        EnsureSchema(db);
+        EnsureReservationsSchema(db);
+        EnsureOrderReservationColumns(db);
+        EnsureSharedDraftSchema(db);
 
         if (!BootstrapSampleData)
-        {
-            EnsureUniqueIndexes();
             return;
-        }
 
         if (!db.Employees.Any())
         {
@@ -158,9 +176,9 @@ public class AppDbContext : DbContext
         EnsureHistoricalActivity(db, days: 14);
         FinancialTransactionService.EnsureCompletedOrderRevenues(db);
         db.SaveChanges();
-        EnsureUniqueIndexes();
     }
 
+    #if false
     private static void EnsureSchema(AppDbContext db)
     {
         using var conn = new SqliteConnection($"Data Source={DatabasePath}");
@@ -300,6 +318,8 @@ public class AppDbContext : DbContext
 
     }
 
+    #endif
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Table>()
@@ -317,17 +337,31 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<SalaryAdvance>().ToTable("SalaryAdvances");
         modelBuilder.Entity<PayrollPaymentRecord>().ToTable("PayrollPaymentRecords");
         modelBuilder.Entity<MoneyTransaction>().ToTable("Transactions");
+        modelBuilder.Entity<CustomerProfile>().ToTable("CustomerProfiles");
+        modelBuilder.Entity<ReservationBooking>().ToTable("Reservations");
+        modelBuilder.Entity<WaitlistEntry>().ToTable("WaitlistEntries");
+        modelBuilder.Entity<SharedOrderDraft>().ToTable("SharedOrderDrafts");
 
         modelBuilder.Entity<Employee>().HasIndex(e => e.UniqueId).IsUnique();
         modelBuilder.Entity<Employee>()
             .HasIndex(e => e.SignInId)
             .IsUnique()
-            .HasFilter("SignInId IS NOT NULL AND SignInId <> ''");
+            .HasFilter("\"SignInId\" IS NOT NULL AND \"SignInId\" <> ''");
         modelBuilder.Entity<Product>().HasIndex(p => p.UniqueId).IsUnique();
         modelBuilder.Entity<Table>().HasIndex(t => t.UniqueId).IsUnique();
         modelBuilder.Entity<Table>().HasIndex(t => t.TableNumber).IsUnique();
         modelBuilder.Entity<OrderRecord>().HasIndex(o => o.UniqueId).IsUnique();
         modelBuilder.Entity<InventoryItem>().HasIndex(i => i.UniqueId).IsUnique();
+        modelBuilder.Entity<CustomerProfile>().HasIndex(c => c.UniqueId).IsUnique();
+        modelBuilder.Entity<CustomerProfile>().HasIndex(c => c.PrimaryPhone);
+        modelBuilder.Entity<ReservationBooking>().HasIndex(r => r.UniqueId).IsUnique();
+        modelBuilder.Entity<ReservationBooking>().HasIndex(r => r.ReservedFor);
+        modelBuilder.Entity<ReservationBooking>().HasIndex(r => r.Status);
+        modelBuilder.Entity<WaitlistEntry>().HasIndex(w => w.UniqueId).IsUnique();
+        modelBuilder.Entity<WaitlistEntry>().HasIndex(w => w.CreatedAt);
+        modelBuilder.Entity<WaitlistEntry>().HasIndex(w => w.Status);
+        modelBuilder.Entity<SharedOrderDraft>().HasIndex(d => d.UniqueId).IsUnique();
+        modelBuilder.Entity<SharedOrderDraft>().HasIndex(d => new { d.EmployeeId, d.Portal, d.UpdatedAtUtc });
         modelBuilder.Entity<EmployeeAttendance>()
             .HasIndex(a => new { a.EmployeeId, a.WorkDate })
             .IsUnique();
@@ -392,6 +426,351 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<MoneyTransaction>()
             .HasIndex(t => new { t.Date, t.Type });
+
+        modelBuilder.Entity<ReservationBooking>()
+            .HasOne(r => r.CustomerProfile)
+            .WithMany()
+            .HasForeignKey(r => r.CustomerProfileId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<ReservationBooking>()
+            .HasOne(r => r.Table)
+            .WithMany()
+            .HasForeignKey(r => r.TableId)
+            .OnDelete(DeleteBehavior.SetNull);
+    }
+
+    private static void EnsureReservationsSchema(AppDbContext db)
+    {
+        db.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "CustomerProfiles" (
+                "Id" integer GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+                "UniqueId" text NOT NULL DEFAULT '',
+                "FullName" text NOT NULL DEFAULT '',
+                "PrimaryPhone" text NOT NULL DEFAULT '',
+                "Email" text NOT NULL DEFAULT '',
+                "PreferredContactChannel" text NOT NULL DEFAULT 'Phone',
+                "Notes" text NOT NULL DEFAULT '',
+                "NoShowCount" integer NOT NULL DEFAULT 0,
+                "CompletedReservationCount" integer NOT NULL DEFAULT 0,
+                "LastVisitAt" timestamp with time zone NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS "Reservations" (
+                "Id" integer GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+                "UniqueId" text NOT NULL DEFAULT '',
+                "ReservationName" text NOT NULL DEFAULT '',
+                "CustomerProfileId" integer NULL REFERENCES "CustomerProfiles"("Id") ON DELETE SET NULL,
+                "GuestName" text NOT NULL DEFAULT '',
+                "GuestPhone" text NOT NULL DEFAULT '',
+                "PartySize" integer NOT NULL DEFAULT 2,
+                "ReservedFor" timestamp with time zone NOT NULL,
+                "Channel" text NOT NULL DEFAULT 'Phone',
+                "Status" text NOT NULL DEFAULT 'Pending',
+                "UserNotes" text NOT NULL DEFAULT '',
+                "TableId" integer NULL REFERENCES "Tables"("Id") ON DELETE SET NULL,
+                "DepositPaid" boolean NOT NULL DEFAULT false,
+                "DepositAmountUsd" numeric NOT NULL DEFAULT 0,
+                "DepositCurrencyCode" text NOT NULL DEFAULT 'USD',
+                "DepositForfeited" boolean NOT NULL DEFAULT false,
+                "CreatedByEmployeeId" integer NULL,
+                "CreatedByName" text NOT NULL DEFAULT '',
+                "CreatedAt" timestamp with time zone NOT NULL,
+                "UpdatedAt" timestamp with time zone NOT NULL
+            );
+
+            ALTER TABLE "Reservations" ADD COLUMN IF NOT EXISTS "ReservationName" text NOT NULL DEFAULT '';
+
+            CREATE TABLE IF NOT EXISTS "WaitlistEntries" (
+                "Id" integer GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+                "UniqueId" text NOT NULL DEFAULT '',
+                "GuestName" text NOT NULL DEFAULT '',
+                "GuestPhone" text NOT NULL DEFAULT '',
+                "PartySize" integer NOT NULL DEFAULT 2,
+                "QuotedWaitMinutes" integer NULL,
+                "UserNotes" text NOT NULL DEFAULT '',
+                "Status" text NOT NULL DEFAULT 'Waiting',
+                "CreatedAt" timestamp with time zone NOT NULL
+            );
+
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_CustomerProfiles_UniqueId" ON "CustomerProfiles" ("UniqueId");
+            CREATE INDEX IF NOT EXISTS "IX_CustomerProfiles_PrimaryPhone" ON "CustomerProfiles" ("PrimaryPhone");
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_Reservations_UniqueId" ON "Reservations" ("UniqueId");
+            CREATE INDEX IF NOT EXISTS "IX_Reservations_ReservedFor" ON "Reservations" ("ReservedFor");
+            CREATE INDEX IF NOT EXISTS "IX_Reservations_Status" ON "Reservations" ("Status");
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_WaitlistEntries_UniqueId" ON "WaitlistEntries" ("UniqueId");
+            CREATE INDEX IF NOT EXISTS "IX_WaitlistEntries_CreatedAt" ON "WaitlistEntries" ("CreatedAt");
+            CREATE INDEX IF NOT EXISTS "IX_WaitlistEntries_Status" ON "WaitlistEntries" ("Status");
+            """);
+    }
+
+    private static void EnsureOrderReservationColumns(AppDbContext db)
+    {
+        db.Database.ExecuteSqlRaw("""
+            ALTER TABLE "Orders" ADD COLUMN IF NOT EXISTS "OrderSource" text NOT NULL DEFAULT 'WalkIn';
+            ALTER TABLE "Orders" ADD COLUMN IF NOT EXISTS "ReservationBookingId" integer NULL;
+            ALTER TABLE "Orders" ADD COLUMN IF NOT EXISTS "ReservationCode" text NOT NULL DEFAULT '';
+            ALTER TABLE "Orders" ADD COLUMN IF NOT EXISTS "ReservationGuestName" text NOT NULL DEFAULT '';
+            CREATE INDEX IF NOT EXISTS "IX_Orders_OrderSource" ON "Orders" ("OrderSource");
+            CREATE INDEX IF NOT EXISTS "IX_Orders_ReservationBookingId" ON "Orders" ("ReservationBookingId");
+            """);
+    }
+
+    private static void EnsureSharedDraftSchema(AppDbContext db)
+    {
+        db.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "SharedOrderDrafts" (
+                "Id" integer GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+                "UniqueId" text NOT NULL DEFAULT '',
+                "EmployeeId" integer NOT NULL,
+                "EmployeeName" text NOT NULL DEFAULT '',
+                "Portal" text NOT NULL DEFAULT 'Server',
+                "DraftLabel" text NOT NULL DEFAULT '',
+                "PayloadJson" text NOT NULL DEFAULT '{{}}',
+                "CreatedAtUtc" timestamp with time zone NOT NULL,
+                "UpdatedAtUtc" timestamp with time zone NOT NULL
+            );
+
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_SharedOrderDrafts_UniqueId" ON "SharedOrderDrafts" ("UniqueId");
+            CREATE INDEX IF NOT EXISTS "IX_SharedOrderDrafts_EmployeeId_Portal_UpdatedAtUtc"
+                ON "SharedOrderDrafts" ("EmployeeId", "Portal", "UpdatedAtUtc");
+            """);
+    }
+
+    private static bool TryGetPostgreSqlConnectionString(out string connectionString)
+    {
+        connectionString = string.Empty;
+
+        var envProvider = Environment.GetEnvironmentVariable("ELITE_DB_PROVIDER");
+        var envConnection = Environment.GetEnvironmentVariable("ELITE_POSTGRES_CONNECTION");
+        if (string.Equals(envProvider, "PostgreSql", StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(envConnection))
+        {
+            connectionString = envConnection.Trim();
+            return true;
+        }
+
+        DatabaseSettings settings;
+        try
+        {
+            settings = SettingsManager.Load().Database ?? new DatabaseSettings();
+        }
+        catch
+        {
+            settings = new DatabaseSettings();
+        }
+
+        var configured = settings.PostgreSqlConnectionString?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(configured))
+            return false;
+
+        connectionString = configured;
+        return true;
+    }
+
+    public static bool ImportLegacySqliteIntoPostgreSql(out string message)
+    {
+        message = string.Empty;
+        var importLogPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "EliteRestaurantPro",
+            "logs",
+            "sqlite-import.log");
+
+        static void WriteImportLog(string path, string text)
+        {
+            try
+            {
+                var dir = Path.GetDirectoryName(path);
+                if (!string.IsNullOrWhiteSpace(dir))
+                    Directory.CreateDirectory(dir);
+                File.AppendAllText(path, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {text}{Environment.NewLine}");
+            }
+            catch
+            {
+                // Ignore logging failures.
+            }
+        }
+
+        WriteImportLog(importLogPath, "Import requested.");
+        var sqlitePath = LegacySqlitePath;
+        if (!File.Exists(sqlitePath))
+        {
+            message = $"Legacy SQLite file not found at: {sqlitePath}";
+            WriteImportLog(importLogPath, message);
+            return false;
+        }
+
+        if (!TryGetPostgreSqlConnectionString(out var postgresConnectionString))
+        {
+            message = "PostgreSQL connection string is missing.";
+            WriteImportLog(importLogPath, message);
+            return false;
+        }
+
+        var sourceOptions = new DbContextOptionsBuilder<AppDbContext>()
+            .UseSqlite($"Data Source={sqlitePath}")
+            .Options;
+        var targetOptions = new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql(postgresConnectionString, npgsql => npgsql.EnableRetryOnFailure(5))
+            .Options;
+
+        using var sourceDb = new AppDbContext(sourceOptions);
+        using var targetDb = new AppDbContext(targetOptions);
+
+        if (!sourceDb.Database.CanConnect())
+        {
+            message = "Could not connect to legacy SQLite database.";
+            WriteImportLog(importLogPath, message);
+            return false;
+        }
+
+        targetDb.Database.EnsureCreated();
+        using var tx = targetDb.Database.BeginTransaction();
+        targetDb.Database.ExecuteSqlRaw("""
+            TRUNCATE TABLE
+                "OrderItems",
+                "Orders",
+                "ProductIngredients",
+                "InventoryItems",
+                "Tables",
+                "Products",
+                "EmployeeAttendances",
+                "AttendanceDayValidations",
+                "SalaryAdvances",
+                "PayrollPaymentRecords",
+                "Transactions",
+                "Employees"
+            RESTART IDENTITY CASCADE;
+            """);
+
+        var employees = sourceDb.Employees.AsNoTracking().ToList();
+        var products = sourceDb.Products.AsNoTracking().ToList();
+        var tables = sourceDb.Tables.AsNoTracking().ToList();
+        var inventoryItems = sourceDb.InventoryItems.AsNoTracking().ToList();
+        var productIngredients = sourceDb.ProductIngredients.AsNoTracking().ToList();
+        var orders = sourceDb.Orders.AsNoTracking().ToList();
+        var orderItems = sourceDb.OrderItems.AsNoTracking().ToList();
+        var attendances = sourceDb.EmployeeAttendances.AsNoTracking().ToList();
+        var validations = sourceDb.AttendanceDayValidations.AsNoTracking().ToList();
+        var salaryAdvances = sourceDb.SalaryAdvances.AsNoTracking().ToList();
+        var payrollRecords = sourceDb.PayrollPaymentRecords.AsNoTracking().ToList();
+        var transactions = sourceDb.Transactions.AsNoTracking().ToList();
+
+        targetDb.Employees.AddRange(employees);
+        targetDb.Products.AddRange(products);
+        targetDb.Tables.AddRange(tables);
+        targetDb.InventoryItems.AddRange(inventoryItems);
+        targetDb.ProductIngredients.AddRange(productIngredients);
+        targetDb.Orders.AddRange(orders);
+        targetDb.OrderItems.AddRange(orderItems);
+        targetDb.EmployeeAttendances.AddRange(attendances);
+        targetDb.AttendanceDayValidations.AddRange(validations);
+        targetDb.SalaryAdvances.AddRange(salaryAdvances);
+        targetDb.PayrollPaymentRecords.AddRange(payrollRecords);
+        targetDb.Transactions.AddRange(transactions);
+        targetDb.SaveChanges();
+        tx.Commit();
+
+        var targetEmployeeCount = targetDb.Employees.Count();
+        var targetProductCount = targetDb.Products.Count();
+        var targetTableCount = targetDb.Tables.Count();
+        var targetInventoryCount = targetDb.InventoryItems.Count();
+        var targetOrderCount = targetDb.Orders.Count();
+        var targetOrderItemCount = targetDb.OrderItems.Count();
+
+        message =
+            $"Import complete. Employees={employees.Count}, Products={products.Count}, Tables={tables.Count}, " +
+            $"Inventory={inventoryItems.Count}, Orders={orders.Count}, OrderItems={orderItems.Count}. " +
+            $"Target counts -> Employees={targetEmployeeCount}, Products={targetProductCount}, Tables={targetTableCount}, " +
+            $"Inventory={targetInventoryCount}, Orders={targetOrderCount}, OrderItems={targetOrderItemCount}.";
+        WriteImportLog(importLogPath, message);
+        return true;
+    }
+
+    #if false
+    private static string BuildSqliteConnectionString()
+    {
+        var csb = new SqliteConnectionStringBuilder
+        {
+            DataSource = DatabasePath,
+            Mode = SqliteOpenMode.ReadWriteCreate,
+            Cache = SqliteCacheMode.Shared,
+            DefaultTimeout = 30
+        };
+        return csb.ToString();
+    }
+
+    private static void TryMigrateFromSqliteIfConfigured(AppDbContext postgresDb)
+    {
+        DatabaseSettings settings;
+        try
+        {
+            settings = SettingsManager.Load().Database ?? new DatabaseSettings();
+        }
+        catch
+        {
+            settings = new DatabaseSettings();
+        }
+
+        if (!settings.AutoMigrateFromSqlite)
+            return;
+
+        if (!File.Exists(DatabasePath))
+            return;
+
+        if (postgresDb.Employees.Any()
+            || postgresDb.Products.Any()
+            || postgresDb.Tables.Any()
+            || postgresDb.Orders.Any())
+            return;
+
+        var sqliteOptions = new DbContextOptionsBuilder<AppDbContext>()
+            .UseSqlite(BuildSqliteConnectionString())
+            .Options;
+        using var sourceDb = new AppDbContext(sqliteOptions);
+        if (!sourceDb.Database.CanConnect())
+            return;
+
+        // Copy full SQLite dataset into the fresh PostgreSQL schema.
+        postgresDb.Employees.AddRange(sourceDb.Employees.AsNoTracking().ToList());
+        postgresDb.Products.AddRange(sourceDb.Products.AsNoTracking().ToList());
+        postgresDb.Tables.AddRange(sourceDb.Tables.AsNoTracking().ToList());
+        postgresDb.InventoryItems.AddRange(sourceDb.InventoryItems.AsNoTracking().ToList());
+        postgresDb.ProductIngredients.AddRange(sourceDb.ProductIngredients.AsNoTracking().ToList());
+        postgresDb.Orders.AddRange(sourceDb.Orders.AsNoTracking().ToList());
+        postgresDb.OrderItems.AddRange(sourceDb.OrderItems.AsNoTracking().ToList());
+        postgresDb.EmployeeAttendances.AddRange(sourceDb.EmployeeAttendances.AsNoTracking().ToList());
+        postgresDb.AttendanceDayValidations.AddRange(sourceDb.AttendanceDayValidations.AsNoTracking().ToList());
+        postgresDb.SalaryAdvances.AddRange(sourceDb.SalaryAdvances.AsNoTracking().ToList());
+        postgresDb.PayrollPaymentRecords.AddRange(sourceDb.PayrollPaymentRecords.AsNoTracking().ToList());
+        postgresDb.Transactions.AddRange(sourceDb.Transactions.AsNoTracking().ToList());
+        postgresDb.SaveChanges();
+
+        SyncPostgreSqlIdentitySequences(postgresDb);
+    }
+
+    private static void SyncPostgreSqlIdentitySequences(AppDbContext db)
+    {
+        static string Sql(string tableName) =>
+            $@"SELECT setval(
+                pg_get_serial_sequence('""{tableName}""', 'Id'),
+                COALESCE((SELECT MAX(""Id"") FROM ""{tableName}""), 1),
+                true
+            );";
+
+        db.Database.ExecuteSqlRaw(Sql("Employees"));
+        db.Database.ExecuteSqlRaw(Sql("Products"));
+        db.Database.ExecuteSqlRaw(Sql("Tables"));
+        db.Database.ExecuteSqlRaw(Sql("Orders"));
+        db.Database.ExecuteSqlRaw(Sql("OrderItems"));
+        db.Database.ExecuteSqlRaw(Sql("InventoryItems"));
+        db.Database.ExecuteSqlRaw(Sql("ProductIngredients"));
+        db.Database.ExecuteSqlRaw(Sql("EmployeeAttendances"));
+        db.Database.ExecuteSqlRaw(Sql("AttendanceDayValidations"));
+        db.Database.ExecuteSqlRaw(Sql("SalaryAdvances"));
+        db.Database.ExecuteSqlRaw(Sql("PayrollPaymentRecords"));
+        db.Database.ExecuteSqlRaw(Sql("Transactions"));
     }
 
     private static bool TableExists(SqliteConnection conn, string tableName)
@@ -730,6 +1109,8 @@ public class AppDbContext : DbContext
         cmd.CommandText = sql;
         cmd.ExecuteNonQuery();
     }
+
+    #endif
 
     private static void EnsureUniqueIds(AppDbContext db)
     {

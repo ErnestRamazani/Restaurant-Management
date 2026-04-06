@@ -18,23 +18,344 @@
 
             <StackPanel Grid.Row="0" Margin="32,24,32,18">
                 <TextBlock Style="{StaticResource HeadingLarge}" FontSize="26">
-                    <Run Text="Appearance"/>
-                    <Run Text=" Settings" Foreground="{StaticResource GoldAccentBrush}"/>
+                    <Run Text="Settings"/>
+                    <Run Text=" Panel" Foreground="{StaticResource GoldAccentBrush}"/>
                 </TextBlock>
-                <TextBlock Text="Customize theme colors. Changes can be previewed instantly, then saved for next app launch."
+                <TextBlock Text="Business profile, currency &amp; pricing, and appearance controls."
                            Style="{StaticResource BodyText}"
                            Margin="0,6,0,0"/>
+                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                    <TextBlock Text="Section:" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <ComboBox Width="220"
+                              ItemsSource="{Binding SettingsSections}"
+                              SelectedItem="{Binding SelectedSettingsSection, Mode=TwoWay}"
+                              Style="{StaticResource EliteComboBox}"/>
+                </StackPanel>
             </StackPanel>
 
             <ScrollViewer Grid.Row="1" Margin="24,0,24,24" VerticalScrollBarVisibility="Auto">
                 <StackPanel>
-                    <Border Style="{StaticResource GlassCard}" Padding="18">
+                    <Border Style="{StaticResource GlassCard}" Padding="18"
+                            Visibility="{Binding ShowBusinessSection, Converter={StaticResource BoolToVisibilityConverter}}">
                         <StackPanel>
-                            <TextBlock Text="Color Picker (HSL)"
+                            <TextBlock Text="Business Profile"
                                        Foreground="{StaticResource GoldAccentBrush}"
                                        FontSize="20"
                                        FontWeight="SemiBold"/>
-                            <TextBlock Text="Pick visually with sliders, then apply to a token."
+                            <TextBlock Text="Restaurant info for receipts and ticket footer."
+                                       Style="{StaticResource BodyText}"
+                                       Margin="0,4,0,12"/>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,10,10">
+                                    <TextBlock Text="Restaurant name" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBox Text="{Binding RestaurantName, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Row="0" Grid.Column="1" Margin="10,0,0,10">
+                                    <TextBlock Text="Phone" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBox Text="{Binding RestaurantPhone, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,0,0,10">
+                                    <TextBlock Text="Address" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBox Text="{Binding RestaurantAddress, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,0,10,10">
+                                    <TextBlock Text="Website domain" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBox Text="{Binding RestaurantWebsiteDomain, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="2" Grid.Column="1" Margin="10,0,0,10">
+                                    <TextBlock Text="Social media" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBox Text="{Binding RestaurantSocialMedia, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Margin="0,0,0,10">
+                                    <TextBlock Text="Logo path" Style="{StaticResource HeadingSmall}"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="120"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Grid.Column="0" Text="{Binding RestaurantLogoPath, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
+                                        <Button Grid.Column="1" Margin="8,0,0,0" Content="Browse" Command="{Binding BrowseLogoCommand}" Style="{StaticResource GhostButton}"/>
+                                    </Grid>
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="4" Grid.ColumnSpan="2">
+                                    <TextBlock Text="Homepage background image" Style="{StaticResource HeadingSmall}"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="120"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Grid.Column="0"
+                                                 Text="{Binding HomepageBackgroundImagePath, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{StaticResource EliteTextBox}"/>
+                                        <Button Grid.Column="1"
+                                                Margin="8,0,0,0"
+                                                Content="Browse"
+                                                Command="{Binding BrowseHomepageBackgroundCommand}"
+                                                Style="{StaticResource GhostButton}"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Grid>
+
+                            <StackPanel Margin="0,10,0,0">
+                                <TextBlock Text="Footer text for tickets" Style="{StaticResource HeadingSmall}"/>
+                                <TextBox Text="{Binding TicketFooterText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
+                            </StackPanel>
+
+                            <StackPanel Margin="0,10,0,0">
+                                <TextBlock Text="Tax ID / legal info for receipts" Style="{StaticResource HeadingSmall}"/>
+                                <TextBox Text="{Binding TaxIdLegalInfo, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
+                            </StackPanel>
+
+                            <Button Content="Save Business Profile"
+                                    Margin="0,14,0,0"
+                                    Command="{Binding SaveBusinessProfileCommand}"
+                                    Style="{StaticResource GoldPrimaryButton}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource GlassCard}" Margin="0,16,0,0" Padding="18"
+                            Visibility="{Binding ShowCurrencySection, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <StackPanel>
+                            <TextBlock Text="Currency &amp; Pricing"
+                                       Foreground="{StaticResource GoldAccentBrush}"
+                                       FontSize="20"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Text="Default display, exchange rate, rounding, tax and service."
+                                       Style="{StaticResource BodyText}"
+                                       Margin="0,4,0,12"/>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,10,10">
+                                    <TextBlock Text="Default currency display mode" Style="{StaticResource HeadingSmall}"/>
+                                    <ComboBox SelectedValuePath="Content"
+                                              SelectedValue="{Binding DefaultCurrencyDisplayMode, Mode=TwoWay}"
+                                              Style="{StaticResource EliteComboBox}">
+                                        <ComboBoxItem Content="USD"/>
+                                        <ComboBoxItem Content="FC"/>
+                                        <ComboBoxItem Content="Dual"/>
+                                    </ComboBox>
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="0" Grid.Column="1" Margin="10,0,0,10">
+                                    <TextBlock Text="USD ↔ FC exchange rate" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBox Text="{Binding ExchangeRateUsdToFc, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,0,0,10">
+                                    <TextBlock Text="Exchange rate last updated" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBox Text="{Binding ExchangeRateLastUpdated, Mode=OneWay}" Style="{StaticResource EliteTextBox}" IsReadOnly="True"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,0,10,10">
+                                    <TextBlock Text="Rounding: line / subtotal" Style="{StaticResource HeadingSmall}"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="8"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <ComboBox Grid.Column="0" SelectedValuePath="Content" SelectedValue="{Binding RoundingLine, Mode=TwoWay}" Style="{StaticResource EliteComboBox}">
+                                            <ComboBoxItem Content="Nearest"/>
+                                            <ComboBoxItem Content="Up"/>
+                                            <ComboBoxItem Content="Down"/>
+                                            <ComboBoxItem Content="None"/>
+                                        </ComboBox>
+                                        <ComboBox Grid.Column="2" SelectedValuePath="Content" SelectedValue="{Binding RoundingSubtotal, Mode=TwoWay}" Style="{StaticResource EliteComboBox}">
+                                            <ComboBoxItem Content="Nearest"/>
+                                            <ComboBoxItem Content="Up"/>
+                                            <ComboBoxItem Content="Down"/>
+                                            <ComboBoxItem Content="None"/>
+                                        </ComboBox>
+                                    </Grid>
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="2" Grid.Column="1" Margin="10,0,0,10">
+                                    <TextBlock Text="Rounding: grand total" Style="{StaticResource HeadingSmall}"/>
+                                    <ComboBox SelectedValuePath="Content"
+                                              SelectedValue="{Binding RoundingGrandTotal, Mode=TwoWay}"
+                                              Style="{StaticResource EliteComboBox}">
+                                        <ComboBoxItem Content="Nearest"/>
+                                        <ComboBoxItem Content="Up"/>
+                                        <ComboBoxItem Content="Down"/>
+                                        <ComboBoxItem Content="None"/>
+                                    </ComboBox>
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="3" Grid.ColumnSpan="2">
+                                    <TextBlock Text="Tax % / Service % (admin only)" Style="{StaticResource HeadingSmall}"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="8"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Grid.Column="0"
+                                                 Text="{Binding TaxPercent, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{StaticResource EliteTextBox}"
+                                                 IsEnabled="{Binding CanEditTaxService}"/>
+                                        <TextBox Grid.Column="2"
+                                                 Text="{Binding ServicePercent, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{StaticResource EliteTextBox}"
+                                                 IsEnabled="{Binding CanEditTaxService}"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Grid>
+
+                            <Button Content="Save Currency &amp; Pricing"
+                                    Margin="0,14,0,0"
+                                    Command="{Binding SaveCurrencyPricingCommand}"
+                                    Style="{StaticResource GoldPrimaryButton}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource GlassCard}" Margin="0,16,0,0" Padding="18"
+                            Visibility="{Binding ShowMenuBackgroundSection, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <StackPanel>
+                            <TextBlock Text="Menu Backgrounds"
+                                       Foreground="{StaticResource GoldAccentBrush}"
+                                       FontSize="20"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Text="Set a custom image for each navigation page. Dim and contrast apply app-wide."
+                                       Style="{StaticResource BodyText}"
+                                       Margin="0,4,0,12"/>
+
+                            <StackPanel>
+                                <TextBlock Text="Page" Style="{StaticResource HeadingSmall}"/>
+                                <ComboBox ItemsSource="{Binding BackgroundMenuKeys}"
+                                          SelectedItem="{Binding SelectedBackgroundMenu, Mode=TwoWay}"
+                                          Style="{StaticResource EliteComboBox}"/>
+                            </StackPanel>
+
+                            <StackPanel Margin="0,10,0,0">
+                                <TextBlock Text="Background image path" Style="{StaticResource HeadingSmall}"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="120"/>
+                                        <ColumnDefinition Width="120"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Grid.Column="0"
+                                             Text="{Binding SelectedMenuBackgroundPath, UpdateSourceTrigger=PropertyChanged}"
+                                             Style="{StaticResource EliteTextBox}"/>
+                                    <Button Grid.Column="1"
+                                            Margin="8,0,0,0"
+                                            Content="Browse"
+                                            Command="{Binding BrowseMenuBackgroundCommand}"
+                                            Style="{StaticResource GhostButton}"/>
+                                    <Button Grid.Column="2"
+                                            Margin="8,0,0,0"
+                                            Content="Clear"
+                                            Command="{Binding ClearMenuBackgroundCommand}"
+                                            Style="{StaticResource GhostButton}"/>
+                                </Grid>
+                            </StackPanel>
+
+                            <TextBlock Margin="0,10,0,0" Foreground="{StaticResource TextSecondaryBrush}">
+                                <Run Text="Dim light: "/><Run Text="{Binding BackgroundDimStrength, StringFormat={}{0:0.00}}"/>
+                            </TextBlock>
+                            <Slider Minimum="0" Maximum="0.5" Value="{Binding BackgroundDimStrength, Mode=TwoWay}"/>
+
+                            <TextBlock Margin="0,6,0,0" Foreground="{StaticResource TextSecondaryBrush}">
+                                <Run Text="Contrast: "/><Run Text="{Binding BackgroundContrastIntensity, StringFormat={}{0:0.00}}"/>
+                            </TextBlock>
+                            <Slider Minimum="0" Maximum="0.5" Value="{Binding BackgroundContrastIntensity, Mode=TwoWay}"/>
+
+                            <Button Content="Save Menu Background Settings"
+                                    Margin="0,14,0,0"
+                                    Command="{Binding SaveMenuBackgroundCommand}"
+                                    Style="{StaticResource GoldPrimaryButton}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource GlassCard}" Margin="0,16,0,0" Padding="18"
+                            Visibility="{Binding ShowDatabaseSection, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <StackPanel>
+                            <TextBlock Text="Database"
+                                       Foreground="{StaticResource GoldAccentBrush}"
+                                       FontSize="20"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Text="PostgreSQL-only runtime. Save credentials here and restart app."
+                                       Style="{StaticResource BodyText}"
+                                       Margin="0,4,0,12"/>
+
+                            <StackPanel>
+                                <TextBlock Text="Provider" Style="{StaticResource HeadingSmall}"/>
+                                <ComboBox ItemsSource="{Binding DatabaseProviders}"
+                                          SelectedItem="{Binding DatabaseProvider, Mode=TwoWay}"
+                                          Style="{StaticResource EliteComboBox}"/>
+                            </StackPanel>
+
+                            <StackPanel Margin="0,10,0,0">
+                                <TextBlock Text="PostgreSQL connection string" Style="{StaticResource HeadingSmall}"/>
+                                <TextBox Text="{Binding DatabaseConnectionString, UpdateSourceTrigger=PropertyChanged}"
+                                         Height="90"
+                                         TextWrapping="Wrap"
+                                         AcceptsReturn="True"
+                                         VerticalScrollBarVisibility="Auto"
+                                         Style="{StaticResource EliteTextBox}"/>
+                            </StackPanel>
+
+                            <TextBlock Margin="0,8,0,0"
+                                       Foreground="{StaticResource TextMutedBrush}"
+                                       FontSize="11"
+                                       Text="Example: Host=192.168.1.10;Port=5432;Database=elite_restaurant;Username=elite_user;Password=your_password"/>
+
+                            <Grid Margin="0,14,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0"
+                                        Content="Test Connection"
+                                        Margin="0,0,6,0"
+                                        Command="{Binding TestDatabaseConnectionCommand}"
+                                        Style="{StaticResource GhostButton}"/>
+                                <Button Grid.Column="1"
+                                        Content="Save Database Settings"
+                                        Margin="6,0,0,0"
+                                        Command="{Binding SaveDatabaseSettingsCommand}"
+                                        Style="{StaticResource GoldPrimaryButton}"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource GlassCard}" Margin="0,16,0,0" Padding="18"
+                            Visibility="{Binding ShowAppearanceSection, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <StackPanel>
+                            <TextBlock Text="Appearance"
+                                       Foreground="{StaticResource GoldAccentBrush}"
+                                       FontSize="20"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Text="Use HSL picker, then apply the token. No live preview panel."
                                        Style="{StaticResource BodyText}"
                                        Margin="0,4,0,10"/>
 
@@ -56,6 +377,7 @@
                                               Style="{StaticResource EliteComboBox}">
                                         <ComboBoxItem Content="Background Dark"/>
                                         <ComboBoxItem Content="Background Medium"/>
+                                        <ComboBoxItem Content="Sidebar"/>
                                         <ComboBoxItem Content="Card Base"/>
                                         <ComboBoxItem Content="Gold Accent"/>
                                         <ComboBoxItem Content="Text Secondary"/>
@@ -92,129 +414,21 @@
                                 </StackPanel>
                             </Grid>
 
-                            <TextBlock Text="Palette Tokens (manual hex edit if needed)"
-                                       Foreground="{StaticResource GoldAccentBrush}"
-                                       FontSize="17"
-                                       FontWeight="SemiBold"
-                                       Margin="0,18,0,10"/>
-
-                            <Grid>
+                            <Button Content="Apply Theme" Margin="0,12,0,0" Command="{Binding ApplyThemeCommand}" Style="{StaticResource GoldPrimaryButton}"/>
+                            <Grid Margin="0,8,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-
-                                <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,10,10">
-                                    <TextBlock Text="Background Dark" Style="{StaticResource HeadingSmall}"/>
-                                    <TextBox Text="{Binding BackgroundDarkHex, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                                </StackPanel>
-                                <StackPanel Grid.Row="0" Grid.Column="1" Margin="10,0,0,10">
-                                    <TextBlock Text="Background Medium" Style="{StaticResource HeadingSmall}"/>
-                                    <TextBox Text="{Binding BackgroundMediumHex, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                                </StackPanel>
-
-                                <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,10,10">
-                                    <TextBlock Text="Card Base" Style="{StaticResource HeadingSmall}"/>
-                                    <TextBox Text="{Binding CardBaseHex, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                                </StackPanel>
-                                <StackPanel Grid.Row="1" Grid.Column="1" Margin="10,0,0,10">
-                                    <TextBlock Text="Gold Accent" Style="{StaticResource HeadingSmall}"/>
-                                    <TextBox Text="{Binding GoldAccentHex, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                                </StackPanel>
-
-                                <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,0,10,10">
-                                    <TextBlock Text="Text Secondary" Style="{StaticResource HeadingSmall}"/>
-                                    <TextBox Text="{Binding TextSecondaryHex, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                                </StackPanel>
-                                <StackPanel Grid.Row="2" Grid.Column="1" Margin="10,0,0,10">
-                                    <TextBlock Text="Border Subtle" Style="{StaticResource HeadingSmall}"/>
-                                    <TextBox Text="{Binding BorderSubtleHex, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                                </StackPanel>
-
-                                <StackPanel Grid.Row="3" Grid.Column="0" Margin="0,0,10,0">
-                                    <TextBlock Text="Stat Blue" Style="{StaticResource HeadingSmall}"/>
-                                    <TextBox Text="{Binding StatBlueHex, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                                </StackPanel>
-                                <StackPanel Grid.Row="3" Grid.Column="1" Margin="10,0,0,0">
-                                    <TextBlock Text="Stat Green / Stat Red" Style="{StaticResource HeadingSmall}"/>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="8"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox Grid.Column="0" Text="{Binding StatGreenHex, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                                        <TextBox Grid.Column="2" Text="{Binding StatRedHex, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                                    </Grid>
-                                </StackPanel>
+                                <Button Grid.Column="0" Content="Save Theme" Margin="0,0,6,0" Command="{Binding SaveThemeCommand}" Style="{StaticResource GoldPrimaryButton}"/>
+                                <Button Grid.Column="1" Content="Reset Default Theme" Margin="6,0,0,0" Command="{Binding ResetThemeCommand}" Style="{StaticResource GhostButton}"/>
                             </Grid>
                         </StackPanel>
                     </Border>
 
-                    <Border Style="{StaticResource GlassCard}" Margin="0,16,0,0" Padding="18">
-                        <StackPanel>
-                            <TextBlock Text="Live Preview"
-                                       Foreground="{StaticResource GoldAccentBrush}"
-                                       FontSize="18"
-                                       FontWeight="SemiBold"/>
-
-                            <Border Margin="0,12,0,0" Background="{StaticResource CardBaseBrush}" CornerRadius="10" Padding="12">
-                                <StackPanel>
-                                    <TextBlock Text="Preview Card Title"
-                                               Foreground="{StaticResource TextPrimaryBrush}"
-                                               FontSize="16"
-                                               FontWeight="SemiBold"/>
-                                    <TextBlock Text="Secondary text sample for readability."
-                                               Foreground="{StaticResource TextSecondaryBrush}"
-                                               Margin="0,4,0,0"/>
-                                    <DockPanel Margin="0,12,0,0">
-                                        <TextBlock Text="Blue info" Foreground="{StaticResource StatBlueBrush}" Margin="0,0,14,0"/>
-                                        <TextBlock Text="Green success" Foreground="{StaticResource StatGreenBrush}" Margin="0,0,14,0"/>
-                                        <TextBlock Text="Red warning" Foreground="{StaticResource StatRedBrush}"/>
-                                    </DockPanel>
-                                </StackPanel>
-                            </Border>
-
-                            <TextBlock Text="{Binding StatusMessage}"
-                                       Foreground="{StaticResource TextSecondaryBrush}"
-                                       Margin="0,12,0,0"/>
-
-                            <Grid Margin="0,14,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Button Grid.Column="0"
-                                        Content="Apply"
-                                        Margin="0,0,6,0"
-                                        Command="{Binding ApplyThemeCommand}"
-                                        Style="{StaticResource GoldPrimaryButton}"/>
-                                <Button Grid.Column="1"
-                                        Content="Save"
-                                        Margin="6,0,6,0"
-                                        Command="{Binding SaveThemeCommand}"
-                                        Style="{StaticResource GoldPrimaryButton}"/>
-                                <Button Grid.Column="2"
-                                        Content="Reload Current"
-                                        Margin="6,0,6,0"
-                                        Command="{Binding ReloadSavedThemeCommand}"
-                                        Style="{StaticResource GhostButton}"/>
-                                <Button Grid.Column="3"
-                                        Content="Reset Default"
-                                        Margin="6,0,0,0"
-                                        Command="{Binding ResetThemeCommand}"
-                                        Style="{StaticResource GhostButton}"/>
-                            </Grid>
-                        </StackPanel>
-                    </Border>
+                    <TextBlock Text="{Binding StatusMessage}"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               Margin="4,12,0,0"/>
                 </StackPanel>
             </ScrollViewer>
         </Grid>

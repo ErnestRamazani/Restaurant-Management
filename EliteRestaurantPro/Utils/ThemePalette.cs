@@ -2,9 +2,10 @@ namespace EliteRestaurantPro.Utils;
 
 public sealed class ThemePalette
 {
-    public string BackgroundDark { get; set; } = "#FF0F1322";
-    public string BackgroundMedium { get; set; } = "#FF151B2D";
-    public string CardBase { get; set; } = "#FF1A2236";
+    public string BackgroundDark { get; set; } = "#B30E1427";
+    public string BackgroundMedium { get; set; } = "#7A141D33";
+    public string Sidebar { get; set; } = "#960B1224";
+    public string CardBase { get; set; } = "#88202D45";
     public string GoldAccent { get; set; } = "#FFD8B24A";
     public string TextSecondary { get; set; } = "#FFB3BCD3";
     public string BorderSubtle { get; set; } = "#FF35405A";

@@ -29,6 +29,10 @@ public class OrderRecord
     public decimal ChangeGivenUsd { get; set; }
     public decimal ChangeGivenFc { get; set; }
     public decimal ExchangeRateUsed { get; set; } = 2250m;
+    public string OrderSource { get; set; } = "WalkIn";
+    public int? ReservationBookingId { get; set; }
+    public string ReservationCode { get; set; } = string.Empty;
+    public string ReservationGuestName { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; } = DateTime.Now;
     /// <summary>When the order was marked Completed (payment recorded). Used for money ledger date.</summary>
     public DateTime? CompletedAt { get; set; }

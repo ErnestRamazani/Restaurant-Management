@@ -32,7 +32,7 @@ public class InventoryViewModel : AdminBaseViewModel
     private string _adjustmentComment = string.Empty;
     private readonly List<InventoryItem> _allInventoryItems = [];
     private string _searchText = string.Empty;
-    private bool _expirationViewActive;
+    private string _inventoryViewMode = "Default";
 
     public override string ActivePage => "Inventory";
 
@@ -42,13 +42,13 @@ public class InventoryViewModel : AdminBaseViewModel
     /// <summary>When true, list is sorted by expiration urgency and cards show red / orange / blue accents.</summary>
     public bool ExpirationViewActive
     {
-        get => _expirationViewActive;
-        set
-        {
-            if (!SetField(ref _expirationViewActive, value))
-                return;
-            ApplyInventoryFilter();
-        }
+        get => string.Equals(_inventoryViewMode, "Expiration", StringComparison.Ordinal);
+    }
+
+    /// <summary>When true, list is sorted by stock quantity (lowest first) and cards show stock urgency accents.</summary>
+    public bool QuantityViewActive
+    {
+        get => string.Equals(_inventoryViewMode, "Quantity", StringComparison.Ordinal);
     }
 
     public string SearchText
@@ -146,6 +146,7 @@ public class InventoryViewModel : AdminBaseViewModel
 
     public ICommand OpenAddDialogCommand { get; }
     public ICommand ToggleExpirationViewCommand { get; }
+    public ICommand ToggleQuantityViewCommand { get; }
     public ICommand EditItemCommand { get; }
     public ICommand DeleteItemCommand { get; }
     public ICommand OpenAdjustDialogCommand { get; }
@@ -157,7 +158,8 @@ public class InventoryViewModel : AdminBaseViewModel
     public InventoryViewModel(Action<BaseViewModel> navigate) : base(navigate)
     {
         OpenAddDialogCommand = new RelayCommand(_ => OpenAddDialog());
-        ToggleExpirationViewCommand = new RelayCommand(_ => ExpirationViewActive = !ExpirationViewActive);
+        ToggleExpirationViewCommand = new RelayCommand(_ => SetInventoryViewMode(ExpirationViewActive ? "Default" : "Expiration"));
+        ToggleQuantityViewCommand = new RelayCommand(_ => SetInventoryViewMode(QuantityViewActive ? "Default" : "Quantity"));
         EditItemCommand = new RelayCommand(item => OpenEditDialog(item as InventoryItem));
         DeleteItemCommand = new RelayCommand(item => DeleteItem(item as InventoryItem));
         OpenAdjustDialogCommand = new RelayCommand(item => OpenAdjustDialog(item as InventoryItem));
@@ -216,6 +218,13 @@ public class InventoryViewModel : AdminBaseViewModel
                 .ThenBy(i => i.ExpirationDate ?? DateTime.MaxValue)
                 .ThenBy(i => i.Name, StringComparer.OrdinalIgnoreCase);
         }
+        else if (QuantityViewActive)
+        {
+            seq = seq
+                .OrderBy(QuantitySortRank)
+                .ThenBy(i => i.StockQuantity)
+                .ThenBy(i => i.Name, StringComparer.OrdinalIgnoreCase);
+        }
         else
         {
             seq = seq.OrderBy(i => i.Name, StringComparer.OrdinalIgnoreCase);
@@ -236,6 +245,27 @@ public class InventoryViewModel : AdminBaseViewModel
             "Good" => 3,
             _ => 4
         };
+
+    private static int QuantitySortRank(InventoryItem item)
+        => item.QuantityStatus switch
+        {
+            "Out" => 0,
+            "Critical" => 1,
+            "Low" => 2,
+            _ => 3
+        };
+
+    private void SetInventoryViewMode(string mode)
+    {
+        var normalized = string.IsNullOrWhiteSpace(mode) ? "Default" : mode.Trim();
+        if (string.Equals(_inventoryViewMode, normalized, StringComparison.Ordinal))
+            return;
+
+        _inventoryViewMode = normalized;
+        OnPropertyChanged(nameof(ExpirationViewActive));
+        OnPropertyChanged(nameof(QuantityViewActive));
+        ApplyInventoryFilter();
+    }
 
     private static bool InventoryItemMatches(InventoryItem item, string q)
     {
