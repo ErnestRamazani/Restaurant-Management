@@ -1,6 +1,6 @@
 using EliteRestaurant.Api.Dtos;
 using EliteRestaurant.Api.Security;
-using EliteRestaurantPro.Data;
+using EliteRestaurant.Core.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,7 +8,7 @@ namespace EliteRestaurant.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public sealed class ReservationsController(TabletAuthService authService) : ControllerBase
+public sealed class ReservationsController(TabletAuthService authService, AppDbContext db) : ControllerBase
 {
     [HttpGet("arrived")]
     public ActionResult<IReadOnlyList<ArrivedReservationDto>> GetArrivedReservations()
@@ -18,7 +18,6 @@ public sealed class ReservationsController(TabletAuthService authService) : Cont
         if (session is null)
             return Unauthorized(new { message = "Missing or expired bearer token." });
 
-        using var db = new AppDbContext();
         var rows = db.Reservations
             .AsNoTracking()
             .Include(r => r.Table)

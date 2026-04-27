@@ -1,0 +1,851 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EliteRestaurant Technical Appendix</title>
+  <style>
+    @page { size: A4; margin: 18mm 15mm; }
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: #111827;
+      line-height: 1.48;
+      margin: 0;
+      background: #eef2f7;
+    }
+    main {
+      max-width: 1040px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 30px 38px 52px;
+    }
+    h1, h2, h3 {
+      color: #0f172a;
+      line-height: 1.2;
+    }
+    h1 {
+      font-size: 28px;
+      margin: 0 0 12px;
+      border-bottom: 3px solid #0f766e;
+      padding-bottom: 10px;
+    }
+    h2 {
+      font-size: 21px;
+      margin-top: 1.2em;
+      border-bottom: 1px solid #cbd5e1;
+      padding-bottom: 5px;
+    }
+    h3 {
+      font-size: 16px;
+      margin-top: 1em;
+      margin-bottom: 0.35em;
+    }
+    p, li {
+      font-size: 12.9px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 18px;
+      font-size: 12.2px;
+    }
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 7px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #dbeafe;
+    }
+    code {
+      font-family: Consolas, "Courier New", monospace;
+      background: #f1f5f9;
+      padding: 1px 4px;
+      border-radius: 4px;
+      font-size: 11.8px;
+    }
+    .panel {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin: 10px 0;
+    }
+    .warning {
+      background: #fff7ed;
+      border-color: #fdba74;
+    }
+    .break {
+      break-before: page;
+      page-break-before: always;
+    }
+    .small { font-size: 11.7px; color: #475569; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>EliteRestaurant Technical Appendix</h1>
+    <p>
+      This appendix complements the main documentation with deeper implementation detail. It is intended as a maintenance,
+      onboarding, and audit reference for developers or operators who need more than a conceptual overview.
+    </p>
+
+    <div class="panel">
+      <strong>Scope:</strong> repository inventory, startup flow, project dependencies, endpoint reference,
+      entity reference, settings schema, workflow details, tooling notes, and technical observations.
+    </div>
+
+    <h2>A. Repository Inventory</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Area</th>
+          <th>Representative files or folders</th>
+          <th>What lives there</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Desktop shell</td>
+          <td><code>EliteRestaurantPro/App.xaml.cs</code>, <code>MainWindow.xaml</code></td>
+          <td>Application startup, exception logging, import mode, theme initialization, root navigation host.</td>
+        </tr>
+        <tr>
+          <td>Desktop screens</td>
+          <td><code>EliteRestaurantPro/Views</code></td>
+          <td>WPF pages for employees, tables, reservations, orders, money, payroll, reports, login, settings, and kitchen/server work.</td>
+        </tr>
+        <tr>
+          <td>Desktop logic</td>
+          <td><code>EliteRestaurantPro/ViewModels</code></td>
+          <td>MVVM behavior, commands, navigation, business logic integration, dashboard and operational workflows.</td>
+        </tr>
+        <tr>
+          <td>Shared persistence</td>
+          <td><code>EliteRestaurantPro/Data/AppDbContext.cs</code></td>
+          <td>Entity model, indexes, schema patching, bootstrap helpers, active-order reconciliation, legacy import logic.</td>
+        </tr>
+        <tr>
+          <td>Shared utilities</td>
+          <td><code>EliteRestaurantPro/Utils</code></td>
+          <td>Settings, currency, workflow constants, payroll math, alerts, shared drafts, theming, export helpers.</td>
+        </tr>
+        <tr>
+          <td>API surface</td>
+          <td><code>EliteRestaurant.Api/Controllers</code></td>
+          <td>Authentication, server portal data and actions, tables, arrived reservations, and health checks.</td>
+        </tr>
+        <tr>
+          <td>API auth helpers</td>
+          <td><code>EliteRestaurant.Api/Security</code></td>
+          <td>Bearer parsing, in-memory token sessions, portal role candidate selection.</td>
+        </tr>
+        <tr>
+          <td>Web portal</td>
+          <td><code>EliteRestaurant.Api/wwwroot/index.html</code></td>
+          <td>Single-file browser UI with inline CSS and JavaScript.</td>
+        </tr>
+        <tr>
+          <td>Operational seeding</td>
+          <td><code>SeedRunner/Program.cs</code></td>
+          <td>Database reset and data generation tool.</td>
+        </tr>
+        <tr>
+          <td>Operational utility</td>
+          <td><code>Tools/ClearActiveOrders/Program.cs</code></td>
+          <td>Legacy-feeling active order cleanup entry point.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>B. Project Dependencies and Coupling</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Project</th>
+          <th>Direct dependencies</th>
+          <th>Architectural implication</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>EliteRestaurantPro</code></td>
+          <td>ClosedXML, EF Core SQLite, EF Core PostgreSQL, QuestPDF</td>
+          <td>Desktop app also acts as domain and persistence core; package list reveals reporting/export and dual-database history.</td>
+        </tr>
+        <tr>
+          <td><code>EliteRestaurant.Api</code></td>
+          <td>OpenAPI, Swashbuckle, project reference to <code>EliteRestaurantPro</code></td>
+          <td>API is a thin host around the shared desktop/business project rather than an isolated service layer.</td>
+        </tr>
+        <tr>
+          <td><code>SeedRunner</code></td>
+          <td>Project reference to <code>EliteRestaurantPro</code></td>
+          <td>Seeding logic directly manipulates the same live schema and entities as the application.</td>
+        </tr>
+        <tr>
+          <td><code>ClearActiveOrders</code></td>
+          <td>Project reference to <code>EliteRestaurantPro</code></td>
+          <td>Utility relies on shared database code but appears partially out of sync with current implementation.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>C. Startup Sequence Detail</h2>
+    <h3>C1. Desktop startup</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Order</th>
+          <th>Action</th>
+          <th>Why it matters</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td>Enable legacy Npgsql timestamp behavior.</td>
+          <td>Compatibility layer during date/time migration from older storage assumptions.</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>Register unhandled exception hooks.</td>
+          <td>Writes crash information to local logs and keeps operators informed.</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>Configure QuestPDF community license.</td>
+          <td>Enables PDF/report functionality.</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td>Check for <code>--import-sqlite-now</code>.</td>
+          <td>Provides migration path from local legacy DB to PostgreSQL.</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td>Ensure PostgreSQL connection string exists or prompt user.</td>
+          <td>Application is PostgreSQL-required in active mode.</td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td>Attempt database initialization in a retry loop.</td>
+          <td>Allows operator to correct a bad connection string at startup.</td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td>Apply theme palette and continue to UI shell.</td>
+          <td>Final presentation setup before view rendering.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>C2. API startup</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Order</th>
+          <th>Action</th>
+          <th>Effect</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td>Enable legacy timestamp behavior.</td>
+          <td>Keeps DB date compatibility aligned with desktop startup.</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>Call <code>AppDbContext.Initialize()</code>.</td>
+          <td>API startup can create or patch schema before serving requests.</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>Add controllers, Swagger, auth service, CORS.</td>
+          <td>Configures REST surface and API discoverability.</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td>Enable Swagger, CORS, default files, static files, controllers.</td>
+          <td>Serves both API and portal from the same host.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="break"></div>
+
+    <h2>D. Entity Reference</h2>
+    <h3>D1. Staff and identity</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Entity</th>
+          <th>Important fields</th>
+          <th>Behavioral notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>Employee</code></td>
+          <td><code>UniqueId</code>, <code>SignInId</code>, <code>Role</code>, <code>PinCode</code>, <code>ProfileImagePath</code>, shift columns, rates</td>
+          <td>Used for both admin-side HR and tablet sign-in. Includes several non-mapped convenience properties for UI display and schedule summary.</td>
+        </tr>
+        <tr>
+          <td><code>EmployeeAttendance</code></td>
+          <td>Employee id, work date, clock-in/out, status, absence flags</td>
+          <td>Feeds payroll calculations and attendance review flows.</td>
+        </tr>
+        <tr>
+          <td><code>AttendanceDayValidation</code></td>
+          <td>Work date, validation timestamp</td>
+          <td>Supports attendance day confirmation logic.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>D2. Sales and floor</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Entity</th>
+          <th>Important fields</th>
+          <th>Behavioral notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>Table</code></td>
+          <td>Number, name, capacity, status, assigned server</td>
+          <td>Table status is periodically reconciled from active orders, except for maintenance tables.</td>
+        </tr>
+        <tr>
+          <td><code>OrderRecord</code></td>
+          <td>Status, server, notes, discount fields, payment fields, source, reservation linkage, created/completed timestamps</td>
+          <td>Acts as open check, kitchen workflow ticket, payment source, and eventual financial posting trigger.</td>
+        </tr>
+        <tr>
+          <td><code>OrderItem</code></td>
+          <td>Product, quantity, prep employee metadata</td>
+          <td>Each line can carry who should prepare it, usually chef for food and barman for drinks.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>D3. Menu and inventory</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Entity</th>
+          <th>Important fields</th>
+          <th>Behavioral notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>Product</code></td>
+          <td>Name, category, subcategory, price</td>
+          <td>Displayed both in desktop menu management and browser portal product listings.</td>
+        </tr>
+        <tr>
+          <td><code>InventoryItem</code></td>
+          <td>Name, unit, stock quantity, expiration date, notes</td>
+          <td>Supports stock management and ingredient mapping.</td>
+        </tr>
+        <tr>
+          <td><code>ProductIngredient</code></td>
+          <td>Product id, inventory item id, quantity</td>
+          <td>Bridge table between menu and inventory depletion logic.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>D4. Finance and payroll</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Entity</th>
+          <th>Important fields</th>
+          <th>Behavioral notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>MoneyTransaction</code></td>
+          <td>Amount, USD amount, FC amount, date, type, category, justification</td>
+          <td>Central finance ledger for revenue and expenses.</td>
+        </tr>
+        <tr>
+          <td><code>SalaryAdvance</code></td>
+          <td>Employee, amount, payroll month targeting, notes</td>
+          <td>Advances can be applied against future payroll runs.</td>
+        </tr>
+        <tr>
+          <td><code>PayrollPaymentRecord</code></td>
+          <td>Employee, year, month, salary, deductions, bonus, advances, net pay</td>
+          <td>Snapshot of a payroll calculation once paid.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>D5. Reservation and customer relations</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Entity</th>
+          <th>Important fields</th>
+          <th>Behavioral notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>CustomerProfile</code></td>
+          <td>Name, phone, contact preference, visit counters, notes</td>
+          <td>Supports reservation context and repeat guest tracking.</td>
+        </tr>
+        <tr>
+          <td><code>ReservationBooking</code></td>
+          <td>Guest, reserved time, channel, status, deposit, table, creator</td>
+          <td>Contains several computed convenience properties such as urgency, health state, and display name.</td>
+        </tr>
+        <tr>
+          <td><code>WaitlistEntry</code></td>
+          <td>Guest, phone, party size, quoted wait, status</td>
+          <td>Represents non-reservation queueing demand.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>D6. Shared UI-state persistence</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Entity</th>
+          <th>Important fields</th>
+          <th>Behavioral notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>SharedOrderDraft</code></td>
+          <td>Employee id, portal, label, payload JSON, timestamps</td>
+          <td>Stores complete server draft snapshots without normalizing cart or screen state.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>E. Indexes and Relationship Notes</h2>
+    <ul>
+      <li>Unique indexes exist for employee unique ids, product unique ids, table unique ids, and order unique ids.</li>
+      <li><code>Employee.SignInId</code> is unique when populated and non-empty.</li>
+      <li><code>Table.TableNumber</code> is unique.</li>
+      <li><code>ReservationBooking.ReservedFor</code> and status are indexed for time and state filtering.</li>
+      <li><code>SharedOrderDraft</code> is indexed by employee, portal, and update time for recent draft retrieval.</li>
+      <li>Attendance uniqueness is enforced on employee plus work date.</li>
+      <li>Payroll uniqueness is enforced on employee plus year plus month.</li>
+    </ul>
+
+    <div class="break"></div>
+
+    <h2>F. API Endpoint Reference</h2>
+    <h3>F1. Authentication</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Method and route</th>
+          <th>Input</th>
+          <th>Success behavior</th>
+          <th>Failure behavior</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>POST /api/auth/login</code></td>
+          <td><code>staffId</code>, <code>pin</code>, optional <code>portal</code></td>
+          <td>Returns access token, expiration, employee identity, role, and sign-in id.</td>
+          <td>Unauthorized if id, pin, and portal role do not resolve to a valid active employee.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>F2. Server portal configuration and media</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Method and route</th>
+          <th>Purpose</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>GET /api/server/config</code></td>
+          <td>Return restaurant name, logo URL, employee photo URL, currency mode, exchange rate, tax and service settings.</td>
+          <td>Requires a valid server session.</td>
+        </tr>
+        <tr>
+          <td><code>GET /api/server/assets/restaurant-logo?token=...</code></td>
+          <td>Serve the restaurant logo file from local path stored in settings.</td>
+          <td>Uses token in query string rather than bearer header.</td>
+        </tr>
+        <tr>
+          <td><code>GET /api/server/assets/me-photo?token=...</code></td>
+          <td>Serve the logged-in employee photo file.</td>
+          <td>Reads file path from employee record in database.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>F3. Server operational data</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Method and route</th>
+          <th>Purpose</th>
+          <th>Key validation</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>GET /api/server/products</code></td>
+          <td>Return menu items ordered by category, subcategory, and name.</td>
+          <td>Server session required.</td>
+        </tr>
+        <tr>
+          <td><code>GET /api/tables/my</code></td>
+          <td>Return non-maintenance tables, filtered to assigned tables for server role.</td>
+          <td>Any valid session can call; server session narrows results.</td>
+        </tr>
+        <tr>
+          <td><code>GET /api/server/open-check?tableId=...</code></td>
+          <td>Determine whether the table has an open active order.</td>
+          <td>Table must exist and be assigned to current server.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>F4. Shared drafts</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Method and route</th>
+          <th>Purpose</th>
+          <th>Behavioral notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>GET /api/server/drafts</code></td>
+          <td>Return up to 50 recent drafts for the server employee.</td>
+          <td>Ordered by latest update first.</td>
+        </tr>
+        <tr>
+          <td><code>POST /api/server/drafts</code></td>
+          <td>Save a new JSON snapshot draft.</td>
+          <td>Request body must contain valid JSON in <code>SnapshotJson</code>.</td>
+        </tr>
+        <tr>
+          <td><code>DELETE /api/server/drafts/{draftId}</code></td>
+          <td>Delete a draft owned by the current employee.</td>
+          <td>Draft id must belong to the logged-in employee and server portal.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>F5. Orders and ready queue</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Method and route</th>
+          <th>Purpose</th>
+          <th>Important validation and side effects</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>POST /api/server/orders</code></td>
+          <td>Create a new order or append to an open check.</td>
+          <td>Checks table assignment, maintenance status, valid products, discount rules, delivery reference, and recalculates table occupancy and payment totals.</td>
+        </tr>
+        <tr>
+          <td><code>GET /api/server/ready-orders</code></td>
+          <td>Return ready orders for the current server.</td>
+          <td>Includes line summary and totals in both USD and FC.</td>
+        </tr>
+        <tr>
+          <td><code>POST /api/server/orders/{orderId}/serve</code></td>
+          <td>Mark a ready order as served.</td>
+          <td>Only the owning server can call it, and only from the <code>Ready</code> state.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>F6. Reservations and health</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Method and route</th>
+          <th>Purpose</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>GET /api/reservations/arrived</code></td>
+          <td>List recently arrived reservations.</td>
+          <td>Returns up to 100 rows with table label information.</td>
+        </tr>
+        <tr>
+          <td><code>GET /api/health</code></td>
+          <td>Process heartbeat endpoint.</td>
+          <td>No DB check beyond service liveness.</td>
+        </tr>
+        <tr>
+          <td><code>GET /api/health/db</code></td>
+          <td>Quick DB connectivity check with employee and table counts.</td>
+          <td>Returns HTTP 500 with exception message on failure.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>G. Browser Portal Internal Logic</h2>
+    <p>
+      The browser portal is intentionally minimal and stores runtime state in JavaScript variables instead of browser persistence.
+      The token is kept in a variable rather than <code>localStorage</code> or <code>sessionStorage</code>. As a result, a refresh or tab close
+      will remove the active session from the UI side even if the API token still exists server-side.
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>Concern</th>
+          <th>Observed implementation</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>State storage</td>
+          <td>In-memory variables: token, current user, tables, products, ready orders, drafts, config, and cart.</td>
+        </tr>
+        <tr>
+          <td>HTTP wrapper</td>
+          <td>Single <code>api()</code> helper that adds bearer header when needed and parses JSON opportunistically.</td>
+        </tr>
+        <tr>
+          <td>Filtering</td>
+          <td>Client-side search plus category and subcategory filtering over preloaded product list.</td>
+        </tr>
+        <tr>
+          <td>Totals</td>
+          <td>Client-side subtotal, discount, tax, service, and grand total calculation for immediate feedback.</td>
+        </tr>
+        <tr>
+          <td>Draft snapshots</td>
+          <td>Serializes current form state and cart to JSON, then restores from snapshot on load.</td>
+        </tr>
+        <tr>
+          <td>Order submission</td>
+          <td>Builds API payload directly from DOM state and cart contents.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="break"></div>
+
+    <h2>H. Configuration Reference</h2>
+    <h3>H1. Local settings file model</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Section</th>
+          <th>Fields observed</th>
+          <th>Consumers</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>BusinessProfile</code></td>
+          <td>RestaurantName, Phone, Address, WebsiteDomain, SocialMedia, LogoPath, HomepageBackgroundImagePath, TicketFooterText, TaxIdLegalInfo</td>
+          <td>Desktop branding, role screen, admin screens, tickets, server portal config and served assets.</td>
+        </tr>
+        <tr>
+          <td><code>CurrencyPricing</code></td>
+          <td>DefaultCurrencyDisplayMode, UsdToFcRate, ExchangeRateLastUpdatedUtc, RoundingLine, RoundingSubtotal, RoundingGrandTotal, TaxPercent, ServicePercent</td>
+          <td>Order totals, tickets, dashboard, server portal config, money display.</td>
+        </tr>
+        <tr>
+          <td><code>NavigationBackgrounds</code></td>
+          <td>PageImagePaths, DimStrength, ContrastIntensity</td>
+          <td>Main view and visual presentation layers.</td>
+        </tr>
+        <tr>
+          <td><code>Database</code></td>
+          <td>Provider, PostgreSqlConnectionString</td>
+          <td>Database startup configuration for desktop and indirectly API.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>H2. Environment variable behavior</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Variable</th>
+          <th>Purpose</th>
+          <th>Observed use</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>ELITE_DB_PROVIDER</code></td>
+          <td>Select DB provider</td>
+          <td>Must equal <code>PostgreSql</code> for env-based connection activation.</td>
+        </tr>
+        <tr>
+          <td><code>ELITE_POSTGRES_CONNECTION</code></td>
+          <td>Provide PostgreSQL connection string</td>
+          <td>Overrides need for local settings value when provider flag is set.</td>
+        </tr>
+        <tr>
+          <td><code>ELITE_IMPORT_SILENT</code></td>
+          <td>Suppress SQLite import popup</td>
+          <td>Used only in import mode.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>H3. Launch settings and service exposure</h3>
+    <p>
+      API launch settings define an HTTP profile on <code>http://localhost:5223</code> and an HTTPS profile on
+      <code>https://localhost:7194;http://localhost:5223</code>. These are development-oriented defaults, not direct LAN exposure guarantees.
+      External device access depends on actual process binding and firewall configuration.
+    </p>
+
+    <h2>I. Workflow Deep Dive</h2>
+    <h3>I1. Server order creation flow</h3>
+    <ol>
+      <li>Server logs in with staff id plus PIN using portal type <code>Server</code>.</li>
+      <li>Portal loads branding config, assigned tables, products, ready orders, and drafts.</li>
+      <li>Server selects a table, order source, payment currency, discount, and products.</li>
+      <li>Portal optionally checks whether an open check already exists on the table.</li>
+      <li>API validates server ownership of the table and product existence.</li>
+      <li>API either appends to the open check or creates a new <code>OrderRecord</code>.</li>
+      <li>Payment totals are recalculated server-side using shared helpers.</li>
+      <li>Table status is reconciled and remains occupied while the check is open.</li>
+    </ol>
+
+    <h3>I2. Draft round-trip flow</h3>
+    <ol>
+      <li>The portal captures order form state and the cart as a JSON snapshot.</li>
+      <li>A server draft is saved with a generated human-readable label.</li>
+      <li>The database stores the snapshot as <code>PayloadJson</code> in <code>SharedOrderDrafts</code>.</li>
+      <li>Loading a draft restores the table, notes, currency, discount, append mode, and cart.</li>
+      <li>The UI explicitly resets search and category filters so the full menu remains visible after load.</li>
+    </ol>
+
+    <h3>I3. Payroll computation flow</h3>
+    <ol>
+      <li>Determine scheduled workdays and hours for the month from the employee shift pattern.</li>
+      <li>Count absences and late days from attendance rows.</li>
+      <li>Convert every four late days into one deduction unit.</li>
+      <li>Compute base salary after attendance deductions.</li>
+      <li>Compute a five percent bonus on the employee's generated sales where relevant.</li>
+      <li>Subtract applicable salary advances.</li>
+      <li>Write a payroll payment snapshot and, when positive, a salary expense transaction.</li>
+    </ol>
+
+    <h3>I4. Financial posting flow</h3>
+    <p>
+      Completed orders can create revenue entries in <code>Transactions</code>. The code uses a structured justification string
+      to avoid duplicate revenue postings. A helper also aligns revenue transaction dates with order completion timestamps when necessary.
+      This indicates that financial records are expected to reflect the business date of actual order completion rather than simple creation time.
+    </p>
+
+    <h2>J. Tooling and Maintenance Commands</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Tool</th>
+          <th>Typical purpose</th>
+          <th>Observed caution</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>dotnet run --project EliteRestaurant.Api</code></td>
+          <td>Run API, Swagger, and browser portal host.</td>
+          <td>May need explicit URL binding for LAN testing.</td>
+        </tr>
+        <tr>
+          <td><code>dotnet run --project EliteRestaurantPro</code></td>
+          <td>Launch full desktop application.</td>
+          <td>May prompt for PostgreSQL connection if settings are missing.</td>
+        </tr>
+        <tr>
+          <td><code>dotnet run --project SeedRunner</code></td>
+          <td>Reset and seed PostgreSQL data.</td>
+          <td>Destructive to existing operational data.</td>
+        </tr>
+        <tr>
+          <td><code>dotnet run --project SeedRunner -- --reduce-active-orders=N</code></td>
+          <td>Reduce current active order count while preserving newest N active checks.</td>
+          <td>Mutates production-like order states; should be used intentionally.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="break"></div>
+
+    <h2>K. Technical Observations and Risks</h2>
+    <h3>K1. PostgreSQL-first with SQLite residue</h3>
+    <p>
+      The active runtime clearly expects PostgreSQL, but the codebase still contains significant SQLite-era material:
+      import routines, disabled schema methods under conditional compilation, and at least one utility that appears to expect a <code>DatabasePath</code>.
+      This is not inherently wrong, but it means new contributors should not assume the code has been fully normalized after migration.
+    </p>
+
+    <h3>K2. Schema evolution without migrations</h3>
+    <p>
+      Startup-driven schema mutation is workable for small teams, but it has tradeoffs. There is no migration history, rollback strategy,
+      or environment-to-environment migration discipline represented in the repo. For local development and direct operator-managed installations,
+      this may be acceptable. For larger deployments or strict change management, it is a notable limitation.
+    </p>
+
+    <h3>K3. Web portal maintainability</h3>
+    <p>
+      The portal is efficient in deployment terms but expensive in long-term maintainability. Styling, UI structure, client state, and API calls
+      are all in one file. Changes are easy to ship quickly, but the file will become progressively harder to test and reason about as portal scope grows.
+    </p>
+
+    <h3>K4. Auth simplicity</h3>
+    <p>
+      The auth model is perfectly understandable but intentionally lightweight. It is suitable for a trusted local environment, especially when the host machine
+      is physically controlled. However, it is not yet a hardened API authentication design. If future scope includes internet exposure, cross-site access,
+      or multiple organizations, auth should be reconsidered early rather than late.
+    </p>
+
+    <h3>K5. Mixed UI and shared-core responsibility</h3>
+    <p>
+      <code>EliteRestaurantPro</code> is both an application and a reusable domain source. That is convenient today, but it means a web-facing API depends on a project
+      that also contains WPF-specific concerns. A future restructuring into separate class libraries for domain, data access, and desktop UI would reduce coupling.
+    </p>
+
+    <h2>L. Suggested Documentation Maintenance Process</h2>
+    <ol>
+      <li>Update the main technical document whenever new modules, deployment practices, or security assumptions change.</li>
+      <li>Update this appendix whenever entity fields, settings structure, endpoint shapes, or tool behaviors change.</li>
+      <li>Re-audit <code>AppDbContext.Initialize()</code> and controller routes after major feature additions.</li>
+      <li>Keep screenshots, operator guides, and business SOPs separate from this technical set to avoid mixing audiences.</li>
+    </ol>
+
+    <div class="panel warning">
+      <strong>Final technical note:</strong> this appendix is based on the code currently present in the repository and emphasizes actual observed behavior.
+      Where legacy or stale paths appear to remain, they are called out as observations rather than asserted defects unless confirmed by execution.
+    </div>
+
+    <p class="small">
+      Generated on 2026-04-15 for the repository at <code>C:\Users\ernes\Documents\EliteRestaurant</code>.
+    </p>
+  </main>
+</body>
+</html>

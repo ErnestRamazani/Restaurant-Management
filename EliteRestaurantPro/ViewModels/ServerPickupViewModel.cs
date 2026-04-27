@@ -1,9 +1,9 @@
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Input;
-using EliteRestaurantPro.Data;
-using EliteRestaurantPro.Models;
-using EliteRestaurantPro.Utils;
+using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Utils;
 using Microsoft.EntityFrameworkCore;
 
 namespace EliteRestaurantPro.ViewModels;
@@ -103,9 +103,23 @@ public sealed class ServerPickupViewModel : AdminBaseViewModel
         }
 
         order.Status = OrderWorkflow.Served;
-        db.SaveChanges();
-        AppDbContext.ReconcileTableStatusesWithOrders(db);
-        db.SaveChanges();
+        DatabaseResilientTransaction.Execute(db, () =>
+        {
+            using var tx = db.Database.BeginTransaction();
+            try
+            {
+                db.SaveChanges();
+                DataReconciler.ReconcileTableStatusesWithOrders(db);
+                db.SaveChanges();
+                tx.Commit();
+            }
+            catch
+            {
+                tx.Rollback();
+                throw;
+            }
+        });
+
         OrderDetail.Close();
         _ = LoadAsync();
     }

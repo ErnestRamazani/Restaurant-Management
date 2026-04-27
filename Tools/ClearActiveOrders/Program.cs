@@ -1,6 +1,8 @@
-using EliteRestaurantPro.Data;
+using EliteRestaurant.Core.Data;
 
-var path = AppDbContext.DatabasePath;
-var removed = AppDbContext.DeleteAllActiveOrders();
-Console.WriteLine($"Database: {path}");
-Console.WriteLine($"Removed {removed} active order(s) (Waiting / In Kitchen / Ready).");
+DatabaseInitializer.Initialize();
+
+Console.WriteLine($"Database: {AppDbContext.GetDatabaseTargetDescription()}");
+
+var removed = DataReconciler.DeleteAllActiveOrders();
+Console.WriteLine($"Removed {removed} active order(s) (Waiting / In Kitchen / Ready / Served).");

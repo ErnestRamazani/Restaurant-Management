@@ -4,9 +4,9 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
-using EliteRestaurantPro.Data;
-using EliteRestaurantPro.Models;
-using EliteRestaurantPro.Utils;
+using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Utils;
 using Microsoft.EntityFrameworkCore;
 
 namespace EliteRestaurantPro.ViewModels;
@@ -475,13 +475,14 @@ public sealed class ReservationsViewModel : AdminBaseViewModel
 
         if (ReservationTableId.HasValue)
         {
-            var blocked = db.Reservations
-                .Where(r =>
-                    r.Id != reservation.Id &&
-                    r.TableId == ReservationTableId &&
-                    (r.Status == "Pending" || r.Status == "Confirmed" || r.Status == "Arrived"))
-                .AsEnumerable()
-                .Any(r => Math.Abs((r.ReservedFor - reservedFor).TotalMinutes) < 120);
+            var windowLow = reservedFor.AddMinutes(-120);
+            var windowHigh = reservedFor.AddMinutes(120);
+            var blocked = db.Reservations.Any(r =>
+                r.Id != reservation.Id &&
+                r.TableId == ReservationTableId &&
+                (r.Status == "Pending" || r.Status == "Confirmed" || r.Status == "Arrived") &&
+                r.ReservedFor > windowLow &&
+                r.ReservedFor < windowHigh);
 
             if (blocked)
             {

@@ -377,7 +377,7 @@
 
                         <StackPanel Grid.Row="2">
                             <TextBlock Foreground="{StaticResource TextSecondaryBrush}">
-                                <Run Text="Subtotal (items): $ "/><Run Text="{Binding LiveSubtotal, Mode=OneWay, StringFormat={}{0:N2}}"/>
+                                <Run Text="{Binding SubtotalCaption, Mode=OneWay}"/><Run Text="{Binding LiveSubtotal, Mode=OneWay, StringFormat={}{0:N2}}"/>
                             </TextBlock>
                             <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0">
                                 <Run Text="{Binding LiveTaxRateLabel, Mode=OneWay}"/><Run Text=": $ "/><Run Text="{Binding LiveTaxAmount, Mode=OneWay, StringFormat={}{0:N2}}"/>

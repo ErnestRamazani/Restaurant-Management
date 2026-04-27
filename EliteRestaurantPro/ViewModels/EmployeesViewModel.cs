@@ -4,9 +4,9 @@ using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Input;
-using EliteRestaurantPro.Data;
-using EliteRestaurantPro.Models;
-using EliteRestaurantPro.Utils;
+using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Utils;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Win32;
 
@@ -37,6 +37,7 @@ public class EmployeesViewModel : AdminBaseViewModel
     private string _saturdayShift = "Off";
     private string _sundayShift = "Off";
     private string _searchText = string.Empty;
+    private bool _pinStoredForEdit;
     private readonly List<Employee> _allEmployees = [];
 
     public override string ActivePage => "Employees";
@@ -89,6 +90,26 @@ public class EmployeesViewModel : AdminBaseViewModel
         get => _pinCode;
         set => SetField(ref _pinCode, value);
     }
+
+    /// <summary>True when editing an employee who already has a PIN on file (hash or legacy).</summary>
+    public bool PinStoredOnAccount
+    {
+        get => _pinStoredForEdit;
+        private set
+        {
+            if (!SetField(ref _pinStoredForEdit, value))
+                return;
+            OnPropertyChanged(nameof(PinFieldHelpText));
+        }
+    }
+
+    /// <summary>Context-sensitive help next to the PIN field (add vs edit, PIN present or not).</summary>
+    public string PinFieldHelpText =>
+        !_editingEmployeeId.HasValue
+            ? "Tablet login PIN — required for roles that sign in on tablets."
+            : PinStoredOnAccount
+                ? "PIN is set on this account (stored securely). The field is intentionally blank — type a new PIN only to change it."
+                : "No PIN on file yet. Enter one if this role requires tablet login.";
 
     /// <summary>Short ID for server/cashier tablet login (required for those roles).</summary>
     public string SignInId
@@ -217,9 +238,10 @@ public class EmployeesViewModel : AdminBaseViewModel
 
         using var db = new AppDbContext();
         var today = DateTime.Today;
+        var (todayStartUtc, todayEndExclusiveUtc) = AttendanceCalendar.DayRangeUtc(today);
         var todayAttendance = db.EmployeeAttendances
             .AsNoTracking()
-            .Where(a => a.WorkDate == today)
+            .Where(a => a.WorkDate >= todayStartUtc && a.WorkDate < todayEndExclusiveUtc)
             .ToDictionary(a => a.EmployeeId, a => a);
         var todayPendingSalariesByEmployeeId = db.Transactions
             .AsNoTracking()
@@ -292,7 +314,6 @@ public class EmployeesViewModel : AdminBaseViewModel
 
         return Hit(e.Name)
                || Hit(e.Role)
-               || Hit(e.PinCode)
                || Hit(e.SignInId)
                || Hit(e.EmploymentStatus)
                || Hit(e.UniqueId)
@@ -321,6 +342,7 @@ public class EmployeesViewModel : AdminBaseViewModel
         FridayShift = "Off";
         SaturdayShift = "Off";
         SundayShift = "Off";
+        PinStoredOnAccount = false;
         IsDialogOpen = true;
     }
 
@@ -332,7 +354,7 @@ public class EmployeesViewModel : AdminBaseViewModel
         DialogTitle = "Edit Employee";
         EmployeeName = employee.Name;
         SelectedRole = employee.Role;
-        PinCode = employee.PinCode;
+        PinCode = string.Empty;
         SignInId = employee.SignInId;
         PhoneNumber = employee.PhoneNumber;
         HourlyRateText = employee.HourlyRate.ToString("0.##", CultureInfo.InvariantCulture);
@@ -348,6 +370,7 @@ public class EmployeesViewModel : AdminBaseViewModel
         FridayShift = string.IsNullOrWhiteSpace(employee.FridayShift) ? "Off" : employee.FridayShift;
         SaturdayShift = string.IsNullOrWhiteSpace(employee.SaturdayShift) ? "Off" : employee.SaturdayShift;
         SundayShift = string.IsNullOrWhiteSpace(employee.SundayShift) ? "Off" : employee.SundayShift;
+        PinStoredOnAccount = !string.IsNullOrWhiteSpace(employee.PinCode);
         IsDialogOpen = true;
     }
 
@@ -369,15 +392,18 @@ public class EmployeesViewModel : AdminBaseViewModel
         var saturdayShift = SaturdayShift.Trim();
         var sundayShift = SundayShift.Trim();
 
+        var pinRequired = !_editingEmployeeId.HasValue;
         if (string.IsNullOrWhiteSpace(normalizedName) ||
             string.IsNullOrWhiteSpace(normalizedRole) ||
-            string.IsNullOrWhiteSpace(normalizedPin) ||
+            (pinRequired && string.IsNullOrWhiteSpace(normalizedPin)) ||
             !decimal.TryParse(HourlyRateText, NumberStyles.Number, CultureInfo.InvariantCulture, out var hourlyRate) ||
             !DateTime.TryParse(JoinDateText, out var joinDate) ||
             string.IsNullOrWhiteSpace(normalizedStatus))
         {
             MessageBox.Show(
-                "Name, role, PIN, hourly rate, join date, and status are required.",
+                pinRequired
+                    ? "Name, role, PIN, hourly rate, join date, and status are required."
+                    : "Name, role, hourly rate, join date, and status are required. Enter a new PIN only if you want to change it.",
                 "Validation",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
@@ -440,27 +466,33 @@ public class EmployeesViewModel : AdminBaseViewModel
         }
 
         using var db = new AppDbContext();
-        var duplicatePinExists = db.Employees.Any(e =>
-            e.PinCode == normalizedPin &&
-            (!_editingEmployeeId.HasValue || e.Id != _editingEmployeeId.Value));
-
-        if (duplicatePinExists)
+        if (!string.IsNullOrWhiteSpace(normalizedPin))
         {
-            MessageBox.Show(
-                "This PIN is already used by another employee. Please enter a unique PIN.",
-                "Duplicate PIN",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-            return;
+            var duplicatePinExists = db.Employees.AsNoTracking()
+                .Where(e => !_editingEmployeeId.HasValue || e.Id != _editingEmployeeId.Value)
+                .Select(e => e.PinCode)
+                .ToList()
+                .Any(stored => EmployeePinHasher.Verify(normalizedPin, stored));
+
+            if (duplicatePinExists)
+            {
+                MessageBox.Show(
+                    "This PIN is already used by another employee. Please enter a unique PIN.",
+                    "Duplicate PIN",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
         }
 
         if (normalizedSignIn.Length > 0)
         {
-            var others = db.Employees.AsEnumerable()
-                .Where(e => !_editingEmployeeId.HasValue || e.Id != _editingEmployeeId.Value)
-                .ToList();
-            var signInComparer = StringComparer.OrdinalIgnoreCase;
-            if (others.Any(e => signInComparer.Equals(e.SignInId?.Trim(), normalizedSignIn)))
+            var signInLower = normalizedSignIn.ToLowerInvariant();
+            var othersQuery = db.Employees.AsNoTracking()
+                .Where(e => !_editingEmployeeId.HasValue || e.Id != _editingEmployeeId.Value);
+
+            if (othersQuery.Any(e =>
+                    !string.IsNullOrWhiteSpace(e.SignInId) && e.SignInId.Trim().ToLower() == signInLower))
             {
                 MessageBox.Show(
                     "This Sign-in ID is already used by another employee.",
@@ -470,7 +502,7 @@ public class EmployeesViewModel : AdminBaseViewModel
                 return;
             }
 
-            if (others.Any(e => signInComparer.Equals(e.UniqueId?.Trim(), normalizedSignIn)))
+            if (othersQuery.Any(e => e.UniqueId.Trim().ToLower() == signInLower))
             {
                 MessageBox.Show(
                     "This Sign-in ID matches another employee's system Unique ID. Choose a different Sign-in ID.",
@@ -486,7 +518,8 @@ public class EmployeesViewModel : AdminBaseViewModel
             var existing = db.Employees.Single(e => e.Id == employeeId);
             existing.Name = normalizedName;
             existing.Role = normalizedRole;
-            existing.PinCode = normalizedPin;
+            if (!string.IsNullOrWhiteSpace(normalizedPin))
+                existing.PinCode = EmployeePinHasher.HashForStorage(normalizedPin);
             existing.SignInId = isStaffPortalRole ? normalizedSignIn : string.Empty;
             existing.PhoneNumber = normalizedPhone;
             existing.HourlyRate = hourlyRate;
@@ -520,7 +553,7 @@ public class EmployeesViewModel : AdminBaseViewModel
                 SignInId = isStaffPortalRole ? normalizedSignIn : string.Empty,
                 Name = normalizedName,
                 Role = normalizedRole,
-                PinCode = normalizedPin,
+                PinCode = EmployeePinHasher.HashForStorage(normalizedPin),
                 PhoneNumber = normalizedPhone,
                 HourlyRate = hourlyRate,
                 MonthlySalaryUSD = Math.Round(Math.Max(0m, monthlySalaryUsd), 2),
@@ -593,9 +626,11 @@ public class EmployeesViewModel : AdminBaseViewModel
 
         using var db = new AppDbContext();
         var fromDate = DateTime.Today.AddDays(-6);
+        var historyStartUtc = AttendanceCalendar.DayAnchorUtc(fromDate);
+        var historyEndExclusiveUtc = AttendanceCalendar.DayAnchorUtc(DateTime.Today).AddDays(1);
         var history = db.EmployeeAttendances
             .AsNoTracking()
-            .Where(a => a.EmployeeId == employee.Id && a.WorkDate.Date >= fromDate && a.WorkDate.Date <= DateTime.Today)
+            .Where(a => a.EmployeeId == employee.Id && a.WorkDate >= historyStartUtc && a.WorkDate < historyEndExclusiveUtc)
             .OrderByDescending(a => a.WorkDate)
             .ToList();
 

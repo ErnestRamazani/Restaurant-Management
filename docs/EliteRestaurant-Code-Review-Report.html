@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EliteRestaurant Code Review Report</title>
+  <style>
+    @page { size: A4; margin: 18mm 15mm; }
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: #111827;
+      line-height: 1.52;
+      margin: 0;
+      background: #f3f6fb;
+    }
+    main {
+      max-width: 1020px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 32px 38px 52px;
+    }
+    h1, h2, h3 {
+      color: #0f172a;
+      line-height: 1.2;
+    }
+    h1 {
+      font-size: 30px;
+      margin: 0 0 12px;
+      border-bottom: 3px solid #b91c1c;
+      padding-bottom: 10px;
+    }
+    h2 {
+      font-size: 22px;
+      margin-top: 1.25em;
+      border-bottom: 1px solid #cbd5e1;
+      padding-bottom: 5px;
+    }
+    h3 {
+      font-size: 17px;
+      margin-top: 1em;
+      margin-bottom: 0.35em;
+    }
+    p, li {
+      font-size: 13px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 18px;
+      font-size: 12.5px;
+    }
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 8px 9px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #e2e8f0;
+    }
+    code {
+      font-family: Consolas, "Courier New", monospace;
+      background: #f1f5f9;
+      padding: 1px 4px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    pre.snippet {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 11.7px;
+      line-height: 1.45;
+      background: #f8fafc;
+      color: #0f172a;
+      border: 1px solid #cbd5e1;
+      padding: 12px;
+      border-radius: 8px;
+      overflow: hidden;
+      white-space: pre-wrap;
+      margin: 10px 0 12px;
+    }
+    .panel {
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin: 12px 0;
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
+    }
+    .critical {
+      border-color: #ef4444;
+      background: #fef2f2;
+    }
+    .high {
+      border-color: #fb923c;
+      background: #fff7ed;
+    }
+    .medium {
+      border-color: #facc15;
+      background: #fefce8;
+    }
+    .low {
+      border-color: #93c5fd;
+      background: #eff6ff;
+    }
+    .break {
+      break-before: page;
+      page-break-before: always;
+    }
+    .small {
+      font-size: 12px;
+      color: #475569;
+    }
+    ul.tight li {
+      margin-bottom: 4px;
+    }
+    .status-update {
+      border-color: #16a34a;
+      background: #f0fdf4;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>EliteRestaurant Code Review Report</h1>
+    <div class="panel status-update">
+      <strong>Status update (2026-04-15):</strong> Several findings below have been <strong>addressed in code</strong> since this report was written:
+      API no longer references the WPF project (<code>EliteRestaurant.Core</code> shared library), <code>ClearActiveOrders</code> is PostgreSQL-aware and builds,
+      SQLite and legacy import paths were removed, and the <code>#if false</code> duplicate in <code>CreateOrderViewModel</code> was deleted.
+      See <code>docs/ARCHITECTURE-REFACTOR-CORE-AND-POSTGRES.md</code> for details and a clean <code>dotnet build</code> verification log.
+      Snippets under individual findings may still show <em>pre-refactor</em> code for historical context.
+    </div>
+    <p>
+      This report reviews the repository with a code-review lens rather than an architecture lens. The goal is to identify
+      weak code, over-engineering, fragile design, stale or broken implementation, security gaps, and places where the code
+      should be made stronger before the system grows further.
+    </p>
+
+    <div class="panel">
+      <strong>Review scope:</strong> <code>EliteRestaurantPro</code>, <code>EliteRestaurant.Api</code>, <code>SeedRunner</code>, and tooling under <code>Tools</code>.<br>
+      <strong>Method:</strong> static code review plus targeted build verification where helpful.<br>
+      <strong>Important note:</strong> findings are prioritized toward correctness, maintainability, security, and operational risk, not cosmetic style.
+    </div>
+
+    <h2>Findings Summary</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Severity</th>
+          <th>Count</th>
+          <th>Main themes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Critical</td>
+          <td>2</td>
+          <td>Broken tooling and architecture that can fail builds.</td>
+        </tr>
+        <tr>
+          <td>High</td>
+          <td>4</td>
+          <td>Credential handling, weak API auth boundaries, secret storage, and schema/runtime coupling.</td>
+        </tr>
+        <tr>
+          <td>Medium</td>
+          <td>5</td>
+          <td>Overgrown classes, duplicated logic, missing retention, partial-save patterns, and lack of tests.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Findings</h2>
+
+    <div class="panel critical">
+      <h3>1. `ClearActiveOrders` is broken code, not just weak code</h3>
+      <p><strong>Location:</strong> <code>Tools/ClearActiveOrders/Program.cs</code></p>
+      <pre class="snippet"><code>var path = AppDbContext.DatabasePath;
+var removed = AppDbContext.DeleteAllActiveOrders();
+Console.WriteLine($"Database: {path}");
+
+Build verification:
+error CS0117: 'AppDbContext' does not contain a definition for 'DatabasePath'</code></pre>
+      <p>
+        The tool references <code>AppDbContext.DatabasePath</code>, but the active <code>AppDbContext</code> no longer defines that member.
+        A targeted build verification failed with <code>CS0117: 'AppDbContext' does not contain a definition for 'DatabasePath'</code>.
+      </p>
+      <p>
+        <strong>Why this matters:</strong> this is dead operational tooling that looks valid until someone tries to use it. It also confirms
+        that old SQLite-era assumptions are still present in the repository. For maintenance software, broken code is worse than ugly code
+        because it creates false confidence during incidents.
+      </p>
+      <p>
+        <strong>Stronger code direction:</strong> either remove this utility entirely or update it to the real PostgreSQL-first runtime model
+        and keep it in the normal build path.
+      </p>
+    </div>
+
+    <div class="panel critical">
+      <h3>2. The API is coupled to a WPF executable project, and that coupling is already causing build fragility</h3>
+      <p><strong>Location:</strong> <code>EliteRestaurant.Api/EliteRestaurant.Api.csproj</code>, <code>EliteRestaurantPro/EliteRestaurantPro.csproj</code></p>
+      <pre class="snippet"><code>&lt;!-- EliteRestaurant.Api.csproj --&gt;
+&lt;ItemGroup&gt;
+  &lt;ProjectReference Include="..\EliteRestaurantPro\EliteRestaurantPro.csproj" /&gt;
+&lt;/ItemGroup&gt;
+
+&lt;!-- EliteRestaurantPro.csproj --&gt;
+&lt;OutputType&gt;WinExe&lt;/OutputType&gt;
+&lt;TargetFramework&gt;net8.0-windows&lt;/TargetFramework&gt;
+&lt;UseWPF&gt;true&lt;/UseWPF&gt;
+
+Build verification:
+error CS0103: The name 'InitializeComponent' does not exist in the current context</code></pre>
+      <p>
+        The API project has a direct <code>ProjectReference</code> to <code>EliteRestaurantPro.csproj</code>, which is a WPF Windows executable
+        project with <code>&lt;UseWPF&gt;true&lt;/UseWPF&gt;</code> and <code>&lt;OutputType&gt;WinExe&lt;/OutputType&gt;</code>.
+        In this environment, building <code>EliteRestaurant.Api.csproj</code> failed while the referenced WPF temporary project was being built,
+        producing WPF-generated-code errors such as missing <code>InitializeComponent</code> and a missing suitable static <code>Main</code>.
+      </p>
+      <p>
+        <strong>Why this matters:</strong> a web API should not depend directly on a desktop UI application project. Even when it happens to work,
+        it makes backend builds, CI, and deployment much more brittle and harder to port. The current failure shows this is already a real risk,
+        not just a theoretical architecture complaint.
+      </p>
+      <p>
+        <strong>Stronger code direction:</strong> move shared entities, DB context, and domain utilities into a dedicated class library, then let
+        both the API and WPF application reference that library instead of each other.
+      </p>
+    </div>
+
+    <div class="panel high">
+      <h3>3. Employee PINs are stored, compared, and even displayed as plaintext</h3>
+      <p><strong>Location:</strong> <code>EliteRestaurantPro/Models/Employee.cs</code>, <code>EliteRestaurant.Api/Security/TabletAuthService.cs</code>, <code>EliteRestaurantPro/ViewModels/StaffLoginViewModel.cs</code>, <code>EliteRestaurantPro/Views/EmployeesView.xaml</code></p>
+      <pre class="snippet"><code>public class Employee
+{
+    public string PinCode { get; set; } = string.Empty;
+}
+
+// API login
+.Where(e => string.Equals((e.PinCode ?? string.Empty).Trim(), normalizedPin, StringComparison.Ordinal))
+
+// Desktop login
+.Where(e => e.PinCode.Trim() == pin)
+
+// Employee list UI
+&lt;TextBlock Text="{Binding PinCode, StringFormat=PIN {0}}"/&gt;</code></pre>
+      <p>
+        The system stores <code>PinCode</code> directly on the employee model, compares it directly during login, and shows it in the employee UI
+        using text such as <code>PIN {0}</code>. The employee form also edits PIN values directly.
+      </p>
+      <p>
+        <strong>Why this matters:</strong> any database dump, local workstation access, screenshot, or admin view leaks live staff credentials.
+        This is one of the clearest places where the code needs stronger security practices, even for an internal network product.
+      </p>
+      <p>
+        <strong>Stronger code direction:</strong> hash PINs, stop rendering them in the employee list, and replace direct comparison with secure verification.
+      </p>
+    </div>
+
+    <div class="panel high">
+      <h3>4. The API authentication surface is intentionally weak and leaks tokens into URLs</h3>
+      <p><strong>Location:</strong> <code>EliteRestaurant.Api/Program.cs</code>, <code>EliteRestaurant.Api/Security/TabletAuthService.cs</code>, <code>EliteRestaurant.Api/Controllers/ServerPortalController.cs</code>, <code>EliteRestaurant.Api/Security/HttpAuthExtensions.cs</code></p>
+      <pre class="snippet"><code>// CORS
+options.AddPolicy("LanOnly", policy =>
+    policy.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin());
+
+// In-memory token session
+private readonly ConcurrentDictionary&lt;string, AuthenticatedStaffSession&gt; _sessions = new(StringComparer.Ordinal);
+var token = Guid.NewGuid().ToString("N");
+
+// Token embedded into URLs
+var token = Uri.EscapeDataString(session.Token);
+var logoUrl = $"/api/server/assets/restaurant-logo?token={token}";
+var employeePhotoUrl = $"/api/server/assets/me-photo?token={token}";
+
+// Custom bearer parsing
+return header[prefix.Length..].Trim();</code></pre>
+      <p>
+        Several design choices stack together here:
+      </p>
+      <ul class="tight">
+        <li><code>Program.cs</code> sets CORS to <code>AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin()</code>.</li>
+        <li>Sessions are stored only in a singleton in-memory <code>ConcurrentDictionary</code>.</li>
+        <li><code>/api/server/config</code> generates asset URLs that include the access token as a query string parameter.</li>
+        <li>Token validation is custom and bypasses the standard ASP.NET authentication/authorization pipeline.</li>
+      </ul>
+      <p>
+        <strong>Why this matters:</strong> permissive CORS plus query-string token usage increases the chance of accidental token leakage through logs,
+        browser history, screenshots, referrers, or diagnostics. In-memory sessions also disappear on restart, which is an availability and UX weakness.
+      </p>
+      <p>
+        <strong>Stronger code direction:</strong> move assets behind standard bearer-header auth, tighten CORS to expected origins, and consider
+        standard auth middleware or at least a more formal token/session mechanism.
+      </p>
+    </div>
+
+    <div class="panel high">
+      <h3>5. Database connection secrets are stored in plaintext and surfaced in settings UI</h3>
+      <p><strong>Location:</strong> <code>EliteRestaurantPro/Utils/AppSettings.cs</code>, <code>EliteRestaurantPro/Utils/SettingsManager.cs</code>, <code>EliteRestaurantPro/ViewModels/AppearanceSettingsViewModel.cs</code>, <code>EliteRestaurantPro/App.xaml.cs</code></p>
+      <pre class="snippet"><code>public sealed class DatabaseSettings
+{
+    public string Provider { get; set; } = "PostgreSql";
+    public string PostgreSqlConnectionString { get; set; } = string.Empty;
+}
+
+DatabaseConnectionString = db.PostgreSqlConnectionString ?? string.Empty;
+_settings.Database.PostgreSqlConnectionString = DatabaseConnectionString.Trim();
+SettingsManager.Save(_settings);</code></pre>
+      <p>
+        The PostgreSQL connection string is saved directly as <code>Database.PostgreSqlConnectionString</code> in the local app settings file,
+        loaded directly into editable UI state, and saved back without any protection or redaction.
+      </p>
+      <p>
+        <strong>Why this matters:</strong> the database secret is effectively stored as workstation-level plaintext configuration.
+        Any local user, support backup, or copied profile can expose the database credentials. This is especially sensitive when the database
+        is shared beyond a single local machine.
+      </p>
+      <p>
+        <strong>Stronger code direction:</strong> prefer environment variables or OS-protected secret storage for credentials, and avoid showing the full connection string in editable UI by default.
+      </p>
+    </div>
+
+    <div class="panel high">
+      <h3>6. `AppDbContext` mixes too many responsibilities and uses startup-time schema mutation instead of migrations</h3>
+      <p><strong>Location:</strong> <code>EliteRestaurantPro/Data/AppDbContext.cs</code></p>
+      <pre class="snippet"><code>public static void Initialize()
+{
+    using var db = new AppDbContext();
+    db.Database.EnsureCreated();
+    EnsureReservationsSchema(db);
+    EnsureOrderReservationColumns(db);
+    EnsureSharedDraftSchema(db);
+    ...
+    EnsureHistoricalActivity(db, days: 14);
+    FinancialTransactionService.EnsureCompletedOrderRevenues(db);
+}
+
+private static void EnsureSharedDraftSchema(AppDbContext db)
+{
+    db.Database.ExecuteSqlRaw("""
+        CREATE TABLE IF NOT EXISTS "SharedOrderDrafts" (
+            ...
+        );
+    """);
+}</code></pre>
+      <p>
+        <code>AppDbContext</code> currently acts as:
+      </p>
+      <ul class="tight">
+        <li>Entity Framework model definition</li>
+        <li>Startup schema creator</li>
+        <li>Schema patch runner via raw SQL</li>
+        <li>Legacy SQLite migration/import engine</li>
+        <li>Sample/bootstrap data loader</li>
+        <li>Consistency-repair utility</li>
+        <li>Active-order cleanup helper</li>
+      </ul>
+      <p>
+        It also uses <code>Database.EnsureCreated()</code> plus manual <code>ExecuteSqlRaw</code> schema patches instead of EF migrations.
+      </p>
+      <p>
+        <strong>Why this matters:</strong> this is over-engineered in one dimension and under-structured in another. Too much unrelated logic lives
+        in one file, while schema evolution remains ad hoc. This increases regression risk whenever the database model changes.
+      </p>
+      <p>
+        <strong>Stronger code direction:</strong> split schema/migration logic, legacy import logic, repair logic, and operational helpers into distinct classes,
+        and move toward real migrations.
+      </p>
+    </div>
+
+    <div class="break"></div>
+
+    <div class="panel medium">
+      <h3>7. `CreateOrderViewModel` is a god object and still contains archived duplicate implementations in the same file</h3>
+      <p><strong>Location:</strong> <code>EliteRestaurantPro/ViewModels/CreateOrderViewModel.cs</code></p>
+      <pre class="snippet"><code>public sealed class CreateOrderViewModel : AdminBaseViewModel
+{
+    ...
+}
+
+#if false
+public sealed class CreateOrderViewModel : AdminBaseViewModel
+{
+    ...
+}
+
+using System.Collections.ObjectModel;
+...
+public sealed class CreateOrderViewModel : AdminBaseViewModel
+{
+    ...
+}</code></pre>
+      <p>
+        The active class is already very large, and the file also contains duplicate historical versions of <code>CreateOrderViewModel</code>
+        behind <code>#if false</code> blocks and archived code sections. The file is large enough that multiple offsets still reveal repeated class declarations.
+      </p>
+      <p>
+        <strong>Why this matters:</strong> this is classic over-engineering-by-accumulation. The file is trying to hold too many concerns at once:
+        UI state, discounts, table flow, reservation integration, shared drafts, payment display, and tablet-specific logic. Keeping dead copies of previous
+        implementations in the same file makes future bug-fixing and review harder.
+      </p>
+      <p>
+        <strong>Stronger code direction:</strong> extract focused services or helper classes for draft persistence, order submission, table loading,
+        reservation binding, and totals; remove archived code from source control instead of keeping it under preprocessor blocks.
+      </p>
+    </div>
+
+    <div class="panel medium">
+      <h3>8. Shared drafts grow without update or retention logic</h3>
+      <p><strong>Location:</strong> <code>EliteRestaurantPro/Utils/SharedOrderDraftStore.cs</code></p>
+      <pre class="snippet"><code>public static IReadOnlyList&lt;SharedDraftRow&gt; ListServerDrafts(int employeeId)
+{
+    return db.SharedOrderDrafts
+        .Where(d => d.EmployeeId == employeeId && d.Portal == ServerPortal)
+        .OrderByDescending(d => d.UpdatedAtUtc)
+        .Take(50)
+        .ToList();
+}
+
+public static SharedDraftRow SaveServerDraft(...)
+{
+    var entity = new SharedOrderDraft
+    {
+        UniqueId = Guid.NewGuid().ToString("N"),
+        ...
+    };
+    db.SharedOrderDrafts.Add(entity);
+    db.SaveChanges();
+}</code></pre>
+      <p>
+        Every draft save inserts a brand new <code>SharedOrderDraft</code> row with a new GUID. Retrieval is capped to the latest 50 rows,
+        but there is no update-in-place behavior, retention policy, cleanup job, or per-user cap enforced at write time.
+      </p>
+      <p>
+        <strong>Why this matters:</strong> usage grows the table forever while only hiding older rows from the UI. That is weak persistence hygiene
+        and will become a maintenance issue if server staff use drafts heavily.
+      </p>
+      <p>
+        <strong>Stronger code direction:</strong> add update semantics, retention limits, or scheduled cleanup, and consider keeping only a bounded number of drafts per employee.
+      </p>
+    </div>
+
+    <div class="panel medium">
+      <h3>9. Login and role-resolution logic is duplicated across desktop and API</h3>
+      <p><strong>Location:</strong> <code>EliteRestaurant.Api/Security/TabletAuthService.cs</code>, <code>EliteRestaurantPro/ViewModels/StaffLoginViewModel.cs</code></p>
+      <pre class="snippet"><code>// API
+if (string.Equals(portal, "KitchenBar", StringComparison.OrdinalIgnoreCase))
+{
+    return candidates.FirstOrDefault(e => IsKitchenBarRole(e.Role));
+}
+
+// Desktop
+Employee? emp = Kind switch
+{
+    StaffPortalKind.Server => candidates.FirstOrDefault(e =>
+        e.Role.Equals("Server", StringComparison.OrdinalIgnoreCase)),
+    StaffPortalKind.KitchenBar => candidates.FirstOrDefault(e => IsKitchenBarRole(e.Role)),
+    _ => candidates.FirstOrDefault(e =>
+        e.Role.Equals("Cashier", StringComparison.OrdinalIgnoreCase))
+};</code></pre>
+      <p>
+        The desktop and API both independently implement active-employee lookup, PIN matching, and role filtering for server, cashier,
+        and kitchen/bar roles. Even the kitchen/bar role matching list is duplicated.
+      </p>
+      <p>
+        <strong>Why this matters:</strong> duplicated auth logic drifts over time. One login surface can silently accept or reject cases that the other
+        surface handles differently. Auth logic is exactly the kind of logic that should not fork.
+      </p>
+      <p>
+        <strong>Stronger code direction:</strong> centralize staff credential validation and role eligibility in a shared service that both UI and API consume.
+      </p>
+    </div>
+
+    <div class="panel medium">
+      <h3>10. Several write paths save in multiple steps without an explicit transaction boundary</h3>
+      <p><strong>Location:</strong> <code>EliteRestaurant.Api/Controllers/ServerPortalController.cs</code>, <code>EliteRestaurantPro/ViewModels/CreateOrderViewModel.cs</code>, <code>EliteRestaurantPro/ViewModels/AdminOrdersViewModel.cs</code></p>
+      <pre class="snippet"><code>// API
+table.Status = "Occupied";
+db.SaveChanges();
+AppDbContext.ReconcileTableStatusesWithOrders(db);
+db.SaveChanges();
+
+// Desktop admin orders
+order.Status = "Waiting";
+db.SaveChanges();
+AppDbContext.ReconcileTableStatusesWithOrders(db);
+db.SaveChanges();</code></pre>
+      <p>
+        Several workflows follow a pattern like “save order changes, then reconcile table statuses, then save again.”
+        This is visible in multiple code paths where <code>db.SaveChanges()</code> is called, then <code>AppDbContext.ReconcileTableStatusesWithOrders(db)</code>,
+        then <code>db.SaveChanges()</code> again.
+      </p>
+      <p>
+        <strong>Why this matters:</strong> if the second step fails, state can be partially committed. The application may recover later, but it is still
+        weaker than treating the workflow as one unit of work.
+      </p>
+      <p>
+        <strong>Stronger code direction:</strong> wrap multi-step state transitions in transactions or reshape the logic so the full change is persisted atomically.
+      </p>
+    </div>
+
+    <div class="panel medium">
+      <h3>11. The repository has no automated test coverage</h3>
+      <p><strong>Location:</strong> repository-wide observation</p>
+      <pre class="snippet"><code>Repository scan result:
+Result of search in 'C:\Users\ernes\Documents\EliteRestaurant': 0 files found
+
+Pattern used:
+**/*test*</code></pre>
+      <p>
+        No test projects or obvious test files were found in the repository scan.
+      </p>
+      <p>
+        <strong>Why this matters:</strong> this codebase contains payroll rules, order-status workflows, financial posting logic, table occupancy rules,
+        reservation state rules, and draft persistence. Those are all areas where silent regression is expensive. The lack of tests increases the cost of every refactor.
+      </p>
+      <p>
+        <strong>Stronger code direction:</strong> start with focused tests around payroll calculation, order workflow transitions, totals calculation,
+        and table occupancy reconciliation.
+      </p>
+    </div>
+
+    <div class="panel medium">
+      <h3>12. Widespread `AsEnumerable()` usage weakens query efficiency and hides translation problems instead of solving them</h3>
+      <p><strong>Location:</strong> <code>TabletAuthService</code>, <code>StaffLoginViewModel</code>, <code>EmployeesViewModel</code>, <code>ReservationsViewModel</code>, <code>AttendanceViewModel</code>, other ViewModels</p>
+      <pre class="snippet"><code>// API auth
+var candidates = db.Employees.AsNoTracking()
+    .Where(e => e.EmploymentStatus == "Active")
+    .AsEnumerable()
+    .Where(e => string.Equals((e.PinCode ?? string.Empty).Trim(), normalizedPin, StringComparison.Ordinal))
+    .ToList();
+
+// Desktop staff login
+var candidates = db.Employees.AsNoTracking()
+    .Where(e => e.EmploymentStatus == "Active")
+    .AsEnumerable()
+    .Where(e => e.PinCode.Trim() == pin)
+    .ToList();</code></pre>
+      <p>
+        The code frequently switches from database-side filtering to in-memory filtering with <code>AsEnumerable()</code> because certain string operations
+        or helper methods are not SQL-translatable.
+      </p>
+      <p>
+        <strong>Why this matters:</strong> for current small datasets this may be acceptable, but it is a weak long-term pattern. It bypasses indexes,
+        obscures where performance boundaries are, and normalizes application-side filtering as the escape hatch.
+      </p>
+      <p>
+        <strong>Stronger code direction:</strong> normalize data so queryable comparisons are simpler, or move repeated query logic into dedicated database-safe helpers.
+      </p>
+    </div>
+
+    <h2>Over-Engineering Hotspots</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Hotspot</th>
+          <th>Why it feels over-engineered or overgrown</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>AppDbContext.cs</code></td>
+          <td>One file tries to be schema manager, migration bridge, bootstrapper, repair engine, import tool, and persistence layer at the same time.</td>
+        </tr>
+        <tr>
+          <td><code>CreateOrderViewModel.cs</code></td>
+          <td>Large multi-concern ViewModel with retained historical copies instead of extracted smaller components.</td>
+        </tr>
+        <tr>
+          <td>API referencing WPF app</td>
+          <td>Shared reuse was pursued in the wrong place; a dedicated domain library would be simpler and stronger than reusing the full desktop app project.</td>
+        </tr>
+        <tr>
+          <td>Custom token/session/auth flow</td>
+          <td>Reimplements a lighter auth system, but now owns the burden of session cleanup, header parsing, role checks, and token distribution details.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Where the Code Should Be Stronger First</h2>
+    <ol>
+      <li>Separate shared business/data code into a neutral class library and remove the API-to-WPF dependency.</li>
+      <li>Fix or delete broken operational tools so the repository build reflects reality.</li>
+      <li>Stop storing and displaying PINs in plaintext; harden auth and secret handling.</li>
+      <li>Introduce EF migrations and reduce startup-time schema mutation.</li>
+      <li>Break up the largest ViewModels, starting with <code>CreateOrderViewModel</code>.</li>
+      <li>Add a first layer of regression tests around payroll, totals, order transitions, and table reconciliation.</li>
+    </ol>
+
+    <h2>Validation Notes</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Check</th>
+          <th>Observed result</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>dotnet build Tools/ClearActiveOrders/ClearActiveOrders.csproj</code></td>
+          <td>Failed with missing <code>AppDbContext.DatabasePath</code>.</td>
+        </tr>
+        <tr>
+          <td><code>dotnet build EliteRestaurant.Api/EliteRestaurant.Api.csproj</code></td>
+          <td>Failed in this environment while building the referenced WPF project, reinforcing the layering/build-coupling concern.</td>
+        </tr>
+        <tr>
+          <td><code>dotnet build EliteRestaurantPro/EliteRestaurantPro.csproj</code></td>
+          <td>Succeeded, but only after a file-lock retry warning.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="small">
+      This report focuses on actionable engineering risk. Some findings are architectural, some are operational, and some are security-related.
+      The recommended next step is to treat the top three findings as backlog items with explicit owners rather than as documentation-only observations.
+    </p>
+  </main>
+</body>
+</html>

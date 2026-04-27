@@ -1,0 +1,4178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Elite Restaurant — Full Architecture Document</title>
+<style>
+:root { --bg:#fafafa; --text:#111; --muted:#444; --border:#ccc; --code:#0d1117; --code-fg:#e6edf3; }
+* { box-sizing: border-box; }
+body { font-family: Georgia, "Times New Roman", serif; line-height: 1.5; color: var(--text); background: var(--bg); margin: 0; padding: 0; }
+.doc { max-width: 52rem; margin: 0 auto; padding: 2rem 1.25rem 6rem; font-size: 11.5pt; }
+h1 { font-family: system-ui, sans-serif; font-size: 1.85rem; border-bottom: 3px double #333; padding-bottom: 0.4rem; }
+h2 { font-family: system-ui, sans-serif; font-size: 1.35rem; margin-top: 2.25rem; page-break-after: avoid; }
+h3 { font-family: system-ui, sans-serif; font-size: 1.05rem; margin-top: 1.4rem; }
+p.path { font-size: 0.9rem; color: var(--muted); margin: 0.2rem 0 0.5rem; }
+nav.toc { background: #fff; border: 1px solid var(--border); padding: 1rem 1.25rem; margin: 1.5rem 0; columns: 2; column-gap: 2rem; }
+nav.toc ul { margin: 0.4rem 0 0; padding-left: 1.2rem; }
+nav.toc li { margin: 0.15rem 0; break-inside: avoid; }
+pre { background: var(--code); color: var(--code-fg); padding: 0.85rem 1rem; overflow-x: auto; font-size: 8.5pt; line-height: 1.35;
+  border: 1px solid #30363d; border-radius: 6px; page-break-inside: auto; white-space: pre; font-family: Consolas, monospace; }
+code { font-family: Consolas, monospace; font-size: 0.92em; }
+.meta { color: var(--muted); font-size: 0.95rem; }
+.note { border-left: 4px solid #0969da; padding: 0.6rem 1rem; background: #f6f8fa; margin: 1rem 0; }
+.warn { border-left: 4px solid #9a6700; padding: 0.6rem 1rem; background: #fff8c5; margin: 1rem 0; }
+table { border-collapse: collapse; width: 100%; font-size: 0.95rem; margin: 1rem 0; }
+th, td { border: 1px solid var(--border); padding: 0.4rem 0.55rem; text-align: left; vertical-align: top; }
+th { background: #eaeaea; }
+@media print {
+  body { background: #fff; }
+  .doc { max-width: none; font-size: 10pt; padding: 0.5in; }
+  pre { font-size: 7.5pt; }
+  nav.toc { columns: 1; page-break-after: always; }
+}
+</style>
+</head>
+<body>
+
+<div class="doc">
+<header>
+<h1>Elite Restaurant — Full Architecture &amp; Refactor Document</h1>
+<p class="meta"><strong>Purpose:</strong> Architecture for senior review with <strong>verbatim code</strong> (full <code>Program.cs</code>, <code>AppDbContext</code>, Server Portal HTML, WPF bootstrap, services, ViewModel, API auth/pricing, tests). <strong>Print length:</strong> often <strong>50–100+ pages</strong> as PDF.</p>
+</header>
+
+<nav class="toc">
+<strong>Table of contents</strong>
+<ul>
+<li><a href="#a1">1. System context &amp; deployment</a></li>
+<li><a href="#a2">2. Layering &amp; dependency rules</a></li>
+<li><a href="#a3">3. PostgreSQL &amp; EF Core (implementation)</a></li>
+<li><a href="#a4">4. ASP.NET Core API host</a></li>
+<li><a href="#a-dbctx">4b. AppDbContext (full)</a></li>
+<li><a href="#a5">5. CORS, HTTPS, static files</a></li>
+<li><a href="#a6">6. Server Portal — HTML/CSS/JS (excerpt + patterns)</a></li>
+<li><a href="#a7">7. WPF client architecture</a></li>
+<li><a href="#a8">8. Create-order refactor (services + ViewModel)</a></li>
+<li><a href="#a9">9. Configuration merge (API vs SettingsManager)</a></li>
+<li><a href="#a10">10. Testing strategy</a></li>
+<li><a href="#a11">11. Roadmap</a></li>
+</ul>
+</nav>
+
+<h2 id="a1">1. System context &amp; deployment</h2>
+<p>The system runs as: (1) Windows desktops executing <strong>EliteRestaurantPro</strong> against a shared <strong>PostgreSQL</strong> database; (2) one or more <strong>EliteRestaurant.Api</strong> instances on the LAN exposing JSON for tablets and serving <code>wwwroot/index.html</code>; (3) batch tools (<code>SeedRunner</code>) for environments where full reset is acceptable.</p>
+
+<h2 id="a2">2. Layering &amp; dependency rules</h2>
+<p><code>EliteRestaurant.Core</code> has no reference to WPF or ASP.NET. <code>EliteRestaurantPro</code> and <code>EliteRestaurant.Api</code> both depend on Core. Tests depend on Core only so CI avoids Windows-only WPF targets.</p>
+
+<h2 id="a3">3. PostgreSQL &amp; EF Core</h2>
+<p>Desktop and tools typically construct <code>new AppDbContext()</code> which uses <code>OnConfiguring</code> when options are not preset. The API registers <code>AddDbContextPool</code> with Npgsql + retry policy. Migrations live under Core; <code>DatabaseInitializer.Initialize()</code> runs on API startup.</p>
+<div class="note">
+The full <code>AppDbContext</code> is lengthy; inspect <code>EliteRestaurant.Core/Data/AppDbContext.cs</code> in the repository. This document embeds API registration and transactional patterns in the listings below.
+</div>
+
+<h2 id="a4">4. ASP.NET Core API host — full <code>Program.cs</code></h2>
+<h3 id="EliteRestaurant-Api-Program-cs">Program.cs (complete)</h3><p class="path"><code>EliteRestaurant.Api/Program.cs</code> — verbatim</p><pre><code>using System.Net;
+using System.Security.Cryptography.X509Certificates;
+using EliteRestaurant.Api.Security;
+using EliteRestaurant.Core.Data;
+using EliteRestaurant.Api;
+using Microsoft.EntityFrameworkCore;
+
+// Do not set Npgsql.EnableLegacyTimestampBehavior — timestamps rely on UTC conversion in AppDbContext and Npgsql defaults.
+
+var builder = WebApplication.CreateBuilder(args);
+DatabaseInitializer.Initialize();
+
+builder.Services.Configure&lt;CurrencyPricingOptions&gt;(builder.Configuration.GetSection("CurrencyPricing"));
+builder.Services.AddDbContextPool&lt;AppDbContext&gt;(o =&gt;
+    {
+        if (!AppDbContext.TryGetPostgreSqlConnectionString(out var cs))
+        {
+            throw new InvalidOperationException(
+                "PostgreSQL connection string is required for the API. Set ELITE_DB_PROVIDER=PostgreSql and ELITE_POSTGRES_CONNECTION, " +
+                "or configure Database in app settings.");
+        }
+
+        o.UseNpgsql(cs, n =&gt; n.EnableRetryOnFailure(5));
+    },
+    poolSize: 32);
+
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+builder.Services.AddScoped&lt;TabletAuthService&gt;();
+
+const string CorsPolicyRestrictToConfiguredOrigins = "RestrictToConfiguredOrigins";
+var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get&lt;string[]&gt;()
+                  ?? Array.Empty&lt;string&gt;();
+if (corsOrigins.Length == 0)
+    throw new InvalidOperationException(
+        "Cors:AllowedOrigins must list at least one origin (e.g. https://192.168.x.x:7194 for tablets).");
+
+var lanSection = builder.Configuration.GetSection("LanHttps");
+var httpPort = lanSection.GetValue("HttpPort", 5223);
+var httpsPort = lanSection.GetValue("HttpsPort", 7194);
+var certRelative = lanSection["CertificatePath"] ?? "certs/elite-lan.pfx";
+var certPath = Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, certRelative));
+var certPassword = Environment.GetEnvironmentVariable("ELITE_LAN_CERTIFICATE_PASSWORD")
+                   ?? lanSection["CertificatePassword"]
+                   ?? "";
+
+var lanHttpsEnabled = File.Exists(certPath);
+if (lanHttpsEnabled)
+{
+    builder.Services.AddHttpsRedirection(options =&gt;
+    {
+        options.HttpsPort = httpsPort;
+    });
+}
+
+builder.WebHost.ConfigureKestrel((_, options) =&gt;
+{
+    if (lanHttpsEnabled)
+    {
+        try
+        {
+            var cert = new X509Certificate2(certPath, certPassword, X509KeyStorageFlags.EphemeralKeySet);
+            options.Listen(IPAddress.Any, httpsPort, listen =&gt; listen.UseHttps(cert));
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"Failed to load HTTPS certificate '{certPath}'. " +
+                "Set ELITE_LAN_CERTIFICATE_PASSWORD if the PFX is password-protected. See docs/HTTPS-LAN.md.",
+                ex);
+        }
+    }
+    else
+    {
+        Console.WriteLine(
+            $"[EliteRestaurant.Api] LAN HTTPS certificate not found at '{certPath}'. " +
+            $"HTTP only on port {httpPort}. Export a PFX and restart (docs/HTTPS-LAN.md).");
+    }
+
+    options.Listen(IPAddress.Any, httpPort);
+});
+
+builder.Services.AddCors(options =&gt;
+{
+    options.AddPolicy(CorsPolicyRestrictToConfiguredOrigins, policy =&gt;
+        policy.WithOrigins(corsOrigins)
+            .AllowAnyHeader()
+            .AllowAnyMethod());
+});
+
+var app = builder.Build();
+
+if (lanHttpsEnabled)
+    app.UseHttpsRedirection();
+
+app.UseSwagger();
+app.UseSwaggerUI();
+
+app.UseCors(CorsPolicyRestrictToConfiguredOrigins);
+app.UseDefaultFiles();
+app.UseStaticFiles();
+app.MapControllers();
+
+app.Run();
+</code></pre>
+<h2 id="a-dbctx">4b. AppDbContext (complete — EF model &amp; configuration)</h2><h3 id="EliteRestaurant-Core-Data-AppDbContext-cs">AppDbContext.cs</h3><p class="path"><code>EliteRestaurant.Core/Data/AppDbContext.cs</code> — verbatim</p><pre><code>using System;
+using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Utils;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Npgsql;
+
+namespace EliteRestaurant.Core.Data;
+
+public class AppDbContext : DbContext
+{
+    public AppDbContext()
+    {
+    }
+
+    public AppDbContext(DbContextOptions&lt;AppDbContext&gt; options) : base(options)
+    {
+    }
+
+    public DbSet&lt;Employee&gt; Employees =&gt; Set&lt;Employee&gt;();
+    public DbSet&lt;Product&gt; Products =&gt; Set&lt;Product&gt;();
+    public DbSet&lt;Table&gt; Tables =&gt; Set&lt;Table&gt;();
+    public DbSet&lt;OrderRecord&gt; Orders =&gt; Set&lt;OrderRecord&gt;();
+    public DbSet&lt;OrderItem&gt; OrderItems =&gt; Set&lt;OrderItem&gt;();
+    public DbSet&lt;InventoryItem&gt; InventoryItems =&gt; Set&lt;InventoryItem&gt;();
+    public DbSet&lt;ProductIngredient&gt; ProductIngredients =&gt; Set&lt;ProductIngredient&gt;();
+    public DbSet&lt;EmployeeAttendance&gt; EmployeeAttendances =&gt; Set&lt;EmployeeAttendance&gt;();
+    public DbSet&lt;AttendanceDayValidation&gt; AttendanceDayValidations =&gt; Set&lt;AttendanceDayValidation&gt;();
+    public DbSet&lt;SalaryAdvance&gt; SalaryAdvances =&gt; Set&lt;SalaryAdvance&gt;();
+    public DbSet&lt;PayrollPaymentRecord&gt; PayrollPaymentRecords =&gt; Set&lt;PayrollPaymentRecord&gt;();
+    public DbSet&lt;MoneyTransaction&gt; Transactions =&gt; Set&lt;MoneyTransaction&gt;();
+    public DbSet&lt;CustomerProfile&gt; CustomerProfiles =&gt; Set&lt;CustomerProfile&gt;();
+    public DbSet&lt;ReservationBooking&gt; Reservations =&gt; Set&lt;ReservationBooking&gt;();
+    public DbSet&lt;WaitlistEntry&gt; WaitlistEntries =&gt; Set&lt;WaitlistEntry&gt;();
+    public DbSet&lt;SharedOrderDraft&gt; SharedOrderDrafts =&gt; Set&lt;SharedOrderDraft&gt;();
+    public DbSet&lt;TabletSession&gt; TabletSessions =&gt; Set&lt;TabletSession&gt;();
+
+    [Obsolete("Use DatabaseInitializer.Initialize() (EF Core migrations + optional sample seed).")]
+    public static void Initialize() =&gt; DatabaseInitializer.Initialize();
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        if (optionsBuilder.IsConfigured)
+            return;
+
+        if (TryGetPostgreSqlConnectionString(out var postgresConnectionString))
+        {
+            optionsBuilder.UseNpgsql(
+                postgresConnectionString,
+                npgsql =&gt; npgsql.EnableRetryOnFailure(5));
+            return;
+        }
+
+        throw new InvalidOperationException(
+            "PostgreSQL is required but no connection string was found. " +
+            "Preferred: set ELITE_DB_PROVIDER=PostgreSql and ELITE_POSTGRES_CONNECTION. " +
+            "Alternatively configure Database (host, port, database, user, DPAPI password) in app settings.");
+    }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity&lt;Table&gt;()
+            .HasOne(t =&gt; t.AssignedServer)
+            .WithMany()
+            .HasForeignKey(t =&gt; t.AssignedServerId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity&lt;OrderRecord&gt;().ToTable("Orders");
+        modelBuilder.Entity&lt;OrderItem&gt;().ToTable("OrderItems");
+        modelBuilder.Entity&lt;InventoryItem&gt;().ToTable("InventoryItems");
+        modelBuilder.Entity&lt;ProductIngredient&gt;().ToTable("ProductIngredients");
+        modelBuilder.Entity&lt;EmployeeAttendance&gt;().ToTable("EmployeeAttendances");
+        modelBuilder.Entity&lt;AttendanceDayValidation&gt;().ToTable("AttendanceDayValidations");
+        modelBuilder.Entity&lt;SalaryAdvance&gt;().ToTable("SalaryAdvances");
+        modelBuilder.Entity&lt;PayrollPaymentRecord&gt;().ToTable("PayrollPaymentRecords");
+        modelBuilder.Entity&lt;MoneyTransaction&gt;().ToTable("Transactions");
+        modelBuilder.Entity&lt;CustomerProfile&gt;().ToTable("CustomerProfiles");
+        modelBuilder.Entity&lt;ReservationBooking&gt;().ToTable("Reservations");
+        modelBuilder.Entity&lt;WaitlistEntry&gt;().ToTable("WaitlistEntries");
+        modelBuilder.Entity&lt;SharedOrderDraft&gt;().ToTable("SharedOrderDrafts");
+        modelBuilder.Entity&lt;TabletSession&gt;().ToTable("TabletSessions");
+        modelBuilder.Entity&lt;TabletSession&gt;().HasKey(t =&gt; t.Token);
+
+        modelBuilder.Entity&lt;TabletSession&gt;()
+            .Property(t =&gt; t.Token)
+            .HasMaxLength(32);
+        modelBuilder.Entity&lt;TabletSession&gt;()
+            .HasIndex(t =&gt; t.ExpiresAtUtc);
+        modelBuilder.Entity&lt;TabletSession&gt;()
+            .HasIndex(t =&gt; t.EmployeeId);
+        modelBuilder.Entity&lt;TabletSession&gt;()
+            .HasOne&lt;Employee&gt;()
+            .WithMany()
+            .HasForeignKey(t =&gt; t.EmployeeId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity&lt;Employee&gt;().HasIndex(e =&gt; e.UniqueId).IsUnique();
+        modelBuilder.Entity&lt;Employee&gt;()
+            .HasIndex(e =&gt; e.SignInId)
+            .IsUnique()
+            .HasFilter("\"SignInId\" IS NOT NULL AND \"SignInId\" &lt;&gt; ''");
+        modelBuilder.Entity&lt;Product&gt;().HasIndex(p =&gt; p.UniqueId).IsUnique();
+        modelBuilder.Entity&lt;Table&gt;().HasIndex(t =&gt; t.UniqueId).IsUnique();
+        modelBuilder.Entity&lt;Table&gt;().HasIndex(t =&gt; t.TableNumber).IsUnique();
+        modelBuilder.Entity&lt;OrderRecord&gt;().HasIndex(o =&gt; o.UniqueId).IsUnique();
+        modelBuilder.Entity&lt;InventoryItem&gt;().HasIndex(i =&gt; i.UniqueId).IsUnique();
+        modelBuilder.Entity&lt;CustomerProfile&gt;().HasIndex(c =&gt; c.UniqueId).IsUnique();
+        modelBuilder.Entity&lt;CustomerProfile&gt;().HasIndex(c =&gt; c.PrimaryPhone);
+        modelBuilder.Entity&lt;ReservationBooking&gt;().HasIndex(r =&gt; r.UniqueId).IsUnique();
+        modelBuilder.Entity&lt;ReservationBooking&gt;().HasIndex(r =&gt; r.ReservedFor);
+        modelBuilder.Entity&lt;ReservationBooking&gt;().HasIndex(r =&gt; r.Status);
+        modelBuilder.Entity&lt;WaitlistEntry&gt;().HasIndex(w =&gt; w.UniqueId).IsUnique();
+        modelBuilder.Entity&lt;WaitlistEntry&gt;().HasIndex(w =&gt; w.CreatedAt);
+        modelBuilder.Entity&lt;WaitlistEntry&gt;().HasIndex(w =&gt; w.Status);
+        modelBuilder.Entity&lt;SharedOrderDraft&gt;().HasIndex(d =&gt; d.UniqueId).IsUnique();
+        modelBuilder.Entity&lt;SharedOrderDraft&gt;().HasIndex(d =&gt; new { d.EmployeeId, d.Portal, d.UpdatedAtUtc });
+        modelBuilder.Entity&lt;EmployeeAttendance&gt;()
+            .HasIndex(a =&gt; new { a.EmployeeId, a.WorkDate })
+            .IsUnique();
+
+        modelBuilder.Entity&lt;AttendanceDayValidation&gt;()
+            .HasIndex(v =&gt; v.WorkDate)
+            .IsUnique();
+
+        modelBuilder.Entity&lt;SalaryAdvance&gt;()
+            .HasOne(a =&gt; a.Employee)
+            .WithMany()
+            .HasForeignKey(a =&gt; a.EmployeeId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity&lt;PayrollPaymentRecord&gt;()
+            .HasOne(p =&gt; p.Employee)
+            .WithMany()
+            .HasForeignKey(p =&gt; p.EmployeeId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity&lt;PayrollPaymentRecord&gt;()
+            .HasIndex(p =&gt; new { p.EmployeeId, p.Year, p.Month })
+            .IsUnique();
+
+        modelBuilder.Entity&lt;OrderRecord&gt;()
+            .HasMany(o =&gt; o.Items)
+            .WithOne(i =&gt; i.OrderRecord)
+            .HasForeignKey(i =&gt; i.OrderRecordId);
+
+        modelBuilder.Entity&lt;OrderItem&gt;()
+            .HasOne(i =&gt; i.Product)
+            .WithMany()
+            .HasForeignKey(i =&gt; i.ProductId);
+
+        modelBuilder.Entity&lt;OrderRecord&gt;()
+            .HasOne(o =&gt; o.Table)
+            .WithMany()
+            .HasForeignKey(o =&gt; o.TableId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity&lt;OrderRecord&gt;()
+            .HasOne(o =&gt; o.Server)
+            .WithMany()
+            .HasForeignKey(o =&gt; o.ServerId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity&lt;ProductIngredient&gt;()
+            .HasOne(pi =&gt; pi.Product)
+            .WithMany(p =&gt; p.Ingredients)
+            .HasForeignKey(pi =&gt; pi.ProductId);
+
+        modelBuilder.Entity&lt;ProductIngredient&gt;()
+            .HasOne(pi =&gt; pi.InventoryItem)
+            .WithMany(i =&gt; i.ProductIngredients)
+            .HasForeignKey(pi =&gt; pi.InventoryItemId);
+
+        modelBuilder.Entity&lt;EmployeeAttendance&gt;()
+            .HasOne(a =&gt; a.Employee)
+            .WithMany()
+            .HasForeignKey(a =&gt; a.EmployeeId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity&lt;MoneyTransaction&gt;()
+            .HasIndex(t =&gt; new { t.Date, t.Type });
+
+        modelBuilder.Entity&lt;ReservationBooking&gt;()
+            .HasOne(r =&gt; r.CustomerProfile)
+            .WithMany()
+            .HasForeignKey(r =&gt; r.CustomerProfileId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity&lt;ReservationBooking&gt;()
+            .HasOne(r =&gt; r.Table)
+            .WithMany()
+            .HasForeignKey(r =&gt; r.TableId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            foreach (var property in entityType.GetProperties())
+            {
+                if (property.ClrType == typeof(DateTime))
+                {
+                    property.SetValueConverter(
+                        new ValueConverter&lt;DateTime, DateTime&gt;(
+                            v =&gt; ToUtcDateTime(v),
+                            v =&gt; DateTime.SpecifyKind(v, DateTimeKind.Utc)));
+                }
+                else if (property.ClrType == typeof(DateTime?))
+                {
+                    property.SetValueConverter(
+                        new ValueConverter&lt;DateTime?, DateTime?&gt;(
+                            v =&gt; v.HasValue ? ToUtcDateTime(v.Value) : v,
+                            v =&gt; v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v));
+                }
+            }
+        }
+    }
+
+    private static DateTime ToUtcDateTime(DateTime v) =&gt;
+        v.Kind switch
+        {
+            DateTimeKind.Utc =&gt; v,
+            DateTimeKind.Local =&gt; v.ToUniversalTime(),
+            _ =&gt; DateTime.SpecifyKind(v, DateTimeKind.Utc)
+        };
+
+    public static bool TryGetPostgreSqlConnectionString(out string connectionString)
+    {
+        connectionString = string.Empty;
+
+        var envProvider = Environment.GetEnvironmentVariable("ELITE_DB_PROVIDER");
+        var envConnection = Environment.GetEnvironmentVariable("ELITE_POSTGRES_CONNECTION");
+        if (string.Equals(envProvider, "PostgreSql", StringComparison.OrdinalIgnoreCase)
+            &amp;&amp; !string.IsNullOrWhiteSpace(envConnection))
+        {
+            connectionString = envConnection.Trim();
+            return true;
+        }
+
+        DatabaseSettings settings;
+        try
+        {
+            settings = SettingsManager.Load().Database ?? new DatabaseSettings();
+        }
+        catch
+        {
+            settings = new DatabaseSettings();
+        }
+
+        return DatabaseSettingsResolver.TryBuildFromSettings(settings, out connectionString);
+    }
+
+    /// &lt;summary&gt;
+    /// Human-readable database target for operational tools (host/database only; no password).
+    /// &lt;/summary&gt;
+    public static string GetDatabaseTargetDescription()
+    {
+        if (!TryGetPostgreSqlConnectionString(out var cs))
+        {
+            return "PostgreSQL (not configured — set ELITE_DB_PROVIDER=PostgreSql and ELITE_POSTGRES_CONNECTION, " +
+                   "or Database host/database/user in app settings).";
+        }
+
+        try
+        {
+            var b = new NpgsqlConnectionStringBuilder(cs);
+            var host = string.IsNullOrWhiteSpace(b.Host) ? "?" : b.Host;
+            var db = string.IsNullOrWhiteSpace(b.Database) ? "?" : b.Database;
+            return $"PostgreSQL {host}:{b.Port}/{db}";
+        }
+        catch
+        {
+            return "PostgreSQL (configured)";
+        }
+    }
+}
+</code></pre>
+<h2 id="a5">5. CORS, HTTPS, static files, Swagger</h2><p>Implemented in <code>Program.cs</code> (listed above and summarized here): strict <code>Cors:AllowedOrigins</code>; optional Kestrel HTTPS with PFX; <code>UseDefaultFiles</code> + <code>UseStaticFiles</code> for the Server Portal; Swagger enabled.</p><h2 id="a6">6. Server Portal — HTML/CSS (first 120 lines of index.html)</h2><p>The portal uses <strong>embedded CSS</strong> (dark theme, CSS grid) and vanilla JavaScript for tabs and fetch calls.</p><h3 id="EliteRestaurant-Api-wwwroot-index-html">index.html (excerpt)</h3><p class="path"><code>EliteRestaurant.Api/wwwroot/index.html</code> — verbatim</p><pre><code>&lt;!doctype html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+  &lt;meta charset="utf-8"&gt;
+  &lt;meta name="viewport" content="width=device-width, initial-scale=1"&gt;
+  &lt;title&gt;Elite Server Portal&lt;/title&gt;
+  &lt;style&gt;
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Segoe UI, Arial, sans-serif; background: radial-gradient(circle at top, #1a2750, #090f22 50%, #070b16); color: #eef3ff; }
+    .layout { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+    .sidebar { border-right: 1px solid #243659; background: #0a132b; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+    .brand-wrap { margin-bottom: 6px; }
+    .brand-logo { width: 100%; max-height: 92px; object-fit: cover; border-radius: 10px; border: 1px solid #2d3f66; background: #0b1430; margin-bottom: 8px; }
+    .brand { font-weight: 700; font-size: 14px; letter-spacing: 0.5px; color: #ffd17c; }
+    .nav-btn { width: 100%; text-align: left; padding: 10px 12px; border: 1px solid #2d3f66; border-radius: 10px; background: #111d3a; color: #eef3ff; cursor: pointer; }
+    .nav-btn.active { background: #1d335e; border-color: #4d72bb; }
+    .who { margin-top: auto; border-top: 1px solid #22345a; padding-top: 10px; font-size: 12px; color: #b8c8e8; }
+    .who-top { display: flex; align-items: center; gap: 8px; }
+    .who-photo { width: 40px; height: 40px; border-radius: 999px; object-fit: cover; border: 1px solid #415987; background: #0e1733; }
+    .main { padding: 16px; display: flex; flex-direction: column; min-height: 100vh; }
+    .hidden { display: none !important; }
+    .card { border: 1px solid #2e426b; border-radius: 12px; background: rgba(17, 29, 58, 0.95); margin-bottom: 12px; padding: 14px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .grow { flex: 1 1 180px; min-width: 160px; }
+    input, select, button, textarea { padding: 9px 10px; border-radius: 8px; border: 1px solid #455377; background: #0f1730; color: #eef3ff; }
+    button { cursor: pointer; }
+    textarea { width: 100%; min-height: 64px; resize: vertical; }
+    h2, h3 { margin: 6px 0 10px; }
+    .two-cols { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 12px; flex: 1; min-height: 0; }
+    .two-cols &gt; .card { height: 100%; display: flex; flex-direction: column; min-height: 0; }
+    .list-box { max-height: 350px; overflow: auto; border: 1px solid #2d3a59; border-radius: 8px; padding: 8px; background: #090f21; }
+    .tall-fill { flex: 1; max-height: none; min-height: 0; }
+    .product, .cart-item, .ready-item, .menu-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px; border-bottom: 1px solid #1b2743; }
+    .product:last-child, .cart-item:last-child, .ready-item:last-child, .menu-item:last-child { border-bottom: 0; }
+    .kpi { display: grid; grid-template-columns: repeat(2,minmax(120px,1fr)); gap: 8px; margin-top: 8px; }
+    .kpi .box { border: 1px solid #2f446f; border-radius: 8px; padding: 8px; background: #0d1630; }
+    .muted { color: #a8bbdf; font-size: 12px; }
+    .muted.ok { color: #8bf1b1; }
+    .muted.danger { color: #ff8f8f; }
+    .warn { color: #ffcb73; }
+    .ok { color: #8bf1b1; }
+    .danger { color: #ff8f8f; }
+    .mono { font-family: Consolas, monospace; }
+    pre { white-space: pre-wrap; overflow: auto; background: #090f21; border: 1px solid #2d3a59; border-radius: 8px; padding: 10px; min-height: 90px; max-height: 250px; }
+    @media (max-width: 1000px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { border-right: 0; border-bottom: 1px solid #243659; }
+      .two-cols { grid-template-columns: 1fr; }
+    }
+  &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;div id="loginWrap" class="main"&gt;
+    &lt;div class="card" style="max-width:760px;margin:32px auto;"&gt;
+      &lt;h2&gt;Server Portal Login&lt;/h2&gt;
+      &lt;div class="row"&gt;
+        &lt;input id="staffId" class="grow" placeholder="SignInId or EMP UniqueId"&gt;
+        &lt;input id="pin" placeholder="PIN"&gt;
+        &lt;button id="btnLogin"&gt;Login as Server&lt;/button&gt;
+      &lt;/div&gt;
+      &lt;p class="muted"&gt;This portal is server-only. No reservation flow in this phase.&lt;/p&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+
+  &lt;div id="app" class="layout hidden"&gt;
+    &lt;aside class="sidebar"&gt;
+      &lt;div class="brand-wrap"&gt;
+        &lt;img id="brandLogo" class="brand-logo hidden" alt="Restaurant logo"&gt;
+        &lt;div id="brandName" class="brand"&gt;ELITE SERVER PORTAL&lt;/div&gt;
+      &lt;/div&gt;
+      &lt;button class="nav-btn active" data-tab="takeOrder"&gt;Take Order&lt;/button&gt;
+      &lt;button class="nav-btn" data-tab="menuTab"&gt;Menu&lt;/button&gt;
+      &lt;button class="nav-btn" data-tab="pickupTab"&gt;Pick Up &amp; Serve&lt;/button&gt;
+      &lt;button id="btnRefreshAll" class="nav-btn"&gt;Refresh Data&lt;/button&gt;
+      &lt;div class="who"&gt;
+        &lt;div class="who-top"&gt;
+          &lt;img id="staffPhoto" class="who-photo hidden" alt="Employee photo"&gt;
+          &lt;div id="sessionLabel" class="mono"&gt;&lt;/div&gt;
+        &lt;/div&gt;
+        &lt;button id="btnLogout" style="margin-top:8px;width:100%;"&gt;Logout&lt;/button&gt;
+      &lt;/div&gt;
+    &lt;/aside&gt;
+
+    &lt;main class="main"&gt;
+      &lt;section id="takeOrder" class="tab" style="display:flex;flex-direction:column;flex:1;min-height:0;"&gt;
+        &lt;div class="card"&gt;
+          &lt;h2&gt;Create Order&lt;/h2&gt;
+          &lt;div class="row"&gt;
+            &lt;select id="orderSource" class="grow"&gt;
+              &lt;option value="WalkIn"&gt;WalkIn&lt;/option&gt;
+              &lt;option value="Delivery"&gt;Delivery&lt;/option&gt;
+            &lt;/select&gt;
+            &lt;input id="sourceReference" class="grow" placeholder="Reference (for Delivery)"&gt;
+            &lt;select id="tableSelect" class="grow"&gt;&lt;/select&gt;
+            &lt;select id="paymentCurrency" style="width:120px;"&gt;
+              &lt;option value="USD"&gt;USD&lt;/option&gt;
+              &lt;option value="FC"&gt;FC&lt;/option&gt;
+            &lt;/select&gt;
+          &lt;/div&gt;
+          &lt;div class="row" style="margin-top:8px;"&gt;
+            &lt;select id="appendMode" style="width:220px;"&gt;
+              &lt;option value="append"&gt;Add to existing open check&lt;/option&gt;
+              &lt;option value="new"&gt;Create separate new check&lt;/option&gt;
+            &lt;/select&gt;
+            &lt;button id="btnCheckOpen"&gt;Check Open Check&lt;/button&gt;
+            &lt;span id="openCheckInfo" class="muted"&gt;&lt;/span&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+
+        &lt;div class="card"&gt;
+          &lt;div class="row"&gt;
+            &lt;input id="search" class="grow" placeholder="Search product by name or ID"&gt;
+            &lt;select id="category" style="width:170px;"&gt;&lt;/select&gt;
+            &lt;select id="subCategory" style="width:170px;"&gt;&lt;/select&gt;
+            &lt;select id="drafts" class="grow"&gt;&lt;/select&gt;
+            &lt;button id="btnLoadDraft"&gt;Load Draft&lt;/button&gt;
+            &lt;button id="btnSaveDraft"&gt;Save Draft&lt;/button&gt;
+            &lt;button id="btnDeleteDraft"&gt;Delete Draft&lt;/button&gt;
+          &lt;/div&gt;
+          &lt;div id="draftStatus" class="muted" style="margin-top:8px;"&gt;Drafts are synced with backend.&lt;/div&gt;
+        &lt;/div&gt;
+
+        &lt;div class="two-cols"&gt;
+          &lt;div class="card"&gt;
+            &lt;h3&gt;Menu&lt;/h3&gt;
+            &lt;div id="products" class="list-box tall-fill"&gt;&lt;/div&gt;
+          &lt;/div&gt;
+
+          &lt;div class="card"&gt;
+            &lt;h3&gt;Live Totals&lt;/h3&gt;
+            &lt;div class="row" style="margin-top:8px;"&gt;&lt;textarea id="customerNotes" placeholder="Customer notes"&gt;&lt;/textarea&gt;&lt;/div&gt;
+            &lt;div class="row"&gt;&lt;textarea id="allergyNotes" placeholder="Allergy notes"&gt;&lt;/textarea&gt;&lt;/div&gt;
+            &lt;div class="row" style="margin-top:8px;"&gt;
+              &lt;select id="discountMode" style="width:150px;"&gt;
+                &lt;option value="None"&gt;None&lt;/option&gt;
+                &lt;option value="Percent"&gt;Percent&lt;/option&gt;
+                &lt;option value="Usd"&gt;Usd&lt;/option&gt;
+              &lt;/select&gt;
+              &lt;input id="discountValue" style="width:130px;" type="number" step="0.01" min="0" placeholder="Discount"&gt;
+            &lt;/div&gt;
+            &lt;div id="cartItems" class="list-box tall-fill" style="margin-top:8px;"&gt;&lt;/div&gt;
+            &lt;div class="kpi" style="margin-top:8px;"&gt;
+              &lt;div class="box"&gt;&lt;div class="muted"&gt;Items&lt;/div&gt;&lt;div id="itemCount"&gt;0&lt;/div&gt;&lt;/div&gt;
+              &lt;div class="box"&gt;&lt;div class="muted"&gt;Subtotal USD&lt;/div&gt;&lt;div id="subtotalUsd"&gt;$ 0.00&lt;/div&gt;&lt;/div&gt;
+              &lt;div class="box"&gt;&lt;div class="muted"&gt;Tax&lt;/div&gt;&lt;div id="taxAmount"&gt;$ 0.00&lt;/div&gt;&lt;/div&gt;
+              &lt;div class="box"&gt;&lt;div class="muted"&gt;Service&lt;/div&gt;&lt;div id="serviceAmount"&gt;$ 0.00&lt;/div&gt;&lt;/div&gt;
+              &lt;div class="box"&gt;&lt;div class="muted"&gt;Discount&lt;/div&gt;&lt;div id="discountAmount"&gt;$ 0.00&lt;/div&gt;&lt;/div&gt;
+              &lt;div class="box"&gt;&lt;div class="muted"&gt;Grand Total&lt;/div&gt;&lt;div id="grandTotal"&gt;$ 0.00&lt;/div&gt;&lt;/div&gt;
+            &lt;/div&gt;
+            &lt;div class="row"&gt;
+              &lt;button id="btnClearOrder"&gt;Clear Order&lt;/button&gt;
+              &lt;button id="btnSubmit"&gt;Send To Cashier&lt;/button&gt;
+            &lt;/div&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/section&gt;
+
+      &lt;section id="menuTab" class="tab hidden"&gt;
+        &lt;div class="card"&gt;
+          &lt;h2&gt;Menu Catalog&lt;/h2&gt;
+          &lt;p class="muted"&gt;Server view of menu items and prices.&lt;/p&gt;
+          &lt;div id="menuCatalog" class="list-box"&gt;&lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/section&gt;
+
+      &lt;section id="pickupTab" class="tab hidden"&gt;
+        &lt;div class="card"&gt;
+          &lt;h2&gt;Pick Up &amp; Serve&lt;/h2&gt;
+          &lt;p class="muted"&gt;Shows Ready orders assigned to this server.&lt;/p&gt;
+          &lt;button id="btnRefreshReady"&gt;Refresh Ready Orders&lt;/button&gt;
+          &lt;div id="readyOrders" class="list-box" style="margin-top:8px;"&gt;&lt;/div&gt;
+        &lt;/div&gt;
+      &lt;/section&gt;
+
+    &lt;/main&gt;
+  &lt;/div&gt;
+
+  &lt;script&gt;
+    let token = "";
+    let me = null;
+    let tables = [];
+    let products = [];
+    let readyOrders = [];
+    let drafts = [];
+    let config = { restaurantName: "Elite Restaurant", restaurantLogoUrl: "", employeePhotoUrl: "", currencyDisplayMode: "Dual", usdToFcRate: 2250, taxPercent: 7, servicePercent: 10 };
+    const cart = new Map();
+
+    const setOut = (title, data) =&gt; console.log(`[ServerPortal] ${title}`, data);
+    function revokeImgBlob(el) {
+      const s = el.getAttribute("src") || "";
+      if (s.startsWith("blob:")) {
+        URL.revokeObjectURL(s);
+        el.removeAttribute("src");
+      }
+    }
+    /** Load image via Bearer auth; plain img src cannot attach Authorization. */
+    async function setAuthImage(el, path) {
+      revokeImgBlob(el);
+      if (!path || !token) {
+        el.classList.add("hidden");
+        return;
+      }
+      try {
+        const res = await fetch(path, { headers: { Authorization: "Bearer " + token } });
+        if (!res.ok) throw new Error("unauthorized or missing");
+        const blob = await res.blob();
+        el.src = URL.createObjectURL(blob);
+        el.classList.remove("hidden");
+        el.onerror = () =&gt; el.classList.add("hidden");
+      } catch {
+        el.classList.add("hidden");
+      }
+    }
+    const fmtUsd = n =&gt; "$ " + Number(n || 0).toFixed(2);
+    const fmtFc = n =&gt; "FC " + Number(n || 0).toFixed(0);
+    const toFc = usd =&gt; Number(usd || 0) * Number(config.usdToFcRate || 2250);
+
+    async function api(url, method = "GET", body = null, auth = true) {
+      const headers = {};
+      if (body) headers["Content-Type"] = "application/json";
+      if (auth &amp;&amp; token) headers["Authorization"] = "Bearer " + token;
+      const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined });
+      const txt = await res.text();
+      let json;
+      try { json = JSON.parse(txt); } catch { json = { raw: txt }; }
+      return { ok: res.ok, status: res.status, body: json };
+    }
+
+    function normalizeDiscount() {
+      const mode = document.getElementById("discountMode").value;
+      let value = Number(document.getElementById("discountValue").value || 0);
+      if (mode === "Percent") value = Math.max(0, Math.min(100, value));
+      if (mode === "Usd") value = Math.max(0, value);
+      if (mode === "None") value = 0;
+      return { mode, value };
+    }
+
+    function computeTotals() {
+      const lines = [...cart.entries()].map(([pid, qty]) =&gt; {
+        const p = products.find(x =&gt; x.id === pid);
+        return p ? { price: Number(p.price), qty: Number(qty) } : null;
+      }).filter(Boolean);
+      const subtotal = lines.reduce((s, x) =&gt; s + (x.price * x.qty), 0);
+      const d = normalizeDiscount();
+      let discount = 0;
+      if (d.mode === "Percent") discount = subtotal * d.value / 100;
+      if (d.mode === "Usd") discount = Math.min(subtotal, d.value);
+      const taxable = Math.max(0, subtotal - discount);
+      const tax = taxable * (Number(config.taxPercent) / 100);
+      const service = taxable * (Number(config.servicePercent) / 100);
+      const grand = taxable + tax + service;
+      return { subtotal, discount, taxable, tax, service, grand };
+    }
+
+    function renderTotals() {
+      const t = computeTotals();
+      document.getElementById("itemCount").textContent = String([...cart.values()].reduce((a, b) =&gt; a + b, 0));
+      document.getElementById("subtotalUsd").textContent = fmtUsd(t.subtotal);
+      document.getElementById("taxAmount").textContent = fmtUsd(t.tax);
+      document.getElementById("serviceAmount").textContent = fmtUsd(t.service);
+      document.getElementById("discountAmount").textContent = fmtUsd(t.discount);
+      const pay = document.getElementById("paymentCurrency").value;
+      document.getElementById("grandTotal").textContent = pay === "FC" ? fmtFc(toFc(t.grand)) : fmtUsd(t.grand);
+    }
+
+    function currentFilteredProducts() {
+      const s = (document.getElementById("search").value || "").trim().toLowerCase();
+      const c = document.getElementById("category").value;
+      const sub = document.getElementById("subCategory").value;
+      return products
+        .filter(p =&gt; c === "All" || p.category === c)
+        .filter(p =&gt; sub === "All" || p.subCategory === sub)
+        .filter(p =&gt; !s || p.name.toLowerCase().includes(s) || p.uniqueId.toLowerCase().includes(s));
+    }
+
+    function renderCategories() {
+      const category = document.getElementById("category");
+      const sub = document.getElementById("subCategory");
+      const cats = ["All", ...new Set(products.map(p =&gt; p.category).filter(Boolean))];
+      category.innerHTML = cats.map(c =&gt; `&lt;option&gt;${c}&lt;/option&gt;`).join("");
+      const applySub = () =&gt; {
+        const selected = category.value;
+        const subs = ["All", ...new Set(products.filter(p =&gt; selected === "All" || p.category === selected).map(p =&gt; p.subCategory).filter(Boolean))];
+        sub.innerHTML = subs.map(x =&gt; `&lt;option&gt;${x}&lt;/option&gt;`).join("");
+        renderProducts();
+      };
+      category.onchange = applySub;
+      sub.onchange = renderProducts;
+      applySub();
+    }
+
+    function renderProducts() {
+      const el = document.getElementById("products");
+      const rows = currentFilteredProducts();
+      if (!rows.length) { el.innerHTML = "&lt;div class='product'&gt;No products found.&lt;/div&gt;"; return; }
+      el.innerHTML = rows.map(p =&gt; `
+        &lt;div class="product"&gt;
+          &lt;div&gt;&lt;strong&gt;${p.name}&lt;/strong&gt;&lt;br&gt;&lt;span class="muted"&gt;${p.category} / ${p.subCategory} · ${p.uniqueId}&lt;/span&gt;&lt;/div&gt;
+          &lt;div class="row"&gt;&lt;span&gt;${fmtUsd(p.price)}&lt;/span&gt;&lt;button data-add="${p.id}"&gt;Add&lt;/button&gt;&lt;/div&gt;
+        &lt;/div&gt;
+      `).join("");
+      el.querySelectorAll("[data-add]").forEach(b =&gt; b.onclick = () =&gt; {
+        const id = Number(b.getAttribute("data-add"));
+        cart.set(id, (cart.get(id) || 0) + 1);
+        renderCart();
+      });
+    }
+
+    function renderCart() {
+      const el = document.getElementById("cartItems");
+      const rows = [...cart.entries()].map(([pid, qty]) =&gt; {
+        const p = products.find(x =&gt; x.id === pid);
+        return p ? { p, qty } : null;
+      }).filter(Boolean);
+      if (!rows.length) {
+        el.innerHTML = "&lt;div class='cart-item'&gt;Cart is empty.&lt;/div&gt;";
+        renderTotals();
+        return;
+      }
+      el.innerHTML = rows.map(r =&gt; `
+        &lt;div class="cart-item"&gt;
+          &lt;div&gt;${r.p.name}&lt;br&gt;&lt;span class="muted"&gt;${fmtUsd(r.p.price)} each&lt;/span&gt;&lt;/div&gt;
+          &lt;div class="row"&gt;
+            &lt;button data-minus="${r.p.id}"&gt;-&lt;/button&gt;&lt;span&gt;${r.qty}&lt;/span&gt;&lt;button data-plus="${r.p.id}"&gt;+&lt;/button&gt;
+            &lt;button data-remove="${r.p.id}"&gt;Remove&lt;/button&gt;
+          &lt;/div&gt;
+        &lt;/div&gt;
+      `).join("");
+      el.querySelectorAll("[data-minus]").forEach(b =&gt; b.onclick = () =&gt; {
+        const id = Number(b.getAttribute("data-minus"));
+        const q = (cart.get(id) || 0) - 1;
+        if (q &lt;= 0) cart.delete(id); else cart.set(id, q);
+        renderCart();
+      });
+      el.querySelectorAll("[data-plus]").forEach(b =&gt; b.onclick = () =&gt; {
+        const id = Number(b.getAttribute("data-plus"));
+        cart.set(id, (cart.get(id) || 0) + 1);
+        renderCart();
+      });
+      el.querySelectorAll("[data-remove]").forEach(b =&gt; b.onclick = () =&gt; {
+        cart.delete(Number(b.getAttribute("data-remove")));
+        renderCart();
+      });
+      renderTotals();
+    }
+
+    function renderTables() {
+      const sel = document.getElementById("tableSelect");
+      if (!tables.length) { sel.innerHTML = "&lt;option value='0'&gt;No assigned tables&lt;/option&gt;"; return; }
+      sel.innerHTML = tables.map(t =&gt; `&lt;option value="${t.id}"&gt;Table ${t.tableNumber} - ${t.name} (${t.status})&lt;/option&gt;`).join("");
+    }
+
+    function renderMenuCatalog() {
+      const el = document.getElementById("menuCatalog");
+      if (!products.length) { el.innerHTML = "&lt;div class='menu-item'&gt;No products.&lt;/div&gt;"; return; }
+      el.innerHTML = products.map(p =&gt; `
+        &lt;div class="menu-item"&gt;
+          &lt;div&gt;&lt;strong&gt;${p.name}&lt;/strong&gt;&lt;br&gt;&lt;span class="muted"&gt;${p.category} / ${p.subCategory} · ${p.uniqueId}&lt;/span&gt;&lt;/div&gt;
+          &lt;div&gt;${fmtUsd(p.price)}&lt;/div&gt;
+        &lt;/div&gt;
+      `).join("");
+    }
+
+    function renderReadyOrders() {
+      const el = document.getElementById("readyOrders");
+      if (!readyOrders.length) { el.innerHTML = "&lt;div class='ready-item'&gt;No ready orders assigned to you.&lt;/div&gt;"; return; }
+      el.innerHTML = readyOrders.map(o =&gt; `
+        &lt;div class="ready-item"&gt;
+          &lt;div&gt;
+            &lt;strong&gt;${o.orderId}&lt;/strong&gt; · ${o.tableLabel}&lt;br&gt;
+            &lt;span class="muted"&gt;${o.itemsSummary || "-"} · ${o.itemCount} items · ${fmtUsd(o.totalUsd)} · ${o.timeText}&lt;/span&gt;
+          &lt;/div&gt;
+          &lt;button data-serve="${o.id}"&gt;Mark Served&lt;/button&gt;
+        &lt;/div&gt;
+      `).join("");
+      el.querySelectorAll("[data-serve]").forEach(b =&gt; b.onclick = async () =&gt; {
+        const id = Number(b.getAttribute("data-serve"));
+        const r = await api(`/api/server/orders/${id}/serve`, "POST");
+        setOut("Mark served result", r);
+        await loadReadyOrders();
+      });
+    }
+
+    async function loadReadyOrders() {
+      const r = await api("/api/server/ready-orders");
+      readyOrders = r.ok &amp;&amp; Array.isArray(r.body) ? r.body : [];
+      renderReadyOrders();
+      return r.ok;
+    }
+
+    async function checkOpenCheck() {
+      const tableId = Number(document.getElementById("tableSelect").value || "0");
+      const label = document.getElementById("openCheckInfo");
+      if (!tableId) { label.textContent = ""; return; }
+      const r = await api(`/api/server/open-check?tableId=${tableId}`);
+      if (!r.ok) { label.textContent = "Cannot check open ticket."; return; }
+      if (!r.body.hasOpenCheck) { label.textContent = "No open check on this table."; return; }
+      label.textContent = `Open check ${r.body.orderCode} (${r.body.status}) found.`;
+    }
+
+    async function loadPortalData() {
+      const cfg = await api("/api/server/config");
+      const t = await api("/api/tables/my");
+      const p = await api("/api/server/products");
+      if (!cfg.ok || !t.ok || !p.ok) {
+        setOut("Load portal data failed", { cfg, tables: t, products: p });
+        return false;
+      }
+      config = cfg.body;
+      const brandNameEl = document.getElementById("brandName");
+      const brandLogoEl = document.getElementById("brandLogo");
+      const staffPhotoEl = document.getElementById("staffPhoto");
+      brandNameEl.textContent = (config.restaurantName || "Elite Restaurant").toUpperCase();
+      if (config.restaurantLogoUrl) {
+        await setAuthImage(brandLogoEl, config.restaurantLogoUrl);
+      } else {
+        brandLogoEl.classList.add("hidden");
+      }
+      if (config.employeePhotoUrl) {
+        await setAuthImage(staffPhotoEl, config.employeePhotoUrl);
+      } else {
+        staffPhotoEl.classList.add("hidden");
+      }
+      tables = Array.isArray(t.body) ? t.body : [];
+      products = Array.isArray(p.body) ? p.body : [];
+      renderTables();
+      renderCategories();
+      renderProducts();
+      renderMenuCatalog();
+      renderCart();
+      await loadReadyOrders();
+      await checkOpenCheck();
+      return true;
+    }
+
+    async function loadDrafts() {
+      const r = await api("/api/server/drafts");
+      drafts = r.ok &amp;&amp; Array.isArray(r.body) ? r.body : [];
+      renderDrafts();
+      if (!r.ok) {
+        setDraftStatus(`Draft sync failed: ${r.body?.message || "request failed"}`, false);
+      }
+      return r.ok;
+    }
+
+    function setDraftStatus(message, ok = true) {
+      const el = document.getElementById("draftStatus");
+      el.textContent = message;
+      el.classList.remove("ok", "danger");
+      el.classList.add(ok ? "ok" : "danger");
+    }
+
+    function renderDrafts() {
+      const sel = document.getElementById("drafts");
+      const options = ["&lt;option value=''&gt;None (empty slot)&lt;/option&gt;"];
+      drafts.forEach(d =&gt; options.push(`&lt;option value="${d.id}"&gt;${d.label}&lt;/option&gt;`));
+      sel.innerHTML = options.join("");
+    }
+    function snapshotState() {
+      const { mode, value } = normalizeDiscount();
+      return {
+        orderSource: document.getElementById("orderSource").value,
+        sourceReference: document.getElementById("sourceReference").value,
+        tableId: Number(document.getElementById("tableSelect").value || "0"),
+        paymentCurrencyCode: document.getElementById("paymentCurrency").value,
+        discountMode: mode,
+        discountValue: value,
+        appendMode: document.getElementById("appendMode").value,
+        customerNotes: document.getElementById("customerNotes").value,
+        allergyNotes: document.getElementById("allergyNotes").value,
+        cart: [...cart.entries()]
+      };
+    }
+    function applySnapshot(s) {
+      if (!s) return;
+      document.getElementById("orderSource").value = s.orderSource || "WalkIn";
+      document.getElementById("sourceReference").value = s.sourceReference || "";
+      document.getElementById("tableSelect").value = String(s.tableId || 0);
+      document.getElementById("paymentCurrency").value = s.paymentCurrencyCode || "USD";
+      document.getElementById("discountMode").value = s.discountMode || "None";
+      document.getElementById("discountValue").value = String(s.discountValue || 0);
+      document.getElementById("appendMode").value = s.appendMode || "append";
+      document.getElementById("customerNotes").value = s.customerNotes || "";
+      document.getElementById("allergyNotes").value = s.allergyNotes || "";
+      cart.clear();
+      (s.cart || []).forEach(([pid, qty]) =&gt; {
+        if (pid &gt; 0 &amp;&amp; qty &gt; 0) cart.set(Number(pid), Number(qty));
+      });
+      // Keep full menu visible after loading a draft.
+      document.getElementById("search").value = "";
+      document.getElementById("category").value = "All";
+      renderCategories();
+      renderProducts();
+      renderCart();
+      checkOpenCheck();
+    }
+
+    function clearCurrentOrder() {
+      cart.clear();
+      document.getElementById("orderSource").value = "WalkIn";
+      document.getElementById("sourceReference").value = "";
+      document.getElementById("sourceReference").disabled = true;
+      document.getElementById("discountMode").value = "None";
+      document.getElementById("discountValue").value = "";
+      document.getElementById("appendMode").value = "append";
+      document.getElementById("customerNotes").value = "";
+      document.getElementById("allergyNotes").value = "";
+      document.getElementById("search").value = "";
+      document.getElementById("category").value = "All";
+      renderCategories();
+      renderCart();
+      checkOpenCheck();
+    }
+
+    document.querySelectorAll(".nav-btn[data-tab]").forEach(btn =&gt; btn.onclick = () =&gt; {
+      document.querySelectorAll(".nav-btn[data-tab]").forEach(x =&gt; x.classList.remove("active"));
+      btn.classList.add("active");
+      const tab = btn.getAttribute("data-tab");
+      document.querySelectorAll(".tab").forEach(x =&gt; x.classList.add("hidden"));
+      document.getElementById(tab).classList.remove("hidden");
+    });
+
+    document.getElementById("search").addEventListener("input", renderProducts);
+    document.getElementById("discountMode").addEventListener("change", renderTotals);
+    document.getElementById("discountValue").addEventListener("input", renderTotals);
+    document.getElementById("paymentCurrency").addEventListener("change", renderTotals);
+    document.getElementById("tableSelect").addEventListener("change", checkOpenCheck);
+    document.getElementById("sourceReference").disabled = true;
+    document.getElementById("orderSource").addEventListener("change", () =&gt; {
+      const src = document.getElementById("orderSource").value;
+      const ref = document.getElementById("sourceReference");
+      ref.disabled = src !== "Delivery";
+      if (src !== "Delivery") ref.value = "";
+    });
+
+    document.getElementById("btnLogin").onclick = async () =&gt; {
+      const payload = {
+        staffId: document.getElementById("staffId").value,
+        pin: document.getElementById("pin").value,
+        portal: "Server"
+      };
+      const res = await api("/api/auth/login", "POST", payload, false);
+      if (!res.ok || !res.body?.accessToken) { setOut("Login failed", res); return; }
+      token = res.body.accessToken;
+      me = res.body;
+      document.getElementById("sessionLabel").textContent = `${me.name} (${me.signInId || me.employeeUniqueId})`;
+      document.getElementById("loginWrap").classList.add("hidden");
+      document.getElementById("app").classList.remove("hidden");
+      const ok = await loadPortalData();
+      await loadDrafts();
+      setOut("Server login success", { login: res, loaded: ok });
+    };
+
+    document.getElementById("btnLogout").onclick = () =&gt; {
+      token = ""; me = null; tables = []; products = []; readyOrders = []; drafts = []; cart.clear();
+      document.getElementById("brandName").textContent = "ELITE SERVER PORTAL";
+      revokeImgBlob(document.getElementById("brandLogo"));
+      document.getElementById("brandLogo").classList.add("hidden");
+      revokeImgBlob(document.getElementById("staffPhoto"));
+      document.getElementById("staffPhoto").classList.add("hidden");
+      document.getElementById("app").classList.add("hidden");
+      document.getElementById("loginWrap").classList.remove("hidden");
+      setOut("Logged out", { ok: true });
+    };
+
+    document.getElementById("btnRefreshAll").onclick = async () =&gt; {
+      const ok = await loadPortalData();
+      const draftOk = await loadDrafts();
+      setOut("Refresh data", { ok, draftOk, tables: tables.length, products: products.length, readyOrders: readyOrders.length, drafts: drafts.length });
+    };
+    document.getElementById("btnRefreshReady").onclick = async () =&gt; {
+      const ok = await loadReadyOrders();
+      setOut("Refresh ready orders", { ok, readyOrders: readyOrders.length });
+    };
+    document.getElementById("btnCheckOpen").onclick = checkOpenCheck;
+
+    document.getElementById("btnSaveDraft").onclick = async () =&gt; {
+      const snapshot = snapshotState();
+      const itemCount = [...cart.values()].reduce((a, b) =&gt; a + b, 0);
+      const tableLabel = tables.find(t =&gt; t.id === snapshot.tableId)?.tableNumber || "-";
+      const label = `${new Date().toLocaleString()} | T${tableLabel} | ${itemCount} items`;
+      const payload = { label, snapshotJson: JSON.stringify(snapshot) };
+      const res = await api("/api/server/drafts", "POST", payload);
+      if (!res.ok) {
+        setDraftStatus(`Save failed: ${res.body?.message || "request failed"}`, false);
+        setOut("Draft save failed", res);
+        return;
+      }
+      await loadDrafts();
+      document.getElementById("drafts").value = res.body.id || "";
+      setDraftStatus("Draft saved to backend.", true);
+      setOut("Draft saved", { id: res.body.id, drafts: drafts.length });
+    };
+    document.getElementById("btnLoadDraft").onclick = async () =&gt; {
+      const id = document.getElementById("drafts").value;
+      if (!id) {
+        setDraftStatus("Select a draft first.", false);
+        setOut("Load draft", { ok: false, message: "Select a draft first." });
+        return;
+      }
+      const draft = drafts.find(d =&gt; d.id === id);
+      if (!draft) {
+        setDraftStatus("Selected draft was not found. Refresh data.", false);
+        setOut("Load draft", { ok: false, message: "No draft selected." });
+        return;
+      }
+      let snapshot;
+      try { snapshot = JSON.parse(draft.snapshotJson || "{}"); } catch { snapshot = null; }
+      if (!snapshot) {
+        setDraftStatus("Draft payload is invalid.", false);
+        setOut("Load draft", { ok: false, message: "Draft payload is invalid." });
+        return;
+      }
+      applySnapshot(snapshot);
+      setDraftStatus("Draft loaded.", true);
+      setOut("Draft loaded", { id: draft.id, label: draft.label });
+    };
+    document.getElementById("btnDeleteDraft").onclick = async () =&gt; {
+      const id = document.getElementById("drafts").value;
+      if (!id) {
+        setDraftStatus("Select a draft first.", false);
+        setOut("Delete draft", { ok: false, message: "Select a draft first." });
+        return;
+      }
+      const res = await api(`/api/server/drafts/${id}`, "DELETE");
+      if (!res.ok) {
+        setDraftStatus(`Delete failed: ${res.body?.message || "request failed"}`, false);
+        setOut("Delete draft failed", res);
+        return;
+      }
+      await loadDrafts();
+      document.getElementById("drafts").value = "";
+      setDraftStatus("Draft deleted.", true);
+      setOut("Draft deleted", { id });
+    };
+
+    document.getElementById("btnClearOrder").onclick = () =&gt; {
+      clearCurrentOrder();
+      setOut("Order cleared", { ok: true });
+    };
+
+    document.getElementById("btnSubmit").onclick = async () =&gt; {
+      const tableId = Number(document.getElementById("tableSelect").value || "0");
+      const lines = [...cart.entries()].map(([productId, quantity]) =&gt; ({ productId, quantity }));
+      if (!tableId) { setOut("Submit blocked", { message: "Select a table first." }); return; }
+      if (!lines.length) { setOut("Submit blocked", { message: "Cart is empty." }); return; }
+      const source = document.getElementById("orderSource").value;
+      const sourceRef = document.getElementById("sourceReference").value || "";
+      if (source === "Delivery" &amp;&amp; !sourceRef.trim()) {
+        setOut("Submit blocked", { message: "Delivery source needs a reference." });
+        return;
+      }
+      const d = normalizeDiscount();
+      const payload = {
+        tableId,
+        orderSource: source,
+        sourceReference: sourceRef,
+        discountMode: d.mode,
+        discountValue: d.value,
+        paymentCurrencyCode: document.getElementById("paymentCurrency").value,
+        appendToOpenCheck: document.getElementById("appendMode").value === "append",
+        customerNotes: document.getElementById("customerNotes").value || "",
+        allergyNotes: document.getElementById("allergyNotes").value || "",
+        lines
+      };
+      const res = await api("/api/server/orders", "POST", payload);
+      setOut("Submit order result", res);
+      if (res.ok) {
+        clearCurrentOrder();
+        await loadPortalData();
+      }
+    };
+  &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+<h2 id="a7">7. WPF client — startup &amp; database dialog (full listings)</h2><h3 id="EliteRestaurantPro-App-xaml-cs">App.xaml.cs</h3><p class="path"><code>EliteRestaurantPro/App.xaml.cs</code> — verbatim</p><pre><code>using System.Windows;
+using System.IO;
+using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Utils;
+using EliteRestaurantPro.Utils;
+using EliteRestaurantPro.Views;
+using Npgsql;
+using QuestPDF.Infrastructure;
+
+namespace EliteRestaurantPro;
+
+public partial class App : Application
+{
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        DispatcherUnhandledException += (_, args) =&gt;
+        {
+            LogUnhandledException("DispatcherUnhandledException", args.Exception);
+            MessageBox.Show(
+                args.Exception.ToString(),
+                "Application Error",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            args.Handled = true;
+        };
+
+        AppDomain.CurrentDomain.UnhandledException += (_, args) =&gt;
+        {
+            if (args.ExceptionObject is Exception ex)
+                LogUnhandledException("AppDomainUnhandledException", ex);
+        };
+
+        TaskScheduler.UnobservedTaskException += (_, args) =&gt;
+        {
+            LogUnhandledException("TaskSchedulerUnobservedTaskException", args.Exception);
+            args.SetObserved();
+        };
+
+        QuestPDF.Settings.License = LicenseType.Community;
+        // Do not set Npgsql.EnableLegacyTimestampBehavior — use UTC in the model (AppDbContext value converters).
+
+        if (!EnsureDatabaseConnectionConfigured())
+        {
+            Shutdown();
+            return;
+        }
+
+        if (!TryInitializeDatabase())
+        {
+            Shutdown();
+            return;
+        }
+
+        ThemeManager.ApplySavedPalette();
+        base.OnStartup(e);
+    }
+
+    private static bool EnsureDatabaseConnectionConfigured()
+    {
+        if (AppDbContext.TryGetPostgreSqlConnectionString(out _))
+            return true;
+
+        var dialog = new DatabasePipeSetupDialog();
+        if (Current.MainWindow != null)
+            dialog.Owner = Current.MainWindow;
+        if (dialog.ShowDialog() != true || string.IsNullOrWhiteSpace(dialog.PipeInput))
+        {
+            MessageBox.Show(
+                "A PostgreSQL connection is required. Set environment variables or complete this dialog.",
+                "Database Setup Required",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return false;
+        }
+
+        var input = dialog.PipeInput;
+        if (!PostgresBootstrapPipe.TryParse(input.Trim(), out var host, out var port, out var database, out var user, out var password))
+            return false;
+
+        if (!string.IsNullOrEmpty(password) &amp;&amp; !DatabaseConnectionSecret.IsDpapiAvailable)
+        {
+            MessageBox.Show(
+                "Cannot store a password on this OS. Use ELITE_POSTGRES_CONNECTION, or leave the password segment empty for trust auth.",
+                "Database Setup",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return false;
+        }
+
+        var settings = SettingsManager.Load();
+        ApplyBootstrapDatabaseSettings(settings.Database, host, port, database, user, password);
+        SettingsManager.Save(settings);
+        return true;
+    }
+
+    private static void ApplyBootstrapDatabaseSettings(
+        DatabaseSettings db,
+        string host,
+        int port,
+        string database,
+        string user,
+        string password)
+    {
+        db.Provider = "PostgreSql";
+        db.PostgreSqlHost = host;
+        db.PostgreSqlPort = port;
+        db.PostgreSqlDatabase = database;
+        db.PostgreSqlUsername = user;
+        if (!string.IsNullOrEmpty(password) &amp;&amp; DatabaseConnectionSecret.IsDpapiAvailable)
+            db.PostgreSqlPasswordProtected = DatabaseConnectionSecret.ProtectUtf8(password);
+        else
+            db.PostgreSqlPasswordProtected = string.Empty;
+        db.PostgreSqlConnectionString = null;
+    }
+
+    private static bool TryInitializeDatabase()
+    {
+        while (true)
+        {
+            try
+            {
+                DatabaseInitializer.Initialize();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                if (IsEfMigrationDuplicateTableError(ex))
+                {
+                    MessageBox.Show(
+                        "Your database already has tables from a previous EliteRestaurant version, but EF Core migration history is missing.\n\n" +
+                        "This is not a wrong password. Run the following once in pgAdmin: open your database → Tools → Query Tool, paste and execute:\n\n" +
+                        DatabaseMigrationMetadata.BaselineInitialMigrationSql +
+                        "\n\nThen click OK here to retry startup.",
+                        "Baseline database migrations",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                    continue;
+                }
+
+                var retry = MessageBox.Show(
+                    BuildDatabaseConnectionFailureMessage(ex),
+                    "PostgreSQL Connection Failed",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning);
+
+                if (retry != MessageBoxResult.Yes)
+                    return false;
+
+                var settings = SettingsManager.Load();
+                var db = settings.Database ?? new DatabaseSettings();
+                var defaultPipe = string.IsNullOrWhiteSpace(db.PostgreSqlHost)
+                    ? "localhost|5432|elite_restaurant|postgres|"
+                    : $"{db.PostgreSqlHost}|{db.PostgreSqlPort}|{db.PostgreSqlDatabase}|{db.PostgreSqlUsername}|";
+
+                var setupDialog = new DatabasePipeSetupDialog(defaultPipe);
+                if (Current.MainWindow != null)
+                    setupDialog.Owner = Current.MainWindow;
+                if (setupDialog.ShowDialog() != true || string.IsNullOrWhiteSpace(setupDialog.PipeInput))
+                    return false;
+
+                var updated = setupDialog.PipeInput;
+                if (!PostgresBootstrapPipe.TryParse(updated.Trim(), out var host, out var port, out var database, out var user, out var password))
+                {
+                    MessageBox.Show(
+                        "Invalid format. Use: host|port|database|username|password",
+                        "Database Setup",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    continue;
+                }
+
+                if (string.IsNullOrEmpty(password) &amp;&amp; IndicatesPostgreSqlPasswordRequired(ex))
+                {
+                    MessageBox.Show(
+                        "No password was entered after the last |, but this server requires password authentication (SCRAM).\n\n" +
+                        "Enter the full line again with your password as the last segment, for example:\n" +
+                        "localhost|5432|elite_restaurant|postgres|your_password",
+                        "Password Required",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    continue;
+                }
+
+                if (!string.IsNullOrEmpty(password) &amp;&amp; !DatabaseConnectionSecret.IsDpapiAvailable)
+                {
+                    MessageBox.Show(
+                        "Cannot store a password on this OS. Use ELITE_POSTGRES_CONNECTION or leave password empty for trust auth.",
+                        "Database Setup",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    continue;
+                }
+
+                ApplyBootstrapDatabaseSettings(db, host, port, database, user, password);
+                settings.Database = db;
+                SettingsManager.Save(settings);
+
+                if (!AppDbContext.TryGetPostgreSqlConnectionString(out var cs))
+                {
+                    MessageBox.Show(
+                        "Could not build a connection string from the entered values.",
+                        "PostgreSQL",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    continue;
+                }
+
+                if (!CanConnect(cs, out var error))
+                {
+                    MessageBox.Show(
+                        $"Connection test failed.\n\n{error}",
+                        "PostgreSQL Test Failed",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    continue;
+                }
+            }
+        }
+    }
+
+    private static bool CanConnect(string connectionString, out string error)
+    {
+        try
+        {
+            using var conn = new NpgsqlConnection(connectionString);
+            conn.Open();
+            using var cmd = new NpgsqlCommand("SELECT 1;", conn);
+            _ = cmd.ExecuteScalar();
+            error = string.Empty;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    private static string BuildDatabaseConnectionFailureMessage(Exception ex)
+    {
+        var baseMsg = ex.GetBaseException().Message ?? ex.Message;
+        var body =
+            $"Database connection failed.\n\n{baseMsg}\n\nClick Yes to update connection string, or No to exit.";
+        if (!IndicatesPostgreSqlPasswordRequired(ex))
+            return body;
+
+        return body +
+               "\n\n— If you see SCRAM or SASL/password errors: the app must store your PostgreSQL user password. " +
+               "On Yes, put it as the last segment: host|port|database|username|password\n\n" +
+               "Or set environment variables ELITE_DB_PROVIDER=PostgreSql and ELITE_POSTGRES_CONNECTION " +
+               "(full Npgsql connection string including Password=…).";
+    }
+
+    private static bool IsEfMigrationDuplicateTableError(Exception ex)
+    {
+        for (Exception? e = ex; e != null; e = e.InnerException)
+        {
+            if (e is PostgresException pg &amp;&amp; pg.SqlState == "42P07")
+                return true;
+            var msg = e.Message ?? string.Empty;
+            if (msg.Contains("already exists", StringComparison.OrdinalIgnoreCase)
+                &amp;&amp; msg.Contains("relation", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool IndicatesPostgreSqlPasswordRequired(Exception ex)
+    {
+        var m = ex.GetBaseException().Message ?? string.Empty;
+        return m.Contains("password", StringComparison.OrdinalIgnoreCase)
+               || m.Contains("SCRAM", StringComparison.OrdinalIgnoreCase)
+               || m.Contains("SASL", StringComparison.OrdinalIgnoreCase)
+               || m.Contains("28P01", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void LogUnhandledException(string source, Exception exception)
+    {
+        try
+        {
+            var appFolder = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "EliteRestaurantPro",
+                "logs");
+            Directory.CreateDirectory(appFolder);
+            var path = Path.Combine(appFolder, "app-crash.log");
+            File.AppendAllText(
+                path,
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {source}{Environment.NewLine}{exception}{Environment.NewLine}{new string('-', 80)}{Environment.NewLine}");
+        }
+        catch
+        {
+            // Ignore logging failures.
+        }
+    }
+}
+</code></pre>
+<h3 id="EliteRestaurantPro-Views-DatabasePipeSetupDialog-xaml">DatabasePipeSetupDialog.xaml</h3><p class="path"><code>EliteRestaurantPro/Views/DatabasePipeSetupDialog.xaml</code> — verbatim</p><pre><code>&lt;Window x:Class="EliteRestaurantPro.Views.DatabasePipeSetupDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Database Setup"
+        Height="320"
+        Width="520"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"&gt;
+    &lt;Grid Margin="16"&gt;
+        &lt;Grid.RowDefinitions&gt;
+            &lt;RowDefinition Height="Auto"/&gt;
+            &lt;RowDefinition Height="*"/&gt;
+            &lt;RowDefinition Height="Auto"/&gt;
+            &lt;RowDefinition Height="Auto"/&gt;
+        &lt;/Grid.RowDefinitions&gt;
+        &lt;TextBlock TextWrapping="Wrap" Margin="0,0,0,12"
+                   Text="Enter PostgreSQL as pipe-separated fields: host|port|database|username|password&amp;#x0a;&amp;#x0a;Example: localhost|5432|elite_restaurant|postgres|your_password&amp;#x0a;&amp;#x0a;Or cancel and set ELITE_DB_PROVIDER=PostgreSql and ELITE_POSTGRES_CONNECTION."/&gt;
+        &lt;TextBox x:Name="PipeInputBox" Grid.Row="1" AcceptsReturn="False" VerticalScrollBarVisibility="Disabled"
+                 Text="localhost|5432|elite_restaurant|postgres|postgres" FontFamily="Consolas" MinHeight="72"/&gt;
+        &lt;TextBlock x:Name="ErrorText" Grid.Row="2" Foreground="DarkRed" TextWrapping="Wrap" Margin="0,8,0,0" Visibility="Collapsed"/&gt;
+        &lt;StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0"&gt;
+            &lt;Button Content="Cancel" Width="88" Margin="0,0,8,0" IsCancel="True" Click="Cancel_Click"/&gt;
+            &lt;Button Content="OK" Width="88" IsDefault="True" Click="Ok_Click"/&gt;
+        &lt;/StackPanel&gt;
+    &lt;/Grid&gt;
+&lt;/Window&gt;
+</code></pre>
+<h3 id="EliteRestaurantPro-Views-DatabasePipeSetupDialog-xaml-cs">DatabasePipeSetupDialog.xaml.cs</h3><p class="path"><code>EliteRestaurantPro/Views/DatabasePipeSetupDialog.xaml.cs</code> — verbatim</p><pre><code>using System.Windows;
+using EliteRestaurant.Core.Utils;
+
+namespace EliteRestaurantPro.Views;
+
+public partial class DatabasePipeSetupDialog : Window
+{
+    public string? PipeInput { get; private set; }
+
+    public DatabasePipeSetupDialog(string? initialPipe = null)
+    {
+        InitializeComponent();
+        if (!string.IsNullOrWhiteSpace(initialPipe))
+            PipeInputBox.Text = initialPipe;
+    }
+
+    private void Ok_Click(object sender, RoutedEventArgs e)
+    {
+        var raw = PipeInputBox.Text ?? string.Empty;
+        if (!PostgresBootstrapPipe.TryParse(raw.Trim(), out _, out _, out _, out _, out _))
+        {
+            ErrorText.Text = "Invalid format. Use: host|port|database|username|password";
+            ErrorText.Visibility = Visibility.Visible;
+            return;
+        }
+
+        PipeInput = raw.Trim();
+        DialogResult = true;
+        Close();
+    }
+
+    private void Cancel_Click(object sender, RoutedEventArgs e)
+    {
+        DialogResult = false;
+        Close();
+    }
+}
+</code></pre>
+<h2 id="a8">8. Create-order services (full listings)</h2><h3 id="EliteRestaurantPro-Services-CreateOrderSubmissionModels-cs">EliteRestaurantPro/Services/CreateOrderSubmissionModels.cs</h3><p class="path"><code>EliteRestaurantPro/Services/CreateOrderSubmissionModels.cs</code> — verbatim</p><pre><code>namespace EliteRestaurantPro.Services;
+
+public sealed record CreateOrderOpenCheckInfo(int? OrderId, string Code, string Status);
+
+public sealed record CreateOrderPhaseResult(
+    bool Ok,
+    string Caption,
+    string Message,
+    int TableNumber,
+    string TableName,
+    CreateOrderOpenCheckInfo OpenCheck);
+
+public sealed record CreateOrderAppendResult(bool Ok, string Caption, string Message);
+
+public sealed record CreateOrderSaveResult(bool Ok, string Caption, string Message);
+
+public sealed record CreateOrderSubmitSnapshot(
+    int TableId,
+    IReadOnlyList&lt;(int ProductId, int Quantity)&gt; SelectedLines,
+    string CustomerNotes,
+    string AllergyNotes,
+    string DiscountMode,
+    string DiscountInput,
+    decimal LiveDiscountAmount,
+    decimal LiveSubtotal,
+    decimal LiveGrandTotal,
+    decimal LiveGrandTotalFc,
+    string LiveDiscountLabel,
+    string LiveGrandTotalUsdText,
+    string LiveGrandTotalFcText,
+    string SelectedPaymentCurrency,
+    string ChosenPaymentAmountText,
+    string EstimatedPrepText,
+    string SelectedOrderStatus,
+    string SelectedOrderSource,
+    string SourceReference,
+    bool IsTabletStaffOrderFlow,
+    int? ServerEmployeeId,
+    string ServerEmployeeName,
+    string ReservationCode,
+    string ReservationGuestName);
+</code></pre>
+<h3 id="EliteRestaurantPro-Services-TableLoadingService-cs">EliteRestaurantPro/Services/TableLoadingService.cs</h3><p class="path"><code>EliteRestaurantPro/Services/TableLoadingService.cs</code> — verbatim</p><pre><code>using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Models;
+using Microsoft.EntityFrameworkCore;
+using ModelTable = EliteRestaurant.Core.Models.Table;
+
+namespace EliteRestaurantPro.Services;
+
+public sealed record CreateOrderCatalogProduct(
+    int ProductId,
+    string UniqueId,
+    string Name,
+    string Category,
+    string SubCategory,
+    decimal Price);
+
+public sealed record CreateOrderArrivedReservationRow(
+    int Id,
+    string UniqueId,
+    string ReservationName,
+    string GuestName,
+    DateTime ReservedFor,
+    int? TableId,
+    string TableLabel);
+
+public sealed record CreateOrderPageCatalog(
+    IReadOnlyList&lt;ModelTable&gt; Tables,
+    IReadOnlyList&lt;CreateOrderCatalogProduct&gt; Products,
+    IReadOnlyList&lt;CreateOrderArrivedReservationRow&gt; ArrivedReservations,
+    IReadOnlyList&lt;string&gt; DeliveryReferences);
+
+/// &lt;summary&gt;Loads tables, menu, reservations, and delivery references for the create-order page.&lt;/summary&gt;
+public sealed class TableLoadingService
+{
+    public CreateOrderPageCatalog LoadCatalog(int? restrictToServerEmployeeId)
+    {
+        using var db = new AppDbContext();
+
+        var tableQuery = db.Tables.AsNoTracking()
+            .Include(t =&gt; t.AssignedServer)
+            .Where(t =&gt; t.Status != "Maintenance" &amp;&amp; t.AssignedServerId != null);
+        if (restrictToServerEmployeeId.HasValue)
+            tableQuery = tableQuery.Where(t =&gt; t.AssignedServerId == restrictToServerEmployeeId.Value);
+
+        var tables = tableQuery.OrderBy(t =&gt; t.TableNumber).ToList();
+
+        var products = db.Products.AsNoTracking()
+            .OrderBy(p =&gt; p.Category)
+            .ThenBy(p =&gt; p.SubCategory)
+            .ThenBy(p =&gt; p.Name)
+            .Select(p =&gt; new CreateOrderCatalogProduct(
+                p.Id,
+                p.UniqueId,
+                p.Name,
+                p.Category,
+                string.IsNullOrWhiteSpace(p.SubCategory) ? "General" : p.SubCategory!,
+                p.Price))
+            .ToList();
+
+        var arrivedReservations = db.Reservations
+            .AsNoTracking()
+            .Include(r =&gt; r.Table)
+            .Where(r =&gt; r.Status == "Arrived")
+            .OrderBy(r =&gt; r.ReservedFor)
+            .Take(60)
+            .Select(r =&gt; new CreateOrderArrivedReservationRow(
+                r.Id,
+                r.UniqueId,
+                r.ReservationName,
+                r.GuestName,
+                r.ReservedFor,
+                r.TableId,
+                r.Table != null &amp;&amp; !string.IsNullOrWhiteSpace(r.Table.Name)
+                    ? r.Table.Name
+                    : (r.TableId.HasValue ? $"Table #{r.TableId.Value}" : "-")))
+            .ToList();
+
+        var deliveryReferences = db.Orders
+            .AsNoTracking()
+            .Where(o =&gt; o.OrderSource == "Delivery")
+            .OrderByDescending(o =&gt; o.CreatedAt)
+            .Select(o =&gt; !string.IsNullOrWhiteSpace(o.ReservationGuestName)
+                ? o.ReservationGuestName
+                : (!string.IsNullOrWhiteSpace(o.TableName) ? o.TableName : o.UniqueId))
+            .Where(s =&gt; !string.IsNullOrWhiteSpace(s))
+            .Distinct()
+            .Take(40)
+            .ToList();
+
+        return new CreateOrderPageCatalog(tables, products, arrivedReservations, deliveryReferences);
+    }
+}
+</code></pre>
+<h3 id="EliteRestaurantPro-Services-DraftPersistenceService-cs">EliteRestaurantPro/Services/DraftPersistenceService.cs</h3><p class="path"><code>EliteRestaurantPro/Services/DraftPersistenceService.cs</code> — verbatim</p><pre><code>using System.Text.Json;
+using EliteRestaurant.Core.Utils;
+
+namespace EliteRestaurantPro.Services;
+
+public sealed class CreateOrderDraftItemPayload
+{
+    public int ProductId { get; set; }
+    public int Quantity { get; set; }
+}
+
+/// &lt;summary&gt;JSON payload for server create-order drafts (shared with SharedOrderDraftStore).&lt;/summary&gt;
+public sealed class CreateOrderDraftPayload
+{
+    public string DraftLabel { get; set; } = string.Empty;
+    public int SelectedTableId { get; set; }
+    public string SelectedOrderSource { get; set; } = "WalkIn";
+    public string SelectedDeliveryReference { get; set; } = string.Empty;
+    public string SelectedReservationCode { get; set; } = string.Empty;
+    public string SelectedOrderStatus { get; set; } = "Waiting";
+    public string SelectedOrderCategory { get; set; } = "All";
+    public string SelectedOrderSubCategory { get; set; } = "All";
+    public string ProductSearchText { get; set; } = string.Empty;
+    public string CustomerNotes { get; set; } = string.Empty;
+    public string AllergyNotes { get; set; } = string.Empty;
+    public string SelectedPaymentCurrency { get; set; } = CurrencyHelper.Usd;
+    public string DiscountMode { get; set; } = "None";
+    public string DiscountInput { get; set; } = string.Empty;
+    public List&lt;CreateOrderDraftItemPayload&gt; Items { get; set; } = [];
+}
+
+public sealed class DraftPersistenceService
+{
+    public static string Serialize(CreateOrderDraftPayload payload) =&gt;
+        JsonSerializer.Serialize(payload);
+
+    public static CreateOrderDraftPayload? Deserialize(string json)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize&lt;CreateOrderDraftPayload&gt;(json);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public SharedDraftRow Save(int employeeId, string employeeName, CreateOrderDraftPayload payload) =&gt;
+        SharedOrderDraftStore.SaveServerDraft(employeeId, employeeName, payload.DraftLabel, Serialize(payload));
+
+    public static IReadOnlyList&lt;SharedDraftRow&gt; ListForEmployee(int employeeId) =&gt;
+        SharedOrderDraftStore.ListServerDrafts(employeeId);
+
+    public static bool TryGetPayload(int employeeId, string draftUniqueId, out SharedDraftRow? row)
+    {
+        row = SharedOrderDraftStore.ListServerDrafts(employeeId)
+            .FirstOrDefault(d =&gt; string.Equals(d.Id, draftUniqueId, StringComparison.Ordinal));
+        return row is not null;
+    }
+
+    public static bool Delete(int employeeId, string draftUniqueId) =&gt;
+        SharedOrderDraftStore.DeleteServerDraft(employeeId, draftUniqueId);
+}
+</code></pre>
+<h3 id="EliteRestaurantPro-Services-OrderSubmissionService-cs">EliteRestaurantPro/Services/OrderSubmissionService.cs</h3><p class="path"><code>EliteRestaurantPro/Services/OrderSubmissionService.cs</code> — verbatim</p><pre><code>using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Orders;
+using EliteRestaurant.Core.Utils;
+using EliteRestaurantPro.Utils;
+using Microsoft.EntityFrameworkCore;
+using ModelTable = EliteRestaurant.Core.Models.Table;
+
+namespace EliteRestaurantPro.Services;
+
+/// &lt;summary&gt;Persists create-order flows: phase validation, append to open check, new order.&lt;/summary&gt;
+public sealed class OrderSubmissionService
+{
+    public CreateOrderPhaseResult LoadPhase1(CreateOrderSubmitSnapshot snap)
+    {
+        if (string.Equals(snap.SelectedOrderSource, "Delivery", StringComparison.OrdinalIgnoreCase))
+        {
+            return new CreateOrderPhaseResult(
+                true,
+                "Create Order",
+                string.Empty,
+                0,
+                "Delivery",
+                new CreateOrderOpenCheckInfo(null, string.Empty, string.Empty));
+        }
+
+        using var db = new AppDbContext();
+        var table = db.Tables.Include(t =&gt; t.AssignedServer).SingleOrDefault(t =&gt; t.Id == snap.TableId);
+        if (table is null || table.AssignedServerId is null || table.AssignedServer is null)
+            return new CreateOrderPhaseResult(false, "Create Order", "Selected table must have an assigned server.", 0, string.Empty, new CreateOrderOpenCheckInfo(null, string.Empty, string.Empty));
+
+        if (AppSession.IsServerTablet &amp;&amp; table.AssignedServerId != snap.ServerEmployeeId)
+            return new CreateOrderPhaseResult(false, "Create Order", "This table is not assigned to your session.", 0, string.Empty, new CreateOrderOpenCheckInfo(null, string.Empty, string.Empty));
+
+        var open = db.Orders.AsNoTracking()
+            .WhereOpenCheckForTable(table.Id)
+            .OrderByDescending(o =&gt; o.CreatedAt)
+            .FirstOrDefault();
+        var code = open is null ? string.Empty : string.IsNullOrWhiteSpace(open.UniqueId) ? $"#{open.Id:000}" : open.UniqueId;
+        var tableName = string.IsNullOrWhiteSpace(table.Name) ? $"Table {table.TableNumber}" : table.Name;
+
+        return new CreateOrderPhaseResult(
+            true,
+            "Create Order",
+            string.Empty,
+            table.TableNumber,
+            tableName,
+            new CreateOrderOpenCheckInfo(open?.Id, code, open?.Status ?? string.Empty));
+    }
+
+    public CreateOrderAppendResult AppendToExisting(CreateOrderSubmitSnapshot snap, int openOrderId)
+    {
+        using var db = new AppDbContext();
+        var table = db.Tables.Include(t =&gt; t.AssignedServer).SingleOrDefault(t =&gt; t.Id == snap.TableId);
+        if (table is null)
+            return new CreateOrderAppendResult(false, "Create Order", "Table not found.");
+
+        var existing = db.Orders.Include(o =&gt; o.Items).SingleOrDefault(o =&gt; o.Id == openOrderId);
+        if (existing is null || existing.TableId != table.Id)
+            return new CreateOrderAppendResult(false, "Create Order", "Open check was closed or moved. Refresh and try again.");
+
+        var productIds = snap.SelectedLines.Select(s =&gt; s.ProductId).Distinct().ToList();
+        var activeStaff = db.Employees.AsNoTracking().Where(e =&gt; e.EmploymentStatus == "Active").ToList();
+        var productById = db.Products.AsNoTracking().Where(p =&gt; productIds.Contains(p.Id)).ToDictionary(p =&gt; p.Id, p =&gt; p);
+
+        var newItems = new List&lt;OrderItem&gt;();
+        foreach (var (productId, qty) in snap.SelectedLines)
+        {
+            var assignee = OrderSubmissionHelper.ResolveAssignee(productById, activeStaff, productId);
+            newItems.Add(new OrderItem
+            {
+                ProductId = productId,
+                Quantity = qty,
+                PreparedByEmployeeId = assignee.EmployeeId,
+                PreparedByRole = assignee.Role,
+                PreparedByName = assignee.Name
+            });
+        }
+
+        foreach (var item in newItems)
+            existing.Items.Add(item);
+
+        if (!string.IsNullOrWhiteSpace(snap.CustomerNotes))
+        {
+            existing.CustomerNotes = string.IsNullOrWhiteSpace(existing.CustomerNotes)
+                ? snap.CustomerNotes.Trim()
+                : $"{existing.CustomerNotes.Trim()}\n{snap.CustomerNotes.Trim()}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(snap.AllergyNotes))
+        {
+            existing.AllergyNotes = string.IsNullOrWhiteSpace(existing.AllergyNotes)
+                ? snap.AllergyNotes.Trim()
+                : $"{existing.AllergyNotes.Trim()}\n{snap.AllergyNotes.Trim()}";
+        }
+
+        if (string.Equals(existing.Status, "Ready", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(existing.Status, OrderWorkflow.Served, StringComparison.OrdinalIgnoreCase))
+            existing.Status = "In Kitchen";
+
+        if (OrderDiscountParser.ShouldApplyDiscount(snap.DiscountMode, snap.DiscountInput))
+        {
+            var discountRaw = OrderDiscountParser.Parse(snap.DiscountInput);
+            existing.DiscountMode = snap.DiscountMode;
+            existing.DiscountValue = string.Equals(snap.DiscountMode, "None", StringComparison.OrdinalIgnoreCase)
+                ? 0m
+                : discountRaw;
+        }
+
+        OrderSubmissionHelper.SyncPaymentFields(existing, db);
+        OrderSubmissionHelper.ApplyReservationLink(
+            existing,
+            db,
+            snap.SelectedOrderSource,
+            snap.SourceReference,
+            snap.ReservationCode,
+            snap.ReservationGuestName);
+        table.Status = "Occupied";
+
+        using var tx = db.Database.BeginTransaction();
+        try
+        {
+            if (!OrderWorkflow.IsPendingCashier(existing.Status))
+            {
+                var invErr = OrderInventoryDeduction.TryApplyForAdditionalItems(db, existing, newItems);
+                if (invErr is not null)
+                {
+                    tx.Rollback();
+                    return new CreateOrderAppendResult(false, "Insufficient Inventory", invErr);
+                }
+            }
+
+            db.SaveChanges();
+            DataReconciler.ReconcileTableStatusesWithOrders(db);
+            db.SaveChanges();
+            tx.Commit();
+        }
+        catch
+        {
+            tx.Rollback();
+            throw;
+        }
+
+        var code = string.IsNullOrWhiteSpace(existing.UniqueId) ? $"#{existing.Id:000}" : existing.UniqueId;
+        return new CreateOrderAppendResult(true, "Create Order", $"Added {newItems.Count} line(s) to check {code}.");
+    }
+
+    public CreateOrderSaveResult SaveNew(CreateOrderSubmitSnapshot snap)
+    {
+        var discountRaw = OrderDiscountParser.Parse(snap.DiscountInput);
+        using var db = new AppDbContext();
+        ModelTable? table = null;
+        if (!string.Equals(snap.SelectedOrderSource, "Delivery", StringComparison.OrdinalIgnoreCase))
+        {
+            table = db.Tables.Include(t =&gt; t.AssignedServer).SingleOrDefault(t =&gt; t.Id == snap.TableId);
+            if (table is null || table.AssignedServerId is null || table.AssignedServer is null)
+                return new CreateOrderSaveResult(false, "Create Order", "Selected table must have an assigned server.");
+        }
+
+        var status = snap.IsTabletStaffOrderFlow ? OrderWorkflow.PendingCashier : snap.SelectedOrderStatus;
+        var discountValue = string.Equals(snap.DiscountMode, "None", StringComparison.OrdinalIgnoreCase) ? 0m : discountRaw;
+        var paymentCurrency = snap.SelectedPaymentCurrency;
+        var payUsd = Math.Round(snap.LiveGrandTotal, 2);
+        var payFc = snap.LiveGrandTotalFc;
+
+        var order = new OrderRecord
+        {
+            UniqueId = UniqueIdGenerator.NewId("ORD"),
+            TableId = table?.Id,
+            TableCode = table is null ? "Delivery" : $"Table {table.TableNumber}",
+            TableName = table is null
+                ? (string.IsNullOrWhiteSpace(snap.SourceReference) ? "Delivery" : snap.SourceReference)
+                : (string.IsNullOrWhiteSpace(table.Name) ? $"Table {table.TableNumber}" : table.Name),
+            ServerId = table is null
+                ? AppSession.StaffEmployeeId
+                : (AppSession.IsServerTablet ? snap.ServerEmployeeId : table.AssignedServerId),
+            ServerName = table is null
+                ? (string.IsNullOrWhiteSpace(snap.ServerEmployeeName) ? "Delivery desk" : snap.ServerEmployeeName)
+                : (AppSession.IsServerTablet
+                    ? (string.IsNullOrWhiteSpace(snap.ServerEmployeeName) ? table.AssignedServer!.Name : snap.ServerEmployeeName)
+                    : table.AssignedServer!.Name),
+            Status = status,
+            CustomerNotes = snap.CustomerNotes.Trim(),
+            AllergyNotes = snap.AllergyNotes.Trim(),
+            DiscountMode = snap.DiscountMode,
+            DiscountValue = discountValue,
+            DiscountAmountUsd = snap.LiveDiscountAmount,
+            PaymentCurrencyCode = paymentCurrency,
+            PaymentAmountUsd = payUsd,
+            PaymentAmountFc = payFc,
+            PaymentAmount = string.Equals(paymentCurrency, CurrencyHelper.CongoleseFranc, StringComparison.OrdinalIgnoreCase) ? payFc : payUsd,
+            ExchangeRateUsed = CurrencyHelper.FcPerUsd,
+            CreatedAt = DateTime.Now
+        };
+
+        var productIds = snap.SelectedLines.Select(s =&gt; s.ProductId).Distinct().ToList();
+        var activeStaff = db.Employees.AsNoTracking().Where(e =&gt; e.EmploymentStatus == "Active").ToList();
+        var productById = db.Products.AsNoTracking().Where(p =&gt; productIds.Contains(p.Id)).ToDictionary(p =&gt; p.Id, p =&gt; p);
+        foreach (var (productId, qty) in snap.SelectedLines)
+        {
+            var assignee = OrderSubmissionHelper.ResolveAssignee(productById, activeStaff, productId);
+            order.Items.Add(new OrderItem
+            {
+                ProductId = productId,
+                Quantity = qty,
+                PreparedByEmployeeId = assignee.EmployeeId,
+                PreparedByRole = assignee.Role,
+                PreparedByName = assignee.Name
+            });
+        }
+
+        using var tx = db.Database.BeginTransaction();
+        try
+        {
+            if (!snap.IsTabletStaffOrderFlow)
+            {
+                var invErr = OrderInventoryDeduction.TryApplyForPlacedOrder(db, order);
+                if (invErr is not null)
+                {
+                    tx.Rollback();
+                    return new CreateOrderSaveResult(false, "Insufficient Inventory", invErr);
+                }
+            }
+
+            OrderSubmissionHelper.ApplyReservationLink(
+                order,
+                db,
+                snap.SelectedOrderSource,
+                snap.SourceReference,
+                snap.ReservationCode,
+                snap.ReservationGuestName);
+            db.Orders.Add(order);
+            if (table is not null)
+                table.Status = "Occupied";
+            db.SaveChanges();
+            if (table is not null)
+            {
+                DataReconciler.ReconcileTableStatusesWithOrders(db);
+                db.SaveChanges();
+            }
+
+            tx.Commit();
+        }
+        catch
+        {
+            tx.Rollback();
+            throw;
+        }
+
+        return snap.IsTabletStaffOrderFlow
+            ? new CreateOrderSaveResult(true, "Sent to cashier", $"Ticket {order.UniqueId} sent to the cashier.")
+            : new CreateOrderSaveResult(true, "Create Order", $"Order {order.UniqueId} created.");
+    }
+}
+</code></pre>
+<h3>CreateOrderViewModel.cs (complete file)</h3><p class="path"><code>EliteRestaurantPro/ViewModels/CreateOrderViewModel.cs</code></p><pre><code>using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Globalization;
+using System.Windows;
+using System.Windows.Input;
+using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Utils;
+using EliteRestaurantPro.Services;
+using Microsoft.EntityFrameworkCore;
+using ModelTable = EliteRestaurant.Core.Models.Table;
+
+namespace EliteRestaurantPro.ViewModels;
+
+/// &lt;summary&gt;Create-order screen: orchestrates &lt;see cref="TableLoadingService"/&gt;, &lt;see cref="DraftPersistenceService"/&gt;, &lt;see cref="OrderTotalsCalculator"/&gt;, and &lt;see cref="OrderSubmissionService"/&gt;.&lt;/summary&gt;
+public sealed class CreateOrderViewModel : AdminBaseViewModel
+{
+    private readonly OrderTotalsCalculator _totalsCalculator = new();
+    private readonly TableLoadingService _tableLoading = new();
+    private readonly DraftPersistenceService _draftPersistence = new();
+    private readonly OrderSubmissionService _orderSubmission = new();
+
+    public sealed class DraftEntry
+    {
+        public string FilePath { get; init; } = string.Empty;
+        public string DisplayName { get; init; } = string.Empty;
+        public override string ToString() =&gt; DisplayName;
+    }
+
+    public sealed class ArrivedReservationOption
+    {
+        public int Id { get; init; }
+        public string UniqueId { get; init; } = string.Empty;
+        public string ReservationName { get; init; } = string.Empty;
+        public string GuestName { get; init; } = string.Empty;
+        public DateTime ReservedFor { get; init; }
+        public int? TableId { get; init; }
+        public string TableLabel { get; init; } = "-";
+        public string Label =&gt;
+            $"{(string.IsNullOrWhiteSpace(ReservationName) ? GuestName : ReservationName)} • {ReservedFor:dd MMM HH:mm} • {TableLabel} • {UniqueId}";
+
+        public override string ToString() =&gt; Label;
+    }
+
+    private static ArrivedReservationOption NoneReservationOption =&gt; new()
+    {
+        Id = 0,
+        UniqueId = string.Empty,
+        GuestName = "None (Walk-in order)",
+        ReservedFor = DateTime.MinValue,
+        TableId = null,
+        TableLabel = "-"
+    };
+
+    private static DraftEntry EmptyDraftOption =&gt; new() { FilePath = string.Empty, DisplayName = "None (empty slot)" };
+
+    private int _selectedTableId;
+    private string _selectedOrderSource = "WalkIn";
+    private string _selectedOrderStatus = "Waiting";
+    private string _selectedOrderCategory = "All";
+    private string _selectedOrderSubCategory = "All";
+    private string _productSearchText = string.Empty;
+    private DraftEntry? _selectedDraft;
+    private string _customerNotes = string.Empty;
+    private string _allergyNotes = string.Empty;
+    private string _selectedPaymentCurrency = CurrencyHelper.Usd;
+    private bool _isLoading;
+    private bool _isSubmitting;
+    private decimal _liveSubtotal;
+    private decimal _liveTaxAmount;
+    private decimal _liveServiceAmount;
+    private decimal _liveGrandTotal;
+    private decimal _liveDiscountAmount;
+    private string _selectedDiscountMode = "None";
+    private string _discountInput = string.Empty;
+    private string _liveDiscountLabel = string.Empty;
+    private int _liveItemCount;
+    private int _estimatedPrepMinutes;
+    private readonly int? _serverEmployeeId;
+    private readonly string _serverEmployeeName = string.Empty;
+    private int? _openCheckOrderId;
+    private string _openCheckCode = string.Empty;
+    private string _openCheckStatus = string.Empty;
+    private bool _suppressOpenCheckRefresh;
+    private bool _suppressSelectionChanged;
+    /// &lt;summary&gt;When true, live totals exclude the persisted open-check subtotal (e.g. user chose "separate ticket" while a check exists).&lt;/summary&gt;
+    private bool _skipPersistedSubtotalInTotals;
+    private ArrivedReservationOption? _selectedArrivedReservation;
+    private string _selectedDeliveryReference = string.Empty;
+
+    public override string ActivePage =&gt; "CreateOrder";
+    public string PageTitle =&gt; "Create Order";
+    public string PageSubtitle =&gt;
+        IsTabletStaffOrderFlow
+            ? "Shared order pad for admin/server/cashier. If table already has an open check, you can append lines to the same ticket."
+            : "Create and manage table tickets with live totals, discounts, and open-check append support.";
+
+    public bool IsTabletStaffOrderFlow =&gt; AppSession.IsServerTablet || AppSession.IsCashierTablet;
+    public bool CanEditTablePicker =&gt; !AppSession.IsServerTablet || AvailableTables.Count &gt; 1;
+    public bool CanEditTableForCurrentSource =&gt; !IsDeliverySource &amp;&amp; CanEditTablePicker;
+    public bool IsWalkInSource =&gt; string.Equals(SelectedOrderSource, "WalkIn", StringComparison.OrdinalIgnoreCase);
+    public bool IsReservationSource =&gt; string.Equals(SelectedOrderSource, "Reservation", StringComparison.OrdinalIgnoreCase);
+    public bool IsDeliverySource =&gt; string.Equals(SelectedOrderSource, "Delivery", StringComparison.OrdinalIgnoreCase);
+    public bool CanEditOrderStatusPicker =&gt; !AppSession.IsStaffTablet;
+    public bool HasOpenCheckForTable =&gt; _openCheckOrderId.HasValue;
+    public string OpenCheckBannerText =&gt;
+        HasOpenCheckForTable
+            ? $"Open check {_openCheckCode} ({_openCheckStatus}) exists for this table. Submit will ask to append or create a separate ticket."
+            : string.Empty;
+    public string PrimaryActionLabel =&gt; IsTabletStaffOrderFlow ? "Send to cashier" : "Create Real Order";
+
+    public ObservableCollection&lt;ModelTable&gt; AvailableTables { get; } = new();
+    public ObservableCollection&lt;string&gt; OrderSources { get; } = new(["WalkIn", "Reservation", "Delivery"]);
+    public ObservableCollection&lt;string&gt; OrderStatuses { get; } = new(["Waiting", "In Kitchen", "Ready"]);
+    public ObservableCollection&lt;string&gt; OrderCategories { get; } = new();
+    public ObservableCollection&lt;string&gt; OrderSubCategories { get; } = new();
+    public ObservableCollection&lt;string&gt; PaymentCurrencies { get; } = new([CurrencyHelper.Usd, CurrencyHelper.CongoleseFranc]);
+    public ObservableCollection&lt;string&gt; DiscountModes { get; } = new(["None", "Percent", "Usd"]);
+    public ObservableCollection&lt;ProductSelectionItemViewModel&gt; ProductSelections { get; } = new();
+    public ObservableCollection&lt;ProductSelectionItemViewModel&gt; FilteredProductSelections { get; } = new();
+    public ObservableCollection&lt;ProductSelectionItemViewModel&gt; SelectedProductSelections { get; } = new();
+    public ObservableCollection&lt;DraftEntry&gt; SavedDrafts { get; } = new();
+    public ObservableCollection&lt;ArrivedReservationOption&gt; ArrivedReservations { get; } = new();
+    public ObservableCollection&lt;string&gt; DeliveryReferences { get; } = new();
+
+    public string SelectedOrderSource
+    {
+        get =&gt; _selectedOrderSource;
+        set
+        {
+            if (!SetField(ref _selectedOrderSource, value))
+                return;
+
+            HandleOrderSourceChanged();
+            OnPropertyChanged(nameof(IsWalkInSource));
+            OnPropertyChanged(nameof(IsReservationSource));
+            OnPropertyChanged(nameof(IsDeliverySource));
+            OnPropertyChanged(nameof(CanEditTableForCurrentSource));
+        }
+    }
+
+    public int SelectedTableId
+    {
+        get =&gt; _selectedTableId;
+        set
+        {
+            if (!SetField(ref _selectedTableId, value))
+                return;
+            if (!_suppressOpenCheckRefresh)
+                RefreshOpenCheckBanner();
+        }
+    }
+
+    public string SelectedOrderStatus
+    {
+        get =&gt; _selectedOrderStatus;
+        set =&gt; SetField(ref _selectedOrderStatus, value);
+    }
+
+    public string SelectedOrderCategory
+    {
+        get =&gt; _selectedOrderCategory;
+        set
+        {
+            if (!SetField(ref _selectedOrderCategory, value))
+                return;
+            RebuildSubCategoryFilter();
+            ApplyProductFilters();
+        }
+    }
+
+    public string SelectedOrderSubCategory
+    {
+        get =&gt; _selectedOrderSubCategory;
+        set
+        {
+            if (!SetField(ref _selectedOrderSubCategory, value))
+                return;
+            ApplyProductFilters();
+        }
+    }
+
+    public string ProductSearchText
+    {
+        get =&gt; _productSearchText;
+        set
+        {
+            if (!SetField(ref _productSearchText, value))
+                return;
+            ApplyProductFilters();
+        }
+    }
+
+    public DraftEntry? SelectedDraft
+    {
+        get =&gt; _selectedDraft;
+        set =&gt; SetField(ref _selectedDraft, value);
+    }
+
+    public ArrivedReservationOption? SelectedArrivedReservation
+    {
+        get =&gt; _selectedArrivedReservation;
+        set
+        {
+            if (!SetField(ref _selectedArrivedReservation, value))
+                return;
+            ApplyArrivedReservationSelection(value);
+        }
+    }
+
+    public string SelectedDeliveryReference
+    {
+        get =&gt; _selectedDeliveryReference;
+        set =&gt; SetField(ref _selectedDeliveryReference, value);
+    }
+
+    public string CustomerNotes
+    {
+        get =&gt; _customerNotes;
+        set =&gt; SetField(ref _customerNotes, value);
+    }
+
+    public string AllergyNotes
+    {
+        get =&gt; _allergyNotes;
+        set =&gt; SetField(ref _allergyNotes, value);
+    }
+
+    public string SelectedPaymentCurrency
+    {
+        get =&gt; _selectedPaymentCurrency;
+        set
+        {
+            if (!SetField(ref _selectedPaymentCurrency, value))
+                return;
+            OnPropertyChanged(nameof(ChosenPaymentAmountText));
+        }
+    }
+
+    public bool IsLoading
+    {
+        get =&gt; _isLoading;
+        private set
+        {
+            if (!SetField(ref _isLoading, value))
+                return;
+            OnPropertyChanged(nameof(CanSubmitCreateOrder));
+        }
+    }
+
+    public bool CanSubmitCreateOrder =&gt; !IsLoading &amp;&amp; !_isSubmitting;
+
+    public decimal LiveSubtotal
+    {
+        get =&gt; _liveSubtotal;
+        private set =&gt; SetField(ref _liveSubtotal, value);
+    }
+
+    public decimal LiveTaxAmount
+    {
+        get =&gt; _liveTaxAmount;
+        private set =&gt; SetField(ref _liveTaxAmount, value);
+    }
+
+    public decimal LiveServiceAmount
+    {
+        get =&gt; _liveServiceAmount;
+        private set =&gt; SetField(ref _liveServiceAmount, value);
+    }
+
+    public decimal LiveGrandTotal
+    {
+        get =&gt; _liveGrandTotal;
+        private set =&gt; SetField(ref _liveGrandTotal, value);
+    }
+
+    public decimal LiveGrandTotalFc =&gt; CurrencyHelper.ConvertUsdToFc(LiveGrandTotal);
+    public string LiveGrandTotalUsdText =&gt; CurrencyHelper.FormatAmount(LiveGrandTotal, CurrencyHelper.Usd);
+    public string LiveGrandTotalFcText =&gt; CurrencyHelper.FormatAmount(LiveGrandTotalFc, CurrencyHelper.CongoleseFranc);
+    public string LiveTaxRateLabel
+    {
+        get
+        {
+            var pct = SettingsManager.Load().CurrencyPricing.TaxPercent;
+            return $"TVA ({pct:0.##}%)";
+        }
+    }
+
+    public string LiveServiceRateLabel
+    {
+        get
+        {
+            var pct = SettingsManager.Load().CurrencyPricing.ServicePercent;
+            return $"Service ({pct:0.##}%)";
+        }
+    }
+
+    public decimal LiveDiscountAmount
+    {
+        get =&gt; _liveDiscountAmount;
+        private set =&gt; SetField(ref _liveDiscountAmount, value);
+    }
+
+    public string SelectedDiscountMode
+    {
+        get =&gt; _selectedDiscountMode;
+        set
+        {
+            if (!SetField(ref _selectedDiscountMode, value))
+                return;
+            RecalculateTotals();
+        }
+    }
+
+    public string DiscountInput
+    {
+        get =&gt; _discountInput;
+        set
+        {
+            if (!SetField(ref _discountInput, value))
+                return;
+            RecalculateTotals();
+        }
+    }
+
+    public string LiveDiscountLabel
+    {
+        get =&gt; _liveDiscountLabel;
+        private set =&gt; SetField(ref _liveDiscountLabel, value);
+    }
+
+    public string LiveDiscountSummary =&gt;
+        LiveDiscountAmount &lt;= 0m
+            ? "No discount applied."
+            : $"{LiveDiscountLabel}: -{CurrencyHelper.FormatAmount(LiveDiscountAmount, CurrencyHelper.Usd)}";
+
+    /// &lt;summary&gt;Label for the subtotal line — reflects whether totals include the existing open check.&lt;/summary&gt;
+    public string SubtotalCaption =&gt;
+        !_skipPersistedSubtotalInTotals &amp;&amp; HasOpenCheckForTable
+            ? "Ticket subtotal (existing check + new lines): $ "
+            : "Subtotal (items): $ ";
+
+    public int LiveItemCount
+    {
+        get =&gt; _liveItemCount;
+        private set =&gt; SetField(ref _liveItemCount, value);
+    }
+
+    public int EstimatedPrepMinutes
+    {
+        get =&gt; _estimatedPrepMinutes;
+        private set =&gt; SetField(ref _estimatedPrepMinutes, value);
+    }
+
+    public string EstimatedPrepText =&gt; EstimatedPrepMinutes &lt;= 0 ? "-" : $"{EstimatedPrepMinutes} min";
+
+    public string ChosenPaymentAmountText =&gt;
+        string.Equals(SelectedPaymentCurrency, CurrencyHelper.CongoleseFranc, StringComparison.OrdinalIgnoreCase)
+            ? CurrencyHelper.FormatAmount(LiveGrandTotalFc, CurrencyHelper.CongoleseFranc)
+            : CurrencyHelper.FormatAmount(LiveGrandTotal, CurrencyHelper.Usd);
+
+    public ICommand CreateOrderCommand { get; }
+    public ICommand ClearSelectionCommand { get; }
+    public ICommand IncreaseQuantityCommand { get; }
+    public ICommand DecreaseQuantityCommand { get; }
+    public ICommand SaveDraftCommand { get; }
+    public ICommand LoadDraftCommand { get; }
+    public ICommand DeleteDraftCommand { get; }
+    public ICommand DeleteAllDraftsCommand { get; }
+
+    public CreateOrderViewModel(Action&lt;BaseViewModel&gt; navigate) : base(navigate)
+    {
+        SettingsManager.SettingsChanged += OnAppSettingsChanged;
+        if (AppSession.IsServerTablet &amp;&amp; AppSession.StaffEmployeeId is int sid)
+        {
+            _serverEmployeeId = sid;
+            _serverEmployeeName = AppSession.StaffEmployeeName;
+        }
+
+        CreateOrderCommand = new RelayCommand(_ =&gt; CreateOrder(), _ =&gt; CanSubmitCreateOrder);
+        ClearSelectionCommand = new RelayCommand(_ =&gt; ClearSelection());
+        IncreaseQuantityCommand = new RelayCommand(item =&gt; IncreaseQuantity(item as ProductSelectionItemViewModel));
+        DecreaseQuantityCommand = new RelayCommand(item =&gt; DecreaseQuantity(item as ProductSelectionItemViewModel));
+        SaveDraftCommand = new RelayCommand(_ =&gt; SaveDraft());
+        LoadDraftCommand = new RelayCommand(_ =&gt; LoadSelectedDraft());
+        DeleteDraftCommand = new RelayCommand(_ =&gt; DeleteSelectedDraft());
+        DeleteAllDraftsCommand = new RelayCommand(_ =&gt; DeleteAllDrafts());
+
+        RefreshSavedDrafts();
+        LoadData();
+    }
+
+    private void OnAppSettingsChanged()
+    {
+        Application.Current?.Dispatcher.BeginInvoke(new Action(() =&gt;
+        {
+            RecalculateTotals();
+            OnPropertyChanged(nameof(LiveTaxRateLabel));
+            OnPropertyChanged(nameof(LiveServiceRateLabel));
+        }));
+    }
+
+    private static Window? DialogOwner() =&gt;
+        Application.Current?.Windows.OfType&lt;Window&gt;().FirstOrDefault(static w =&gt; w.IsActive)
+        ?? Application.Current?.MainWindow;
+
+    private static MessageBoxResult ShowDialog(string text, string caption, MessageBoxButton button, MessageBoxImage icon)
+    {
+        var owner = DialogOwner();
+        return owner is null
+            ? MessageBox.Show(text, caption, button, icon)
+            : MessageBox.Show(owner, text, caption, button, icon);
+    }
+
+    private void SetSubmitting(bool value)
+    {
+        if (_isSubmitting == value)
+            return;
+        _isSubmitting = value;
+        OnPropertyChanged(nameof(CanSubmitCreateOrder));
+    }
+
+    private void LoadData()
+    {
+        if (IsLoading)
+            return;
+
+        IsLoading = true;
+        try
+        {
+            _skipPersistedSubtotalInTotals = false;
+            var catalog = _tableLoading.LoadCatalog(_serverEmployeeId);
+
+            AvailableTables.Clear();
+            foreach (var t in catalog.Tables)
+            {
+                AvailableTables.Add(new ModelTable
+                {
+                    Id = t.Id,
+                    UniqueId = t.UniqueId,
+                    TableNumber = t.TableNumber,
+                    Name = t.Name,
+                    Capacity = t.Capacity,
+                    Status = t.Status,
+                    AssignedServerId = t.AssignedServerId
+                });
+            }
+
+            ProductSelections.Clear();
+            foreach (var p in catalog.Products)
+            {
+                var vm = new ProductSelectionItemViewModel
+                {
+                    ProductId = p.ProductId,
+                    UniqueId = p.UniqueId,
+                    Name = p.Name,
+                    Category = p.Category,
+                    SubCategory = p.SubCategory,
+                    Price = p.Price,
+                    Quantity = 1
+                };
+                vm.PropertyChanged += OnSelectionChanged;
+                ProductSelections.Add(vm);
+            }
+
+            ArrivedReservations.Clear();
+            ArrivedReservations.Add(NoneReservationOption);
+            foreach (var r in catalog.ArrivedReservations)
+            {
+                ArrivedReservations.Add(new ArrivedReservationOption
+                {
+                    Id = r.Id,
+                    UniqueId = r.UniqueId,
+                    ReservationName = r.ReservationName,
+                    GuestName = r.GuestName,
+                    ReservedFor = r.ReservedFor,
+                    TableId = r.TableId,
+                    TableLabel = r.TableLabel
+                });
+            }
+
+            DeliveryReferences.Clear();
+            foreach (var d in catalog.DeliveryReferences)
+                DeliveryReferences.Add(d);
+
+            _suppressOpenCheckRefresh = true;
+            try
+            {
+                SelectedTableId = AvailableTables.FirstOrDefault()?.Id ?? 0;
+            }
+            finally
+            {
+                _suppressOpenCheckRefresh = false;
+            }
+            SelectedArrivedReservation = ArrivedReservations.FirstOrDefault();
+            SelectedDeliveryReference = string.Empty;
+            SelectedOrderSource = "WalkIn";
+
+            if (IsTabletStaffOrderFlow)
+            {
+                OrderStatuses.Clear();
+                OrderStatuses.Add(OrderWorkflow.PendingCashier);
+                SelectedOrderStatus = OrderWorkflow.PendingCashier;
+            }
+            else if (!OrderStatuses.Contains(SelectedOrderStatus))
+            {
+                SelectedOrderStatus = OrderStatuses.First();
+            }
+
+            SelectedPaymentCurrency = CurrencyHelper.Usd;
+
+            RebuildCategoryFilter();
+            RebuildSubCategoryFilter();
+            ApplyProductFilters();
+            RefreshOpenCheckBanner();
+            RefreshReadyPickupBanner();
+            OnPropertyChanged(nameof(CanEditOrderStatusPicker));
+            OnPropertyChanged(nameof(CanEditTablePicker));
+            OnPropertyChanged(nameof(CanEditTableForCurrentSource));
+        }
+        catch (Exception ex)
+        {
+            ShowDialog($"Create Order failed to load:\n\n{ex.Message}", "Create Order", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private void RefreshOpenCheckBanner()
+    {
+        if (SelectedTableId == 0)
+        {
+            _openCheckOrderId = null;
+            _openCheckCode = string.Empty;
+            _openCheckStatus = string.Empty;
+            OnPropertyChanged(nameof(HasOpenCheckForTable));
+            OnPropertyChanged(nameof(OpenCheckBannerText));
+            HydrateDiscountFieldsFromOpenCheck();
+            RecalculateTotals();
+            OnPropertyChanged(nameof(SubtotalCaption));
+            return;
+        }
+
+        using var db = new AppDbContext();
+        var open = db.Orders.AsNoTracking()
+            .WhereOpenCheckForTable(SelectedTableId)
+            .OrderByDescending(o =&gt; o.CreatedAt)
+            .FirstOrDefault();
+
+        _openCheckOrderId = open?.Id;
+        _openCheckCode = open is null
+            ? string.Empty
+            : string.IsNullOrWhiteSpace(open.UniqueId) ? $"#{open.Id:000}" : open.UniqueId;
+        _openCheckStatus = open?.Status ?? string.Empty;
+
+        OnPropertyChanged(nameof(HasOpenCheckForTable));
+        OnPropertyChanged(nameof(OpenCheckBannerText));
+        HydrateDiscountFieldsFromOpenCheck();
+        RecalculateTotals();
+        OnPropertyChanged(nameof(SubtotalCaption));
+    }
+
+    private void HydrateDiscountFieldsFromOpenCheck()
+    {
+        string mode;
+        string input;
+        if (_openCheckOrderId is not int orderId)
+        {
+            mode = "None";
+            input = string.Empty;
+        }
+        else
+        {
+            using var db = new AppDbContext();
+            var row = db.Orders.AsNoTracking()
+                .Where(o =&gt; o.Id == orderId)
+                .Select(o =&gt; new { o.DiscountMode, o.DiscountValue })
+                .SingleOrDefault();
+            if (row is null || string.Equals(row.DiscountMode, "None", StringComparison.OrdinalIgnoreCase) || row.DiscountValue &lt;= 0m)
+            {
+                mode = "None";
+                input = string.Empty;
+            }
+            else if (string.Equals(row.DiscountMode, "Percent", StringComparison.OrdinalIgnoreCase))
+            {
+                mode = "Percent";
+                input = row.DiscountValue.ToString("0.##", CultureInfo.InvariantCulture);
+            }
+            else if (string.Equals(row.DiscountMode, "Usd", StringComparison.OrdinalIgnoreCase))
+            {
+                mode = "Usd";
+                input = row.DiscountValue.ToString("0.##", CultureInfo.InvariantCulture);
+            }
+            else
+            {
+                mode = "None";
+                input = string.Empty;
+            }
+        }
+
+        if (string.Equals(_selectedDiscountMode, mode, StringComparison.OrdinalIgnoreCase) &amp;&amp;
+            string.Equals(_discountInput, input, StringComparison.Ordinal))
+            return;
+
+        _selectedDiscountMode = mode;
+        _discountInput = input;
+        OnPropertyChanged(nameof(SelectedDiscountMode));
+        OnPropertyChanged(nameof(DiscountInput));
+    }
+
+    private decimal GetPersistedOpenOrderLineSubtotal()
+    {
+        if (_skipPersistedSubtotalInTotals || _openCheckOrderId is not int oid)
+            return 0m;
+
+        using var db = new AppDbContext();
+        var items = db.OrderItems.AsNoTracking().Where(i =&gt; i.OrderRecordId == oid).ToList();
+        if (items.Count == 0)
+            return 0m;
+
+        var productIds = items.Select(i =&gt; i.ProductId).Distinct().ToList();
+        var prices = db.Products.AsNoTracking().Where(p =&gt; productIds.Contains(p.Id)).ToDictionary(p =&gt; p.Id, p =&gt; p.Price);
+        return items.Sum(i =&gt; (prices.TryGetValue(i.ProductId, out var price) ? price : 0m) * i.Quantity);
+    }
+
+    private void RebuildCategoryFilter()
+    {
+        OrderCategories.Clear();
+        OrderCategories.Add("All");
+        foreach (var c in ProductSelections
+                     .Select(p =&gt; p.Category)
+                     .Where(c =&gt; !string.IsNullOrWhiteSpace(c))
+                     .Distinct(StringComparer.OrdinalIgnoreCase)
+                     .OrderBy(c =&gt; c))
+        {
+            OrderCategories.Add(c);
+        }
+
+        if (!OrderCategories.Contains(SelectedOrderCategory))
+            SelectedOrderCategory = "All";
+    }
+
+    private void RebuildSubCategoryFilter()
+    {
+        var sub = ProductSelections
+            .Where(p =&gt; SelectedOrderCategory == "All" || p.Category.Equals(SelectedOrderCategory, StringComparison.OrdinalIgnoreCase))
+            .Select(p =&gt; p.SubCategory)
+            .Where(s =&gt; !string.IsNullOrWhiteSpace(s))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(s =&gt; s)
+            .ToList();
+
+        OrderSubCategories.Clear();
+        OrderSubCategories.Add("All");
+        foreach (var s in sub)
+            OrderSubCategories.Add(s);
+
+        if (!OrderSubCategories.Contains(SelectedOrderSubCategory))
+            SelectedOrderSubCategory = "All";
+    }
+
+    private void ApplyProductFilters()
+    {
+        var search = ProductSearchText.Trim();
+        var filtered = ProductSelections
+            .Where(p =&gt; SelectedOrderCategory == "All" || p.Category.Equals(SelectedOrderCategory, StringComparison.OrdinalIgnoreCase))
+            .Where(p =&gt; SelectedOrderSubCategory == "All" || p.SubCategory.Equals(SelectedOrderSubCategory, StringComparison.OrdinalIgnoreCase))
+            .Where(p =&gt; string.IsNullOrWhiteSpace(search)
+                        || p.Name.Contains(search, StringComparison.OrdinalIgnoreCase)
+                        || p.UniqueId.Contains(search, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(p =&gt; p.Category)
+            .ThenBy(p =&gt; p.SubCategory)
+            .ThenBy(p =&gt; p.Name)
+            .ToList();
+
+        FilteredProductSelections.Clear();
+        foreach (var f in filtered)
+            FilteredProductSelections.Add(f);
+    }
+
+    private void OnSelectionChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (_suppressSelectionChanged)
+            return;
+        if (e.PropertyName is nameof(ProductSelectionItemViewModel.IsSelected) or nameof(ProductSelectionItemViewModel.Quantity))
+            RecalculateTotals();
+    }
+
+    private void RecalculateTotals()
+    {
+        var selected = ProductSelections.Where(p =&gt; p.IsSelected).ToList();
+        var newLinesSubtotal = selected.Sum(s =&gt; s.LineTotal);
+        var ticketSubtotal = GetPersistedOpenOrderLineSubtotal() + newLinesSubtotal;
+        LiveSubtotal = ticketSubtotal;
+
+        var prepLines = selected.Select(s =&gt; (s.Quantity, s.Category, s.SubCategory)).ToList();
+        var ticket = _totalsCalculator.ComputeTicket(
+            ticketSubtotal,
+            selected.Sum(s =&gt; s.Quantity),
+            SelectedDiscountMode,
+            DiscountInput,
+            prepLines);
+        LiveItemCount = ticket.LiveItemCount;
+        LiveDiscountAmount = ticket.DiscountApplied;
+        LiveDiscountLabel = ticket.DiscountLabel;
+        LiveTaxAmount = ticket.TaxAmount;
+        LiveServiceAmount = ticket.ServiceAmount;
+        LiveGrandTotal = ticket.GrandTotal;
+        EstimatedPrepMinutes = ticket.EstimatedPrepMinutes;
+
+        SelectedProductSelections.Clear();
+        foreach (var row in selected.OrderBy(s =&gt; s.Name))
+            SelectedProductSelections.Add(row);
+
+        OnPropertyChanged(nameof(LiveDiscountSummary));
+        OnPropertyChanged(nameof(EstimatedPrepText));
+        OnPropertyChanged(nameof(LiveGrandTotalFc));
+        OnPropertyChanged(nameof(LiveGrandTotalUsdText));
+        OnPropertyChanged(nameof(LiveGrandTotalFcText));
+        OnPropertyChanged(nameof(LiveTaxRateLabel));
+        OnPropertyChanged(nameof(LiveServiceRateLabel));
+        OnPropertyChanged(nameof(ChosenPaymentAmountText));
+    }
+
+    private void IncreaseQuantity(ProductSelectionItemViewModel? item)
+    {
+        if (item is null) return;
+        item.Quantity += 1;
+        item.IsSelected = true;
+    }
+
+    private void DecreaseQuantity(ProductSelectionItemViewModel? item)
+    {
+        if (item is null) return;
+        item.Quantity = Math.Max(1, item.Quantity - 1);
+    }
+
+    private CreateOrderSubmitSnapshot BuildSubmitSnapshot(List&lt;ProductSelectionItemViewModel&gt; selected) =&gt;
+        new(
+            SelectedTableId,
+            selected.Select(s =&gt; (s.ProductId, s.Quantity)).ToList(),
+            CustomerNotes,
+            AllergyNotes,
+            SelectedDiscountMode,
+            DiscountInput,
+            LiveDiscountAmount,
+            LiveSubtotal,
+            LiveGrandTotal,
+            LiveGrandTotalFc,
+            LiveDiscountLabel,
+            LiveGrandTotalUsdText,
+            LiveGrandTotalFcText,
+            SelectedPaymentCurrency,
+            ChosenPaymentAmountText,
+            EstimatedPrepText,
+            SelectedOrderStatus,
+            SelectedOrderSource,
+            IsDeliverySource ? (SelectedDeliveryReference ?? string.Empty).Trim() : string.Empty,
+            IsTabletStaffOrderFlow,
+            _serverEmployeeId,
+            _serverEmployeeName,
+            SelectedArrivedReservation?.UniqueId ?? string.Empty,
+            SelectedArrivedReservation?.GuestName ?? string.Empty);
+
+    private void ApplyArrivedReservationSelection(ArrivedReservationOption? selected)
+    {
+        if (!IsReservationSource)
+        {
+            RemoveReservationMarkerFromNotes();
+            return;
+        }
+
+        if (selected is null || string.IsNullOrWhiteSpace(selected.UniqueId))
+        {
+            RemoveReservationMarkerFromNotes();
+            return;
+        }
+
+        if (selected.TableId is int tableId &amp;&amp; tableId != 0)
+            SelectedTableId = tableId;
+
+        var marker = $"Reservation {selected.UniqueId}";
+        if (string.IsNullOrWhiteSpace(CustomerNotes))
+        {
+            CustomerNotes = marker;
+            return;
+        }
+
+        if (!CustomerNotes.Contains(marker, StringComparison.OrdinalIgnoreCase))
+            CustomerNotes = $"{marker}\n{CustomerNotes}";
+    }
+
+    private void HandleOrderSourceChanged()
+    {
+        if (IsWalkInSource)
+        {
+            SelectedArrivedReservation = ArrivedReservations.FirstOrDefault();
+            SelectedDeliveryReference = string.Empty;
+            if (SelectedTableId == 0)
+                SelectedTableId = AvailableTables.FirstOrDefault()?.Id ?? 0;
+            return;
+        }
+
+        if (IsReservationSource)
+        {
+            var firstActualReservation = ArrivedReservations.FirstOrDefault(r =&gt; !string.IsNullOrWhiteSpace(r.UniqueId));
+            SelectedArrivedReservation = firstActualReservation ?? ArrivedReservations.FirstOrDefault();
+            SelectedDeliveryReference = string.Empty;
+            return;
+        }
+
+        // Delivery
+        SelectedArrivedReservation = ArrivedReservations.FirstOrDefault();
+        SelectedTableId = 0;
+        RemoveReservationMarkerFromNotes();
+    }
+
+    private void RemoveReservationMarkerFromNotes()
+    {
+        if (string.IsNullOrWhiteSpace(CustomerNotes))
+            return;
+
+        var lines = CustomerNotes
+            .Split('\n')
+            .Where(l =&gt; !l.TrimStart().StartsWith("Reservation RSV-", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        CustomerNotes = string.Join(Environment.NewLine, lines).Trim();
+    }
+
+    private void CreateOrder()
+    {
+        if (IsLoading || _isSubmitting)
+            return;
+
+        var selected = ProductSelections.Where(p =&gt; p.IsSelected).ToList();
+        if (selected.Count == 0)
+        {
+            ShowDialog("Select at least one menu item.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        if (!IsDeliverySource &amp;&amp; SelectedTableId == 0)
+        {
+            ShowDialog("Select a table for this order source.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        if (IsReservationSource &amp;&amp; (SelectedArrivedReservation is null || string.IsNullOrWhiteSpace(SelectedArrivedReservation.UniqueId)))
+        {
+            ShowDialog("Select a reservation for reservation mode.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        if (IsDeliverySource &amp;&amp; string.IsNullOrWhiteSpace(SelectedDeliveryReference))
+        {
+            ShowDialog("Enter a delivery name/reference for delivery mode.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        SetSubmitting(true);
+        try
+        {
+            _skipPersistedSubtotalInTotals = false;
+
+            var snap = BuildSubmitSnapshot(selected);
+            var phase = _orderSubmission.LoadPhase1(snap);
+            if (!phase.Ok)
+            {
+                ShowDialog(phase.Message, phase.Caption, MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (!IsDeliverySource &amp;&amp; phase.OpenCheck.OrderId is int openOrderId)
+            {
+                var newLinesSubtotal = selected.Sum(s =&gt; s.LineTotal);
+                var choice = ShowDialog(
+                    $"Table {phase.TableNumber} ({phase.TableName}) already has open check {phase.OpenCheck.Code} — status: {phase.OpenCheck.Status}.\n\n" +
+                    $"Add {snap.SelectedLines.Count} new item line(s) to THIS ticket?\nSubtotal for new lines: {CurrencyHelper.FormatAmount(newLinesSubtotal, CurrencyHelper.Usd)}\n\n" +
+                    "Yes = append to same ticket\nNo = create separate ticket\nCancel = go back",
+                    "Open check on table",
+                    MessageBoxButton.YesNoCancel,
+                    MessageBoxImage.Question);
+
+                if (choice == MessageBoxResult.Cancel)
+                    return;
+                if (choice == MessageBoxResult.Yes)
+                {
+                    var append = _orderSubmission.AppendToExisting(snap, openOrderId);
+                    if (!append.Ok)
+                    {
+                        ShowDialog(append.Message, append.Caption, MessageBoxButton.OK, MessageBoxImage.Warning);
+                        RefreshOpenCheckBanner();
+                        return;
+                    }
+
+                    ShowDialog(append.Message, append.Caption, MessageBoxButton.OK, MessageBoxImage.Information);
+                    ClearSelection();
+                    RefreshOpenCheckBanner();
+                    RefreshReadyPickupBanner();
+                    return;
+                }
+
+                _skipPersistedSubtotalInTotals = true;
+                RecalculateTotals();
+                OnPropertyChanged(nameof(SubtotalCaption));
+                snap = BuildSubmitSnapshot(selected);
+            }
+
+            var discountRaw = OrderDiscountParser.Parse(snap.DiscountInput);
+            if (string.Equals(snap.DiscountMode, "Percent", StringComparison.OrdinalIgnoreCase) &amp;&amp;
+                (discountRaw &lt;= 0m || discountRaw &gt; 100m))
+            {
+                ShowDialog("Enter a discount percent between 0 and 100.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (string.Equals(snap.DiscountMode, "Usd", StringComparison.OrdinalIgnoreCase) &amp;&amp; discountRaw &lt;= 0m)
+            {
+                ShowDialog("Enter a discount amount greater than zero (USD).", "Create Order", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var discountLine = snap.LiveDiscountAmount &gt; 0m
+                ? $"\n{snap.LiveDiscountLabel}: -{CurrencyHelper.FormatAmount(snap.LiveDiscountAmount, CurrencyHelper.Usd)}"
+                : string.Empty;
+
+            var sourceLine = IsDeliverySource
+                ? $"Create delivery order ({(string.IsNullOrWhiteSpace(SelectedDeliveryReference) ? "No reference" : SelectedDeliveryReference)})"
+                : IsReservationSource
+                    ? $"Create reservation order for {SelectedArrivedReservation?.Label ?? "selected reservation"}"
+                    : $"Create walk-in order for Table {phase.TableNumber} ({phase.TableName})";
+
+            var confirm = ShowDialog(
+                $"{sourceLine} with {snap.SelectedLines.Count} selected item(s)?\n\n" +
+                $"Subtotal: {CurrencyHelper.FormatAmount(snap.LiveSubtotal, CurrencyHelper.Usd)}{discountLine}\n" +
+                $"Grand Total: {snap.LiveGrandTotalUsdText}\n" +
+                $"Equivalent FC: {snap.LiveGrandTotalFcText}\n" +
+                $"Payment Currency: {snap.SelectedPaymentCurrency}\n" +
+                $"Amount To Collect: {snap.ChosenPaymentAmountText}\n" +
+                $"Estimated Prep: {snap.EstimatedPrepText}",
+                snap.IsTabletStaffOrderFlow ? "Send to cashier" : "Confirm Create Order",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (confirm != MessageBoxResult.Yes)
+                return;
+
+            var save = _orderSubmission.SaveNew(snap);
+            if (!save.Ok)
+            {
+                ShowDialog(save.Message, save.Caption, MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            ShowDialog(save.Message, save.Caption, MessageBoxButton.OK, MessageBoxImage.Information);
+            ClearSelection();
+            RefreshOpenCheckBanner();
+            RefreshReadyPickupBanner();
+        }
+        catch (Exception ex)
+        {
+            ShowDialog($"Create order could not be completed.\n\n{ex.Message}", "Create Order", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            SetSubmitting(false);
+        }
+    }
+
+    private void ClearSelection()
+    {
+        _skipPersistedSubtotalInTotals = false;
+        _suppressSelectionChanged = true;
+        try
+        {
+            foreach (var item in ProductSelections)
+            {
+                item.IsSelected = false;
+                item.Quantity = 1;
+            }
+        }
+        finally
+        {
+            _suppressSelectionChanged = false;
+        }
+
+        ProductSearchText = string.Empty;
+        CustomerNotes = string.Empty;
+        AllergyNotes = string.Empty;
+        SelectedPaymentCurrency = CurrencyHelper.Usd;
+        RefreshOpenCheckBanner();
+        ApplyProductFilters();
+    }
+
+    private void SaveDraft()
+    {
+        var ownerId = ResolveDraftOwnerEmployeeId();
+        if (!ownerId.HasValue)
+        {
+            ShowDialog("Drafts are available for signed-in server sessions only.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var table = AvailableTables.FirstOrDefault(t =&gt; t.Id == SelectedTableId);
+        var selectedCount = ProductSelections.Where(p =&gt; p.IsSelected).Sum(p =&gt; p.Quantity);
+        var tableLabel = table is null ? "No Table" : $"Table {table.TableNumber}";
+
+        var draft = new CreateOrderDraftPayload
+        {
+            DraftLabel = $"{DateTime.Now:dd MMM HH:mm:ss} | {tableLabel} | {selectedCount} items | {SelectedOrderStatus}",
+            SelectedTableId = SelectedTableId,
+            SelectedOrderSource = SelectedOrderSource,
+            SelectedDeliveryReference = SelectedDeliveryReference,
+            SelectedReservationCode = SelectedArrivedReservation?.UniqueId ?? string.Empty,
+            SelectedOrderStatus = SelectedOrderStatus,
+            SelectedOrderCategory = SelectedOrderCategory,
+            SelectedOrderSubCategory = SelectedOrderSubCategory,
+            ProductSearchText = ProductSearchText,
+            CustomerNotes = CustomerNotes,
+            AllergyNotes = AllergyNotes,
+            SelectedPaymentCurrency = SelectedPaymentCurrency,
+            DiscountMode = SelectedDiscountMode,
+            DiscountInput = DiscountInput,
+            Items = ProductSelections.Where(p =&gt; p.IsSelected)
+                .Select(p =&gt; new CreateOrderDraftItemPayload { ProductId = p.ProductId, Quantity = p.Quantity })
+                .ToList()
+        };
+
+        var saved = _draftPersistence.Save(ownerId.Value, ResolveDraftOwnerName(), draft);
+        RefreshSavedDrafts();
+        SelectedDraft = SavedDrafts.FirstOrDefault(d =&gt; d.FilePath == saved.Id) ?? EmptyDraftOption;
+        ShowDialog("Draft saved.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private void LoadSelectedDraft()
+    {
+        if (!LoadDraft(SelectedDraft, showMessage: true, autoDeleteAfterLoad: false))
+            ShowDialog("No saved draft found.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private bool LoadDraft(DraftEntry? entry, bool showMessage, bool autoDeleteAfterLoad)
+    {
+        if (entry is null || string.IsNullOrWhiteSpace(entry.FilePath))
+            return false;
+
+        var ownerId = ResolveDraftOwnerEmployeeId();
+        if (!ownerId.HasValue)
+            return false;
+
+        if (!DraftPersistenceService.TryGetPayload(ownerId.Value, entry.FilePath, out var draftRow) || draftRow is null)
+            return false;
+
+        var draft = DraftPersistenceService.Deserialize(draftRow.PayloadJson);
+        if (draft is null)
+            return false;
+
+        SelectedOrderSource = string.IsNullOrWhiteSpace(draft.SelectedOrderSource) ? "WalkIn" : draft.SelectedOrderSource;
+        SelectedTableId = draft.SelectedTableId;
+        SelectedOrderStatus = string.IsNullOrWhiteSpace(draft.SelectedOrderStatus) ? "Waiting" : draft.SelectedOrderStatus;
+        // Keep full menu visible after loading a draft.
+        SelectedOrderCategory = "All";
+        SelectedOrderSubCategory = "All";
+        ProductSearchText = string.Empty;
+        CustomerNotes = draft.CustomerNotes ?? string.Empty;
+        AllergyNotes = draft.AllergyNotes ?? string.Empty;
+        SelectedPaymentCurrency = string.IsNullOrWhiteSpace(draft.SelectedPaymentCurrency) ? CurrencyHelper.Usd : draft.SelectedPaymentCurrency;
+        SelectedDiscountMode = string.IsNullOrWhiteSpace(draft.DiscountMode) ? "None" : draft.DiscountMode;
+        DiscountInput = draft.DiscountInput ?? string.Empty;
+        SelectedDeliveryReference = draft.SelectedDeliveryReference ?? string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(draft.SelectedReservationCode))
+        {
+            SelectedArrivedReservation = ArrivedReservations.FirstOrDefault(r =&gt;
+                                           string.Equals(r.UniqueId, draft.SelectedReservationCode, StringComparison.OrdinalIgnoreCase))
+                                       ?? ArrivedReservations.FirstOrDefault();
+        }
+
+        var qtyByProduct = draft.Items.ToDictionary(i =&gt; i.ProductId, i =&gt; Math.Max(1, i.Quantity));
+        _suppressSelectionChanged = true;
+        try
+        {
+            foreach (var item in ProductSelections)
+            {
+                if (qtyByProduct.TryGetValue(item.ProductId, out var qty))
+                {
+                    item.IsSelected = true;
+                    item.Quantity = qty;
+                }
+                else
+                {
+                    item.IsSelected = false;
+                    item.Quantity = 1;
+                }
+            }
+        }
+        finally
+        {
+            _suppressSelectionChanged = false;
+        }
+
+        RebuildSubCategoryFilter();
+        ApplyProductFilters();
+        RecalculateTotals();
+
+        if (autoDeleteAfterLoad)
+        {
+            DraftPersistenceService.Delete(ownerId.Value, entry.FilePath);
+            RefreshSavedDrafts();
+            SelectedDraft = EmptyDraftOption;
+        }
+
+        if (showMessage)
+            ShowDialog(autoDeleteAfterLoad ? "Draft loaded and removed." : "Draft loaded.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
+
+        return true;
+    }
+
+    private void RefreshSavedDrafts()
+    {
+        var previousDraftId = SelectedDraft?.FilePath ?? string.Empty;
+        SavedDrafts.Clear();
+        SavedDrafts.Add(EmptyDraftOption);
+
+        var ownerId = ResolveDraftOwnerEmployeeId();
+        if (ownerId.HasValue)
+        {
+            foreach (var row in DraftPersistenceService.ListForEmployee(ownerId.Value))
+                SavedDrafts.Add(new DraftEntry { FilePath = row.Id, DisplayName = row.Label });
+        }
+
+        SelectedDraft = SavedDrafts.FirstOrDefault(d =&gt; d.FilePath == previousDraftId)
+            ?? SavedDrafts.FirstOrDefault();
+    }
+
+    private void DeleteSelectedDraft()
+    {
+        if (SelectedDraft is null || string.IsNullOrWhiteSpace(SelectedDraft.FilePath))
+        {
+            ShowDialog("Select a draft to delete.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var confirm = ShowDialog($"Delete draft \"{SelectedDraft.DisplayName}\"?", "Delete Draft", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        if (confirm != MessageBoxResult.Yes)
+            return;
+
+        var ownerId = ResolveDraftOwnerEmployeeId();
+        if (!ownerId.HasValue)
+            return;
+
+        DraftPersistenceService.Delete(ownerId.Value, SelectedDraft.FilePath);
+        RefreshSavedDrafts();
+    }
+
+    private void DeleteAllDrafts()
+    {
+        var ownerId = ResolveDraftOwnerEmployeeId();
+        if (!ownerId.HasValue)
+        {
+            ShowDialog("No drafts to delete.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var drafts = DraftPersistenceService.ListForEmployee(ownerId.Value);
+        var hasDrafts = drafts.Count &gt; 0;
+        if (!hasDrafts)
+        {
+            ShowDialog("No drafts to delete.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var confirm = ShowDialog("Delete ALL saved drafts?", "Delete All Drafts", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        if (confirm != MessageBoxResult.Yes)
+            return;
+
+        foreach (var draft in drafts)
+            DraftPersistenceService.Delete(ownerId.Value, draft.Id);
+
+        RefreshSavedDrafts();
+        SelectedDraft = EmptyDraftOption;
+    }
+
+    private int? ResolveDraftOwnerEmployeeId()
+    {
+        if (_serverEmployeeId.HasValue)
+            return _serverEmployeeId;
+        if (AppSession.StaffEmployeeId.HasValue)
+            return AppSession.StaffEmployeeId;
+
+        var candidateName = ResolveDraftOwnerName();
+        if (string.IsNullOrWhiteSpace(candidateName) || string.Equals(candidateName, "Server", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        try
+        {
+            using var db = new AppDbContext();
+            var employeeId = db.Employees.AsNoTracking()
+                .Where(e =&gt; e.EmploymentStatus == "Active")
+                .Where(e =&gt; e.Name == candidateName
+                            || e.SignInId == candidateName
+                            || e.UniqueId == candidateName)
+                .Select(e =&gt; (int?)e.Id)
+                .FirstOrDefault();
+            return employeeId;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private string ResolveDraftOwnerName()
+    {
+        if (!string.IsNullOrWhiteSpace(_serverEmployeeName))
+            return _serverEmployeeName;
+        if (!string.IsNullOrWhiteSpace(AppSession.StaffEmployeeName))
+            return AppSession.StaffEmployeeName;
+        if (!string.IsNullOrWhiteSpace(AppSession.AdminLoginDisplayName))
+            return AppSession.AdminLoginDisplayName;
+        return "Server";
+    }
+}
+</code></pre><h2 id="a-api-more">8b. API — Tablet auth, pricing options, appsettings</h2><h3 id="EliteRestaurant-Api-Security-TabletAuthService-cs">TabletAuthService.cs</h3><p class="path"><code>EliteRestaurant.Api/Security/TabletAuthService.cs</code> — verbatim</p><pre><code>using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Staff;
+using Microsoft.EntityFrameworkCore;
+
+namespace EliteRestaurant.Api.Security;
+
+public sealed class TabletAuthService(AppDbContext db)
+{
+    private static readonly TimeSpan SessionDuration = TimeSpan.FromHours(12);
+
+    public AuthenticatedStaffSession? Login(string staffId, string pin, string portal)
+    {
+        var id = (staffId ?? string.Empty).Trim();
+        var normalizedPin = (pin ?? string.Empty).Trim();
+        var normalizedPortal = (portal ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(normalizedPin))
+            return null;
+
+        var idMatches = StaffPortalAuthentication
+            .QueryActiveEmployeesMatchingStaffId(db.Employees.AsNoTracking(), id)
+            .ToList();
+        var candidates = StaffPortalAuthentication.FilterPinMatches(idMatches, normalizedPin);
+        var employee = StaffPortalAuthentication.ResolvePortalCandidate(candidates, normalizedPortal);
+        if (employee is null)
+            return null;
+
+        CleanupExpiredSessions(db);
+
+        var token = Guid.NewGuid().ToString("N");
+        var expiresAtUtc = DateTime.UtcNow.Add(SessionDuration);
+        var canonicalPortal = StaffPortalAuthentication.CanonicalPortalForEmployee(employee);
+
+        db.TabletSessions.Add(new TabletSession
+        {
+            Token = token,
+            EmployeeId = employee.Id,
+            Portal = canonicalPortal,
+            EmployeeUniqueId = employee.UniqueId ?? string.Empty,
+            Name = employee.Name,
+            Role = employee.Role,
+            SignInId = employee.SignInId ?? string.Empty,
+            ExpiresAtUtc = expiresAtUtc,
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        db.SaveChanges();
+
+        return ToAuthenticatedSession(token, employee, canonicalPortal, expiresAtUtc);
+    }
+
+    public AuthenticatedStaffSession? Validate(string? token)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+            return null;
+
+        var t = token.Trim();
+        var row = db.TabletSessions.FirstOrDefault(s =&gt; s.Token == t);
+        if (row is null)
+            return null;
+
+        if (row.ExpiresAtUtc &lt;= DateTime.UtcNow)
+        {
+            db.TabletSessions.Remove(row);
+            db.SaveChanges();
+            return null;
+        }
+
+        return new AuthenticatedStaffSession(
+            row.Token,
+            row.EmployeeId,
+            row.EmployeeUniqueId,
+            row.Name,
+            row.Role,
+            row.SignInId,
+            row.Portal,
+            row.ExpiresAtUtc);
+    }
+
+    private static AuthenticatedStaffSession ToAuthenticatedSession(
+        string token,
+        Employee employee,
+        string canonicalPortal,
+        DateTime expiresAtUtc) =&gt;
+        new(
+            token,
+            employee.Id,
+            employee.UniqueId ?? string.Empty,
+            employee.Name,
+            employee.Role,
+            employee.SignInId ?? string.Empty,
+            canonicalPortal,
+            expiresAtUtc);
+
+    private static void CleanupExpiredSessions(AppDbContext db)
+    {
+        var utcNow = DateTime.UtcNow;
+        db.TabletSessions.Where(s =&gt; s.ExpiresAtUtc &lt;= utcNow).ExecuteDelete();
+    }
+}
+</code></pre>
+<h3 id="EliteRestaurant-Api-CurrencyPricingOptions-cs">CurrencyPricingOptions.cs</h3><p class="path"><code>EliteRestaurant.Api/CurrencyPricingOptions.cs</code> — verbatim</p><pre><code>namespace EliteRestaurant.Api;
+
+/// &lt;summary&gt;API-level overrides for tax/service shown on tablet config; falls back to shared app settings when zero.&lt;/summary&gt;
+public sealed class CurrencyPricingOptions
+{
+    public decimal TaxPercent { get; set; } = 7m;
+    public decimal ServicePercent { get; set; } = 10m;
+}
+</code></pre>
+<h3 id="EliteRestaurant-Api-appsettings-json">appsettings.json</h3><p class="path"><code>EliteRestaurant.Api/appsettings.json</code> — verbatim</p><pre><code>{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*",
+  "LanHttps": {
+    "CertificatePath": "certs/elite-lan.pfx",
+    "CertificatePassword": "",
+    "HttpPort": 5223,
+    "HttpsPort": 7194
+  },
+  "Cors": {
+    "AllowedOrigins": [
+      "http://localhost:5223",
+      "http://127.0.0.1:5223",
+      "https://localhost:7194",
+      "https://127.0.0.1:7194"
+    ]
+  },
+  "CurrencyPricing": {
+    "TaxPercent": 7,
+    "ServicePercent": 10
+  }
+}
+</code></pre>
+<h2 id="a9">9. ServerPortalController (complete)</h2><h3 id="EliteRestaurant-Api-Controllers-ServerPortalController-cs">ServerPortalController.cs</h3><p class="path"><code>EliteRestaurant.Api/Controllers/ServerPortalController.cs</code> — verbatim</p><pre><code>using EliteRestaurant.Api.Dtos;
+using EliteRestaurant.Api.Security;
+using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Orders;
+using EliteRestaurant.Core.Utils;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using System.Text.Json;
+
+namespace EliteRestaurant.Api.Controllers;
+
+[ApiController]
+[Route("api/server")]
+public sealed class ServerPortalController(
+    TabletAuthService authService,
+    IOptions&lt;CurrencyPricingOptions&gt; currencyPricingOptions,
+    AppDbContext db) : ControllerBase
+{
+    [HttpGet("config")]
+    public ActionResult&lt;ServerPortalConfigDto&gt; GetConfig()
+    {
+        var session = RequireServerSession();
+        if (session is null)
+            return Unauthorized(new { message = "Missing/invalid token or non-server role." });
+
+        var allSettings = SettingsManager.Load();
+        var settings = allSettings.CurrencyPricing;
+        var business = allSettings.BusinessProfile;
+        var logoUrl = "/api/server/assets/restaurant-logo";
+        var employeePhotoUrl = "/api/server/assets/me-photo";
+        var apiPricing = currencyPricingOptions.Value;
+        var taxPercent = apiPricing.TaxPercent &gt; 0m ? apiPricing.TaxPercent : (settings.TaxPercent &gt; 0m ? settings.TaxPercent : 7m);
+        var servicePercent = apiPricing.ServicePercent &gt; 0m ? apiPricing.ServicePercent : (settings.ServicePercent &gt; 0m ? settings.ServicePercent : 10m);
+
+        return Ok(new ServerPortalConfigDto(
+            string.IsNullOrWhiteSpace(business.RestaurantName) ? "Elite Restaurant" : business.RestaurantName.Trim(),
+            logoUrl,
+            employeePhotoUrl,
+            settings.DefaultCurrencyDisplayMode,
+            settings.UsdToFcRate &gt; 0m ? settings.UsdToFcRate : CurrencyHelper.DefaultFcPerUsd,
+            taxPercent,
+            servicePercent));
+    }
+
+    [HttpGet("assets/restaurant-logo")]
+    public IActionResult GetRestaurantLogo()
+    {
+        var session = RequireServerSession();
+        if (session is null)
+            return Unauthorized();
+
+        var logoPath = SettingsManager.Load().BusinessProfile.LogoPath?.Trim() ?? string.Empty;
+        return ServeImageFromPath(logoPath);
+    }
+
+    [HttpGet("assets/me-photo")]
+    public IActionResult GetEmployeePhoto()
+    {
+        var session = RequireServerSession();
+        if (session is null)
+            return Unauthorized();
+
+        var photoPath = db.Employees.AsNoTracking()
+            .Where(e =&gt; e.Id == session.EmployeeId)
+            .Select(e =&gt; e.ProfileImagePath)
+            .FirstOrDefault();
+        return ServeImageFromPath(photoPath?.Trim() ?? string.Empty);
+    }
+
+    [HttpGet("products")]
+    public ActionResult&lt;IReadOnlyList&lt;ServerProductDto&gt;&gt; GetProducts()
+    {
+        var session = RequireServerSession();
+        if (session is null)
+            return Unauthorized(new { message = "Missing/invalid token or non-server role." });
+
+        var rows = db.Products.AsNoTracking()
+            .OrderBy(p =&gt; p.Category)
+            .ThenBy(p =&gt; p.SubCategory)
+            .ThenBy(p =&gt; p.Name)
+            .Select(p =&gt; new ServerProductDto(
+                p.Id,
+                p.UniqueId,
+                p.Name,
+                p.Category,
+                string.IsNullOrWhiteSpace(p.SubCategory) ? "General" : p.SubCategory,
+                p.Price))
+            .ToList();
+
+        return Ok(rows);
+    }
+
+    [HttpGet("open-check")]
+    public ActionResult GetOpenCheck([FromQuery] int tableId)
+    {
+        var session = RequireServerSession();
+        if (session is null)
+            return Unauthorized(new { message = "Missing/invalid token or non-server role." });
+        if (tableId &lt;= 0)
+            return BadRequest(new { message = "tableId is required." });
+
+        var table = db.Tables.AsNoTracking().SingleOrDefault(t =&gt; t.Id == tableId);
+        if (table is null)
+            return NotFound(new { message = "Table not found." });
+        if (table.AssignedServerId != session.EmployeeId)
+            return BadRequest(new { message = "This table is not assigned to the logged-in server." });
+
+        var open = db.Orders.AsNoTracking()
+            .WhereOpenCheckForTable(tableId)
+            .OrderByDescending(o =&gt; o.CreatedAt)
+            .FirstOrDefault();
+
+        if (open is null)
+            return Ok(new { hasOpenCheck = false });
+
+        var orderLabel = string.IsNullOrWhiteSpace(open.UniqueId) ? $"#{open.Id:000}" : open.UniqueId;
+        return Ok(new
+        {
+            hasOpenCheck = true,
+            orderId = open.Id,
+            orderCode = orderLabel,
+            status = open.Status,
+            createdAt = open.CreatedAt
+        });
+    }
+
+    [HttpGet("drafts")]
+    public ActionResult&lt;IReadOnlyList&lt;ServerDraftDto&gt;&gt; GetDrafts()
+    {
+        var session = RequireServerSession();
+        if (session is null)
+            return Unauthorized(new { message = "Missing/invalid token or non-server role." });
+
+        try
+        {
+            var rows = SharedOrderDraftStore.ListServerDrafts(session.EmployeeId)
+                .Select(d =&gt; new ServerDraftDto(d.Id, d.Label, d.PayloadJson, d.UpdatedAtUtc))
+                .ToList();
+            return Ok(rows);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Draft storage read failed.", detail = ex.Message });
+        }
+    }
+
+    [HttpPost("drafts")]
+    public ActionResult&lt;ServerDraftDto&gt; SaveDraft([FromBody] ServerSaveDraftRequest request)
+    {
+        var session = RequireServerSession();
+        if (session is null)
+            return Unauthorized(new { message = "Missing/invalid token or non-server role." });
+
+        var snapshot = request.SnapshotJson?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(snapshot))
+            return BadRequest(new { message = "SnapshotJson is required." });
+
+        try
+        {
+            using var _ = JsonDocument.Parse(snapshot);
+        }
+        catch
+        {
+            return BadRequest(new { message = "SnapshotJson must be valid JSON." });
+        }
+
+        try
+        {
+            var saved = SharedOrderDraftStore.SaveServerDraft(
+                session.EmployeeId,
+                session.Name,
+                request.Label ?? string.Empty,
+                snapshot);
+
+            return Ok(new ServerDraftDto(saved.Id, saved.Label, saved.PayloadJson, saved.UpdatedAtUtc));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Draft save failed.", detail = ex.Message });
+        }
+    }
+
+    [HttpDelete("drafts/{draftId}")]
+    public ActionResult DeleteDraft(string draftId)
+    {
+        var session = RequireServerSession();
+        if (session is null)
+            return Unauthorized(new { message = "Missing/invalid token or non-server role." });
+
+        try
+        {
+            var deleted = SharedOrderDraftStore.DeleteServerDraft(session.EmployeeId, draftId);
+            if (!deleted)
+                return NotFound(new { message = "Draft not found for this server." });
+
+            return Ok(new { ok = true, id = draftId });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Draft delete failed.", detail = ex.Message });
+        }
+    }
+
+    [HttpPost("orders")]
+    public ActionResult&lt;ServerCreateOrderResponse&gt; CreateOrAppendOrder([FromBody] ServerCreateOrderRequest request)
+    {
+        var session = RequireServerSession();
+        if (session is null)
+            return Unauthorized(new { message = "Missing/invalid token or non-server role." });
+
+        if (request.TableId &lt;= 0)
+            return BadRequest(new { message = "TableId is required." });
+        if (request.Lines is null || request.Lines.Count == 0)
+            return BadRequest(new { message = "At least one line is required." });
+
+        var source = (request.OrderSource ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(source))
+            source = "WalkIn";
+        var isDelivery = source.Equals("Delivery", StringComparison.OrdinalIgnoreCase);
+        if (isDelivery &amp;&amp; string.IsNullOrWhiteSpace(request.SourceReference))
+            return BadRequest(new { message = "Delivery requires a source reference." });
+        if (!isDelivery &amp;&amp; !source.Equals("WalkIn", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { message = "Only WalkIn and Delivery order sources are supported in Server portal." });
+
+        var discountMode = string.IsNullOrWhiteSpace(request.DiscountMode) ? "None" : request.DiscountMode.Trim();
+        var discountValue = request.DiscountValue;
+        if (discountMode.Equals("Percent", StringComparison.OrdinalIgnoreCase)
+            &amp;&amp; (discountValue &lt; 0m || discountValue &gt; 100m))
+            return BadRequest(new { message = "Percent discount must be between 0 and 100." });
+        if (discountMode.Equals("Usd", StringComparison.OrdinalIgnoreCase) &amp;&amp; discountValue &lt; 0m)
+            return BadRequest(new { message = "USD discount cannot be negative." });
+        if (!discountMode.Equals("None", StringComparison.OrdinalIgnoreCase)
+            &amp;&amp; !discountMode.Equals("Percent", StringComparison.OrdinalIgnoreCase)
+            &amp;&amp; !discountMode.Equals("Usd", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { message = "Discount mode must be None, Percent or Usd." });
+
+        var normalizedLines = request.Lines
+            .Where(l =&gt; l is not null &amp;&amp; l.ProductId &gt; 0 &amp;&amp; l.Quantity &gt; 0)
+            .GroupBy(l =&gt; l.ProductId)
+            .Select(g =&gt; new ServerOrderLineRequest(g.Key, g.Sum(x =&gt; x.Quantity)))
+            .ToList();
+
+        if (normalizedLines.Count == 0)
+            return BadRequest(new { message = "No valid lines provided." });
+
+        var table = db.Tables.Include(t =&gt; t.AssignedServer).SingleOrDefault(t =&gt; t.Id == request.TableId);
+        if (table is null)
+            return NotFound(new { message = "Table not found." });
+        if (table.AssignedServerId != session.EmployeeId)
+            return BadRequest(new { message = "This table is not assigned to the logged-in server." });
+        if (string.Equals(table.Status, "Maintenance", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { message = "Maintenance table cannot receive orders." });
+
+        var productIds = normalizedLines.Select(l =&gt; l.ProductId).Distinct().ToList();
+        var products = db.Products.AsNoTracking().Where(p =&gt; productIds.Contains(p.Id)).ToDictionary(p =&gt; p.Id, p =&gt; p);
+        if (products.Count != productIds.Count)
+            return BadRequest(new { message = "One or more products no longer exist." });
+
+        var activeStaff = db.Employees.AsNoTracking()
+            .Where(e =&gt; e.EmploymentStatus == "Active")
+            .ToList();
+
+        var openOrder = db.Orders.Include(o =&gt; o.Items)
+            .WhereOpenCheckForTable(table.Id)
+            .OrderByDescending(o =&gt; o.CreatedAt)
+            .FirstOrDefault();
+
+        var newItems = BuildOrderItems(normalizedLines, products, activeStaff);
+
+        if (request.AppendToOpenCheck &amp;&amp; openOrder is not null)
+        {
+            foreach (var item in newItems)
+                openOrder.Items.Add(item);
+
+            if (!string.IsNullOrWhiteSpace(request.CustomerNotes))
+            {
+                openOrder.CustomerNotes = string.IsNullOrWhiteSpace(openOrder.CustomerNotes)
+                    ? request.CustomerNotes.Trim()
+                    : $"{openOrder.CustomerNotes.Trim()}\n{request.CustomerNotes.Trim()}";
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.AllergyNotes))
+            {
+                openOrder.AllergyNotes = string.IsNullOrWhiteSpace(openOrder.AllergyNotes)
+                    ? request.AllergyNotes.Trim()
+                    : $"{openOrder.AllergyNotes.Trim()}\n{request.AllergyNotes.Trim()}";
+            }
+
+            if (string.Equals(openOrder.Status, "Ready", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(openOrder.Status, OrderWorkflow.Served, StringComparison.OrdinalIgnoreCase))
+            {
+                openOrder.Status = "In Kitchen";
+            }
+
+            // Preserve existing discount when appending unless caller sends a meaningful non-None discount.
+            var explicitDiscount = !discountMode.Equals("None", StringComparison.OrdinalIgnoreCase)
+                &amp;&amp; (discountMode.Equals("Percent", StringComparison.OrdinalIgnoreCase)
+                    ? discountValue &gt; 0m &amp;&amp; discountValue &lt;= 100m
+                    : discountMode.Equals("Usd", StringComparison.OrdinalIgnoreCase) &amp;&amp; discountValue &gt; 0m);
+
+            if (explicitDiscount)
+            {
+                openOrder.DiscountMode = discountMode;
+                openOrder.DiscountValue = discountValue;
+            }
+            openOrder.OrderSource = isDelivery ? "Delivery" : "WalkIn";
+            openOrder.ReservationGuestName = isDelivery ? request.SourceReference.Trim() : string.Empty;
+            openOrder.PaymentCurrencyCode = CurrencyHelper.NormalizeCurrencyCode(request.PaymentCurrencyCode);
+            OrderSubmissionHelper.SyncPaymentFields(openOrder, products);
+            table.Status = "Occupied";
+            using (var tx = db.Database.BeginTransaction())
+            {
+                try
+                {
+                    db.SaveChanges();
+                    DataReconciler.ReconcileTableStatusesWithOrders(db);
+                    db.SaveChanges();
+                    tx.Commit();
+                }
+                catch
+                {
+                    tx.Rollback();
+                    throw;
+                }
+            }
+
+            var code = string.IsNullOrWhiteSpace(openOrder.UniqueId) ? $"#{openOrder.Id:000}" : openOrder.UniqueId;
+            return Ok(new ServerCreateOrderResponse(
+                Mode: "Append",
+                OrderId: code,
+                LinesAdded: newItems.Count,
+                Message: $"Added {newItems.Count} line(s) to open check {code}.",
+                CreatedAtUtc: DateTime.UtcNow));
+        }
+
+        var order = new OrderRecord
+        {
+            UniqueId = UniqueIdGenerator.NewId("ORD"),
+            TableId = table.Id,
+            TableCode = $"Table {table.TableNumber}",
+            TableName = string.IsNullOrWhiteSpace(table.Name) ? $"Table {table.TableNumber}" : table.Name,
+            ServerId = session.EmployeeId,
+            ServerName = session.Name,
+            Status = OrderWorkflow.PendingCashier,
+            CustomerNotes = (request.CustomerNotes ?? string.Empty).Trim(),
+            AllergyNotes = (request.AllergyNotes ?? string.Empty).Trim(),
+            DiscountMode = discountMode,
+            DiscountValue = discountValue,
+            PaymentCurrencyCode = CurrencyHelper.NormalizeCurrencyCode(request.PaymentCurrencyCode),
+            CreatedAt = DateTime.Now,
+            OrderSource = isDelivery ? "Delivery" : "WalkIn",
+            ReservationGuestName = isDelivery ? request.SourceReference.Trim() : string.Empty
+        };
+
+        foreach (var item in newItems)
+            order.Items.Add(item);
+
+        OrderSubmissionHelper.SyncPaymentFields(order, products);
+        db.Orders.Add(order);
+        table.Status = "Occupied";
+        using (var tx = db.Database.BeginTransaction())
+        {
+            try
+            {
+                db.SaveChanges();
+                DataReconciler.ReconcileTableStatusesWithOrders(db);
+                db.SaveChanges();
+                tx.Commit();
+            }
+            catch
+            {
+                tx.Rollback();
+                throw;
+            }
+        }
+
+        return Ok(new ServerCreateOrderResponse(
+            Mode: "Create",
+            OrderId: order.UniqueId,
+            LinesAdded: newItems.Count,
+            Message: $"Order {order.UniqueId} sent to cashier.",
+            CreatedAtUtc: DateTime.UtcNow));
+    }
+
+    [HttpGet("ready-orders")]
+    public ActionResult&lt;IReadOnlyList&lt;ServerReadyOrderDto&gt;&gt; GetReadyOrders()
+    {
+        var session = RequireServerSession();
+        if (session is null)
+            return Unauthorized(new { message = "Missing/invalid token or non-server role." });
+
+        var orders = db.Orders
+            .AsNoTracking()
+            .Include(o =&gt; o.Items)
+            .ThenInclude(i =&gt; i.Product)
+            .Where(o =&gt; o.Status == "Ready" &amp;&amp; o.ServerId == session.EmployeeId)
+            .OrderBy(o =&gt; o.CreatedAt)
+            .ToList();
+
+        var rows = orders.Select(o =&gt;
+        {
+            var subtotal = o.Items.Sum(i =&gt; (i.Product?.Price ?? 0m) * i.Quantity);
+            var totals = OrderTotalsHelper.ComputeTotals(subtotal, o.DiscountMode, o.DiscountValue);
+            return new ServerReadyOrderDto(
+                o.Id,
+                string.IsNullOrWhiteSpace(o.UniqueId) ? $"#{o.Id:000}" : o.UniqueId,
+                o.TableId ?? 0,
+                $"{o.TableCode} · {o.TableName}",
+                string.IsNullOrWhiteSpace(o.ServerName) ? "-" : o.ServerName,
+                o.Status,
+                string.Join(", ", o.Items.Select(i =&gt; $"{i.Product?.Name ?? "Unknown"} x{i.Quantity}")),
+                o.Items.Sum(i =&gt; i.Quantity),
+                totals.GrandTotal,
+                CurrencyHelper.ConvertUsdToFc(totals.GrandTotal),
+                o.CreatedAt,
+                o.CreatedAt.ToString("HH:mm"))
+            ;
+        }).ToList();
+
+        return Ok(rows);
+    }
+
+    [HttpPost("orders/{orderId:int}/serve")]
+    public ActionResult&lt;ServerMarkServedResponse&gt; MarkServed(int orderId)
+    {
+        var session = RequireServerSession();
+        if (session is null)
+            return Unauthorized(new { message = "Missing/invalid token or non-server role." });
+        if (orderId &lt;= 0)
+            return BadRequest(new { message = "orderId is required." });
+
+        var order = db.Orders.SingleOrDefault(o =&gt; o.Id == orderId &amp;&amp; o.ServerId == session.EmployeeId);
+        if (order is null)
+            return NotFound(new { message = "Order not found for this server." });
+        if (!string.Equals(order.Status, "Ready", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { message = "Only Ready orders can be marked Served." });
+
+        order.Status = OrderWorkflow.Served;
+        using (var tx = db.Database.BeginTransaction())
+        {
+            try
+            {
+                db.SaveChanges();
+                DataReconciler.ReconcileTableStatusesWithOrders(db);
+                db.SaveChanges();
+                tx.Commit();
+            }
+            catch
+            {
+                tx.Rollback();
+                throw;
+            }
+        }
+
+        var orderCode = string.IsNullOrWhiteSpace(order.UniqueId) ? $"#{order.Id:000}" : order.UniqueId;
+        return Ok(new ServerMarkServedResponse(
+            true,
+            $"Order {orderCode} marked Served.",
+            orderCode,
+            order.Status,
+            DateTime.UtcNow));
+    }
+
+    private AuthenticatedStaffSession? RequireServerSession()
+    {
+        var token = Request.ReadBearerToken();
+        var session = authService.Validate(token);
+        if (session is null)
+            return null;
+        return session.Role.Equals("Server", StringComparison.OrdinalIgnoreCase) ? session : null;
+    }
+
+    private IActionResult ServeImageFromPath(string absolutePath)
+    {
+        if (string.IsNullOrWhiteSpace(absolutePath) || !System.IO.File.Exists(absolutePath))
+            return NotFound();
+
+        var provider = new FileExtensionContentTypeProvider();
+        if (!provider.TryGetContentType(absolutePath, out var contentType))
+            contentType = "application/octet-stream";
+
+        var bytes = System.IO.File.ReadAllBytes(absolutePath);
+        return File(bytes, contentType);
+    }
+
+    private static List&lt;OrderItem&gt; BuildOrderItems(
+        IReadOnlyList&lt;ServerOrderLineRequest&gt; lines,
+        IReadOnlyDictionary&lt;int, Product&gt; products,
+        IReadOnlyList&lt;Employee&gt; activeStaff)
+    {
+        var items = new List&lt;OrderItem&gt;(lines.Count);
+        foreach (var line in lines)
+        {
+            var assignee = OrderSubmissionHelper.ResolveAssignee(products, activeStaff, line.ProductId);
+            items.Add(new OrderItem
+            {
+                ProductId = line.ProductId,
+                Quantity = line.Quantity,
+                PreparedByEmployeeId = assignee.EmployeeId,
+                PreparedByRole = assignee.Role,
+                PreparedByName = assignee.Name
+            });
+        }
+
+        return items;
+    }
+
+}
+</code></pre>
+<h2 id="a10">10. Testing strategy (full listings)</h2><p>Tests reference Core only so they run on any CI agent without WPF.</p><h3 id="EliteRestaurant-Tests-DataReconcilerReconcileTests-cs">EliteRestaurant.Tests/DataReconcilerReconcileTests.cs</h3><p class="path"><code>EliteRestaurant.Tests/DataReconcilerReconcileTests.cs</code> — verbatim</p><pre><code>using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Utils;
+using Microsoft.EntityFrameworkCore;
+using Xunit;
+
+namespace EliteRestaurant.Tests;
+
+public class DataReconcilerReconcileTests
+{
+    [Fact]
+    public void ReconcileTableStatusesWithOrders_MarksOccupiedWhenKitchenActiveOrderExists()
+    {
+        var options = new DbContextOptionsBuilder&lt;AppDbContext&gt;()
+            .UseInMemoryDatabase($"reconcile-{Guid.NewGuid():N}")
+            .Options;
+        using var db = new AppDbContext(options);
+        db.Database.EnsureCreated();
+
+        db.Tables.Add(new Table
+        {
+            Id = 1,
+            UniqueId = "T1",
+            TableNumber = 1,
+            Name = "Patio 1",
+            Capacity = 4,
+            Status = "Available"
+        });
+        db.Orders.Add(new OrderRecord
+        {
+            UniqueId = "O1",
+            TableId = 1,
+            TableCode = "Table 1",
+            TableName = "Patio 1",
+            Status = "Waiting",
+            CreatedAt = DateTime.UtcNow
+        });
+        db.SaveChanges();
+
+        DataReconciler.ReconcileTableStatusesWithOrders(db);
+        db.SaveChanges();
+
+        Assert.Equal("Occupied", db.Tables.Single(t =&gt; t.Id == 1).Status);
+    }
+
+    [Fact]
+    public void ReconcileTableStatusesWithOrders_LeavesAvailableWhenOnlyCompletedOrders()
+    {
+        var options = new DbContextOptionsBuilder&lt;AppDbContext&gt;()
+            .UseInMemoryDatabase($"reconcile2-{Guid.NewGuid():N}")
+            .Options;
+        using var db = new AppDbContext(options);
+        db.Database.EnsureCreated();
+
+        db.Tables.Add(new Table
+        {
+            Id = 2,
+            UniqueId = "T2",
+            TableNumber = 2,
+            Name = "Patio 2",
+            Capacity = 2,
+            Status = "Occupied"
+        });
+        db.Orders.Add(new OrderRecord
+        {
+            UniqueId = "O2",
+            TableId = 2,
+            TableCode = "Table 2",
+            TableName = "Patio 2",
+            Status = "Completed",
+            CreatedAt = DateTime.UtcNow
+        });
+        db.SaveChanges();
+
+        DataReconciler.ReconcileTableStatusesWithOrders(db);
+        db.SaveChanges();
+
+        Assert.Equal("Available", db.Tables.Single(t =&gt; t.Id == 2).Status);
+    }
+
+    [Fact]
+    public void ReconcileTableStatusesWithOrders_SkipsMaintenanceTables()
+    {
+        var options = new DbContextOptionsBuilder&lt;AppDbContext&gt;()
+            .UseInMemoryDatabase($"reconcile3-{Guid.NewGuid():N}")
+            .Options;
+        using var db = new AppDbContext(options);
+        db.Database.EnsureCreated();
+
+        db.Tables.Add(new Table
+        {
+            Id = 3,
+            UniqueId = "T3",
+            TableNumber = 3,
+            Name = "Closed",
+            Capacity = 2,
+            Status = "Maintenance"
+        });
+        db.Orders.Add(new OrderRecord
+        {
+            UniqueId = "O3",
+            TableId = 3,
+            TableCode = "Table 3",
+            TableName = "Closed",
+            Status = "Waiting",
+            CreatedAt = DateTime.UtcNow
+        });
+        db.SaveChanges();
+
+        DataReconciler.ReconcileTableStatusesWithOrders(db);
+        db.SaveChanges();
+
+        Assert.Equal("Maintenance", db.Tables.Single(t =&gt; t.Id == 3).Status);
+    }
+}
+</code></pre>
+<h3 id="EliteRestaurant-Tests-DataReconcilerTests-cs">EliteRestaurant.Tests/DataReconcilerTests.cs</h3><p class="path"><code>EliteRestaurant.Tests/DataReconcilerTests.cs</code> — verbatim</p><pre><code>using EliteRestaurant.Core.Data;
+using Xunit;
+
+namespace EliteRestaurant.Tests;
+
+public class DataReconcilerTests
+{
+    [Theory]
+    [InlineData("Waiting", true)]
+    [InlineData("READY", true)]
+    [InlineData("Completed", false)]
+    public void IsActiveOrderStatus_MatchesKitchenPipeline(string status, bool expected) =&gt;
+        Assert.Equal(expected, DataReconciler.IsActiveOrderStatus(status));
+}
+</code></pre>
+<h3 id="EliteRestaurant-Tests-OrderDiscountParserTests-cs">EliteRestaurant.Tests/OrderDiscountParserTests.cs</h3><p class="path"><code>EliteRestaurant.Tests/OrderDiscountParserTests.cs</code> — verbatim</p><pre><code>using EliteRestaurant.Core.Utils;
+using Xunit;
+
+namespace EliteRestaurant.Tests;
+
+public class OrderDiscountParserTests
+{
+    [Theory]
+    [InlineData("12.5", 12.5)]
+    [InlineData("", 0)]
+    [InlineData("  ", 0)]
+    public void Parse_AcceptsInvariantDecimals(string? text, decimal expected) =&gt;
+        Assert.Equal(expected, OrderDiscountParser.Parse(text));
+
+    [Theory]
+    [InlineData("Percent", "10", true)]
+    [InlineData("Percent", "0", false)]
+    [InlineData("Percent", "101", false)]
+    [InlineData("Usd", "5", true)]
+    [InlineData("None", "99", false)]
+    public void ShouldApplyDiscount_RespectsMode(string mode, string input, bool expected) =&gt;
+        Assert.Equal(expected, OrderDiscountParser.ShouldApplyDiscount(mode, input));
+}
+</code></pre>
+<h3 id="EliteRestaurant-Tests-OrderPrepTimeEstimatorTests-cs">EliteRestaurant.Tests/OrderPrepTimeEstimatorTests.cs</h3><p class="path"><code>EliteRestaurant.Tests/OrderPrepTimeEstimatorTests.cs</code> — verbatim</p><pre><code>using EliteRestaurant.Core.Utils;
+using Xunit;
+
+namespace EliteRestaurant.Tests;
+
+public class OrderPrepTimeEstimatorTests
+{
+    [Fact]
+    public void MinutesForLineItem_Drink_IsFast() =&gt;
+        Assert.Equal(3, OrderPrepTimeEstimator.MinutesForLineItem("Drink", "Coffee"));
+
+    [Fact]
+    public void MinutesForLineItem_Cocktail_AddsTime() =&gt;
+        Assert.True(OrderPrepTimeEstimator.MinutesForLineItem("Drink", "Cocktail") &gt; 3);
+
+    [Fact]
+    public void EstimateTicketPrepMinutes_Empty_IsZero() =&gt;
+        Assert.Equal(0, OrderPrepTimeEstimator.EstimateTicketPrepMinutes([]));
+
+    [Fact]
+    public void EstimateTicketPrepMinutes_ParallelModel_UsesMaxPlusBump()
+    {
+        var lines = new List&lt;(int Quantity, string Category, string SubCategory)&gt;
+        {
+            (2, "Main", "Meat Meal"),
+            (1, "Drink", "Coffee")
+        };
+        var m = OrderPrepTimeEstimator.EstimateTicketPrepMinutes(lines);
+        Assert.True(m &gt;= 20);
+    }
+}
+</code></pre>
+<h3 id="EliteRestaurant-Tests-OrderSubmissionHelperTests-cs">EliteRestaurant.Tests/OrderSubmissionHelperTests.cs</h3><p class="path"><code>EliteRestaurant.Tests/OrderSubmissionHelperTests.cs</code> — verbatim</p><pre><code>using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Orders;
+using Xunit;
+
+namespace EliteRestaurant.Tests;
+
+public class OrderSubmissionHelperTests
+{
+    [Fact]
+    public void ResolveAssignee_Drink_GoesToBarman()
+    {
+        var products = new Dictionary&lt;int, Product&gt;
+        {
+            [1] = new Product { Id = 1, Category = "Drink", Name = "Cola" }
+        };
+        var staff = new List&lt;Employee&gt;
+        {
+            new() { Id = 10, Role = "Bartender", Name = "Alex" },
+            new() { Id = 11, Role = "Chef", Name = "Sam" }
+        };
+        var a = OrderSubmissionHelper.ResolveAssignee(products, staff, 1);
+        Assert.Equal(10, a.EmployeeId);
+        Assert.Equal("Barman", a.Role);
+    }
+
+    [Fact]
+    public void ResolveAssignee_Main_GoesToChef()
+    {
+        var products = new Dictionary&lt;int, Product&gt;
+        {
+            [2] = new Product { Id = 2, Category = "Main", Name = "Steak" }
+        };
+        var staff = new List&lt;Employee&gt;
+        {
+            new() { Id = 11, Role = "Chef", Name = "Sam" }
+        };
+        var a = OrderSubmissionHelper.ResolveAssignee(products, staff, 2);
+        Assert.Equal(11, a.EmployeeId);
+    }
+}
+</code></pre>
+<h3 id="EliteRestaurant-Tests-OrderTotalsCalculatorTests-cs">EliteRestaurant.Tests/OrderTotalsCalculatorTests.cs</h3><p class="path"><code>EliteRestaurant.Tests/OrderTotalsCalculatorTests.cs</code> — verbatim</p><pre><code>using EliteRestaurant.Core.Utils;
+using Xunit;
+
+namespace EliteRestaurant.Tests;
+
+public class OrderTotalsCalculatorTests
+{
+    private readonly OrderTotalsCalculator _calculator = new();
+
+    [Fact]
+    public void ComputeTicket_AggregatesDiscountTaxServicePrep()
+    {
+        var prepLines = new List&lt;(int Quantity, string Category, string SubCategory)&gt;
+        {
+            (2, "Main", "Pasta")
+        };
+        var result = _calculator.ComputeTicket(100m, 2, "Percent", "10", prepLines);
+
+        Assert.Equal(2, result.LiveItemCount);
+        Assert.Equal(100m, result.TicketSubtotal);
+        Assert.True(result.DiscountApplied &gt; 0m);
+        Assert.True(result.TaxAmount &gt;= 0m);
+        Assert.True(result.ServiceAmount &gt;= 0m);
+        Assert.True(result.GrandTotal &gt; 0m);
+        Assert.True(result.EstimatedPrepMinutes &gt; 0);
+
+        var raw = OrderDiscountParser.Parse("10");
+        var expected = OrderTotalsHelper.ComputeTotals(100m, "Percent", raw);
+        Assert.Equal(expected.DiscountApplied, result.DiscountApplied);
+        Assert.Equal(expected.Tax, result.TaxAmount);
+        Assert.Equal(expected.Service, result.ServiceAmount);
+        Assert.Equal(expected.GrandTotal, result.GrandTotal);
+    }
+}
+</code></pre>
+<h3 id="EliteRestaurant-Tests-OrderWorkflowTests-cs">EliteRestaurant.Tests/OrderWorkflowTests.cs</h3><p class="path"><code>EliteRestaurant.Tests/OrderWorkflowTests.cs</code> — verbatim</p><pre><code>using EliteRestaurant.Core.Utils;
+using Xunit;
+
+namespace EliteRestaurant.Tests;
+
+public class OrderWorkflowTests
+{
+    [Theory]
+    [InlineData("Pending cashier", true)]
+    [InlineData("PENDING CASHIER", true)]
+    [InlineData("Waiting", false)]
+    [InlineData("", false)]
+    public void IsPendingCashier_Normalizes(string? status, bool expected) =&gt;
+        Assert.Equal(expected, OrderWorkflow.IsPendingCashier(status));
+
+    [Fact]
+    public void CanCashierComplete_OnlyWhenServed() =&gt;
+        Assert.True(OrderWorkflow.CanCashierComplete(OrderWorkflow.Served));
+
+    [Fact]
+    public void OccupiesTable_IncludesKitchenPipeline() =&gt;
+        Assert.True(OrderWorkflow.OccupiesTable("Waiting"));
+
+    [Fact]
+    public void CanAdminAdvanceOrderStatus_IncludesReady() =&gt;
+        Assert.True(OrderWorkflow.CanAdminAdvanceOrderStatus("Ready"));
+}
+</code></pre>
+<h3 id="EliteRestaurant-Tests-PayrollCalculatorTests-cs">EliteRestaurant.Tests/PayrollCalculatorTests.cs</h3><p class="path"><code>EliteRestaurant.Tests/PayrollCalculatorTests.cs</code> — verbatim</p><pre><code>using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Utils;
+using Xunit;
+
+namespace EliteRestaurant.Tests;
+
+public class PayrollCalculatorTests
+{
+    [Fact]
+    public void ComputeBonusUsd_IsFivePercentOfSales()
+    {
+        Assert.Equal(5m, PayrollCalculator.ComputeBonusUsd(100m));
+        Assert.Equal(0m, PayrollCalculator.ComputeBonusUsd(-10m));
+    }
+
+    [Fact]
+    public void ComputeBaseAfterAttendanceUsd_DeductsUnitsFromGross()
+    {
+        var after = PayrollCalculator.ComputeBaseAfterAttendanceUsd(1000m, 10, 2);
+        Assert.Equal(800m, after);
+    }
+
+    [Fact]
+    public void ComputeFinalNetPayUsd_NeverNegative()
+    {
+        var net = PayrollCalculator.ComputeFinalNetPayUsd(100m, 5, 10, 0m, 500m);
+        Assert.Equal(0m, net);
+    }
+
+    [Fact]
+    public void GetHourlyGrossForPayrollMonth_CountsScheduledShifts()
+    {
+        var emp = new Employee
+        {
+            JoinDate = new DateTime(2020, 1, 1),
+            HourlyRate = 10m,
+            MondayShift = "Morning",
+            TuesdayShift = "Off",
+            WednesdayShift = "Off",
+            ThursdayShift = "Off",
+            FridayShift = "Off",
+            SaturdayShift = "Off",
+            SundayShift = "Off"
+        };
+        var (hours, workdays, gross) = PayrollCalculator.GetHourlyGrossForPayrollMonth(emp, 2026, 4);
+        Assert.True(workdays &gt;= 4);
+        Assert.True(hours &gt; 0);
+        Assert.Equal(Math.Round(10m * hours, 2), gross);
+    }
+}
+</code></pre>
+<h3 id="EliteRestaurant-Tests-StaffPortalAuthenticationTests-cs">EliteRestaurant.Tests/StaffPortalAuthenticationTests.cs</h3><p class="path"><code>EliteRestaurant.Tests/StaffPortalAuthenticationTests.cs</code> — verbatim</p><pre><code>using EliteRestaurant.Core.Staff;
+using Xunit;
+
+namespace EliteRestaurant.Tests;
+
+public class StaffPortalAuthenticationTests
+{
+    [Theory]
+    [InlineData("Chef", true)]
+    [InlineData("Bartender", true)]
+    [InlineData("Server", false)]
+    public void IsKitchenBarRole_Classifies(string role, bool expected) =&gt;
+        Assert.Equal(expected, StaffPortalAuthentication.IsKitchenBarRole(role));
+}
+</code></pre>
+<h2 id="a11">11. Roadmap</h2><ul><li>API integration tests (<code>WebApplicationFactory</code>).</li><li>Further ViewModel decomposition (money, reports, kitchen).</li><li>Optional: extract Server Portal CSS/JS to separate files with a small build step.</li></ul><p class="meta"><em>End of architecture document. Regenerate via <code>python docs/_generate_full_review_docs.py</code></em></p></div>
+</body>
+</html>

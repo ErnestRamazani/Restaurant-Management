@@ -1,11 +1,12 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Input;
-using EliteRestaurantPro.Data;
-using EliteRestaurantPro.Models;
-using EliteRestaurantPro.Utils;
+using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Utils;
 using Microsoft.EntityFrameworkCore;
 
 namespace EliteRestaurantPro.ViewModels;
@@ -35,9 +36,21 @@ public sealed class SalaryEmployeeRowVm
     public decimal MoneyGeneratedUsd { get; init; }
     public decimal BonusFivePercentUsd { get; init; }
     public decimal AdvancesDeductUsd { get; init; }
+    /// <summary>Remaining net pay still owed for this payroll month (installments reduce this).</summary>
     public decimal NetPay { get; init; }
+    /// <summary>Full net pay for the month from the payroll snapshot (or live calc when no snapshot yet).</summary>
+    public decimal TotalNetUsd { get; init; }
+    /// <summary>Cumulative cash posted toward this month’s net (from <see cref="PayrollPaymentRecord.PaidToDateUsd"/>).</summary>
+    public decimal PaidToDateUsd { get; init; }
+    public bool HasPayrollRecord { get; init; }
+    public bool IsPartiallyPaid { get; init; }
     public bool AlreadyPaid { get; init; }
     public string StatusText { get; init; } = string.Empty;
+
+    public string PayrollActionLabel { get; init; } = "Confirm payroll";
+    public string PayrollActionLabelShort { get; init; } = "Pay";
+    public string HeaderMoneyChipText { get; init; } = string.Empty;
+    public string NetPaySectionTitle { get; init; } = "Net pay";
 
     /// <summary>True when a stored payroll payment record exists (amount and paid date available for display).</summary>
     public bool HasPaidReceiptDetail { get; init; }
@@ -50,7 +63,10 @@ public sealed class SalaryEmployeeRowVm
     /// <summary>Shows generic <see cref="StatusText"/> line when there is no receipt breakdown.</summary>
     public bool ShowPlainStatusLine => !HasPaidReceiptDetail;
 
-    public bool CanConfirmPayroll => !AlreadyPaid && BaseGrossUsd > 0m;
+    public bool CanConfirmPayroll =>
+        !AlreadyPaid
+        && NetPay > 0.005m
+        && (HasPayrollRecord || (BaseGrossUsd > 0m && ScheduledWorkdays > 0 && HourlyRateUsd > 0m));
 }
 
 public sealed class SalaryAdvanceEmployeePickVm
@@ -75,6 +91,11 @@ public sealed class SalaryViewModel : AdminBaseViewModel
     private bool _useInteractiveCards = true;
     private SalaryEmployeeVisibilityFilter _employeeVisibilityFilter = SalaryEmployeeVisibilityFilter.All;
     private readonly List<SalaryEmployeeRowVm> _allPayrollRows = [];
+    private bool _isPayrollPaymentDialogOpen;
+    private string _payrollPaymentDialogEmployee = string.Empty;
+    private string _payrollPaymentAmountText = string.Empty;
+    private string _payrollPaymentRemainingHint = string.Empty;
+    private SalaryEmployeeRowVm? _payrollPaymentDialogRow;
 
     public override string ActivePage => "Salary";
 
@@ -220,6 +241,8 @@ public sealed class SalaryViewModel : AdminBaseViewModel
     /// <summary>Finalize payroll for one employee (row command parameter).</summary>
     public ICommand ConfirmSinglePayrollCommand { get; }
     public ICommand RecordSalaryAdvanceCommand { get; }
+    public ICommand SubmitPayrollPaymentDialogCommand { get; }
+    public ICommand CancelPayrollPaymentDialogCommand { get; }
 
     public SalaryViewModel(Action<BaseViewModel> navigate) : base(navigate)
     {
@@ -237,7 +260,38 @@ public sealed class SalaryViewModel : AdminBaseViewModel
             p => ConfirmSinglePayment(p as SalaryEmployeeRowVm),
             p => p is SalaryEmployeeRowVm r && r.CanConfirmPayroll);
         RecordSalaryAdvanceCommand = new RelayCommand(_ => RecordSalaryAdvance());
+        SubmitPayrollPaymentDialogCommand = new RelayCommand(_ => SubmitPayrollPaymentDialog());
+        CancelPayrollPaymentDialogCommand = new RelayCommand(_ => ClosePayrollPaymentDialog());
         ReloadRows();
+    }
+
+    public bool IsPayrollPaymentDialogOpen
+    {
+        get => _isPayrollPaymentDialogOpen;
+        private set
+        {
+            if (!SetField(ref _isPayrollPaymentDialogOpen, value))
+                return;
+            CommandManager.InvalidateRequerySuggested();
+        }
+    }
+
+    public string PayrollPaymentDialogEmployee
+    {
+        get => _payrollPaymentDialogEmployee;
+        private set => SetField(ref _payrollPaymentDialogEmployee, value);
+    }
+
+    public string PayrollPaymentAmountText
+    {
+        get => _payrollPaymentAmountText;
+        set => SetField(ref _payrollPaymentAmountText, value);
+    }
+
+    public string PayrollPaymentRemainingHint
+    {
+        get => _payrollPaymentRemainingHint;
+        private set => SetField(ref _payrollPaymentRemainingHint, value);
     }
 
     private void ApplyEmployeeFilter()
@@ -262,6 +316,8 @@ public sealed class SalaryViewModel : AdminBaseViewModel
         using var db = new AppDbContext();
         var start = new DateTime(SelectedPayrollYear, SelectedPayrollMonth, 1).Date;
         var endExclusive = start.AddMonths(1);
+        var monthStartUtc = AttendanceCalendar.DayAnchorUtc(start);
+        var monthEndExclusiveUtc = AttendanceCalendar.DayAnchorUtc(endExclusive);
         var monthEnd = new DateTime(
             SelectedPayrollYear,
             SelectedPayrollMonth,
@@ -288,10 +344,10 @@ public sealed class SalaryViewModel : AdminBaseViewModel
                                   ?? AdvanceEmployees.FirstOrDefault();
 
         var attendancesByEmployee = db.EmployeeAttendances.AsNoTracking()
-            .Where(a => a.WorkDate >= start && a.WorkDate < endExclusive)
+            .Where(a => a.WorkDate >= monthStartUtc && a.WorkDate < monthEndExclusiveUtc)
             .ToList()
             .GroupBy(a => a.EmployeeId)
-            .ToDictionary(g => g.Key, g => g.AsEnumerable());
+            .ToDictionary(g => g.Key, g => (IEnumerable<EmployeeAttendance>)g);
 
         var payrollRecords = db.PayrollPaymentRecords.AsNoTracking()
             .Where(p => p.Year == SelectedPayrollYear && p.Month == SelectedPayrollMonth)
@@ -301,32 +357,91 @@ public sealed class SalaryViewModel : AdminBaseViewModel
         {
             attendancesByEmployee.TryGetValue(emp.Id, out var attRows);
             var rows = attRows ?? Enumerable.Empty<EmployeeAttendance>();
-            var (abs, late, pen, total) =
+            var (absLive, lateLive, penLive, totalLive) =
                 PayrollCalculator.CountAttendanceUnitsForPayroll(emp, SelectedPayrollYear, SelectedPayrollMonth, rows);
 
-            var (schedHours, workdays, grossPay) =
+            var (schedHours, workdays, grossLive) =
                 PayrollCalculator.GetHourlyGrossForPayrollMonth(emp, SelectedPayrollYear, SelectedPayrollMonth);
 
-            var money = PayrollSupport.SumServerCompletedOrderMerchandiseUsd(db, emp.Id, start, endExclusive);
-            var bonus = PayrollCalculator.ComputeBonusUsd(money);
-            var advances = PayrollSupport.SumPendingAdvancesForPayrollMonth(
+            var moneyLive = PayrollSupport.SumServerCompletedOrderMerchandiseUsd(db, emp.Id, start, endExclusive);
+            var bonusLive = PayrollCalculator.ComputeBonusUsd(moneyLive);
+            var advancesPending = PayrollSupport.SumPendingAdvancesForPayrollMonth(
                 db,
                 emp.Id,
                 SelectedPayrollYear,
                 SelectedPayrollMonth);
-            var baseAfter = PayrollCalculator.ComputeBaseAfterAttendanceUsd(grossPay, workdays, total);
-            var net = PayrollCalculator.ComputeFinalNetPayUsd(
-                grossPay,
-                workdays,
-                total,
-                money,
-                advances);
 
-            var paid = FinancialTransactionService.HasMonthlySalaryPayment(db, emp.Id, SelectedPayrollYear, SelectedPayrollMonth);
             payrollRecords.TryGetValue(emp.Id, out var payRec);
+            var fullyPaid = FinancialTransactionService.IsPayrollFullyPaid(db, emp.Id, SelectedPayrollYear, SelectedPayrollMonth);
 
-            var advancesDisplay = paid ? 0m : advances;
-            var netDisplay = paid ? 0m : net;
+            decimal baseGrossUsd;
+            int abs;
+            int late;
+            int pen;
+            int total;
+            decimal money;
+            decimal bonus;
+            decimal advancesApplied;
+            decimal baseAfter;
+            decimal totalNet;
+            decimal paidToDate;
+            var hasPayrollRecord = payRec is not null;
+
+            if (payRec is not null)
+            {
+                baseGrossUsd = payRec.MonthlySalaryUsd;
+                abs = payRec.AbsenceDays;
+                late = payRec.LateDays;
+                pen = payRec.LatePenaltyUnits;
+                total = payRec.TotalDeductionUnits;
+                money = payRec.MoneyGeneratedUsd;
+                bonus = payRec.BonusFivePercentUsd;
+                advancesApplied = payRec.AdvancesDeductedUsd;
+                baseAfter = PayrollCalculator.ComputeBaseAfterAttendanceUsd(baseGrossUsd, workdays, total);
+                totalNet = payRec.NetPayUsd;
+                paidToDate = payRec.PaidToDateUsd;
+            }
+            else
+            {
+                baseGrossUsd = grossLive;
+                abs = absLive;
+                late = lateLive;
+                pen = penLive;
+                total = totalLive;
+                money = moneyLive;
+                bonus = bonusLive;
+                advancesApplied = advancesPending;
+                baseAfter = PayrollCalculator.ComputeBaseAfterAttendanceUsd(grossLive, workdays, totalLive);
+                totalNet = PayrollCalculator.ComputeFinalNetPayUsd(
+                    grossLive,
+                    workdays,
+                    totalLive,
+                    moneyLive,
+                    advancesPending);
+                paidToDate = 0m;
+            }
+
+            var remaining = hasPayrollRecord
+                ? Math.Max(0m, Math.Round(totalNet - paidToDate, 2))
+                : fullyPaid ? 0m : totalNet;
+
+            var advancesDisplay = fullyPaid ? 0m : advancesApplied;
+            var netDisplay = fullyPaid ? 0m : remaining;
+
+            var isPartiallyPaid = hasPayrollRecord && !fullyPaid && paidToDate > 0.005m;
+
+            var payrollActionLabel = fullyPaid ? "Confirmed" : isPartiallyPaid ? "Add payment" : "Confirm payroll";
+            var payrollActionLabelShort = fullyPaid ? "Done" : isPartiallyPaid ? "Add" : "Pay";
+
+            string headerMoneyChipText;
+            if (fullyPaid)
+                headerMoneyChipText = "Paid in full";
+            else if (isPartiallyPaid)
+                headerMoneyChipText = $"Still owed ${remaining:N2} of ${totalNet:N2}";
+            else
+                headerMoneyChipText = $"Net ${remaining:N2}";
+
+            var netPaySectionTitle = fullyPaid ? "Net pay" : isPartiallyPaid ? "Still to pay" : "Net pay";
 
             var lastDay = monthEnd;
             var daysLate = DateTime.Today > lastDay ? Math.Max(0, (DateTime.Today - lastDay).Days) : 0;
@@ -337,19 +452,27 @@ public sealed class SalaryViewModel : AdminBaseViewModel
             if (payRec is not null)
             {
                 var localPaid = payRec.PaidAtUtc.ToLocalTime();
-                paidAmountDisplay = $"${payRec.NetPayUsd:N2} USD";
                 paidDateDisplay = localPaid.ToString("MMM d, yyyy", CultureInfo.CurrentCulture);
+                paidAmountDisplay = remaining <= 0.005m
+                    ? $"${payRec.NetPayUsd:N2} USD in full"
+                    : $"${payRec.PaidToDateUsd:N2} of ${payRec.NetPayUsd:N2} USD";
             }
 
             string status;
-            if (paid && payRec is not null)
+            if (fullyPaid && payRec is not null)
             {
                 var localPaid = payRec.PaidAtUtc.ToLocalTime();
-                status = $"Paid ${payRec.NetPayUsd:N2} USD on {localPaid:MMM d, yyyy}";
+                status = $"Paid in full (${payRec.NetPayUsd:N2} USD). Last posting {localPaid:MMM d, yyyy}.";
             }
-            else if (paid)
+            else if (fullyPaid)
             {
                 status = "Paid";
+            }
+            else if (payRec is not null)
+            {
+                var localPaid = payRec.PaidAtUtc.ToLocalTime();
+                status =
+                    $"Partially paid ${payRec.PaidToDateUsd:N2} of ${payRec.NetPayUsd:N2} USD — still owe ${remaining:N2}. Last payment {localPaid:MMM d, yyyy}.";
             }
             else if (emp.HourlyRate <= 0m)
             {
@@ -376,7 +499,7 @@ public sealed class SalaryViewModel : AdminBaseViewModel
                 HourlyRateUsd = emp.HourlyRate,
                 ScheduledHoursMonth = schedHours,
                 ScheduledWorkdays = workdays,
-                BaseGrossUsd = grossPay,
+                BaseGrossUsd = baseGrossUsd,
                 AbsenceDays = abs,
                 LateDays = late,
                 LatePenaltyAbsences = pen,
@@ -386,17 +509,25 @@ public sealed class SalaryViewModel : AdminBaseViewModel
                 BonusFivePercentUsd = bonus,
                 AdvancesDeductUsd = advancesDisplay,
                 NetPay = netDisplay,
-                AlreadyPaid = paid,
+                TotalNetUsd = totalNet,
+                PaidToDateUsd = payRec?.PaidToDateUsd ?? 0m,
+                HasPayrollRecord = hasPayrollRecord,
+                IsPartiallyPaid = isPartiallyPaid,
+                AlreadyPaid = fullyPaid,
                 StatusText = status,
                 HasPaidReceiptDetail = hasReceipt,
                 PaidAmountDisplay = paidAmountDisplay,
-                PaidDateDisplay = paidDateDisplay
+                PaidDateDisplay = paidDateDisplay,
+                PayrollActionLabel = payrollActionLabel,
+                PayrollActionLabelShort = payrollActionLabelShort,
+                HeaderMoneyChipText = headerMoneyChipText,
+                NetPaySectionTitle = netPaySectionTitle
             });
         }
 
         ApplyEmployeeFilter();
 
-        var anyUnpaid = _allPayrollRows.Any(r => r.BaseGrossUsd > 0m && !r.AlreadyPaid);
+        var anyUnpaid = _allPayrollRows.Any(r => !r.AlreadyPaid && r.NetPay > 0.005m);
         var pastMonthEnd = DateTime.Today > monthEnd;
         ShowPayrollOverdueWarning = anyUnpaid && pastMonthEnd;
         DaysPastPayDay = ShowPayrollOverdueWarning ? Math.Max(0, (DateTime.Today - monthEnd).Days) : 0;
@@ -410,11 +541,11 @@ public sealed class SalaryViewModel : AdminBaseViewModel
 
     private void ConfirmAllPayments()
     {
-        var pending = _allPayrollRows.Where(r => !r.AlreadyPaid && r.BaseGrossUsd > 0m).ToList();
+        var pending = _allPayrollRows.Where(r => r.CanConfirmPayroll).ToList();
         if (pending.Count == 0)
         {
             MessageBox.Show(
-                "No employees to finalize for this month. Each person needs an hourly rate (USD) and at least one scheduled workday (not Off) in the month.",
+                "No payroll payments to record for this month. Each new employee needs an hourly rate (USD) and at least one scheduled workday (not Off), or an existing partial payroll row with a balance due.",
                 "Salary",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
@@ -422,47 +553,118 @@ public sealed class SalaryViewModel : AdminBaseViewModel
         }
 
         var confirm = MessageBox.Show(
-            $"Finalize payroll for all {pending.Count} unpaid employee(s) for {PayrollPeriodLabel}? Matching salary advances (for this payroll month) reduce net pay. A Money expense is posted for each positive net pay.",
+            $"Record payroll for all {pending.Count} employee(s) with a balance due for {PayrollPeriodLabel}? Each person’s payment will use their remaining net amount. You can still enter a custom amount when paying one employee at a time.",
             "Confirm all payroll",
             MessageBoxButton.YesNo,
             MessageBoxImage.Question);
         if (confirm != MessageBoxResult.Yes)
             return;
 
-        RunPayrollForRows(pending);
+        RunPayrollForRows(pending, r => r.NetPay);
     }
 
     private void ConfirmSinglePayment(SalaryEmployeeRowVm? row)
     {
-        if (row is null || row.AlreadyPaid || row.BaseGrossUsd <= 0m)
+        if (row is null || !row.CanConfirmPayroll)
             return;
 
-        var confirm = MessageBox.Show(
-            $"Finalize payroll only for {row.EmployeeName} for {PayrollPeriodLabel}? Matching salary advances for this month reduce net pay.",
-            "Confirm payroll",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question);
-        if (confirm != MessageBoxResult.Yes)
-            return;
-
-        RunPayrollForRows([row]);
+        OpenPayrollPaymentDialog(row);
     }
 
-    private void RunPayrollForRows(IReadOnlyList<SalaryEmployeeRowVm> rows)
+    private void OpenPayrollPaymentDialog(SalaryEmployeeRowVm row)
+    {
+        _payrollPaymentDialogRow = row;
+        PayrollPaymentDialogEmployee = row.EmployeeName;
+        PayrollPaymentAmountText = row.NetPay > 0.005m
+            ? row.NetPay.ToString("0.00", CultureInfo.InvariantCulture)
+            : string.Empty;
+        PayrollPaymentRemainingHint = row.HasPayrollRecord
+            ? $"Net this month: ${row.TotalNetUsd:N2} — paid so far: ${row.PaidToDateUsd:N2} — remaining: ${row.NetPay:N2}"
+            : $"Net pay due: ${row.NetPay:N2}";
+        IsPayrollPaymentDialogOpen = true;
+    }
+
+    private void ClosePayrollPaymentDialog()
+    {
+        IsPayrollPaymentDialogOpen = false;
+        _payrollPaymentDialogRow = null;
+        PayrollPaymentAmountText = string.Empty;
+        PayrollPaymentRemainingHint = string.Empty;
+        PayrollPaymentDialogEmployee = string.Empty;
+    }
+
+    private void SubmitPayrollPaymentDialog()
+    {
+        var row = _payrollPaymentDialogRow;
+        if (row is null)
+            return;
+
+        if (!decimal.TryParse(
+                PayrollPaymentAmountText.Trim(),
+                NumberStyles.Number,
+                CultureInfo.InvariantCulture,
+                out var amt) ||
+            amt <= 0m)
+        {
+            MessageBox.Show(
+                "Enter a positive payment amount in USD.",
+                "Salary",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        amt = Math.Round(amt, 2);
+
+        using var db = new AppDbContext();
+        var err = FinancialTransactionService.TryRecordMonthlySalaryPayment(
+            db,
+            row.EmployeeId,
+            SelectedPayrollYear,
+            SelectedPayrollMonth,
+            amt);
+        if (err is not null)
+        {
+            MessageBox.Show(err, "Salary", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        db.SaveChanges();
+        ClosePayrollPaymentDialog();
+        MessageBox.Show(
+            "Payroll payment saved. Money shows a Salary expense for the amount you entered. Run Refresh if amounts look stale.",
+            "Salary",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
+        ReloadRows();
+    }
+
+    private void RunPayrollForRows(IReadOnlyList<SalaryEmployeeRowVm> rows, Func<SalaryEmployeeRowVm, decimal> amountSelector)
     {
         using var db = new AppDbContext();
         foreach (var row in rows)
         {
-            FinancialTransactionService.RecordMonthlySalaryPayment(
+            var amt = Math.Round(amountSelector(row), 2);
+            var err = FinancialTransactionService.TryRecordMonthlySalaryPayment(
                 db,
                 row.EmployeeId,
                 SelectedPayrollYear,
-                SelectedPayrollMonth);
+                SelectedPayrollMonth,
+                amt);
+            if (err is not null)
+            {
+                MessageBox.Show(
+                    $"{row.EmployeeName}: {err}",
+                    "Salary",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
         }
 
         db.SaveChanges();
         MessageBox.Show(
-            "Payroll saved. Daily and Employees reports include Money salary lines for the payment date. Employee timeline shows advances and payments.",
+            "Payroll saved. Daily and Employees reports include Money salary lines for each payment. Employee timeline shows advances and payments.",
             "Salary",
             MessageBoxButton.OK,
             MessageBoxImage.Information);

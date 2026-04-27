@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Elite Restaurant — Architecture &amp; Refactor Narrative</title>
+  <style>
+    :root { --text: #1a1a1a; --muted: #444; --border: #ccc; --code-bg: #f4f4f4; }
+    * { box-sizing: border-box; }
+    body { font-family: "Segoe UI", system-ui, sans-serif; line-height: 1.55; color: var(--text); max-width: 48rem; margin: 0 auto; padding: 2rem 1.5rem 4rem; font-size: 11pt; }
+    h1 { font-size: 1.75rem; border-bottom: 2px solid var(--text); padding-bottom: 0.35rem; }
+    h2 { font-size: 1.35rem; margin-top: 2rem; color: #111; }
+    h3 { font-size: 1.1rem; margin-top: 1.25rem; color: #222; }
+    .meta { color: var(--muted); font-size: 0.95rem; margin-bottom: 2rem; }
+    nav.toc { background: #f6f6f6; border: 1px solid var(--border); padding: 1rem 1.25rem; margin: 1.5rem 0; page-break-inside: avoid; }
+    nav.toc ul { margin: 0.5rem 0 0; padding-left: 1.25rem; }
+    pre.diagram { background: #fff; border: 1px dashed var(--border); padding: 1rem; font-size: 0.82rem; line-height: 1.35; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.95rem; }
+    th, td { border: 1px solid var(--border); padding: 0.45rem 0.6rem; text-align: left; vertical-align: top; }
+    th { background: #eee; }
+    code, pre { font-family: Consolas, "Courier New", monospace; font-size: 0.88rem; }
+    pre { background: var(--code-bg); padding: 0.75rem; overflow-x: auto; border: 1px solid var(--border); }
+    ul.compact li { margin: 0.2rem 0; }
+    a { color: #0645ad; }
+    @media print {
+      body { max-width: none; font-size: 10pt; padding: 0.75in; }
+      h2 { page-break-after: avoid; }
+      nav.toc { page-break-after: always; }
+      a { color: #000; text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Elite Restaurant — Architecture &amp; Refactor Narrative</h1>
+  <p class="meta">
+    <strong>Purpose:</strong> Describe system architecture, technology choices, and the evolution of the codebase (especially Core extraction, PostgreSQL, API, and presentation layers).<br>
+    <strong>Audience:</strong> Senior engineers, new maintainers, architects.<br>
+    <strong>Last updated:</strong> April 2026<br>
+    <strong>Companion:</strong> <code>Senior-Code-Review-EliteRestaurant.html</code>
+  </p>
+</header>
+
+<nav class="toc" aria-label="Table of contents">
+  <strong>Table of contents</strong>
+  <ul>
+    <li><a href="#context">1. System context</a></li>
+    <li><a href="#layers">2. Layered architecture</a></li>
+    <li><a href="#core">3. EliteRestaurant.Core (domain kernel)</a></li>
+    <li><a href="#postgres">4. PostgreSQL and EF Core</a></li>
+    <li><a href="#pro">5. EliteRestaurantPro (WPF desktop)</a></li>
+    <li><a href="#api">6. EliteRestaurant.Api (HTTP + hosting)</a></li>
+    <li><a href="#portal">7. Server Portal: HTML, CSS, and static delivery</a></li>
+    <li><a href="#auth">8. Authentication and sessions</a></li>
+    <li><a href="#config">9. Configuration: appsettings, env, IOptions</a></li>
+    <li><a href="#refactor">10. Refactor narrative: create-order and shared logic</a></li>
+    <li><a href="#tests">11. Test architecture</a></li>
+    <li><a href="#ops">12. Operational tools and data lifecycle</a></li>
+    <li><a href="#future">13. Evolution roadmap</a></li>
+    <li><a href="#wpf-detail">14. WPF UI architecture (patterns)</a></li>
+    <li><a href="#transactions">15. Transactions and consistency</a></li>
+    <li><a href="#deploy">16. Deployment checklist (LAN / single-site)</a></li>
+    <li><a href="#glossary">17. Glossary</a></li>
+  </ul>
+</nav>
+
+<h2 id="context">1. System context</h2>
+
+<p>Elite Restaurant supports <strong>in-house restaurant operations</strong>: floor tables, kitchen flow, cashier completion, money tracking, payroll-related utilities, reservations, and staff-facing tablet workflows. The same PostgreSQL database is accessed from:</p>
+<ul class="compact">
+  <li>The <strong>admin / back-office WPF application</strong> (rich UI, reporting, configuration).</li>
+  <li>The <strong>ASP.NET Core API</strong> (LAN tablets and the lightweight Server Portal UI).</li>
+  <li><strong>Console utilities</strong> (seeding, maintenance).</li>
+</ul>
+
+<pre class="diagram">
+┌─────────────────────┐     HTTPS/HTTP (LAN)      ┌──────────────────────┐
+│  Tablets / Browsers │ ◄──────────────────────► │  EliteRestaurant.Api │
+│  (Server Portal)    │   Bearer token + JSON    │  + wwwroot (static)  │
+└─────────────────────┘                          └──────────┬───────────┘
+                                                            │
+                     ┌──────────────────────────────────────┼──────────────────────┐
+                     │                                      │                      │
+                     ▼                                      ▼                      ▼
+            ┌────────────────┐                    ┌────────────────┐    ┌─────────────────┐
+            │ EliteRestaurant│                    │  PostgreSQL    │    │  File system /  │
+            │ Pro (WPF)      │ ─────────────────► │  (single DB)   │    │  logos, exports │
+            └────────────────┘                    └────────────────┘    └─────────────────┘
+                     │
+                     └──── SeedRunner, ClearActiveOrders (batch / ops)
+</pre>
+
+<h2 id="layers">2. Layered architecture</h2>
+
+<table>
+  <thead>
+    <tr><th>Layer</th><th>Project</th><th>Responsibility</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Presentation (desktop)</td><td><code>EliteRestaurantPro</code></td><td>WPF views, ViewModels, navigation, dialogs, PDF/report UX</td></tr>
+    <tr><td>Presentation (web)</td><td><code>EliteRestaurant.Api/wwwroot</code></td><td>Static HTML/CSS/JS for Server Portal</td></tr>
+    <tr><td>Application / API</td><td><code>EliteRestaurant.Api</code></td><td>Controllers, DTOs, auth service, CORS, Kestrel endpoints</td></tr>
+    <tr><td>Domain + persistence</td><td><code>EliteRestaurant.Core</code></td><td>EF Core <code>AppDbContext</code>, entities, migrations, business helpers</td></tr>
+    <tr><td>Quality</td><td><code>EliteRestaurant.Tests</code></td><td>xUnit tests targeting Core (and pure logic)</td></tr>
+    <tr><td>Operations</td><td><code>SeedRunner</code>, tools</td><td>Data seeding, ad-hoc maintenance</td></tr>
+  </tbody>
+</table>
+
+<p><strong>Dependency rule:</strong> Core must not reference WPF or ASP.NET. The API and Pro both reference Core — this keeps domain rules portable.</p>
+
+<h2 id="core">3. EliteRestaurant.Core (domain kernel)</h2>
+
+<h3>3.1 Responsibilities</h3>
+<ul class="compact">
+  <li><strong>Entity model</strong> — employees, products, tables, orders, reservations, money transactions, payroll artifacts, shared drafts, tablet sessions.</li>
+  <li><strong>EF Core configuration</strong> — relationships, table names, value conversions (including timestamp handling documented in code comments).</li>
+  <li><strong>Migrations</strong> — schema evolution under <code>Migrations/</code>.</li>
+  <li><strong>Business utilities</strong> — e.g. <code>OrderWorkflow</code>, <code>OrderTotalsHelper</code>, <code>OrderTotalsCalculator</code>, <code>PayrollCalculator</code>, <code>DataReconciler</code>, <code>FinancialTransactionService</code>.</li>
+  <li><strong>Cross-app services</strong> — <code>SharedOrderDraftStore</code> for persisted JSON drafts keyed by employee.</li>
+</ul>
+
+<h3>3.2 Design implications</h3>
+<p>Keeping “how we calculate totals” and “what counts as an active order” in Core means the <strong>WPF admin</strong> and <strong>API tablet path</strong> can align — when they do not, the bug is usually <em>caller misuse</em> or <em>configuration precedence</em>, not duplicated formulas.</p>
+
+<h2 id="postgres">4. PostgreSQL and EF Core</h2>
+
+<h3>4.1 Why PostgreSQL</h3>
+<p>The system targets a <strong>networked database</strong> suitable for multiple clients (desktop + API) and concurrent access. Npgsql is the provider; connection strings are resolved via environment variables and/or persisted desktop settings.</p>
+
+<h3>4.2 Connection resolution</h3>
+<p><code>AppDbContext</code> uses <code>OnConfiguring</code> when options are not pre-supplied (typical desktop/tooling path). The API registers a pre-configured pool using the same connection string helpers — ensuring one consistent source of truth for credentials.</p>
+
+<h3>4.3 Pooling on the API</h3>
+<p><code>Program.cs</code> configures <code>AddDbContextPool&lt;AppDbContext&gt;(..., poolSize: 32)</code> with retry-on-failure for transient network errors. This is the recommended posture for ASP.NET Core apps hitting remote PostgreSQL.</p>
+
+<h3>4.4 Migrations and startup</h3>
+<p><code>DatabaseInitializer.Initialize()</code> is invoked at API startup (and similar patterns exist on desktop) so schema is brought current. Operators should treat migration failures as <strong>blocking</strong> deployment events.</p>
+
+<h3>4.5 Reconciliation</h3>
+<p><code>DataReconciler.ReconcileTableStatusesWithOrders</code> enforces consistency between <code>Orders</code> (active statuses) and <code>Tables.Status</code>, skipping maintenance tables. This is idempotent repair logic — important after partial failures or manual DB edits.</p>
+
+<h2 id="pro">5. EliteRestaurantPro (WPF desktop)</h2>
+
+<h3>5.1 Technology</h3>
+<ul class="compact">
+  <li><strong>.NET 8</strong>, <strong>WPF</strong>, <code>net8.0-windows</code></li>
+  <li><strong>MVVM</strong> — ViewModels inherit base types (e.g. <code>AdminBaseViewModel</code>), views in <code>Views/</code></li>
+  <li><strong>Styling</strong> — shared resources (e.g. <code>Resources/Styles.xaml</code>), per-view XAML</li>
+  <li><strong>Reporting</strong> — QuestPDF and related exports</li>
+</ul>
+
+<h3>5.2 Database bootstrap UX</h3>
+<p>First-run and retry paths use a <strong>WPF dialog</strong> (<code>DatabasePipeSetupDialog</code>) for pipe-separated PostgreSQL fields instead of legacy VB-style input boxes — improving validation, accessibility, and visual consistency.</p>
+
+<h3>5.3 Create-order refactor (application architecture)</h3>
+<p>The create-order screen is a high-complexity feature (open checks, discounts, reservations, tablet flows). The codebase now separates:</p>
+<ul class="compact">
+  <li><code>TableLoadingService</code> — EF queries for tables, menu, reservations, delivery references.</li>
+  <li><code>DraftPersistenceService</code> — JSON payload shape + <code>SharedOrderDraftStore</code> integration.</li>
+  <li><code>OrderSubmissionService</code> — transactional create/append paths, inventory hooks, reconciliation calls.</li>
+  <li><code>OrderTotalsCalculator</code> (Core) — wraps discount parsing, <code>OrderTotalsHelper</code>, and prep estimation.</li>
+</ul>
+<p>The ViewModel (<code>CreateOrderViewModel</code>, ~1,000+ lines) remains large because it still owns <strong>observable state</strong>, <strong>command wiring</strong>, and <strong>user messaging</strong> — acceptable if business rules stay out of it.</p>
+
+<h2 id="api">6. EliteRestaurant.Api (HTTP + hosting)</h2>
+
+<h3>6.1 Role</h3>
+<p>The API is a <strong>LAN-first service</strong>: expose JSON endpoints for tablets, serve static portal files, optional HTTPS via PFX.</p>
+
+<h3>6.2 Key components</h3>
+<ul class="compact">
+  <li><strong>Controllers</strong> — <code>ServerPortalController</code>, <code>TablesController</code>, <code>ReservationsController</code>, <code>HealthController</code>, <code>AuthController</code></li>
+  <li><strong>Security</strong> — <code>TabletAuthService</code> (scoped) validates bearer tokens against <code>TabletSession</code></li>
+  <li><strong>DTOs</strong> — dedicated request/response records under <code>Dtos/</code></li>
+  <li><strong>Swagger</strong> — developer ergonomics; consider gating in production</li>
+</ul>
+
+<h3>6.3 CORS</h3>
+<p>CORS policy requires configured origins — the API fails fast if none are listed. This matches a known set of tablet browser origins rather than open wildcard.</p>
+
+<h3>6.4 Static files</h3>
+<p><code>UseDefaultFiles</code> + <code>UseStaticFiles</code> serves <code>wwwroot/index.html</code> as the Server Portal shell.</p>
+
+<h2 id="portal">7. Server Portal: HTML, CSS, and static delivery</h2>
+
+<h3>7.1 Implementation style</h3>
+<p>The portal is a <strong>single-page style document</strong>: <code>wwwroot/index.html</code> embeds a large <code>&lt;style&gt;</code> block (dark theme, grid layout, responsive breakpoints) and inline behavior in <code>&lt;script&gt;</code>. This trades <strong>long-term modularity</strong> for <strong>deployment simplicity</strong> (no npm build pipeline on the server).</p>
+
+<h3>7.2 CSS architecture (observed)</h3>
+<ul class="compact">
+  <li>CSS variables for <code>color-scheme: dark</code> and typography</li>
+  <li>Layout via <code>display: grid</code> (<code>.layout</code>, <code>.two-cols</code>)</li>
+  <li>Component-like classes: <code>.card</code>, <code>.nav-btn</code>, <code>.list-box</code>, <code>.muted</code></li>
+  <li>Responsive: sidebar collapses under ~1000px width</li>
+</ul>
+
+<h3>7.3 Maintainability notes</h3>
+<p>For senior review: the portal is straightforward to read but will benefit from <strong>extracting CSS/JS into separate files</strong> if multiple engineers edit it concurrently. A bundler is optional; even static file split improves diff clarity.</p>
+
+<h2 id="auth">8. Authentication and sessions</h2>
+
+<p>Tablet login flows create <code>TabletSession</code> rows with tokens and expiry. Validation is per-request via <code>TabletAuthService.Validate</code>. The API controllers check the session before returning sensitive operational data.</p>
+
+<p><strong>Desktop</strong> uses separate concepts (<code>AppSession</code>, admin/staff login flows) appropriate to a thick client.</p>
+
+<h2 id="config">9. Configuration: appsettings, env, IOptions</h2>
+
+<p>Dual sources exist by design:</p>
+<ul class="compact">
+  <li><strong>Desktop / Core file settings</strong> via <code>SettingsManager</code> (business profile, currency pricing, rounding)</li>
+  <li><strong>API appsettings</strong> for infrastructure: CORS origins, LAN HTTPS ports, certificate paths, and <code>CurrencyPricing</code> section bound to <code>IOptions&lt;CurrencyPricingOptions&gt;</code></li>
+</ul>
+<p>Senior maintainers should document <strong>precedence</strong>: e.g. API tax/service rates may override file defaults when explicitly positive — verify in <code>ServerPortalController</code> and keep parity tests.</p>
+
+<h2 id="refactor">10. Refactor narrative: create-order and shared logic</h2>
+
+<h3>10.1 Motivation</h3>
+<p>Large ViewModels complicate testing and encourage duplicated submission logic between surfaces. The refactor moves <strong>deterministic</strong> and <strong>transactional</strong> work into services while preserving WPF bindings in the ViewModel.</p>
+
+<h3>10.2 Cross-cutting Core helpers</h3>
+<ul class="compact">
+  <li><code>OrderDiscountParser</code>, <code>OrderPrepTimeEstimator</code></li>
+  <li><code>OrderSubmissionHelper</code> (assignee resolution, payment field sync, reservation link)</li>
+  <li><code>OrderTotalsHelper</code> / <code>OrderTotalsCalculator</code></li>
+</ul>
+
+<h3>10.3 Pattern to replicate</h3>
+<ol>
+  <li>Identify a ViewModel region with DB access + domain rules.</li>
+  <li>Extract pure logic to Core when it has no UI dependencies.</li>
+  <li>Extract orchestration to a Pro <code>sealed class</code> service when it needs <code>AppSession</code> or WPF-specific messaging boundaries.</li>
+  <li>Leave the ViewModel as state + ICommand + dialog coordination.</li>
+</ol>
+
+<h2 id="tests">11. Test architecture</h2>
+
+<p><code>EliteRestaurant.Tests</code> targets <code>net8.0</code> and references Core only (not WPF), enabling fast CI. InMemory EF tests validate reconciliation behavior without PostgreSQL.</p>
+
+<p><strong>Gap:</strong> API integration tests (WebApplicationFactory) are not described in this repository snapshot — adding them would validate auth + controller contracts.</p>
+
+<h2 id="ops">12. Operational tools and data lifecycle</h2>
+
+<h3>12.1 SeedRunner</h3>
+<p>Destructive reseed: truncates and rebuilds sample data. Guarded by interactive confirmation (restaurant name) with <code>--force</code> for automation. Runbook should state: backups, correct connection string, and least-privilege roles for non-prod.</p>
+
+<h3>12.2 ClearActiveOrders</h3>
+<p>Maintenance utility for operational cleanup — treat like any production-affecting binary.</p>
+
+<h2 id="future">13. Evolution roadmap (suggested)</h2>
+
+<table>
+  <thead>
+    <tr><th>Horizon</th><th>Initiative</th><th>Outcome</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Near</td><td>Expand Core tests around money + inventory</td><td>Lower regression cost</td></tr>
+    <tr><td>Near</td><td>Decompose next-largest ViewModels</td><td>Faster reviews, fewer coupled defects</td></tr>
+    <tr><td>Mid</td><td>API integration test suite</td><td>Contract safety for tablets</td></tr>
+    <tr><td>Mid</td><td>Split Server Portal assets</td><td>Easier front-end maintenance</td></tr>
+    <tr><td>Long</td><td>Optional: extract shared “application services” into a Core or separate library if a third client appears</td><td>Avoid triple maintenance</td></tr>
+  </tbody>
+</table>
+
+<h2 id="wpf-detail">14. WPF UI architecture (patterns)</h2>
+
+<h3>14.1 MVVM boundaries</h3>
+<p>Views (<code>*.xaml</code>) declare layout and bindings; ViewModels expose observable properties and <code>ICommand</code> instances. Navigation is typically mediated by a root shell (<code>MainWindow</code>) and/or delegate callbacks passed into ViewModels (e.g. <code>Action&lt;BaseViewModel&gt; navigate</code> pattern).</p>
+
+<h3>14.2 Resource dictionaries</h3>
+<p>Shared brushes, control styles, and typography should remain in <code>Resources/Styles.xaml</code> (and merged dictionaries) so individual feature views stay focused on layout. Senior reviewers should watch for <strong>inline styles duplicated across views</strong> — a maintenance tax.</p>
+
+<h3>14.3 Dialogs vs. main window</h3>
+<p>Modal flows (database setup, confirmations) use dedicated <code>Window</code> subclasses. This is preferable to OS-specific input boxes for validation, accessibility, and branding consistency.</p>
+
+<h2 id="transactions">15. Transactions and consistency</h2>
+
+<p>Several write paths wrap <code>Database.BeginTransaction()</code> around <code>SaveChanges()</code> plus follow-up reconciliation (e.g. order append/create in <code>OrderSubmissionService</code> and API server portal). The architectural intent is:</p>
+<ul class="compact">
+  <li><strong>Atomic inventory + order lines</strong> where both must succeed or neither.</li>
+  <li><strong>Post-commit reconciliation</strong> to repair derived state (table occupancy).</li>
+</ul>
+<p>Senior reviewers should verify that <strong>new write paths</strong> either participate in an explicit transaction or document why read-committed single calls are sufficient.</p>
+
+<h2 id="deploy">16. Deployment checklist (LAN / single-site)</h2>
+
+<ol>
+  <li><strong>PostgreSQL</strong> — version compatibility with Npgsql/EF; backups enabled (PITR or nightly dump).</li>
+  <li><strong>Migrations</strong> — run via app startup or controlled pipeline; verify migration history on prod clones.</li>
+  <li><strong>API</strong> — configure <code>Cors:AllowedOrigins</code>; place PFX for LAN HTTPS if used; document passwords in secret store.</li>
+  <li><strong>Desktop clients</strong> — distribute connection settings via GPO or installer; DPAPI secrets are per-user/per-machine.</li>
+  <li><strong>Operational tools</strong> — restrict who can run <code>SeedRunner</code>; never store prod connection strings in shared scripts.</li>
+</ol>
+
+<h2 id="glossary">17. Glossary</h2>
+
+<table>
+  <thead>
+    <tr><th>Term</th><th>Meaning</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Core</td><td><code>EliteRestaurant.Core</code> — shared domain + EF + migrations</td></tr>
+    <tr><td>Pro</td><td><code>EliteRestaurantPro</code> — WPF desktop client</td></tr>
+    <tr><td>Server Portal</td><td>Static HTML UI under API <code>wwwroot</code> for server role</td></tr>
+    <tr><td>Open check</td><td>In-progress order on a table eligible for append flows</td></tr>
+    <tr><td>Reconciliation</td><td><code>DataReconciler</code> repairs table occupancy vs active orders</td></tr>
+    <tr><td>DbContext pool</td><td>EF Core pooling of contexts for ASP.NET Core requests</td></tr>
+  </tbody>
+</table>
+
+<p class="meta" style="margin-top:3rem;"><em>End of document — approximately 10+ printed pages at typical memo density (adjust browser print scale).</em></p>
+
+</body>
+</html>

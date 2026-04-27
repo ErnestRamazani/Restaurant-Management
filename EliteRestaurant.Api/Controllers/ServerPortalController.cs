@@ -1,32 +1,43 @@
+// PRICING PRECEDENCE:
+// 1. API appsettings.json (CurrencyPricing section) — explicit operator override when values are positive.
+// 2. App file settings (SettingsManager / app-settings.json) — desktop-configured defaults.
+// Both must remain consistent for matching totals. See PricingPrecedenceTests.
 using EliteRestaurant.Api.Dtos;
 using EliteRestaurant.Api.Security;
-using EliteRestaurantPro.Data;
-using EliteRestaurantPro.Models;
-using EliteRestaurantPro.Utils;
+using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Orders;
+using EliteRestaurant.Core.Utils;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using System.Text.Json;
 
 namespace EliteRestaurant.Api.Controllers;
 
 [ApiController]
 [Route("api/server")]
-public sealed class ServerPortalController(TabletAuthService authService) : ControllerBase
+public sealed class ServerPortalController(
+    TabletAuthService authService,
+    IOptions<CurrencyPricingOptions> currencyPricingOptions,
+    AppDbContext db) : ControllerBase
 {
     [HttpGet("config")]
     public ActionResult<ServerPortalConfigDto> GetConfig()
     {
-        var session = RequireServerSession();
+        var session = RequireServerOrCashierSession();
         if (session is null)
-            return Unauthorized(new { message = "Missing/invalid token or non-server role." });
+            return Unauthorized(new { message = "Missing/invalid token. Requires Server or Cashier portal login." });
 
         var allSettings = SettingsManager.Load();
         var settings = allSettings.CurrencyPricing;
         var business = allSettings.BusinessProfile;
-        var token = Uri.EscapeDataString(session.Token);
-        var logoUrl = $"/api/server/assets/restaurant-logo?token={token}";
-        var employeePhotoUrl = $"/api/server/assets/me-photo?token={token}";
+        var logoUrl = "/api/server/assets/restaurant-logo";
+        var employeePhotoUrl = "/api/server/assets/me-photo";
+        var apiPricing = currencyPricingOptions.Value;
+        var taxPercent = PricingResolver.ResolveTaxRate(apiPricing.TaxPercent, settings.TaxPercent);
+        var servicePercent = PricingResolver.ResolveServicePercent(apiPricing.ServicePercent, settings.ServicePercent);
 
         return Ok(new ServerPortalConfigDto(
             string.IsNullOrWhiteSpace(business.RestaurantName) ? "Elite Restaurant" : business.RestaurantName.Trim(),
@@ -34,15 +45,15 @@ public sealed class ServerPortalController(TabletAuthService authService) : Cont
             employeePhotoUrl,
             settings.DefaultCurrencyDisplayMode,
             settings.UsdToFcRate > 0m ? settings.UsdToFcRate : CurrencyHelper.DefaultFcPerUsd,
-            settings.TaxPercent > 0m ? settings.TaxPercent : 7m,
-            settings.ServicePercent > 0m ? settings.ServicePercent : 10m));
+            taxPercent,
+            servicePercent));
     }
 
     [HttpGet("assets/restaurant-logo")]
-    public IActionResult GetRestaurantLogo([FromQuery] string token)
+    public IActionResult GetRestaurantLogo()
     {
-        var session = authService.Validate(token);
-        if (session is null || !session.Role.Equals("Server", StringComparison.OrdinalIgnoreCase))
+        var session = RequireServerOrCashierSession();
+        if (session is null)
             return Unauthorized();
 
         var logoPath = SettingsManager.Load().BusinessProfile.LogoPath?.Trim() ?? string.Empty;
@@ -50,13 +61,12 @@ public sealed class ServerPortalController(TabletAuthService authService) : Cont
     }
 
     [HttpGet("assets/me-photo")]
-    public IActionResult GetEmployeePhoto([FromQuery] string token)
+    public IActionResult GetEmployeePhoto()
     {
-        var session = authService.Validate(token);
-        if (session is null || !session.Role.Equals("Server", StringComparison.OrdinalIgnoreCase))
+        var session = RequireServerOrCashierSession();
+        if (session is null)
             return Unauthorized();
 
-        using var db = new AppDbContext();
         var photoPath = db.Employees.AsNoTracking()
             .Where(e => e.Id == session.EmployeeId)
             .Select(e => e.ProfileImagePath)
@@ -67,23 +77,40 @@ public sealed class ServerPortalController(TabletAuthService authService) : Cont
     [HttpGet("products")]
     public ActionResult<IReadOnlyList<ServerProductDto>> GetProducts()
     {
-        var session = RequireServerSession();
+        var session = RequireServerOrCashierSession();
         if (session is null)
-            return Unauthorized(new { message = "Missing/invalid token or non-server role." });
+            return Unauthorized(new { message = "Missing/invalid token. Requires Server or Cashier portal login." });
 
-        using var db = new AppDbContext();
-        var rows = db.Products.AsNoTracking()
+        var products = db.Products.AsNoTracking()
             .OrderBy(p => p.Category)
             .ThenBy(p => p.SubCategory)
             .ThenBy(p => p.Name)
-            .Select(p => new ServerProductDto(
+            .Select(p => new
+            {
                 p.Id,
                 p.UniqueId,
                 p.Name,
                 p.Category,
-                string.IsNullOrWhiteSpace(p.SubCategory) ? "General" : p.SubCategory,
-                p.Price))
+                SubCategory = string.IsNullOrWhiteSpace(p.SubCategory) ? "General" : p.SubCategory,
+                p.Price
+            })
             .ToList();
+
+        var productIds = products.Select(p => p.Id).ToList();
+        var ingredientStocks = db.ProductIngredients.AsNoTracking()
+            .Where(pi => productIds.Contains(pi.ProductId))
+            .Select(pi => new { pi.ProductId, pi.Quantity, Stock = pi.InventoryItem!.StockQuantity })
+            .ToList()
+            .GroupBy(x => x.ProductId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var rows = products.Select(p =>
+        {
+            var inStock = true;
+            if (ingredientStocks.TryGetValue(p.Id, out var lines) && lines.Count > 0)
+                inStock = lines.All(x => x.Stock >= x.Quantity);
+            return new ServerProductDto(p.Id, p.UniqueId, p.Name, p.Category, p.SubCategory, p.Price, inStock);
+        }).ToList();
 
         return Ok(rows);
     }
@@ -91,18 +118,22 @@ public sealed class ServerPortalController(TabletAuthService authService) : Cont
     [HttpGet("open-check")]
     public ActionResult GetOpenCheck([FromQuery] int tableId)
     {
-        var session = RequireServerSession();
+        var session = RequireServerOrCashierSession();
         if (session is null)
-            return Unauthorized(new { message = "Missing/invalid token or non-server role." });
+            return Unauthorized(new { message = "Missing/invalid token. Requires Server or Cashier portal login." });
         if (tableId <= 0)
             return BadRequest(new { message = "tableId is required." });
 
-        using var db = new AppDbContext();
         var table = db.Tables.AsNoTracking().SingleOrDefault(t => t.Id == tableId);
         if (table is null)
             return NotFound(new { message = "Table not found." });
-        if (table.AssignedServerId != session.EmployeeId)
-            return BadRequest(new { message = "This table is not assigned to the logged-in server." });
+        if (session.Role.Equals("Server", StringComparison.OrdinalIgnoreCase))
+        {
+            if (table.AssignedServerId != session.EmployeeId)
+                return BadRequest(new { message = "This table is not assigned to the logged-in server." });
+        }
+        else if (table.AssignedServerId is null)
+            return BadRequest(new { message = "Table must have an assigned server for open checks." });
 
         var open = db.Orders.AsNoTracking()
             .WhereOpenCheckForTable(tableId)
@@ -124,15 +155,16 @@ public sealed class ServerPortalController(TabletAuthService authService) : Cont
     }
 
     [HttpGet("drafts")]
-    public ActionResult<IReadOnlyList<ServerDraftDto>> GetDrafts()
+    public ActionResult<IReadOnlyList<ServerDraftDto>> GetDrafts([FromQuery] int tableId = 0)
     {
-        var session = RequireServerSession();
+        var session = RequireServerOrCashierSession();
         if (session is null)
-            return Unauthorized(new { message = "Missing/invalid token or non-server role." });
+            return Unauthorized(new { message = "Missing/invalid token. Requires Server or Cashier portal login." });
 
+        var restrict = session.Role.Equals("Server", StringComparison.OrdinalIgnoreCase);
         try
         {
-            var rows = SharedOrderDraftStore.ListServerDrafts(session.EmployeeId)
+            var rows = SharedOrderDraftStore.ListServerDrafts(session.EmployeeId, tableId, restrict)
                 .Select(d => new ServerDraftDto(d.Id, d.Label, d.PayloadJson, d.UpdatedAtUtc))
                 .ToList();
             return Ok(rows);
@@ -146,9 +178,9 @@ public sealed class ServerPortalController(TabletAuthService authService) : Cont
     [HttpPost("drafts")]
     public ActionResult<ServerDraftDto> SaveDraft([FromBody] ServerSaveDraftRequest request)
     {
-        var session = RequireServerSession();
+        var session = RequireServerOrCashierSession();
         if (session is null)
-            return Unauthorized(new { message = "Missing/invalid token or non-server role." });
+            return Unauthorized(new { message = "Missing/invalid token. Requires Server or Cashier portal login." });
 
         var snapshot = request.SnapshotJson?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(snapshot))
@@ -165,11 +197,13 @@ public sealed class ServerPortalController(TabletAuthService authService) : Cont
 
         try
         {
+            var tableId = SharedOrderDraftStore.ParseTableIdFromSnapshotJson(snapshot);
             var saved = SharedOrderDraftStore.SaveServerDraft(
                 session.EmployeeId,
                 session.Name,
                 request.Label ?? string.Empty,
-                snapshot);
+                snapshot,
+                tableId);
 
             return Ok(new ServerDraftDto(saved.Id, saved.Label, saved.PayloadJson, saved.UpdatedAtUtc));
         }
@@ -180,15 +214,16 @@ public sealed class ServerPortalController(TabletAuthService authService) : Cont
     }
 
     [HttpDelete("drafts/{draftId}")]
-    public ActionResult DeleteDraft(string draftId)
+    public ActionResult DeleteDraft(string draftId, [FromQuery] int tableId = 0)
     {
-        var session = RequireServerSession();
+        var session = RequireServerOrCashierSession();
         if (session is null)
-            return Unauthorized(new { message = "Missing/invalid token or non-server role." });
+            return Unauthorized(new { message = "Missing/invalid token. Requires Server or Cashier portal login." });
 
+        var restrict = session.Role.Equals("Server", StringComparison.OrdinalIgnoreCase);
         try
         {
-            var deleted = SharedOrderDraftStore.DeleteServerDraft(session.EmployeeId, draftId);
+            var deleted = SharedOrderDraftStore.DeleteServerDraft(session.EmployeeId, draftId, tableId, restrict);
             if (!deleted)
                 return NotFound(new { message = "Draft not found for this server." });
 
@@ -203,9 +238,9 @@ public sealed class ServerPortalController(TabletAuthService authService) : Cont
     [HttpPost("orders")]
     public ActionResult<ServerCreateOrderResponse> CreateOrAppendOrder([FromBody] ServerCreateOrderRequest request)
     {
-        var session = RequireServerSession();
+        var session = RequireServerOrCashierSession();
         if (session is null)
-            return Unauthorized(new { message = "Missing/invalid token or non-server role." });
+            return Unauthorized(new { message = "Missing/invalid token. Requires Server or Cashier portal login." });
 
         if (request.TableId <= 0)
             return BadRequest(new { message = "TableId is required." });
@@ -242,14 +277,29 @@ public sealed class ServerPortalController(TabletAuthService authService) : Cont
         if (normalizedLines.Count == 0)
             return BadRequest(new { message = "No valid lines provided." });
 
-        using var db = new AppDbContext();
         var table = db.Tables.Include(t => t.AssignedServer).SingleOrDefault(t => t.Id == request.TableId);
         if (table is null)
             return NotFound(new { message = "Table not found." });
-        if (table.AssignedServerId != session.EmployeeId)
-            return BadRequest(new { message = "This table is not assigned to the logged-in server." });
+        if (session.Role.Equals("Server", StringComparison.OrdinalIgnoreCase))
+        {
+            if (table.AssignedServerId != session.EmployeeId)
+                return BadRequest(new { message = "This table is not assigned to the logged-in server." });
+        }
+        else
+        {
+            if (table.AssignedServerId is null || table.AssignedServer is null)
+                return BadRequest(new { message = "Table must have an assigned server before placing orders." });
+        }
+
         if (string.Equals(table.Status, "Maintenance", StringComparison.OrdinalIgnoreCase))
             return BadRequest(new { message = "Maintenance table cannot receive orders." });
+
+        var ticketServerId = session.Role.Equals("Server", StringComparison.OrdinalIgnoreCase)
+            ? session.EmployeeId
+            : table.AssignedServerId!.Value;
+        var ticketServerName = session.Role.Equals("Server", StringComparison.OrdinalIgnoreCase)
+            ? session.Name
+            : table.AssignedServer!.Name;
 
         var productIds = normalizedLines.Select(l => l.ProductId).Distinct().ToList();
         var products = db.Products.AsNoTracking().Where(p => productIds.Contains(p.Id)).ToDictionary(p => p.Id, p => p);
@@ -266,6 +316,31 @@ public sealed class ServerPortalController(TabletAuthService authService) : Cont
             .FirstOrDefault();
 
         var newItems = BuildOrderItems(normalizedLines, products, activeStaff);
+
+        IReadOnlyList<(int ProductId, int Quantity)> linesToValidate;
+        OrderInventoryDeduction.InventoryValidationKind validationKind;
+        if (request.AppendToOpenCheck && openOrder is not null)
+        {
+            if (OrderWorkflow.IsPendingCashier(openOrder.Status))
+            {
+                linesToValidate = MergeOrderItemsWithNewLines(openOrder.Items, normalizedLines);
+                validationKind = OrderInventoryDeduction.InventoryValidationKind.FullOrder;
+            }
+            else
+            {
+                linesToValidate = normalizedLines.Select(l => (l.ProductId, l.Quantity)).ToList();
+                validationKind = OrderInventoryDeduction.InventoryValidationKind.AdditionalLinesOnly;
+            }
+        }
+        else
+        {
+            linesToValidate = normalizedLines.Select(l => (l.ProductId, l.Quantity)).ToList();
+            validationKind = OrderInventoryDeduction.InventoryValidationKind.FullOrder;
+        }
+
+        var inventoryError = OrderInventoryDeduction.TryValidateInventoryForProductQuantities(db, linesToValidate, validationKind);
+        if (inventoryError is not null)
+            return BadRequest(new { message = inventoryError });
 
         if (request.AppendToOpenCheck && openOrder is not null)
         {
@@ -292,11 +367,13 @@ public sealed class ServerPortalController(TabletAuthService authService) : Cont
                 openOrder.Status = "In Kitchen";
             }
 
-            if (discountMode.Equals("None", StringComparison.OrdinalIgnoreCase))
-            {
-                // preserve existing discount setup when appending unless caller explicitly sets a mode
-            }
-            else
+            // Preserve existing discount when appending unless caller sends a meaningful non-None discount.
+            var explicitDiscount = !discountMode.Equals("None", StringComparison.OrdinalIgnoreCase)
+                && (discountMode.Equals("Percent", StringComparison.OrdinalIgnoreCase)
+                    ? discountValue > 0m && discountValue <= 100m
+                    : discountMode.Equals("Usd", StringComparison.OrdinalIgnoreCase) && discountValue > 0m);
+
+            if (explicitDiscount)
             {
                 openOrder.DiscountMode = discountMode;
                 openOrder.DiscountValue = discountValue;
@@ -304,10 +381,9 @@ public sealed class ServerPortalController(TabletAuthService authService) : Cont
             openOrder.OrderSource = isDelivery ? "Delivery" : "WalkIn";
             openOrder.ReservationGuestName = isDelivery ? request.SourceReference.Trim() : string.Empty;
             openOrder.PaymentCurrencyCode = CurrencyHelper.NormalizeCurrencyCode(request.PaymentCurrencyCode);
-            SyncPaymentFields(openOrder, products);
+            OrderSubmissionHelper.SyncPaymentFields(openOrder, products);
             table.Status = "Occupied";
-            db.SaveChanges();
-            AppDbContext.ReconcileTableStatusesWithOrders(db);
+            DataReconciler.ReconcileTableStatusesWithOrders(db);
             db.SaveChanges();
 
             var code = string.IsNullOrWhiteSpace(openOrder.UniqueId) ? $"#{openOrder.Id:000}" : openOrder.UniqueId;
@@ -325,8 +401,8 @@ public sealed class ServerPortalController(TabletAuthService authService) : Cont
             TableId = table.Id,
             TableCode = $"Table {table.TableNumber}",
             TableName = string.IsNullOrWhiteSpace(table.Name) ? $"Table {table.TableNumber}" : table.Name,
-            ServerId = session.EmployeeId,
-            ServerName = session.Name,
+            ServerId = ticketServerId,
+            ServerName = ticketServerName,
             Status = OrderWorkflow.PendingCashier,
             CustomerNotes = (request.CustomerNotes ?? string.Empty).Trim(),
             AllergyNotes = (request.AllergyNotes ?? string.Empty).Trim(),
@@ -341,11 +417,10 @@ public sealed class ServerPortalController(TabletAuthService authService) : Cont
         foreach (var item in newItems)
             order.Items.Add(item);
 
-        SyncPaymentFields(order, products);
+        OrderSubmissionHelper.SyncPaymentFields(order, products);
         db.Orders.Add(order);
         table.Status = "Occupied";
-        db.SaveChanges();
-        AppDbContext.ReconcileTableStatusesWithOrders(db);
+        DataReconciler.ReconcileTableStatusesWithOrders(db);
         db.SaveChanges();
 
         return Ok(new ServerCreateOrderResponse(
@@ -363,7 +438,6 @@ public sealed class ServerPortalController(TabletAuthService authService) : Cont
         if (session is null)
             return Unauthorized(new { message = "Missing/invalid token or non-server role." });
 
-        using var db = new AppDbContext();
         var orders = db.Orders
             .AsNoTracking()
             .Include(o => o.Items)
@@ -404,7 +478,6 @@ public sealed class ServerPortalController(TabletAuthService authService) : Cont
         if (orderId <= 0)
             return BadRequest(new { message = "orderId is required." });
 
-        using var db = new AppDbContext();
         var order = db.Orders.SingleOrDefault(o => o.Id == orderId && o.ServerId == session.EmployeeId);
         if (order is null)
             return NotFound(new { message = "Order not found for this server." });
@@ -412,8 +485,7 @@ public sealed class ServerPortalController(TabletAuthService authService) : Cont
             return BadRequest(new { message = "Only Ready orders can be marked Served." });
 
         order.Status = OrderWorkflow.Served;
-        db.SaveChanges();
-        AppDbContext.ReconcileTableStatusesWithOrders(db);
+        DataReconciler.ReconcileTableStatusesWithOrders(db);
         db.SaveChanges();
 
         var orderCode = string.IsNullOrWhiteSpace(order.UniqueId) ? $"#{order.Id:000}" : order.UniqueId;
@@ -434,6 +506,18 @@ public sealed class ServerPortalController(TabletAuthService authService) : Cont
         return session.Role.Equals("Server", StringComparison.OrdinalIgnoreCase) ? session : null;
     }
 
+    private AuthenticatedStaffSession? RequireServerOrCashierSession()
+    {
+        var token = Request.ReadBearerToken();
+        var session = authService.Validate(token);
+        if (session is null)
+            return null;
+        if (session.Role.Equals("Server", StringComparison.OrdinalIgnoreCase)
+            || session.Role.Equals("Cashier", StringComparison.OrdinalIgnoreCase))
+            return session;
+        return null;
+    }
+
     private IActionResult ServeImageFromPath(string absolutePath)
     {
         if (string.IsNullOrWhiteSpace(absolutePath) || !System.IO.File.Exists(absolutePath))
@@ -447,6 +531,20 @@ public sealed class ServerPortalController(TabletAuthService authService) : Cont
         return File(bytes, contentType);
     }
 
+    private static List<(int ProductId, int Quantity)> MergeOrderItemsWithNewLines(
+        ICollection<OrderItem> existing,
+        IReadOnlyList<ServerOrderLineRequest> additional)
+    {
+        var map = existing.GroupBy(i => i.ProductId).ToDictionary(g => g.Key, g => g.Sum(i => i.Quantity));
+        foreach (var l in additional)
+        {
+            if (!map.TryAdd(l.ProductId, l.Quantity))
+                map[l.ProductId] += l.Quantity;
+        }
+
+        return map.Select(kv => (kv.Key, kv.Value)).ToList();
+    }
+
     private static List<OrderItem> BuildOrderItems(
         IReadOnlyList<ServerOrderLineRequest> lines,
         IReadOnlyDictionary<int, Product> products,
@@ -455,7 +553,7 @@ public sealed class ServerPortalController(TabletAuthService authService) : Cont
         var items = new List<OrderItem>(lines.Count);
         foreach (var line in lines)
         {
-            var assignee = ResolveAssignee(products, activeStaff, line.ProductId);
+            var assignee = OrderSubmissionHelper.ResolveAssignee(products, activeStaff, line.ProductId);
             items.Add(new OrderItem
             {
                 ProductId = line.ProductId,
@@ -469,41 +567,4 @@ public sealed class ServerPortalController(TabletAuthService authService) : Cont
         return items;
     }
 
-    private static (int? EmployeeId, string Role, string Name) ResolveAssignee(
-        IReadOnlyDictionary<int, Product> products,
-        IReadOnlyList<Employee> activeStaff,
-        int productId)
-    {
-        if (!products.TryGetValue(productId, out var product))
-            return (null, "Unknown", "Unassigned");
-
-        if (string.Equals(product.Category, "Drink", StringComparison.OrdinalIgnoreCase))
-        {
-            var barman = activeStaff.FirstOrDefault(e =>
-                e.Role.Equals("Barman", StringComparison.OrdinalIgnoreCase) ||
-                e.Role.Equals("Bartender", StringComparison.OrdinalIgnoreCase));
-            return barman is null ? (null, "Barman", "Unassigned Barman") : (barman.Id, "Barman", barman.Name);
-        }
-
-        var chef = activeStaff.FirstOrDefault(e => e.Role.Equals("Chef", StringComparison.OrdinalIgnoreCase));
-        return chef is null ? (null, "Chef", "Unassigned Chef") : (chef.Id, "Chef", chef.Name);
-    }
-
-    private static void SyncPaymentFields(OrderRecord order, IReadOnlyDictionary<int, Product> products)
-    {
-        var subtotal = order.Items.Sum(i => (products.TryGetValue(i.ProductId, out var p) ? p.Price : 0m) * i.Quantity);
-        var totals = OrderTotalsHelper.ComputeTotals(subtotal, order.DiscountMode, order.DiscountValue);
-        var grand = totals.GrandTotal;
-        order.DiscountAmountUsd = totals.DiscountApplied;
-        order.PaymentAmountUsd = Math.Round(grand, 2);
-        order.PaymentAmountFc = CurrencyHelper.ConvertUsdToFc(grand);
-        order.PaymentAmount = string.Equals(order.PaymentCurrencyCode, CurrencyHelper.CongoleseFranc, StringComparison.OrdinalIgnoreCase)
-            ? order.PaymentAmountFc
-            : order.PaymentAmountUsd;
-        order.CustomerPaidUsd = 0m;
-        order.CustomerPaidFc = 0m;
-        order.ChangeGivenUsd = 0m;
-        order.ChangeGivenFc = 0m;
-        order.ExchangeRateUsed = CurrencyHelper.FcPerUsd;
-    }
 }

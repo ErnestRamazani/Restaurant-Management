@@ -1,13 +1,13 @@
-using System.Collections.Concurrent;
-using EliteRestaurantPro.Data;
+using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Staff;
 using Microsoft.EntityFrameworkCore;
 
 namespace EliteRestaurant.Api.Security;
 
-public sealed class TabletAuthService
+public sealed class TabletAuthService(AppDbContext db)
 {
     private static readonly TimeSpan SessionDuration = TimeSpan.FromHours(12);
-    private readonly ConcurrentDictionary<string, AuthenticatedStaffSession> _sessions = new(StringComparer.Ordinal);
 
     public AuthenticatedStaffSession? Login(string staffId, string pin, string portal)
     {
@@ -17,34 +17,35 @@ public sealed class TabletAuthService
         if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(normalizedPin))
             return null;
 
-        using var db = new AppDbContext();
-        var candidates = db.Employees.AsNoTracking()
-            .Where(e => e.EmploymentStatus == "Active")
-            .AsEnumerable()
-            .Where(e => string.Equals((e.PinCode ?? string.Empty).Trim(), normalizedPin, StringComparison.Ordinal))
-            .Where(e =>
-                (!string.IsNullOrWhiteSpace(e.SignInId) &&
-                 e.SignInId.Trim().Equals(id, StringComparison.OrdinalIgnoreCase))
-                || (e.UniqueId ?? string.Empty).Trim().Equals(id, StringComparison.OrdinalIgnoreCase))
+        var idMatches = StaffPortalAuthentication
+            .QueryActiveEmployeesMatchingStaffId(db.Employees.AsNoTracking(), id)
             .ToList();
-
-        var employee = ResolvePortalCandidate(candidates, normalizedPortal);
+        var candidates = StaffPortalAuthentication.FilterPinMatches(idMatches, normalizedPin);
+        var employee = StaffPortalAuthentication.ResolvePortalCandidate(candidates, normalizedPortal);
         if (employee is null)
             return null;
 
-        var token = Guid.NewGuid().ToString("N");
-        var session = new AuthenticatedStaffSession(
-            Token: token,
-            EmployeeId: employee.Id,
-            EmployeeUniqueId: employee.UniqueId,
-            Name: employee.Name,
-            Role: employee.Role,
-            SignInId: employee.SignInId,
-            ExpiresAtUtc: DateTime.UtcNow.Add(SessionDuration));
+        CleanupExpiredSessions(db);
 
-        _sessions[token] = session;
-        CleanupExpiredSessions();
-        return session;
+        var token = Guid.NewGuid().ToString("N");
+        var expiresAtUtc = DateTime.UtcNow.Add(SessionDuration);
+        var canonicalPortal = StaffPortalAuthentication.CanonicalPortalForEmployee(employee);
+
+        db.TabletSessions.Add(new TabletSession
+        {
+            Token = token,
+            EmployeeId = employee.Id,
+            Portal = canonicalPortal,
+            EmployeeUniqueId = employee.UniqueId ?? string.Empty,
+            Name = employee.Name,
+            Role = employee.Role,
+            SignInId = employee.SignInId ?? string.Empty,
+            ExpiresAtUtc = expiresAtUtc,
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        db.SaveChanges();
+
+        return ToAuthenticatedSession(token, employee, canonicalPortal, expiresAtUtc);
     }
 
     public AuthenticatedStaffSession? Validate(string? token)
@@ -52,57 +53,47 @@ public sealed class TabletAuthService
         if (string.IsNullOrWhiteSpace(token))
             return null;
 
-        if (!_sessions.TryGetValue(token.Trim(), out var session))
+        var t = token.Trim();
+        var row = db.TabletSessions.FirstOrDefault(s => s.Token == t);
+        if (row is null)
             return null;
 
-        if (session.ExpiresAtUtc <= DateTime.UtcNow)
+        if (row.ExpiresAtUtc <= DateTime.UtcNow)
         {
-            _sessions.TryRemove(session.Token, out _);
+            db.TabletSessions.Remove(row);
+            db.SaveChanges();
             return null;
         }
 
-        return session;
+        return new AuthenticatedStaffSession(
+            row.Token,
+            row.EmployeeId,
+            row.EmployeeUniqueId,
+            row.Name,
+            row.Role,
+            row.SignInId,
+            row.Portal,
+            row.ExpiresAtUtc);
     }
 
-    private void CleanupExpiredSessions()
+    private static AuthenticatedStaffSession ToAuthenticatedSession(
+        string token,
+        Employee employee,
+        string canonicalPortal,
+        DateTime expiresAtUtc) =>
+        new(
+            token,
+            employee.Id,
+            employee.UniqueId ?? string.Empty,
+            employee.Name,
+            employee.Role,
+            employee.SignInId ?? string.Empty,
+            canonicalPortal,
+            expiresAtUtc);
+
+    private static void CleanupExpiredSessions(AppDbContext db)
     {
-        var now = DateTime.UtcNow;
-        foreach (var pair in _sessions)
-        {
-            if (pair.Value.ExpiresAtUtc <= now)
-                _sessions.TryRemove(pair.Key, out _);
-        }
-    }
-
-    private static EliteRestaurantPro.Models.Employee? ResolvePortalCandidate(
-        IReadOnlyList<EliteRestaurantPro.Models.Employee> candidates,
-        string portal)
-    {
-        if (string.Equals(portal, "Cashier", StringComparison.OrdinalIgnoreCase))
-        {
-            return candidates.FirstOrDefault(e =>
-                e.Role.Equals("Cashier", StringComparison.OrdinalIgnoreCase));
-        }
-
-        if (string.Equals(portal, "KitchenBar", StringComparison.OrdinalIgnoreCase))
-        {
-            return candidates.FirstOrDefault(e => IsKitchenBarRole(e.Role));
-        }
-
-        // Default to Server portal.
-        return candidates.FirstOrDefault(e =>
-            e.Role.Equals("Server", StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static bool IsKitchenBarRole(string role)
-    {
-        if (string.IsNullOrWhiteSpace(role))
-            return false;
-
-        var normalized = role.Trim();
-        return normalized.Equals("Chef", StringComparison.OrdinalIgnoreCase)
-               || normalized.Equals("Barman", StringComparison.OrdinalIgnoreCase)
-               || normalized.Equals("Bartender", StringComparison.OrdinalIgnoreCase)
-               || normalized.Equals("Sous Chef", StringComparison.OrdinalIgnoreCase);
+        var utcNow = DateTime.UtcNow;
+        db.TabletSessions.Where(s => s.ExpiresAtUtc <= utcNow).ExecuteDelete();
     }
 }

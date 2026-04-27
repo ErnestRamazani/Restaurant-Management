@@ -93,6 +93,7 @@
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
@@ -121,7 +122,14 @@
                             </Grid>
                         </Border>
 
-                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                        <TextBox Grid.Row="1"
+                                 Margin="12,0,12,8"
+                                 Padding="10,8"
+                                 Text="{Binding ActiveOrdersSearchFilter, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource EliteTextBox}"
+                                 ToolTip="Search by order #, table, server, items, or status"/>
+
+                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
                                       Style="{StaticResource EliteScrollViewer}" Padding="12,8">
                             <ItemsControl ItemsSource="{Binding ActiveOrders}">
                                 <ItemsControl.ItemTemplate>
@@ -207,6 +215,7 @@
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
@@ -235,7 +244,14 @@
                             </Grid>
                         </Border>
 
-                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                        <TextBox Grid.Row="1"
+                                 Margin="12,0,12,8"
+                                 Padding="10,8"
+                                 Text="{Binding PastOrdersSearchFilter, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource EliteTextBox}"
+                                 ToolTip="Search by order #, table, server, items, or status"/>
+
+                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
                                       Style="{StaticResource EliteScrollViewer}" Padding="12,8">
                             <ItemsControl ItemsSource="{Binding PastOrderDayGroups}">
                                 <ItemsControl.ItemTemplate>

@@ -6,7 +6,8 @@ public sealed record ServerProductDto(
     string Name,
     string Category,
     string SubCategory,
-    decimal Price);
+    decimal Price,
+    bool InStock);
 
 public sealed record ServerOrderLineRequest(int ProductId, int Quantity);
 

@@ -3,9 +3,9 @@ using System.Globalization;
 using System.Windows.Input;
 using System.Windows;
 using System.Windows.Threading;
-using EliteRestaurantPro.Data;
-using EliteRestaurantPro.Models;
-using EliteRestaurantPro.Utils;
+using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Utils;
 using Microsoft.EntityFrameworkCore;
 
 namespace EliteRestaurantPro.ViewModels;
@@ -227,6 +227,7 @@ public class AdminDashboardViewModel : AdminBaseViewModel
                 }
 
                 var today = DateTime.Today;
+                var (attendanceTodayStartUtc, attendanceTodayEndExclusiveUtc) = AttendanceCalendar.DayRangeUtc(today);
                 var tomorrow = today.AddDays(1);
                 var yesterday = today.AddDays(-1);
                 var activeStatuses = new[]
@@ -302,7 +303,8 @@ public class AdminDashboardViewModel : AdminBaseViewModel
                 var inKitchenCount = allOrders.Count(o => string.Equals(o.Status, "In Kitchen", StringComparison.OrdinalIgnoreCase));
                 var lowStockAlerts = db.InventoryItems.AsNoTracking().Count(i => i.StockQuantity <= 10);
                 var totalActiveEmployees = db.Employees.AsNoTracking().Count(e => e.EmploymentStatus == "Active");
-                var clockedInCount = db.EmployeeAttendances.AsNoTracking().Count(a => a.WorkDate == today && a.ClockInTime != null);
+                var clockedInCount = db.EmployeeAttendances.AsNoTracking().Count(a =>
+                    a.WorkDate >= attendanceTodayStartUtc && a.WorkDate < attendanceTodayEndExclusiveUtc && a.ClockInTime != null);
                 var occupiedTables = db.Tables.AsNoTracking().Count(t => t.Status == "Occupied");
                 var totalTables = db.Tables.AsNoTracking().Count();
 
@@ -376,14 +378,14 @@ public class AdminDashboardViewModel : AdminBaseViewModel
 
                 var todayAttendance = db.EmployeeAttendances
                     .AsNoTracking()
-                    .Where(a => a.WorkDate == today)
+                    .Where(a => a.WorkDate >= attendanceTodayStartUtc && a.WorkDate < attendanceTodayEndExclusiveUtc)
                     .ToDictionary(a => a.EmployeeId, a => a);
 
                 var staffPresence = db.Employees
                     .AsNoTracking()
                     .Where(e => e.EmploymentStatus == "Active")
                     .OrderBy(e => e.Name)
-                    .AsEnumerable()
+                    .ToList()
                     .Select(emp => new DashboardStaffPresenceItem
                     {
                         Name = emp.Name,
@@ -457,7 +459,8 @@ public class AdminDashboardViewModel : AdminBaseViewModel
                 var attendanceItems = db.EmployeeAttendances
                     .AsNoTracking()
                     .Include(a => a.Employee)
-                    .Where(a => a.WorkDate == today && a.ClockInTime != null)
+                    .Where(a =>
+                        a.WorkDate >= attendanceTodayStartUtc && a.WorkDate < attendanceTodayEndExclusiveUtc && a.ClockInTime != null)
                     .OrderBy(a => a.ClockInTime)
                     .Select(row => new DashboardDrilldownItem
                     {
@@ -549,7 +552,7 @@ public class AdminDashboardViewModel : AdminBaseViewModel
             await Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 DatabaseConnected = snapshot.dbOk;
-                DatabaseStatusText = snapshot.dbOk ? "Local database · Connected" : "Local database · Offline";
+                DatabaseStatusText = snapshot.dbOk ? "PostgreSQL · Connected" : "PostgreSQL · Offline";
 
                 ShowSalaryPayrollWarning = snapshot.salaryWarningShow;
                 SalaryPayrollWarningText = snapshot.salaryWarningMessage;

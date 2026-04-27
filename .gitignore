@@ -64,6 +64,15 @@ BenchmarkDotNet.Artifacts/
 project.lock.json
 project.fragment.lock.json
 artifacts/
+.build-check/
+
+# Local coverage scratch (not produced by default test run)
+coverage-tmp/
+coverage-tmp2/
+
+# LAN HTTPS exports (never commit)
+EliteRestaurant.Api/certs/*.pfx
+EliteRestaurant.Api/certs/*.p12
 
 # Tye
 .tye/
@@ -290,6 +299,10 @@ FakesAssemblies/
 # Node.js Tools for Visual Studio
 .ntvs_analysis.dat
 node_modules/
+
+# Customer menu (Vite) — keep node_modules and any local dist out of git
+elite-menu/node_modules/
+elite-menu/dist/
 
 # Visual Studio 6 build log
 *.plg

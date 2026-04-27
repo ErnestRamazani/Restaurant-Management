@@ -205,7 +205,9 @@
                 <Border Style="{StaticResource DialogCard}"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
-                        Width="440">
+                        Width="520"
+                        MaxHeight="640">
+                    <ScrollViewer MaxHeight="560" VerticalScrollBarVisibility="Auto" Style="{StaticResource EliteScrollViewer}">
                     <StackPanel>
                         <TextBlock Text="{Binding DialogTitle}"
                                    Style="{StaticResource HeadingMedium}"
@@ -230,6 +232,25 @@
                         <TextBlock Text="PRICE" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
                         <TextBox Text="{Binding PriceText, UpdateSourceTrigger=PropertyChanged}"
                                  Style="{StaticResource EliteTextBox}"/>
+
+                        <TextBlock Text="DESCRIPTION (CUSTOMER MENU)" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                        <TextBox Text="{Binding ProductDescription, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource EliteTextBox}"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"
+                                 MinHeight="72"
+                                 MaxLength="350"
+                                 VerticalScrollBarVisibility="Auto"/>
+                        <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,4,0,0"
+                                   Text="{Binding DescriptionCharCountRemaining, StringFormat=Characters remaining: {0}}"/>
+
+                        <TextBlock Text="COMPOSITION (CUSTOMER, COMMA-SEPARATED)" Style="{StaticResource HeadingSmall}" Margin="0,12,0,8"/>
+                        <TextBox Text="{Binding ProductComposition, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource EliteTextBox}"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"
+                                 MinHeight="56"
+                                 VerticalScrollBarVisibility="Auto"/>
 
                         <TextBlock Text="INGREDIENTS FROM INVENTORY"
                                    Style="{StaticResource HeadingSmall}"
@@ -291,6 +312,7 @@
                                     Style="{StaticResource GoldPrimaryButton}"/>
                         </Grid>
                     </StackPanel>
+                    </ScrollViewer>
                 </Border>
             </Grid>
         </Grid>

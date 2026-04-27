@@ -11,12 +11,11 @@
             <Setter Property="Margin" Value="0,0,10,10"/>
         </Style>
         <Style x:Key="SalaryConfirmButtonActive" TargetType="Button" BasedOn="{StaticResource GoldPrimaryButton}">
-            <Setter Property="Content" Value="Confirm payroll"/>
+            <Setter Property="Content" Value="{Binding PayrollActionLabel}"/>
             <Setter Property="Padding" Value="18,10"/>
             <Setter Property="MinWidth" Value="160"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding AlreadyPaid}" Value="True">
-                    <Setter Property="Content" Value="Confirmed"/>
                     <Setter Property="IsEnabled" Value="False"/>
                     <Setter Property="Background" Value="{StaticResource StatGreenBrush}"/>
                     <Setter Property="Foreground" Value="#FFF1FFF4"/>
@@ -35,7 +34,7 @@
             </Style.Triggers>
         </Style>
         <Style x:Key="SalaryConfirmButtonTable" TargetType="Button" BasedOn="{StaticResource SalaryConfirmButtonActive}">
-            <Setter Property="Content" Value="Confirm"/>
+            <Setter Property="Content" Value="{Binding PayrollActionLabelShort}"/>
             <Setter Property="MinWidth" Value="96"/>
             <Setter Property="Padding" Value="8,4"/>
             <Setter Property="FontSize" Value="12"/>
@@ -172,7 +171,7 @@
                                 FontSize="14"
                                 VerticalAlignment="Center"/>
                     </WrapPanel>
-                    <Button Content="Confirm all unpaid"
+                    <Button Content="Pay all remaining balances"
                             Command="{Binding ConfirmAllPayrollCommand}"
                             Style="{StaticResource GoldPrimaryButton}"
                             HorizontalAlignment="Left"
@@ -260,31 +259,46 @@
                                                         <Border CornerRadius="8" Padding="10,5" Margin="0,0,8,0">
                                                             <Border.Style>
                                                                 <Style TargetType="Border">
-                                                                    <Setter Property="Background" Value="#224CAF50"/>
+                                                                    <Setter Property="Background" Value="#33D4AF37"/>
                                                                     <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding AlreadyPaid}" Value="False">
-                                                                            <Setter Property="Background" Value="#33D4AF37"/>
+                                                                        <DataTrigger Binding="{Binding AlreadyPaid}" Value="True">
+                                                                            <Setter Property="Background" Value="#224CAF50"/>
                                                                         </DataTrigger>
+                                                                        <MultiDataTrigger>
+                                                                            <MultiDataTrigger.Conditions>
+                                                                                <Condition Binding="{Binding AlreadyPaid}" Value="False"/>
+                                                                                <Condition Binding="{Binding IsPartiallyPaid}" Value="True"/>
+                                                                            </MultiDataTrigger.Conditions>
+                                                                            <Setter Property="Background" Value="#33E65100"/>
+                                                                        </MultiDataTrigger>
                                                                     </Style.Triggers>
                                                                 </Style>
                                                             </Border.Style>
                                                             <TextBlock FontSize="13">
                                                                 <TextBlock.Style>
                                                                     <Style TargetType="TextBlock">
-                                                                        <Setter Property="Foreground" Value="{StaticResource StatGreenBrush}"/>
-                                                                        <Setter Property="Text" Value="Paid"/>
+                                                                        <Setter Property="Foreground" Value="{StaticResource GoldAccentBrush}"/>
+                                                                        <Setter Property="Text" Value="Pending pay"/>
                                                                         <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding AlreadyPaid}" Value="False">
-                                                                                <Setter Property="Foreground" Value="{StaticResource GoldAccentBrush}"/>
-                                                                                <Setter Property="Text" Value="Pending pay"/>
+                                                                            <DataTrigger Binding="{Binding AlreadyPaid}" Value="True">
+                                                                                <Setter Property="Foreground" Value="{StaticResource StatGreenBrush}"/>
+                                                                                <Setter Property="Text" Value="Paid in full"/>
                                                                             </DataTrigger>
+                                                                            <MultiDataTrigger>
+                                                                                <MultiDataTrigger.Conditions>
+                                                                                    <Condition Binding="{Binding AlreadyPaid}" Value="False"/>
+                                                                                    <Condition Binding="{Binding IsPartiallyPaid}" Value="True"/>
+                                                                                </MultiDataTrigger.Conditions>
+                                                                                <Setter Property="Foreground" Value="#FFFFCC80"/>
+                                                                                <Setter Property="Text" Value="Partially paid"/>
+                                                                            </MultiDataTrigger>
                                                                         </Style.Triggers>
                                                                     </Style>
                                                                 </TextBlock.Style>
                                                             </TextBlock>
                                                         </Border>
                                                         <Border Background="#152196F3" CornerRadius="8" Padding="10,5">
-                                                            <TextBlock Text="{Binding NetPay, StringFormat=Net $ {0:N2}}"
+                                                            <TextBlock Text="{Binding HeaderMoneyChipText}"
                                                                        Foreground="{StaticResource StatBlueBrush}" FontSize="13"/>
                                                         </Border>
                                                     </StackPanel>
@@ -362,7 +376,7 @@
                                                                    FontWeight="Bold"/>
                                                     </StackPanel>
                                                     <StackPanel Grid.Column="2">
-                                                        <TextBlock Text="Net pay" Foreground="{StaticResource TextMutedBrush}" FontSize="14" Margin="0,0,0,6"/>
+                                                        <TextBlock Text="{Binding NetPaySectionTitle}" Foreground="{StaticResource TextMutedBrush}" FontSize="14" Margin="0,0,0,6"/>
                                                         <TextBlock Text="{Binding NetPay, StringFormat=$ {0:N2}}"
                                                                    Foreground="#FF4ADE80"
                                                                    FontSize="34"
@@ -462,7 +476,7 @@
                         <DataGridTextColumn Header="Sales" Binding="{Binding MoneyGeneratedUsd, StringFormat=$ {0:N2}}" Width="88" MinWidth="72"/>
                         <DataGridTextColumn Header="Bonus" Binding="{Binding BonusFivePercentUsd, StringFormat=$ {0:N2}}" Width="78" MinWidth="64"/>
                         <DataGridTextColumn Header="Advances" Binding="{Binding AdvancesDeductUsd, StringFormat=$ {0:N2}}" Width="84" MinWidth="68"/>
-                        <DataGridTextColumn Header="Net" Binding="{Binding NetPay, StringFormat=$ {0:N2}}" Width="82" MinWidth="68"/>
+                        <DataGridTextColumn Header="Owed" Binding="{Binding NetPay, StringFormat=$ {0:N2}}" Width="82" MinWidth="68"/>
                         <DataGridTemplateColumn Header="Pay" Width="108" MinWidth="96">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
@@ -509,6 +523,61 @@
                     </DataGrid.Columns>
                 </DataGrid>
             </Grid>
+
+            <Border Grid.Row="0" Grid.RowSpan="5"
+                    Background="#CC0A0A12"
+                    Panel.ZIndex="50"
+                    Visibility="{Binding IsPayrollPaymentDialogOpen, Converter={StaticResource BoolToVisibilityConverter}}">
+                <Border VerticalAlignment="Center"
+                        HorizontalAlignment="Center"
+                        MinWidth="400"
+                        MaxWidth="520"
+                        Background="#FF1A2238"
+                        CornerRadius="14"
+                        BorderBrush="#44FFFFFF"
+                        BorderThickness="1"
+                        Padding="24,20">
+                    <StackPanel>
+                        <TextBlock Text="Record payroll payment"
+                                   FontSize="20"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource GoldAccentBrush}"/>
+                        <TextBlock Text="{Binding PayrollPaymentDialogEmployee}"
+                                   Margin="0,6,0,0"
+                                   FontSize="17"
+                                   Foreground="{StaticResource TextPrimaryBrush}"/>
+                        <TextBlock Text="{Binding PayrollPeriodLabel}"
+                                   Margin="0,2,0,0"
+                                   FontSize="14"
+                                   Foreground="{StaticResource TextMutedBrush}"/>
+                        <TextBlock Text="{Binding PayrollPaymentRemainingHint}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,14,0,0"
+                                   FontSize="14"
+                                   Foreground="{StaticResource TextSecondaryBrush}"/>
+                        <TextBlock Text="Amount to pay (USD)"
+                                   Margin="0,16,0,6"
+                                   FontSize="14"
+                                   Foreground="{StaticResource TextMutedBrush}"/>
+                        <TextBox Text="{Binding PayrollPaymentAmountText, UpdateSourceTrigger=PropertyChanged}"
+                                 Style="{StaticResource EliteTextBox}"
+                                 FontSize="16"/>
+                        <StackPanel Orientation="Horizontal"
+                                    Margin="0,20,0,0"
+                                    HorizontalAlignment="Right">
+                            <Button Content="Cancel"
+                                    Command="{Binding CancelPayrollPaymentDialogCommand}"
+                                    Style="{StaticResource GhostButton}"
+                                    Padding="16,10"
+                                    Margin="0,0,10,0"/>
+                            <Button Content="Record payment"
+                                    Command="{Binding SubmitPayrollPaymentDialogCommand}"
+                                    Style="{StaticResource GoldPrimaryButton}"
+                                    Padding="18,10"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Border>
         </Grid>
     </Grid>
 </UserControl>

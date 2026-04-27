@@ -1,17 +1,14 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
-using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
-using EliteRestaurantPro.Data;
-using EliteRestaurantPro.Models;
-using EliteRestaurantPro.Utils;
+using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Reporting;
+using EliteRestaurant.Core.Utils;
+using EliteRestaurantPro.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Win32;
-using QuestPDF.Fluent;
-using QuestPDF.Helpers;
-using QuestPDF.Infrastructure;
 
 namespace EliteRestaurantPro.ViewModels;
 
@@ -69,6 +66,7 @@ public class MoneyViewModel : AdminBaseViewModel
     private string _todayNetProfitText = "$ 0.00 | FC 0";
     private string _todayNetProfitColor = "#2ECC71";
     private bool _isLoading;
+    private readonly FinancialPostingService _posting = new();
 
     public override string ActivePage => "Money";
 
@@ -302,21 +300,19 @@ public class MoneyViewModel : AdminBaseViewModel
             return;
         }
 
-        using var db = new AppDbContext();
-        db.Transactions.Add(new MoneyTransaction
+        var result = _posting.AddManualLedgerEntry(
+            amount,
+            SelectedCurrency,
+            EntryDate,
+            SelectedType,
+            SelectedCategory,
+            Justification?.Trim() ?? string.Empty,
+            FixedCategories.Contains(SelectedCategory));
+        if (!result.Ok)
         {
-            Amount = amount,
-            AmountUsd = CurrencyHelper.ResolveUsdAmount(amount, SelectedCurrency),
-            AmountFc = CurrencyHelper.ResolveFcAmount(amount, SelectedCurrency),
-            Date = EntryDate.Date.AddHours(DateTime.Now.Hour).AddMinutes(DateTime.Now.Minute),
-            Type = SelectedType,
-            Category = SelectedCategory,
-            CurrencyCode = SelectedCurrency,
-            ExchangeRateUsed = CurrencyHelper.FcPerUsd,
-            Justification = Justification?.Trim() ?? string.Empty,
-            IsFixed = FixedCategories.Contains(SelectedCategory)
-        });
-        db.SaveChanges();
+            MessageBox.Show(result.Message, "Money Entry", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
 
         AmountInput = string.Empty;
         SelectedCurrency = CurrencyHelper.Usd;
@@ -336,11 +332,10 @@ public class MoneyViewModel : AdminBaseViewModel
         try
         {
             var selectedPeriod = SelectedPeriod;
-            var snapshotTask = Task.Run(() => BuildDashboardSnapshot(selectedPeriod));
+            var snapshotTask = Task.Run(() => MoneyDashboardSnapshotBuilder.Build(selectedPeriod, MaxLedgerRows));
             var completedTask = await Task.WhenAny(snapshotTask, Task.Delay(5000));
             if (completedTask != snapshotTask)
             {
-                LogMoneyDebug("Snapshot build timeout (>5000ms).");
                 MessageBox.Show(
                     "Money dashboard timed out while loading data. Please try Refresh again.",
                     "Money",
@@ -361,8 +356,18 @@ public class MoneyViewModel : AdminBaseViewModel
             ReportEndDate = snapshot.ReportEndDate;
 
             DailyLedger.Clear();
-            foreach (var item in snapshot.LedgerItems)
-                DailyLedger.Add(item);
+            foreach (var row in snapshot.LedgerItems)
+            {
+                DailyLedger.Add(new MoneyLedgerItemViewModel
+                {
+                    Date = row.Date,
+                    Type = row.Type,
+                    Category = row.Category,
+                    Justification = row.Justification,
+                    AmountText = row.AmountText,
+                    AmountColor = row.AmountColor
+                });
+            }
 
             TotalRevenueText = snapshot.TotalRevenueText;
             TotalExpensesText = snapshot.TotalExpensesText;
@@ -394,32 +399,6 @@ public class MoneyViewModel : AdminBaseViewModel
 
         var (fromDate, toDate, rangeEndExclusive) = range.Value;
 
-        using var db = new AppDbContext();
-        var transactions = db.Transactions
-            .AsNoTracking()
-            .Where(t => t.Date >= fromDate && t.Date < rangeEndExclusive)
-            .OrderBy(t => t.Date)
-            .ThenBy(t => t.Id)
-            .ToList();
-
-        var totalSales = transactions.Where(t => t.Type == RevenueType && t.Category == "Sale").ToList();
-        var tipsCollected = transactions.Where(t => t.Type == RevenueType && t.Category == "Tip").ToList();
-        var payrollDeductions = transactions.Where(t => t.Type == ExpenseType && t.Category == "Salary").ToList();
-        var totalRevenue = transactions.Where(t => t.Type == RevenueType).ToList();
-        var totalExpenses = transactions.Where(t => t.Type == ExpenseType).ToList();
-        var totalSalesText = CurrencyHelper.FormatDualCurrency(
-            SumByCurrency(totalSales, CurrencyHelper.Usd),
-            SumByCurrency(totalSales, CurrencyHelper.CongoleseFranc));
-        var tipsCollectedText = CurrencyHelper.FormatDualCurrency(
-            SumByCurrency(tipsCollected, CurrencyHelper.Usd),
-            SumByCurrency(tipsCollected, CurrencyHelper.CongoleseFranc));
-        var payrollDeductionsText = CurrencyHelper.FormatDualCurrency(
-            SumByCurrency(payrollDeductions, CurrencyHelper.Usd),
-            SumByCurrency(payrollDeductions, CurrencyHelper.CongoleseFranc));
-        var netUsd = SumByCurrency(totalRevenue, CurrencyHelper.Usd) - SumByCurrency(totalExpenses, CurrencyHelper.Usd);
-        var netFc = SumByCurrency(totalRevenue, CurrencyHelper.CongoleseFranc) - SumByCurrency(totalExpenses, CurrencyHelper.CongoleseFranc);
-        var finalNetBalanceText = CurrencyHelper.FormatDualCurrency(netUsd, netFc);
-
         var fileDialog = new SaveFileDialog
         {
             Title = "Save Financial Report",
@@ -432,95 +411,7 @@ public class MoneyViewModel : AdminBaseViewModel
         if (fileDialog.ShowDialog() != true)
             return;
 
-        Document.Create(container =>
-        {
-            container.Page(page =>
-            {
-                page.Size(PageSizes.A4);
-                page.Margin(26);
-                page.PageColor("#111427");
-                page.DefaultTextStyle(style => style.FontColor("#F3E8C5").FontSize(10));
-
-                page.Header().Column(column =>
-                {
-                    column.Item().Text("EliteRestaurantPro - MoneyView Financial Report")
-                        .FontSize(18)
-                        .Bold()
-                        .FontColor("#D4AF37");
-                    column.Item().Text($"{fromDate:dd MMM yyyy} to {toDate:dd MMM yyyy}")
-                        .FontColor("#CFC39A");
-                    column.Item().PaddingTop(4).LineHorizontal(1).LineColor("#6E5930");
-                });
-
-                page.Content().Column(column =>
-                {
-                    column.Spacing(12);
-
-                    column.Item().Text("Financial Summary").Bold().FontSize(13).FontColor("#D4AF37");
-                    column.Item().Table(table =>
-                    {
-                        table.ColumnsDefinition(columns =>
-                        {
-                            columns.RelativeColumn(2);
-                            columns.RelativeColumn(1);
-                        });
-
-                        table.Cell().PaddingVertical(4).Text("Total Sales");
-                        table.Cell().AlignRight().PaddingVertical(4).Text(totalSalesText).FontColor("#2ECC71").Bold();
-
-                        table.Cell().PaddingVertical(4).Text("Tips Collected");
-                        table.Cell().AlignRight().PaddingVertical(4).Text(tipsCollectedText).FontColor("#2ECC71").Bold();
-
-                        table.Cell().PaddingVertical(4).Text("Payroll Deductions");
-                        table.Cell().AlignRight().PaddingVertical(4).Text(payrollDeductionsText).FontColor("#DC143C").Bold();
-
-                        table.Cell().PaddingVertical(6).Text("Final Net Balance").Bold();
-                        table.Cell().AlignRight().PaddingVertical(6).Text(finalNetBalanceText)
-                            .FontColor(netUsd >= 0m && netFc >= 0m ? "#2ECC71" : "#DC143C")
-                            .Bold()
-                            .FontSize(12);
-                    });
-
-                    column.Item().LineHorizontal(1).LineColor("#6E5930");
-                    column.Item().Text("Detailed Ledger").Bold().FontSize(13).FontColor("#D4AF37");
-
-                    column.Item().Table(table =>
-                    {
-                        table.ColumnsDefinition(columns =>
-                        {
-                            columns.ConstantColumn(80);
-                            columns.ConstantColumn(70);
-                            columns.ConstantColumn(90);
-                            columns.RelativeColumn(2.3f);
-                            columns.ConstantColumn(90);
-                        });
-
-                        table.Header(header =>
-                        {
-                            header.Cell().Text("Date").Bold();
-                            header.Cell().Text("Type").Bold();
-                            header.Cell().Text("Category").Bold();
-                            header.Cell().Text("Justification").Bold();
-                            header.Cell().AlignRight().Text("Amount").Bold();
-                        });
-
-                        foreach (var transaction in transactions)
-                        {
-                            var isRevenue = transaction.Type == RevenueType;
-                            table.Cell().PaddingVertical(3).Text(transaction.Date.ToString("dd/MM/yyyy HH:mm"));
-                            table.Cell().PaddingVertical(3).Text(transaction.Type);
-                            table.Cell().PaddingVertical(3).Text(transaction.Category);
-                            table.Cell().PaddingVertical(3).Text(string.IsNullOrWhiteSpace(transaction.Justification) ? "-" : transaction.Justification);
-                            table.Cell().PaddingVertical(3).AlignRight().Text($"{(isRevenue ? "+" : "-")}{CurrencyHelper.FormatAmount(transaction.Amount, NormalizeCurrencyCode(transaction.CurrencyCode))}")
-                                .FontColor(isRevenue ? "#2ECC71" : "#DC143C");
-                        }
-                    });
-                });
-
-                page.Footer().AlignCenter().Text($"EliteRestaurantPro MoneyView  |  Generated {DateTime.Now:dd MMM yyyy HH:mm}")
-                    .FontColor("#A99867");
-            });
-        }).GeneratePdf(fileDialog.FileName);
+        MoneyFinancialPdfExportService.ExportLedgerPdf(fileDialog.FileName, fromDate, toDate, rangeEndExclusive);
 
         MessageBox.Show(
             $"Financial PDF exported:\n{fileDialog.FileName}",
@@ -559,7 +450,7 @@ public class MoneyViewModel : AdminBaseViewModel
         FinancialTransactionService.EnsureScheduledSalaryExpenses(db, fromDate, toDate);
         db.SaveChanges();
 
-        var data = BuildReportRows(db, SelectedReportType, fromDate, rangeEndExclusive);
+        var data = MoneyExcelReportRowsBuilder.BuildReportRows(db, SelectedReportType, fromDate, rangeEndExclusive);
         ExcelExportService.ExportSingleSheet(saveDialog.FileName, SelectedReportType, data.Headers, data.Rows);
 
         MessageBox.Show($"Excel exported:\n{saveDialog.FileName}", "Excel Export", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -589,10 +480,10 @@ public class MoneyViewModel : AdminBaseViewModel
         FinancialTransactionService.EnsureScheduledSalaryExpenses(db, fromDate, toDate);
         db.SaveChanges();
 
-        var transactions = BuildReportRows(db, "Transactions", fromDate, rangeEndExclusive);
-        var orders = BuildReportRows(db, "Orders", fromDate, rangeEndExclusive);
-        var inventory = BuildReportRows(db, "Inventory", fromDate, rangeEndExclusive);
-        var attendance = BuildReportRows(db, "Attendance", fromDate, rangeEndExclusive);
+        var transactions = MoneyExcelReportRowsBuilder.BuildReportRows(db, "Transactions", fromDate, rangeEndExclusive);
+        var orders = MoneyExcelReportRowsBuilder.BuildReportRows(db, "Orders", fromDate, rangeEndExclusive);
+        var inventory = MoneyExcelReportRowsBuilder.BuildReportRows(db, "Inventory", fromDate, rangeEndExclusive);
+        var attendance = MoneyExcelReportRowsBuilder.BuildReportRows(db, "Attendance", fromDate, rangeEndExclusive);
 
         ExcelExportService.ExportWorkbook(saveDialog.FileName, [
             ("Transactions", transactions.Headers, transactions.Rows),
@@ -621,176 +512,6 @@ public class MoneyViewModel : AdminBaseViewModel
         return (fromDate, toDate, toDate.AddDays(1));
     }
 
-    private static (IReadOnlyList<string> Headers, IReadOnlyList<IReadOnlyList<string>> Rows) BuildReportRows(
-        AppDbContext db,
-        string reportType,
-        DateTime fromDate,
-        DateTime toExclusive)
-        => reportType switch
-        {
-            "Transactions" => BuildTransactionRows(db, fromDate, toExclusive),
-            "Orders" => BuildOrderRows(db, fromDate, toExclusive),
-            "Inventory" => BuildInventoryRows(db, fromDate, toExclusive),
-            "Attendance" => BuildAttendanceRows(db, fromDate, toExclusive),
-            _ => BuildTransactionRows(db, fromDate, toExclusive)
-        };
-
-    private static (IReadOnlyList<string> Headers, IReadOnlyList<IReadOnlyList<string>> Rows) BuildTransactionRows(AppDbContext db, DateTime fromDate, DateTime toExclusive)
-    {
-        var records = db.Transactions
-            .AsNoTracking()
-            .Where(t => t.Date >= fromDate && t.Date < toExclusive)
-            .OrderBy(t => t.Date)
-            .ThenBy(t => t.Id)
-            .ToList();
-
-        var rows = records
-            .Select(t => (IReadOnlyList<string>)
-            [
-                t.Id.ToString(),
-                t.Date.ToString("yyyy-MM-dd HH:mm"),
-                t.Type,
-                t.Category,
-                NormalizeCurrencyCode(t.CurrencyCode),
-                t.Amount.ToString("N2"),
-                t.IsFixed ? "Yes" : "No",
-                t.Justification
-            ])
-            .ToList();
-
-        return (["Id", "Date", "Type", "Category", "Currency", "Amount", "IsFixed", "Justification"], rows);
-    }
-
-    private static (IReadOnlyList<string> Headers, IReadOnlyList<IReadOnlyList<string>> Rows) BuildOrderRows(AppDbContext db, DateTime fromDate, DateTime toExclusive)
-    {
-        var orders = db.Orders
-            .AsNoTracking()
-            .Where(o => o.CreatedAt >= fromDate && o.CreatedAt < toExclusive)
-            .OrderBy(o => o.CreatedAt)
-            .ToList();
-
-        var orderItems = db.OrderItems
-            .AsNoTracking()
-            .Where(i => orders.Select(o => o.Id).Contains(i.OrderRecordId))
-            .ToList();
-
-        var products = db.Products
-            .AsNoTracking()
-            .ToDictionary(p => p.Id, p => p.Price);
-
-        var totalsByOrder = orderItems
-            .GroupBy(i => i.OrderRecordId)
-            .ToDictionary(
-                g => g.Key,
-                g => g.Sum(item => (products.TryGetValue(item.ProductId, out var price) ? price : 0m) * item.Quantity));
-
-        var rows = orders
-            .Select(order => (IReadOnlyList<string>)
-            [
-                order.Id.ToString(),
-                string.IsNullOrWhiteSpace(order.UniqueId) ? $"ORD-{order.Id:000}" : order.UniqueId,
-                order.CreatedAt.ToString("yyyy-MM-dd HH:mm"),
-                string.Equals(order.OrderSource, "Reservation", StringComparison.OrdinalIgnoreCase)
-                    ? $"Reservation ({(string.IsNullOrWhiteSpace(order.ReservationCode) ? "-" : order.ReservationCode)})"
-                    : "WalkIn",
-                order.Status,
-                order.TableCode,
-                order.ServerName,
-                (totalsByOrder.TryGetValue(order.Id, out var total) ? total : 0m).ToString("N2")
-            ])
-            .ToList();
-
-        return (["Id", "OrderId", "Date", "Source", "Status", "Table", "Server", "Total"], rows);
-    }
-
-    private static (IReadOnlyList<string> Headers, IReadOnlyList<IReadOnlyList<string>> Rows) BuildInventoryRows(AppDbContext db, DateTime fromDate, DateTime toExclusive)
-    {
-        var orders = db.Orders
-            .AsNoTracking()
-            .Where(o => o.CreatedAt >= fromDate && o.CreatedAt < toExclusive && o.Status != "Cancelled")
-            .Select(o => new { o.Id, o.UniqueId })
-            .ToList();
-        var orderIds = orders.Select(o => o.Id).ToList();
-
-        var orderItems = db.OrderItems
-            .AsNoTracking()
-            .Where(i => orderIds.Contains(i.OrderRecordId))
-            .ToList();
-        var ingredients = db.ProductIngredients
-            .AsNoTracking()
-            .ToList();
-        var inventory = db.InventoryItems
-            .AsNoTracking()
-            .ToDictionary(i => i.Id, i => i);
-
-        var ingredientsByProduct = ingredients
-            .GroupBy(i => i.ProductId)
-            .ToDictionary(g => g.Key, g => g.ToList());
-
-        var usedByInventory = new Dictionary<int, decimal>();
-        var orderCountByInventory = new Dictionary<int, int>();
-
-        foreach (var line in orderItems)
-        {
-            if (!ingredientsByProduct.TryGetValue(line.ProductId, out var recipe))
-                continue;
-
-            foreach (var ingredient in recipe)
-            {
-                var consumed = ingredient.Quantity * line.Quantity;
-                if (!usedByInventory.TryAdd(ingredient.InventoryItemId, consumed))
-                    usedByInventory[ingredient.InventoryItemId] += consumed;
-
-                if (!orderCountByInventory.TryAdd(ingredient.InventoryItemId, 1))
-                    orderCountByInventory[ingredient.InventoryItemId]++;
-            }
-        }
-
-        var rows = usedByInventory
-            .OrderByDescending(kv => kv.Value)
-            .Select(kv =>
-            {
-                var item = inventory.TryGetValue(kv.Key, out var inv) ? inv : null;
-                var count = orderCountByInventory.TryGetValue(kv.Key, out var c) ? c : 0;
-                return (IReadOnlyList<string>)
-                [
-                    item?.UniqueId ?? "N/A",
-                    item?.Name ?? "Unknown",
-                    item?.Unit ?? string.Empty,
-                    kv.Value.ToString("0.##"),
-                    (item?.StockQuantity ?? 0m).ToString("0.##"),
-                    count.ToString()
-                ];
-            })
-            .ToList();
-
-        return (["ItemId", "Item", "Unit", "UsedQty", "CurrentStock", "LinkedOrders"], rows);
-    }
-
-    private static (IReadOnlyList<string> Headers, IReadOnlyList<IReadOnlyList<string>> Rows) BuildAttendanceRows(AppDbContext db, DateTime fromDate, DateTime toExclusive)
-    {
-        var rows = db.EmployeeAttendances
-            .AsNoTracking()
-            .Include(a => a.Employee)
-            .Where(a => a.WorkDate >= fromDate && a.WorkDate < toExclusive)
-            .OrderBy(a => a.WorkDate)
-            .ThenBy(a => a.EmployeeId)
-            .ToList()
-            .Select(a => (IReadOnlyList<string>)
-            [
-                a.WorkDate.ToString("yyyy-MM-dd"),
-                a.Employee?.UniqueId ?? string.Empty,
-                a.Employee?.Name ?? "Unknown",
-                a.ClockInTime?.ToString("HH:mm") ?? "-",
-                a.ClockOutTime?.ToString("HH:mm") ?? "-",
-                string.IsNullOrWhiteSpace(a.ClockInStatus) ? "Pending" : a.ClockInStatus,
-                a.Justification
-            ])
-            .ToList();
-
-        return (["Date", "EmployeeId", "Employee", "ClockIn", "ClockOut", "Status", "Justification"], rows);
-    }
-
     private void SetPeriod(string? period)
     {
         if (string.IsNullOrWhiteSpace(period))
@@ -800,233 +521,5 @@ public class MoneyViewModel : AdminBaseViewModel
             return;
 
         SelectedPeriod = period;
-    }
-
-    private static (DateTime FromDate, DateTime ToDate, DateTime ToExclusive, string Label) ResolvePeriodRange(AppDbContext db, DateTime today, string selectedPeriod)
-    {
-        return selectedPeriod switch
-        {
-            "Month" => ResolveMonthRange(today),
-            "Year" => ResolveYearRange(today),
-            "All" => ResolveAllRange(db, today),
-            _ => ResolveWeekRange(today)
-        };
-    }
-
-    private static (DateTime FromDate, DateTime ToDate, DateTime ToExclusive, string Label) ResolveWeekRange(DateTime today)
-    {
-        var dayOfWeek = ((int)today.DayOfWeek + 6) % 7;
-        var from = today.AddDays(-dayOfWeek).Date;
-        var to = today.Date;
-        return (from, to, to.AddDays(1), "This Week");
-    }
-
-    private static (DateTime FromDate, DateTime ToDate, DateTime ToExclusive, string Label) ResolveMonthRange(DateTime today)
-    {
-        var from = new DateTime(today.Year, today.Month, 1);
-        var to = today.Date;
-        return (from, to, to.AddDays(1), "This Month");
-    }
-
-    private static (DateTime FromDate, DateTime ToDate, DateTime ToExclusive, string Label) ResolveYearRange(DateTime today)
-    {
-        var from = new DateTime(today.Year, 1, 1);
-        var to = today.Date;
-        return (from, to, to.AddDays(1), "This Year");
-    }
-
-    private static (DateTime FromDate, DateTime ToDate, DateTime ToExclusive, string Label) ResolveAllRange(AppDbContext db, DateTime today)
-    {
-        var firstDate = db.Transactions
-            .AsNoTracking()
-            .OrderBy(t => t.Date)
-            .Select(t => (DateTime?)t.Date)
-            .FirstOrDefault();
-
-        var from = firstDate?.Date ?? today.Date;
-        var to = today.Date;
-        return (from, to, to.AddDays(1), "All Time");
-    }
-
-    private static MoneyDashboardSnapshot BuildDashboardSnapshot(string selectedPeriod)
-    {
-        LogMoneyDebug($"Build snapshot start | period={selectedPeriod}");
-        var startedAt = DateTime.UtcNow;
-        using var db = new AppDbContext();
-        db.Database.SetCommandTimeout(5);
-        // Backfill sale rows for completed orders (e.g. if revenue was skipped before a save-order fix).
-        FinancialTransactionService.EnsureCompletedOrderRevenues(db);
-        db.SaveChanges();
-        var today = DateTime.Today;
-        var tomorrow = today.AddDays(1);
-
-        var todaysTransactions = db.Transactions
-            .AsNoTracking()
-            .Where(t => t.Date >= today && t.Date < tomorrow)
-            .ToList();
-        LogMoneyDebug($"Loaded today transactions: {todaysTransactions.Count}");
-
-        var todayRevenue = todaysTransactions
-            .Where(t => string.Equals(t.Type, RevenueType, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        var todayExpenses = todaysTransactions
-            .Where(t => string.Equals(t.Type, ExpenseType, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        var todayRevenueUsd = SumByCurrency(todayRevenue, CurrencyHelper.Usd);
-        var todayRevenueFc = SumByCurrency(todayRevenue, CurrencyHelper.CongoleseFranc);
-        var todayExpensesUsd = SumByCurrency(todayExpenses, CurrencyHelper.Usd);
-        var todayExpensesFc = SumByCurrency(todayExpenses, CurrencyHelper.CongoleseFranc);
-
-        var period = ResolvePeriodRange(db, today, selectedPeriod);
-        var periodRows = db.Transactions
-            .AsNoTracking()
-            .Where(t => t.Date >= period.FromDate && t.Date < period.ToExclusive)
-            .Select(t => new
-            {
-                t.Id,
-                t.Date,
-                t.Type,
-                t.Category,
-                t.Amount,
-                t.CurrencyCode,
-                t.Justification,
-                t.IsFixed
-            })
-            .ToList();
-        LogMoneyDebug($"Loaded period rows (full): {periodRows.Count} | range={period.FromDate:yyyy-MM-dd}->{period.ToDate:yyyy-MM-dd}");
-
-        var periodLedgerRows = periodRows
-            .OrderByDescending(t => t.Date)
-            .ThenByDescending(t => t.Id)
-            .Take(MaxLedgerRows)
-            .ToList();
-        LogMoneyDebug($"Loaded period ledger rows: {periodLedgerRows.Count} | range={period.FromDate:yyyy-MM-dd}->{period.ToDate:yyyy-MM-dd}");
-
-        var ledger = periodLedgerRows.Select(row =>
-        {
-            var isRevenue = string.Equals(row.Type, RevenueType, StringComparison.OrdinalIgnoreCase);
-            return new MoneyLedgerItemViewModel
-            {
-                Date = row.Date,
-                Type = row.Type,
-                Category = row.Category,
-                Justification = string.IsNullOrWhiteSpace(row.Justification)
-                    ? (row.IsFixed ? "Fixed scheduled transaction" : "No justification")
-                    : row.Justification,
-                AmountText = $"{(isRevenue ? "+" : "-")}{CurrencyHelper.FormatAmount(row.Amount, NormalizeCurrencyCode(row.CurrencyCode))}",
-                AmountColor = isRevenue ? "#2ECC71" : "#DC143C"
-            };
-        }).ToList();
-
-        var totalRevenue = periodRows
-            .Where(t => t.Type == RevenueType)
-            .ToList();
-        var totalExpenses = periodRows
-            .Where(t => t.Type == ExpenseType)
-            .ToList();
-
-        var salesTotal = periodRows
-            .Where(t => t.Type == RevenueType && t.Category == "Sale")
-            .ToList();
-        var tipsTotal = periodRows
-            .Where(t => t.Type == RevenueType && t.Category == "Tip")
-            .ToList();
-        var payrollTotal = periodRows
-            .Where(t => t.Type == ExpenseType && t.Category == "Salary")
-            .ToList();
-
-        var totalRevenueUsd = SumByCurrency(totalRevenue, CurrencyHelper.Usd);
-        var totalRevenueFc = SumByCurrency(totalRevenue, CurrencyHelper.CongoleseFranc);
-        var totalExpensesUsd = SumByCurrency(totalExpenses, CurrencyHelper.Usd);
-        var totalExpensesFc = SumByCurrency(totalExpenses, CurrencyHelper.CongoleseFranc);
-        var netUsd = totalRevenueUsd - totalExpensesUsd;
-        var netFc = totalRevenueFc - totalExpensesFc;
-        var salesUsd = SumByCurrency(salesTotal, CurrencyHelper.Usd);
-        var salesFc = SumByCurrency(salesTotal, CurrencyHelper.CongoleseFranc);
-        var tipsUsd = SumByCurrency(tipsTotal, CurrencyHelper.Usd);
-        var tipsFc = SumByCurrency(tipsTotal, CurrencyHelper.CongoleseFranc);
-        var payrollUsd = SumByCurrency(payrollTotal, CurrencyHelper.Usd);
-        var payrollFc = SumByCurrency(payrollTotal, CurrencyHelper.CongoleseFranc);
-
-        var snapshot = new MoneyDashboardSnapshot
-        {
-            TodayRevenueText = CurrencyHelper.FormatDualCurrency(todayRevenueUsd, todayRevenueFc),
-            TodayExpensesText = CurrencyHelper.FormatDualCurrency(todayExpensesUsd, todayExpensesFc),
-            TodayNetProfitText = CurrencyHelper.FormatDualCurrency(todayRevenueUsd - todayExpensesUsd, todayRevenueFc - todayExpensesFc),
-            TodayNetProfitColor = todayRevenueUsd - todayExpensesUsd >= 0m && todayRevenueFc - todayExpensesFc >= 0m ? "#2ECC71" : "#DC143C",
-            SelectedPeriodLabel = period.Label,
-            ReportStartDate = period.FromDate,
-            ReportEndDate = period.ToDate,
-            LedgerItems = ledger,
-            TotalRevenueText = CurrencyHelper.FormatDualCurrency(totalRevenueUsd, totalRevenueFc),
-            TotalExpensesText = CurrencyHelper.FormatDualCurrency(totalExpensesUsd, totalExpensesFc),
-            NetProfitText = CurrencyHelper.FormatDualCurrency(netUsd, netFc),
-            NetProfitColor = netUsd >= 0m && netFc >= 0m ? "#2ECC71" : "#DC143C",
-            SalesSummaryText = CurrencyHelper.FormatDualCurrency(salesUsd, salesFc),
-            TipsSummaryText = CurrencyHelper.FormatDualCurrency(tipsUsd, tipsFc),
-            PayrollSummaryText = CurrencyHelper.FormatDualCurrency(payrollUsd, payrollFc)
-        };
-        LogMoneyDebug($"Build snapshot done in {(DateTime.UtcNow - startedAt).TotalMilliseconds:N0} ms");
-        return snapshot;
-    }
-
-    private static string NormalizeCurrencyCode(string? currencyCode)
-        => string.Equals(currencyCode, CurrencyHelper.CongoleseFranc, StringComparison.OrdinalIgnoreCase)
-            ? CurrencyHelper.CongoleseFranc
-            : CurrencyHelper.Usd;
-
-    private static decimal SumByCurrency<T>(IEnumerable<T> rows, string currencyCode) where T : class
-    {
-        decimal total = 0m;
-        foreach (var row in rows)
-        {
-            var type = row.GetType();
-            var rowCurrency = NormalizeCurrencyCode(type.GetProperty("CurrencyCode")?.GetValue(row) as string);
-            if (!string.Equals(rowCurrency, currencyCode, StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            var amountValue = type.GetProperty("Amount")?.GetValue(row);
-            if (amountValue is decimal amount)
-                total += amount;
-        }
-
-        return total;
-    }
-
-    private sealed class MoneyDashboardSnapshot
-    {
-        public string TodayRevenueText { get; init; } = "$ 0.00 | FC 0";
-        public string TodayExpensesText { get; init; } = "$ 0.00 | FC 0";
-        public string TodayNetProfitText { get; init; } = "$ 0.00 | FC 0";
-        public string TodayNetProfitColor { get; init; } = "#2ECC71";
-        public string SelectedPeriodLabel { get; init; } = "This Week";
-        public DateTime ReportStartDate { get; init; } = DateTime.Today;
-        public DateTime ReportEndDate { get; init; } = DateTime.Today;
-        public List<MoneyLedgerItemViewModel> LedgerItems { get; init; } = [];
-        public string TotalRevenueText { get; init; } = "$ 0.00 | FC 0";
-        public string TotalExpensesText { get; init; } = "$ 0.00 | FC 0";
-        public string NetProfitText { get; init; } = "$ 0.00 | FC 0";
-        public string NetProfitColor { get; init; } = "#2ECC71";
-        public string SalesSummaryText { get; init; } = "$ 0.00 | FC 0";
-        public string TipsSummaryText { get; init; } = "$ 0.00 | FC 0";
-        public string PayrollSummaryText { get; init; } = "$ 0.00 | FC 0";
-    }
-
-    private static void LogMoneyDebug(string message)
-    {
-        try
-        {
-            var appFolder = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "EliteRestaurantPro",
-                "logs");
-            Directory.CreateDirectory(appFolder);
-            var path = Path.Combine(appFolder, "money-debug.log");
-            File.AppendAllText(path, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} | {message}{Environment.NewLine}");
-        }
-        catch
-        {
-            // Best-effort logging only.
-        }
     }
 }

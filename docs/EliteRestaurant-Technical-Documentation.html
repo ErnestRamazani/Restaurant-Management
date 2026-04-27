@@ -1,0 +1,763 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EliteRestaurant Technical Documentation</title>
+  <style>
+    @page { size: A4; margin: 20mm 16mm; }
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: #1f2937;
+      line-height: 1.55;
+      margin: 0;
+      background: #f5f7fb;
+    }
+    main {
+      max-width: 980px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 32px 40px 48px;
+    }
+    h1, h2, h3 {
+      color: #0f172a;
+      margin-top: 1.2em;
+      margin-bottom: 0.45em;
+      line-height: 1.2;
+    }
+    h1 {
+      font-size: 30px;
+      margin-top: 0;
+      border-bottom: 3px solid #1d4ed8;
+      padding-bottom: 10px;
+    }
+    h2 {
+      font-size: 22px;
+      border-bottom: 1px solid #cbd5e1;
+      padding-bottom: 6px;
+    }
+    h3 { font-size: 17px; }
+    p, li { font-size: 13.5px; }
+    .lead {
+      font-size: 14.5px;
+      color: #334155;
+    }
+    .meta, .note, .warning {
+      padding: 12px 14px;
+      border-radius: 8px;
+      margin: 12px 0;
+    }
+    .meta {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+    }
+    .note {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+    }
+    .warning {
+      background: #fff7ed;
+      border: 1px solid #fdba74;
+    }
+    code {
+      font-family: Consolas, "Courier New", monospace;
+      background: #f1f5f9;
+      padding: 1px 4px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0 18px;
+      font-size: 12.5px;
+    }
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 8px 9px;
+      vertical-align: top;
+      text-align: left;
+    }
+    th {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+    ul {
+      margin-top: 0.35em;
+      margin-bottom: 0.8em;
+    }
+    .toc li {
+      margin: 4px 0;
+    }
+    .page-break {
+      break-before: page;
+      page-break-before: always;
+    }
+    .small {
+      font-size: 12px;
+      color: #475569;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>EliteRestaurant Technical Documentation</h1>
+    <p class="lead">
+      This document describes the codebase, runtime structure, architecture, database behavior, API layer,
+      web portal, desktop application logic, connectivity model, configuration system, operational practices,
+      and security posture of the <code>EliteRestaurant</code> project.
+    </p>
+
+    <div class="meta">
+      <strong>Repository:</strong> <code>C:\Users\ernes\Documents\EliteRestaurant</code><br>
+      <strong>Documentation date:</strong> 2026-04-15<br>
+      <strong>Main applications:</strong> WPF desktop application, ASP.NET Core API, embedded server portal, seeding and utility tools
+    </div>
+
+    <h2>Table of Contents</h2>
+    <ul class="toc">
+      <li>1. Executive Summary</li>
+      <li>2. Repository and Project Structure</li>
+      <li>3. Architectural Overview</li>
+      <li>4. Desktop Application Architecture</li>
+      <li>5. API and Web Portal Architecture</li>
+      <li>6. Database Design and Persistence Strategy</li>
+      <li>7. Core Business Logic and Workflow Rules</li>
+      <li>8. Configuration, Settings, and Branding</li>
+      <li>9. Connectivity and Deployment Model</li>
+      <li>10. Security Model and Current Risks</li>
+      <li>11. Operational Tooling and Maintenance</li>
+      <li>12. Architectural Strengths, Constraints, and Recommendations</li>
+    </ul>
+
+    <div class="page-break"></div>
+
+    <h2>1. Executive Summary</h2>
+    <p>
+      <code>EliteRestaurant</code> is a multi-surface restaurant management system implemented primarily in .NET 8.
+      The project is centered around a shared business and data layer contained in <code>EliteRestaurantPro</code>.
+      That shared layer is consumed by both a Windows Presentation Foundation desktop application and an ASP.NET Core API.
+      The API also hosts a browser-based server portal inside <code>wwwroot/index.html</code>, which makes the system usable
+      from tablets and other LAN-connected devices without introducing a separate frontend framework or a separate frontend repository.
+    </p>
+    <p>
+      The overall architecture is pragmatic rather than heavily layered. Entity Framework Core is used directly from the shared
+      project, with PostgreSQL as the active database target. The codebase still carries visible legacy traces of an earlier SQLite
+      era, mainly in import and disabled compatibility code paths. The system therefore behaves like a hybrid project that has
+      migrated from a local single-machine database model to a shared network database model while preserving some backwards-compatible logic.
+    </p>
+    <p>
+      The application domain is broad. It covers menu management, tables, order creation, kitchen preparation flow,
+      cashier and payment flow, reservations, waitlist, attendance, payroll, money tracking, inventory linkage,
+      branding, and reporting. Rather than splitting these features into multiple services, the codebase keeps most of the domain
+      logic in one shared application layer and exposes selected capabilities through the API for remote staff use.
+    </p>
+
+    <h2>2. Repository and Project Structure</h2>
+    <p>
+      The repository does not currently use a top-level Visual Studio solution file. Instead, the codebase is composed of four
+      separate project files, each built independently. The effective structure is simple and understandable once the shared dependency
+      model is recognized.
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Project</th>
+          <th>Path</th>
+          <th>Type</th>
+          <th>Responsibility</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>EliteRestaurantPro</code></td>
+          <td><code>EliteRestaurantPro/EliteRestaurantPro.csproj</code></td>
+          <td>WPF desktop app + shared core</td>
+          <td>Main desktop application, shared entities, EF Core context, business utilities, payroll, order logic, settings, exports.</td>
+        </tr>
+        <tr>
+          <td><code>EliteRestaurant.Api</code></td>
+          <td><code>EliteRestaurant.Api/EliteRestaurant.Api.csproj</code></td>
+          <td>ASP.NET Core Web API</td>
+          <td>REST endpoints, Swagger, static portal hosting, LAN access point for server workflows, shared DB access via project reference.</td>
+        </tr>
+        <tr>
+          <td><code>SeedRunner</code></td>
+          <td><code>SeedRunner/SeedRunner.csproj</code></td>
+          <td>Console utility</td>
+          <td>Reset and reseed PostgreSQL data, generate realistic operational records, optionally reduce active orders.</td>
+        </tr>
+        <tr>
+          <td><code>ClearActiveOrders</code></td>
+          <td><code>Tools/ClearActiveOrders/ClearActiveOrders.csproj</code></td>
+          <td>Console utility</td>
+          <td>Small operational cleanup helper for active orders; appears to retain stale assumptions from earlier database design.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      The repository root also contains <code>.vscode/tasks.json</code>, which currently builds and publishes only the WPF project.
+      This is an important operational detail because developers or operators may incorrectly assume that the API is covered by the same
+      task shortcuts when it is not.
+    </p>
+
+    <h3>Important folders</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Folder</th>
+          <th>Meaning</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>EliteRestaurantPro/ViewModels</code></td>
+          <td>MVVM application logic for desktop screens including admin, orders, kitchen, payroll, attendance, inventory, reports, and settings.</td>
+        </tr>
+        <tr>
+          <td><code>EliteRestaurantPro/Views</code></td>
+          <td>WPF views for the desktop application.</td>
+        </tr>
+        <tr>
+          <td><code>EliteRestaurantPro/Models</code></td>
+          <td>Entity and domain classes persisted by EF Core or used in business workflows.</td>
+        </tr>
+        <tr>
+          <td><code>EliteRestaurantPro/Data</code></td>
+          <td>Entity Framework context and data helpers such as financial and query support.</td>
+        </tr>
+        <tr>
+          <td><code>EliteRestaurantPro/Utils</code></td>
+          <td>Cross-cutting utilities: settings, currency, order workflow, payroll calculations, draft sharing, theming, alerts, exports.</td>
+        </tr>
+        <tr>
+          <td><code>EliteRestaurant.Api/Controllers</code></td>
+          <td>HTTP entry points for authentication, tables, reservations, health, and server portal behavior.</td>
+        </tr>
+        <tr>
+          <td><code>EliteRestaurant.Api/Security</code></td>
+          <td>Bearer token parsing, in-memory session state, and portal role validation logic.</td>
+        </tr>
+        <tr>
+          <td><code>EliteRestaurant.Api/wwwroot</code></td>
+          <td>Single-file browser UI for the server portal.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="page-break"></div>
+
+    <h2>3. Architectural Overview</h2>
+    <p>
+      Architecturally, the project follows a shared-core model. The desktop application and the API do not maintain separate domain models.
+      Instead, both rely on the same <code>AppDbContext</code>, the same entity classes, and many of the same utility classes from the
+      <code>EliteRestaurantPro</code> project. This makes the architecture compact and reduces duplication, but it also means the API is coupled
+      to desktop-centric implementation decisions.
+    </p>
+
+    <h3>High-level runtime diagram</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Layer</th>
+          <th>Implementation</th>
+          <th>Primary responsibility</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>User interfaces</td>
+          <td>WPF desktop UI and browser portal UI</td>
+          <td>Provide operator workflows for admin, kitchen, cashier, reservations, and server order-taking.</td>
+        </tr>
+        <tr>
+          <td>Application logic</td>
+          <td>ViewModels, utilities, controller methods, workflow helpers</td>
+          <td>Enforce order states, payroll formulas, table occupancy, financial postings, settings behavior, and session-based features.</td>
+        </tr>
+        <tr>
+          <td>Persistence layer</td>
+          <td><code>AppDbContext</code> with Entity Framework Core</td>
+          <td>Read and write restaurant data to PostgreSQL, while preserving legacy import support from SQLite.</td>
+        </tr>
+        <tr>
+          <td>Data store</td>
+          <td>PostgreSQL</td>
+          <td>Shared authoritative backend for all current runtime surfaces.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      The absence of a separate repository or service abstraction layer means much of the business logic is close to the UI or controller layer.
+      That choice keeps the implementation approachable for a single-project team, but it also requires discipline when changing data rules because
+      database access can be triggered from multiple places. In practical terms, the project behaves like a desktop-first application that has gradually
+      evolved into a shared local-network system.
+    </p>
+
+    <h3>Architectural characteristics</h3>
+    <ul>
+      <li>Shared domain model between desktop and API, minimizing duplication.</li>
+      <li>MVVM pattern on desktop, with direct EF Core usage from ViewModels and utilities.</li>
+      <li>Thin API surface focused on server operations and lightweight health or table queries.</li>
+      <li>Static web portal instead of a SPA framework, reducing deployment complexity.</li>
+      <li>Settings stored outside the repository in the host machine's local application data.</li>
+      <li>PostgreSQL-first runtime with legacy SQLite migration code still present.</li>
+    </ul>
+
+    <h2>4. Desktop Application Architecture</h2>
+    <p>
+      The desktop application is the broadest functional surface in the codebase. It is implemented in WPF on .NET 8 with an MVVM structure.
+      The application starts in <code>App.xaml.cs</code>, configures Npgsql compatibility behavior, sets up crash logging, optionally runs a
+      SQLite import mode, validates that a PostgreSQL connection string is available, and then initializes the database schema.
+    </p>
+
+    <h3>Startup responsibilities</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Stage</th>
+          <th>Observed behavior</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Unhandled exception handling</td>
+          <td>Crashes are logged to <code>%LocalAppData%\EliteRestaurantPro\logs\app-crash.log</code> and surfaced to the user.</td>
+        </tr>
+        <tr>
+          <td>PDF license setup</td>
+          <td>QuestPDF is initialized in community license mode.</td>
+        </tr>
+        <tr>
+          <td>Legacy import mode</td>
+          <td>If <code>--import-sqlite-now</code> is passed, the app attempts a one-time import from the legacy SQLite database into PostgreSQL.</td>
+        </tr>
+        <tr>
+          <td>Database configuration</td>
+          <td>If no PostgreSQL connection string exists in settings, the user is prompted interactively.</td>
+        </tr>
+        <tr>
+          <td>Database initialization</td>
+          <td><code>AppDbContext.Initialize()</code> runs schema creation and schema patch logic.</td>
+        </tr>
+        <tr>
+          <td>Theming</td>
+          <td>Saved appearance settings are applied before normal UI startup continues.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Desktop feature modules</h3>
+    <p>
+      The desktop system is functionally rich and covers most restaurant operations. Major ViewModel areas include:
+      role selection and login, executive dashboard and drilldown, employee management, menu management, table management,
+      reservations and waitlist, order creation, admin order supervision, kitchen queue, server pickup, money management,
+      salary and attendance, inventory, reporting, and appearance settings.
+    </p>
+    <p>
+      A notable structural choice is the use of an <code>AdminBaseViewModel</code> that centralizes navigation, branding, and session-aware
+      behavior for both full-admin and limited staff tablet experiences. The code therefore uses one application shell for multiple operational
+      personas instead of maintaining separate desktop clients.
+    </p>
+
+    <h3>Session model</h3>
+    <p>
+      The desktop application uses <code>AppSession</code> to track whether the active session is a full admin login or a role-limited tablet-style
+      session such as server, cashier, or kitchen/bar. The session model holds the current employee id, display name, and optional profile image path.
+      Navigation visibility is then driven from those flags, allowing the same application to expose different menus without changing the deployed binary.
+    </p>
+
+    <div class="page-break"></div>
+
+    <h2>5. API and Web Portal Architecture</h2>
+    <p>
+      The API is intentionally small and focused. It is configured in <code>EliteRestaurant.Api/Program.cs</code> with controllers,
+      OpenAPI/Swagger, a singleton tablet authentication service, permissive CORS under the policy name <code>LanOnly</code>,
+      and static file hosting. The API also calls <code>AppDbContext.Initialize()</code> during startup, meaning the API process itself
+      is capable of bootstrapping the shared database schema.
+    </p>
+
+    <h3>API responsibilities</h3>
+    <ul>
+      <li>Authenticate staff into portal-specific sessions.</li>
+      <li>Serve server portal configuration and branding assets.</li>
+      <li>Return a server's assigned tables and available menu items.</li>
+      <li>Persist and retrieve shared order drafts for the server portal.</li>
+      <li>Create or append orders from the web portal.</li>
+      <li>Show ready orders and allow marking them as served.</li>
+      <li>Expose reservation arrivals and health endpoints.</li>
+    </ul>
+
+    <h3>Server portal frontend</h3>
+    <p>
+      The server portal lives entirely in one file, <code>EliteRestaurant.Api/wwwroot/index.html</code>. It contains HTML, CSS, and JavaScript
+      inline. The UI is effectively a hand-written single-page application, but without a framework. It maintains in-memory state for the bearer token,
+      current employee, tables, products, ready orders, shared drafts, configuration data, and the current cart.
+    </p>
+    <p>
+      This design keeps deployment simple because the API serves both the JSON endpoints and the UI itself. A tablet only needs browser access
+      to the API host over the LAN. The tradeoff is maintainability: the portal file mixes presentation, data fetching, state management,
+      and workflow logic in one place.
+    </p>
+
+    <h3>API endpoint groups</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Controller</th>
+          <th>Route base</th>
+          <th>Main purpose</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>AuthController</code></td>
+          <td><code>/api/auth</code></td>
+          <td>Staff login using staff id plus PIN for a specific portal type.</td>
+        </tr>
+        <tr>
+          <td><code>ServerPortalController</code></td>
+          <td><code>/api/server</code></td>
+          <td>Server-specific configuration, branding assets, products, drafts, orders, ready queue, and serve actions.</td>
+        </tr>
+        <tr>
+          <td><code>TablesController</code></td>
+          <td><code>/api/tables</code></td>
+          <td>Returns available tables for the current session, filtering to assigned server tables for server users.</td>
+        </tr>
+        <tr>
+          <td><code>ReservationsController</code></td>
+          <td><code>/api/reservations</code></td>
+          <td>Exposes arrived reservations.</td>
+        </tr>
+        <tr>
+          <td><code>HealthController</code></td>
+          <td><code>/api/health</code></td>
+          <td>Basic process and database connectivity health checks.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Authentication model</h3>
+    <p>
+      Authentication is implemented by <code>TabletAuthService</code>. It is not JWT-based and does not use ASP.NET authentication middleware.
+      Instead, the service creates a random GUID-like token, stores it in a singleton <code>ConcurrentDictionary</code>, and returns that token to the client.
+      Subsequent requests send the token in the <code>Authorization: Bearer ...</code> header. Validation checks token existence and expiration.
+    </p>
+    <p>
+      Sessions expire after twelve hours. Because the token store is in memory, all active sessions are lost if the API process restarts.
+      This is acceptable for a lightweight LAN tool, but it is important operationally because tablets will appear logged out after every API restart.
+    </p>
+
+    <h2>6. Database Design and Persistence Strategy</h2>
+    <p>
+      <code>AppDbContext</code> is the single authoritative persistence context. It exposes entity sets for employees, products, tables,
+      orders, order items, inventory items, product ingredients, attendance, payroll artifacts, money transactions, customers, reservations,
+      waitlist entries, and shared order drafts.
+    </p>
+    <p>
+      On configuration, the context attempts to resolve a PostgreSQL connection string either from environment variables
+      (<code>ELITE_DB_PROVIDER</code> and <code>ELITE_POSTGRES_CONNECTION</code>) or from the settings file under
+      <code>Database.PostgreSqlConnectionString</code>. If no connection string is found, the application throws rather than silently falling back.
+    </p>
+
+    <h3>Schema strategy</h3>
+    <p>
+      The codebase does not currently use Entity Framework migrations. Instead, initialization relies on <code>Database.EnsureCreated()</code>
+      plus additional explicit SQL executed through methods such as <code>EnsureReservationsSchema</code>, <code>EnsureOrderReservationColumns</code>,
+      and <code>EnsureSharedDraftSchema</code>. This approach is fast and convenient for a small project, but it also means schema evolution is manual
+      and embedded in application startup logic rather than tracked in migration files.
+    </p>
+
+    <h3>Main persisted entities</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Entity</th>
+          <th>Meaning</th>
+          <th>Notable fields</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>Employee</code></td>
+          <td>Staff record for admin, kitchen, cashier, server, and other roles.</td>
+          <td><code>UniqueId</code>, <code>SignInId</code>, <code>PinCode</code>, hourly rate, shifts, profile image path.</td>
+        </tr>
+        <tr>
+          <td><code>Table</code></td>
+          <td>Restaurant floor table definition.</td>
+          <td><code>TableNumber</code>, name, capacity, status, assigned server.</td>
+        </tr>
+        <tr>
+          <td><code>Product</code></td>
+          <td>Menu item.</td>
+          <td>Unique id, category, subcategory, price, ingredient links.</td>
+        </tr>
+        <tr>
+          <td><code>OrderRecord</code></td>
+          <td>Main sales document / open check / kitchen flow record.</td>
+          <td>Status, notes, discount, payment fields, order source, reservation reference, timestamps.</td>
+        </tr>
+        <tr>
+          <td><code>OrderItem</code></td>
+          <td>Line item inside an order.</td>
+          <td>Product, quantity, assigned prep employee or role label.</td>
+        </tr>
+        <tr>
+          <td><code>ReservationBooking</code></td>
+          <td>Future or current reservation.</td>
+          <td>Reserved time, party size, status, deposit fields, linked customer and optional table.</td>
+        </tr>
+        <tr>
+          <td><code>SharedOrderDraft</code></td>
+          <td>Shared backend snapshot used by server drafts.</td>
+          <td>Employee ownership, portal, label, JSON payload, timestamps.</td>
+        </tr>
+        <tr>
+          <td><code>MoneyTransaction</code></td>
+          <td>Ledger-style revenue or expense entry.</td>
+          <td>Amount in base and converted values, category, date, fixed/variable marker, justification.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      The model also defines several useful indexes and uniqueness constraints, for example unique employee sign-in ids when non-empty,
+      unique table numbers, and unique entity <code>UniqueId</code> values. Relationships are mostly configured with delete behaviors such as
+      <code>SetNull</code> for optional table or server links and <code>Cascade</code> for payroll-linked records.
+    </p>
+
+    <div class="page-break"></div>
+
+    <h2>7. Core Business Logic and Workflow Rules</h2>
+    <h3>Order lifecycle</h3>
+    <p>
+      The project has a clearly defined order status model in <code>OrderWorkflow</code>. The key states are
+      <code>Pending cashier</code>, <code>Waiting</code>, <code>In Kitchen</code>, <code>Ready</code>, <code>Served</code>,
+      <code>Completed</code>, and <code>Cancelled</code>. Not all states appear in the same screens, but together they define the operational path.
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>Status</th>
+          <th>Meaning</th>
+          <th>Operational consequence</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>Pending cashier</code></td>
+          <td>Server has sent the order but it has not yet entered kitchen flow.</td>
+          <td>Still treated as an open check and still occupies the table.</td>
+        </tr>
+        <tr>
+          <td><code>Waiting</code></td>
+          <td>Kitchen should receive the order.</td>
+          <td>Included in kitchen queue and active order tracking.</td>
+        </tr>
+        <tr>
+          <td><code>In Kitchen</code></td>
+          <td>Preparation is underway.</td>
+          <td>Active check remains open and table remains occupied.</td>
+        </tr>
+        <tr>
+          <td><code>Ready</code></td>
+          <td>Prepared items are awaiting pickup by server.</td>
+          <td>Visible in the server pickup flow and alert banners.</td>
+        </tr>
+        <tr>
+          <td><code>Served</code></td>
+          <td>Food has reached the guest and cashier may complete payment.</td>
+          <td>Still considered open until payment completion.</td>
+        </tr>
+        <tr>
+          <td><code>Completed</code></td>
+          <td>Order is finalized and financially posted.</td>
+          <td>Revenue ledger entries can be created and table may become available.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Open check model</h3>
+    <p>
+      A major rule in the codebase is that a table may have one active open check that can continue receiving additional lines
+      until it is completed or cancelled. The API explicitly checks for open checks through the EF-translatable helper
+      <code>WhereOpenCheckForTable</code>. The server portal allows the user either to append to the open check or force creation of a separate one,
+      but the code still consistently treats certain statuses as occupying the table.
+    </p>
+
+    <h3>Shared draft logic</h3>
+    <p>
+      Shared order drafts are stored in the database and keyed to employee id plus portal type. This allows the same employee to save and load
+      drafts across sessions and devices as long as they authenticate with the same staff identity. Drafts are stored as raw JSON snapshots rather than
+      normalized relational data. That choice makes snapshot persistence flexible and decoupled from every small UI state change, at the cost of making
+      drafts opaque to database queries.
+    </p>
+
+    <h3>Payroll and finance logic</h3>
+    <p>
+      Payroll uses attendance-based deductions and a sales-based bonus. <code>PayrollCalculator</code> computes scheduled hours from shift definitions,
+      counts absences and late penalties, computes a five percent bonus on generated sales, and returns a net value that never falls below zero.
+      <code>FinancialTransactionService</code> persists both revenue and salary-related expense entries into the money ledger, linking them back to orders
+      or payroll periods through structured justification text.
+    </p>
+
+    <h3>Inventory linkage</h3>
+    <p>
+      Products are linked to inventory items through <code>ProductIngredient</code>. The seeding utility uses these links to reduce stock when generating
+      historical orders, demonstrating the intended relationship between the menu and stock usage. This implies that the data model is designed for inventory-aware
+      restaurant operations rather than a purely sales-only system.
+    </p>
+
+    <h2>8. Configuration, Settings, and Branding</h2>
+    <p>
+      Application settings are stored outside the repository in
+      <code>%LocalAppData%\EliteRestaurantPro\settings\app-settings.json</code>. The central abstraction is <code>SettingsManager</code>,
+      which reads and writes a JSON representation of <code>AppSettings</code>.
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>Settings group</th>
+          <th>Purpose</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>BusinessProfile</code></td>
+          <td>Restaurant name, phone, address, social links, logo path, homepage image, footer text, and legal/tax identifiers.</td>
+        </tr>
+        <tr>
+          <td><code>CurrencyPricing</code></td>
+          <td>Default display mode, USD to FC exchange rate, rounding behavior, tax percent, and service percent.</td>
+        </tr>
+        <tr>
+          <td><code>NavigationBackgrounds</code></td>
+          <td>Per-page image paths plus dim and contrast values for navigation screens.</td>
+        </tr>
+        <tr>
+          <td><code>Database</code></td>
+          <td>Provider marker and PostgreSQL connection string.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      The server portal consumes this same settings model indirectly through <code>/api/server/config</code>.
+      As a result, branding in the browser is not duplicated in a separate web config file. The restaurant name,
+      logo, tax percentage, service percentage, and currency mode are all derived from the same persisted settings that the desktop app uses.
+      Employee profile photos are resolved from the <code>Employees</code> table and served as local files by the API host.
+    </p>
+
+    <h2>9. Connectivity and Deployment Model</h2>
+    <p>
+      The deployment model is LAN-oriented. The API can be launched on the host machine and bound to a LAN-accessible address, allowing tablets or phones
+      on the same network to open the browser portal. The default development launch settings include <code>http://localhost:5223</code> and
+      <code>https://localhost:7194</code>, but real device access depends on running with a reachable host binding such as
+      <code>http://0.0.0.0:5223</code> and ensuring that local firewall rules allow inbound traffic.
+    </p>
+    <p>
+      This architecture is especially suited for a restaurant where the main workstation is on Ethernet and staff tablets are on Wi-Fi.
+      No public hosting is required as long as the API host and devices share network visibility. The browser portal is downloaded from the API,
+      and all data exchange occurs through local HTTP requests.
+    </p>
+
+    <div class="warning">
+      <strong>Operational caution:</strong> connectivity success depends on correct protocol and port usage. A common field failure is trying to open
+      an HTTPS URL from a device when only HTTP is actually exposed or trusted on the LAN.
+    </div>
+
+    <div class="page-break"></div>
+
+    <h2>10. Security Model and Current Risks</h2>
+    <p>
+      The codebase includes meaningful access separation, but it should be described as pragmatic application security rather than enterprise-grade security.
+      Authentication is PIN-based and role-sensitive. A login request can only succeed if the employee matches the requested portal type,
+      for example server or cashier. That is a positive control because the same employee credentials are not automatically valid for every portal.
+    </p>
+
+    <h3>Security strengths currently present</h3>
+    <ul>
+      <li>Staff must match both identity and PIN.</li>
+      <li>Portal role resolution filters staff by allowed role before creating a session.</li>
+      <li>Bearer tokens expire after a fixed duration.</li>
+      <li>Server endpoints verify that the caller is a server and that selected tables belong to that server.</li>
+      <li>Image asset access uses a token query parameter, preventing anonymous direct reads.</li>
+    </ul>
+
+    <h3>Security limitations and risks</h3>
+    <ul>
+      <li>Sessions are stored only in memory and are not cryptographically signed tokens.</li>
+      <li>Pins appear to be stored directly on employee records rather than hashed values.</li>
+      <li>CORS policy <code>AllowAnyOrigin</code> is intentionally permissive.</li>
+      <li>There is no HTTPS enforcement inside the API configuration.</li>
+      <li>The project does not use ASP.NET Core authentication middleware, authorization policies, or claims.</li>
+      <li>Settings and asset file paths rely on local file-system trust on the host machine.</li>
+      <li>The API and desktop both execute schema creation logic at startup, which increases startup-side privileges.</li>
+    </ul>
+
+    <p>
+      None of these observations mean the system is unsafe for a small local restaurant LAN, but they do define the current trust model:
+      the environment is expected to be controlled, local, and operator-managed. If the project were expanded to internet deployment,
+      multi-site use, or untrusted device networks, the security architecture would need substantial strengthening.
+    </p>
+
+    <h2>11. Operational Tooling and Maintenance</h2>
+    <p>
+      The repository includes two operational console tools. <code>SeedRunner</code> is the primary maintenance tool and is capable of resetting
+      the database, reseeding staff, menu, tables, inventory, and two months of historical activity, and even reducing active orders while preserving
+      business consistency. It is effectively a data reset and demo-data generation utility.
+    </p>
+    <p>
+      <code>ClearActiveOrders</code> appears intended to remove in-progress orders. However, it references a <code>DatabasePath</code> property
+      that is not part of the active PostgreSQL-focused code path shown in the current context. This suggests that the utility may contain stale code
+      left over from the SQLite period and should be revalidated before operational reliance.
+    </p>
+
+    <h3>Observed maintenance model</h3>
+    <ul>
+      <li>Schema changes are embedded in application code rather than migrations.</li>
+      <li>The desktop app can prompt for missing database configuration interactively.</li>
+      <li>The API can be used as both service endpoint and static portal host.</li>
+      <li>Financial consistency is partially repaired through startup helper methods and reconciliation routines.</li>
+      <li>Table state consistency can be recalculated from active orders using <code>ReconcileTableStatusesWithOrders</code>.</li>
+    </ul>
+
+    <h2>12. Architectural Strengths, Constraints, and Recommendations</h2>
+    <h3>Strengths</h3>
+    <p>
+      The codebase is cohesive and direct. Desktop and API share the same business understanding, the operational workflows are easy to trace,
+      and the system is very suitable for a single-site restaurant. The browser portal is deployment-light, the settings model is unified,
+      and the domain coverage is broad enough to function as a real restaurant management platform rather than a narrow point-of-sale sample.
+    </p>
+
+    <h3>Constraints</h3>
+    <p>
+      The same cohesion that makes the project approachable also increases coupling. Because the API depends on the desktop project,
+      web-facing logic inherits many assumptions from the WPF application. Database evolution is manual. Security controls are lightweight.
+      The portal frontend is concentrated in one HTML file. Some helper utilities still reveal legacy SQLite residue. These are not immediate blockers,
+      but they are the main scaling constraints.
+    </p>
+
+    <h3>Recommended next improvements</h3>
+    <ul>
+      <li>Introduce formal EF Core migrations for repeatable schema evolution.</li>
+      <li>Split <code>wwwroot/index.html</code> into separate HTML, CSS, and JavaScript files for maintainability.</li>
+      <li>Move authentication to signed tokens or middleware-backed auth if broader deployment is planned.</li>
+      <li>Hash staff PINs instead of storing raw values.</li>
+      <li>Tighten CORS and prefer HTTPS for device access where operationally feasible.</li>
+      <li>Revalidate or modernize <code>ClearActiveOrders</code> against the PostgreSQL-first design.</li>
+      <li>Consider separating shared domain logic from WPF-specific concerns into a dedicated class library.</li>
+    </ul>
+
+    <p class="small">
+      This document is intentionally architecture-first. A deeper appendix with entity detail, endpoint reference, folder inventory,
+      operational notes, and technical observations is provided separately in <code>EliteRestaurant-Technical-Appendix</code>.
+    </p>
+  </main>
+</body>
+</html>

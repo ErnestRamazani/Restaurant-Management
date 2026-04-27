@@ -1,12 +1,17 @@
-using EliteRestaurantPro.Data;
-using EliteRestaurantPro.Models;
-using EliteRestaurantPro.Utils;
+// Destructively truncates and reseeds the database. Interactive confirmation is required unless you pass --force (for automation only).
+using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Utils;
 using Microsoft.EntityFrameworkCore;
 
-AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
-
-AppDbContext.Initialize();
+DatabaseInitializer.Initialize();
 using var db = new AppDbContext();
+
+if (args.Any(a => string.Equals(a, "--cancel-all-open-orders", StringComparison.OrdinalIgnoreCase)))
+{
+    CancelAllOpenOrders(db);
+    return;
+}
 
 var reduceArg = args.FirstOrDefault(a =>
     a.StartsWith("--reduce-active-orders=", StringComparison.OrdinalIgnoreCase));
@@ -23,6 +28,23 @@ if (!string.IsNullOrWhiteSpace(reduceArg))
     return;
 }
 
+if (!args.Any(a => string.Equals(a, "--force", StringComparison.OrdinalIgnoreCase)))
+{
+    var settings = SettingsManager.Load();
+    var expectedName = string.IsNullOrWhiteSpace(settings.BusinessProfile.RestaurantName)
+        ? "Elite Restaurant"
+        : settings.BusinessProfile.RestaurantName.Trim();
+    Console.WriteLine("WARNING: This will DELETE ALL DATA in the configured PostgreSQL database.");
+    Console.WriteLine($"Target: {AppDbContext.GetDatabaseTargetDescription()}");
+    Console.WriteLine($"Type the restaurant name exactly to confirm (expected: {expectedName}):");
+    var line = Console.ReadLine();
+    if (!string.Equals(line?.Trim(), expectedName, StringComparison.Ordinal))
+    {
+        Console.WriteLine("Aborted.");
+        return;
+    }
+}
+
 Console.WriteLine("Resetting PostgreSQL data...");
 db.Database.ExecuteSqlRaw("""
     TRUNCATE TABLE
@@ -37,6 +59,11 @@ db.Database.ExecuteSqlRaw("""
         "SalaryAdvances",
         "PayrollPaymentRecords",
         "Transactions",
+        "TabletSessions",
+        "SharedOrderDrafts",
+        "Reservations",
+        "WaitlistEntries",
+        "CustomerProfiles",
         "Employees"
     RESTART IDENTITY CASCADE;
     """);
@@ -313,10 +340,26 @@ foreach (var table in tables)
 db.SaveChanges();
 Console.WriteLine("Done: 2 months of data seeded.");
 Console.WriteLine();
-Console.WriteLine("=== SIGN-IN CREDENTIALS ===");
+Console.WriteLine("=== SIGN-IN CREDENTIALS (PINs match seed script; stored hashed in DB) ===");
+var seedPinBySignInId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+{
+    ["ADM01"] = "1100",
+    ["CHF01"] = "2200",
+    ["SRV01"] = "3101",
+    ["SRV02"] = "3102",
+    ["SRV03"] = "3103",
+    ["SRV04"] = "3104",
+    ["SRV05"] = "3105",
+    ["SRV06"] = "3106",
+    ["SRV07"] = "3107",
+    ["CSH01"] = "4101",
+    ["CSH02"] = "4102",
+};
 foreach (var employee in employees.OrderBy(e => e.Role).ThenBy(e => e.Name))
 {
-    Console.WriteLine($"{employee.Role,-8} | {employee.Name,-16} | ID: {employee.SignInId,-5} | PIN: {employee.PinCode}");
+    var sid = (employee.SignInId ?? string.Empty).Trim();
+    var pinDisplay = seedPinBySignInId.TryGetValue(sid, out var p) ? p : "?";
+    Console.WriteLine($"{employee.Role,-8} | {employee.Name,-16} | ID: {employee.SignInId,-5} | PIN: {pinDisplay}");
 }
 
 static Employee CreateEmployee(
@@ -339,7 +382,7 @@ static Employee CreateEmployee(
         SignInId = signInId,
         Name = name,
         Role = role,
-        PinCode = pin,
+        PinCode = EmployeePinHasher.HashForStorage(pin),
         PhoneNumber = "+1 555 000 0000",
         HourlyRate = hourlyRate,
         JoinDate = DateTime.Today.AddMonths(-6),
@@ -394,6 +437,28 @@ static string GetShiftForDate(Employee employee, DayOfWeek dayOfWeek)
     };
 }
 
+static void CancelAllOpenOrders(AppDbContext db)
+{
+    var openStatuses = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        OrderWorkflow.PendingCashier,
+        "Waiting",
+        "In Kitchen",
+        "Ready",
+        OrderWorkflow.Served
+    };
+
+    var orders = db.Orders.Where(o => openStatuses.Contains(o.Status)).ToList();
+    foreach (var o in orders)
+        o.Status = "Cancelled";
+
+    db.SaveChanges();
+    DataReconciler.ReconcileTableStatusesWithOrders(db);
+    db.SaveChanges();
+
+    Console.WriteLine($"Cancelled {orders.Count} open order(s). Tables reconciled.");
+}
+
 static void ReduceActiveOrders(AppDbContext db, int keepActiveCount)
 {
     var activeStatuses = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -440,7 +505,7 @@ static void ReduceActiveOrders(AppDbContext db, int keepActiveCount)
     }
 
     db.SaveChanges();
-    AppDbContext.ReconcileTableStatusesWithOrders(db);
+    DataReconciler.ReconcileTableStatusesWithOrders(db);
     db.SaveChanges();
 
     var remainingActive = db.Orders.Count(o => activeStatuses.Contains(o.Status));

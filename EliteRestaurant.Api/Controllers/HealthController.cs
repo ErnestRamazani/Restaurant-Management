@@ -1,11 +1,11 @@
-using EliteRestaurantPro.Data;
+using EliteRestaurant.Core.Data;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EliteRestaurant.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public sealed class HealthController : ControllerBase
+public sealed class HealthController(AppDbContext db) : ControllerBase
 {
     [HttpGet]
     public IActionResult Get() => Ok(new
@@ -20,7 +20,6 @@ public sealed class HealthController : ControllerBase
     {
         try
         {
-            using var db = new AppDbContext();
             var employeeCount = db.Employees.Count();
             var tableCount = db.Tables.Count();
             return Ok(new

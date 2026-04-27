@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore dependencies
+        run: dotnet restore EliteRestaurant.sln
+
+      - name: Build solution
+        run: dotnet build EliteRestaurant.sln --no-restore --configuration Release
+
+      - name: Run tests with coverage
+        run: >
+          dotnet test EliteRestaurant.Tests/EliteRestaurant.Tests.csproj
+          --no-build
+          --configuration Release
+          --verbosity normal
+          --settings EliteRestaurant.Tests/CodeCoverage.runsettings
+          --collect:"XPlat Code Coverage"
+          --results-directory ./coverage
+
+      - name: Install ReportGenerator
+        run: dotnet tool install -g dotnet-reportgenerator-globaltool
+
+      - name: Generate coverage summary
+        run: reportgenerator "-reports:./coverage/**/coverage.cobertura.xml" "-targetdir:./coverage/report" "-reporttypes:TextSummary"
+
+      # Rubric target: 40% line coverage as tests grow. Migrations are excluded via CodeCoverage.runsettings
+      # (~20% combined Core+Api today). Raise $min toward 40 when the suite catches up.
+      - name: Check coverage threshold (line minimum)
+        shell: pwsh
+        run: |
+          $path = "./coverage/report/Summary.txt"
+          if (-not (Test-Path $path)) { throw "Missing $path — was coverage data collected?" }
+          Get-Content $path
+          $text = Get-Content $path -Raw
+          if ($text -notmatch 'Line coverage:\s*([\d.]+)%') {
+            throw "Could not parse Line coverage from Summary.txt"
+          }
+          $cov = [decimal]$Matches[1]
+          $min = [decimal]20
+          Write-Host "Line coverage: $cov% (minimum $min%; milestone 40% — see workflow comment)"
+          if ($cov -lt $min) { throw "Line coverage $cov% is below the $min% minimum (regression gate)" }
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: ./coverage
+
+  core-tests-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore test project
+        run: dotnet restore EliteRestaurant.Tests/EliteRestaurant.Tests.csproj
+
+      - name: Build test project (Core + API, no WPF)
+        run: dotnet build EliteRestaurant.Tests/EliteRestaurant.Tests.csproj --no-restore --configuration Release
+
+      - name: Run tests
+        run: dotnet test EliteRestaurant.Tests/EliteRestaurant.Tests.csproj --no-build --configuration Release --verbosity normal

@@ -1,9 +1,9 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows.Input;
-using EliteRestaurantPro.Data;
-using EliteRestaurantPro.Utils;
-using EliteRestaurantPro.Models;
+using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Utils;
+using EliteRestaurant.Core.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Win32;
 
@@ -376,7 +376,13 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             : string.Join(
                 "\n",
                 payrollLines.Select(p =>
-                    $"{PayrollCalculator.FormatPayrollMonthLabel(p.Year, p.Month)}: Paid ${p.NetPayUsd:N2} USD (base gross ${p.MonthlySalaryUsd:N2}, sales ${p.MoneyGeneratedUsd:N2}, 5% bonus ${p.BonusFivePercentUsd:N2}, advances -${p.AdvancesDeductedUsd:N2}) — {p.PaidAtUtc.ToLocalTime():yyyy-MM-dd}"));
+                {
+                    var paidLine = p.PaidToDateUsd >= p.NetPayUsd - 0.005m
+                        ? $"Paid in full ${p.NetPayUsd:N2} USD"
+                        : $"Partial: ${p.PaidToDateUsd:N2} of ${p.NetPayUsd:N2} USD net";
+                    return
+                        $"{PayrollCalculator.FormatPayrollMonthLabel(p.Year, p.Month)}: {paidLine} (base gross ${p.MonthlySalaryUsd:N2}, sales ${p.MoneyGeneratedUsd:N2}, 5% bonus ${p.BonusFivePercentUsd:N2}, advances -${p.AdvancesDeductedUsd:N2}) — last posting {p.PaidAtUtc.ToLocalTime():yyyy-MM-dd}";
+                }));
         var entries = new List<ReportTimeEntryDto>();
 
         var attendanceRows = db.EmployeeAttendances
@@ -579,57 +585,13 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             .Where(pi => pi.InventoryItemId == item.Id)
             .ToList();
 
-        var qtyByProductId = ingredients
-            .GroupBy(i => i.ProductId)
-            .ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity));
-
-        var usedProductIds = qtyByProductId.Keys.ToList();
         var entries = new List<ReportTimeEntryDto>();
-
-        if (usedProductIds.Count > 0)
-        {
-            var orderLines = db.OrderItems
-                .AsNoTracking()
-                .Include(oi => oi.Product)
-                .Include(oi => oi.OrderRecord!)
-                .ThenInclude(o => o.Table)
-                .Where(oi => usedProductIds.Contains(oi.ProductId))
-                .OrderByDescending(oi => oi.OrderRecord!.CreatedAt)
-                .Take(320)
-                .ToList();
-
-            foreach (var line in orderLines)
-            {
-                var order = line.OrderRecord;
-                if (order is null || !qtyByProductId.TryGetValue(line.ProductId, out var ingredientQty))
-                    continue;
-
-                var usage = ingredientQty * line.Quantity;
-                entries.Add(new ReportTimeEntryDto
-                {
-                    EventTime = order.CreatedAt,
-                    EventType = "Derived Usage",
-                    Summary = $"{line.Product?.Name ?? "Unknown"} x{line.Quantity} consumed {usage:0.##} {item.Unit}",
-                    RelatedInfo = $"Order {order.UniqueId} | {order.TableCode} ({order.TableName}) | Server: {DisplayOrFallback(order.ServerName, "Unassigned")}",
-                    EntityContext = item.Name,
-                    OrdersCount = 1,
-                    ItemCount = line.Quantity,
-                    UnitUsage = usage
-                });
-            }
-        }
 
         AppendInventoryNotesTimeline(item.Notes, entries, item.Name);
         ApplyDayGroups(InventoryTimelineDays, entries);
 
-        var totalUsage = entries.Sum(e => e.UnitUsage);
-        var linkedOrders = entries
-            .Where(e => e.EventType == "Derived Usage")
-            .Select(e => e.Summary)
-            .Count();
-
         InventorySummary =
-            $"Item: {item.Name}\nID: {item.UniqueId}\nQuantity: {item.StockQuantity:0.##} {item.Unit}\nExpiration: {item.ExpirationDate?.ToString("yyyy-MM-dd") ?? "Not set"}\nLinked Menu Items: {ingredients.Select(i => i.ProductId).Distinct().Count()}\nDerived Usage: {totalUsage:0.##} {item.Unit}\nUsage Events: {linkedOrders}";
+            $"Item: {item.Name}\nID: {item.UniqueId}\nQuantity: {item.StockQuantity:0.##} {item.Unit}\nExpiration: {item.ExpirationDate?.ToString("yyyy-MM-dd") ?? "Not set"}\nLinked Menu Items: {ingredients.Select(i => i.ProductId).Distinct().Count()}";
     }
 
     private void LoadMenuDetails(int? productId)
@@ -702,13 +664,16 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             return;
         }
 
+        var rangeStartUtc = AttendanceCalendar.DayAnchorUtc(start);
+        var rangeEndExclusiveUtc = AttendanceCalendar.DayAnchorUtc(endExclusive);
+
         using var db = new AppDbContext();
         var entries = new List<ReportTimeEntryDto>();
 
         var attendanceRows = db.EmployeeAttendances
             .AsNoTracking()
             .Include(a => a.Employee)
-            .Where(a => a.WorkDate >= start && a.WorkDate < endExclusive)
+            .Where(a => a.WorkDate >= rangeStartUtc && a.WorkDate < rangeEndExclusiveUtc)
             .OrderByDescending(a => a.WorkDate)
             .ToList();
 
@@ -799,36 +764,12 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             });
         }
 
-        var usageRows = db.OrderItems
+        var inventoryNoteRows = db.InventoryItems
             .AsNoTracking()
-            .Include(oi => oi.OrderRecord)
-            .Join(
-                db.ProductIngredients.AsNoTracking().Include(pi => pi.InventoryItem),
-                oi => oi.ProductId,
-                pi => pi.ProductId,
-                (oi, pi) => new { oi, pi })
-            .Where(x => x.oi.OrderRecord != null &&
-                        x.oi.OrderRecord.CreatedAt >= start &&
-                        x.oi.OrderRecord.CreatedAt < endExclusive)
-            .OrderByDescending(x => x.oi.OrderRecord!.CreatedAt)
+            .Where(i => !string.IsNullOrWhiteSpace(i.Notes))
+            .Select(i => new InventoryNotesSnapshot(i.UniqueId, i.Name, i.Notes))
             .ToList();
-
-        foreach (var row in usageRows)
-        {
-            if (row.oi.OrderRecord is null)
-                continue;
-
-            var usage = row.pi.Quantity * row.oi.Quantity;
-            entries.Add(new ReportTimeEntryDto
-            {
-                EventTime = row.oi.OrderRecord.CreatedAt,
-                EventType = "Inventory Usage",
-                Summary = $"{row.pi.InventoryItem?.Name ?? "Unknown"} used {usage:0.##} {row.pi.InventoryItem?.Unit ?? "unit"}",
-                RelatedInfo = $"Order {row.oi.OrderRecord.UniqueId} | Product Qty: {row.oi.Quantity}",
-                EntityContext = $"Inventory: {row.pi.InventoryItem?.Name ?? "Unknown"}",
-                UnitUsage = usage
-            });
-        }
+        AppendInventoryActivityFromNotes(entries, start, endExclusive, inventoryNoteRows);
 
         var salaryTx = db.Transactions
             .AsNoTracking()
@@ -854,7 +795,7 @@ public sealed class ReportsViewModel : AdminBaseViewModel
 
         ApplyDayGroups(DailyTimelineDays, entries);
         DailySummary =
-            $"Daily timeline {start:yyyy-MM-dd} → {ReportEndDate:yyyy-MM-dd}: {entries.Count} events (attendance, orders, reservations, inventory, salary/Money).";
+            $"Daily timeline {start:yyyy-MM-dd} → {ReportEndDate:yyyy-MM-dd}: {entries.Count} events (attendance, orders, reservations, menu, inventory activity, salary/Money).";
     }
 
     private static void ApplyDayGroups(ObservableCollection<ReportDayGroupDto> target, IEnumerable<ReportTimeEntryDto> entries)
@@ -896,6 +837,45 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             });
         }
     }
+
+    /// <summary>
+    /// Adds timestamped lines from <see cref="InventoryItem.Notes"/> (manual adjustments, order deductions, etc.)
+    /// to the daily feed. Only lines with a leading <c>yyyy-MM-dd HH:mm</c> timestamp in range are included.
+    /// </summary>
+    private static void AppendInventoryActivityFromNotes(
+        List<ReportTimeEntryDto> entries,
+        DateTime start,
+        DateTime endExclusive,
+        IReadOnlyList<InventoryNotesSnapshot> inventoryNoteRows)
+    {
+        foreach (var row in inventoryNoteRows)
+        {
+            if (string.IsNullOrWhiteSpace(row.Notes))
+                continue;
+
+            foreach (var rawLine in row.Notes.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                var line = rawLine.Trim();
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
+
+                var ts = TryParseLeadingTimestamp(line);
+                if (ts is null || ts.Value < start || ts.Value >= endExclusive)
+                    continue;
+
+                entries.Add(new ReportTimeEntryDto
+                {
+                    EventTime = ts.Value,
+                    EventType = "Inventory Activity",
+                    Summary = line,
+                    RelatedInfo = $"Item: {row.Name} ({row.UniqueId})",
+                    EntityContext = $"Inventory: {row.Name}"
+                });
+            }
+        }
+    }
+
+    private sealed record InventoryNotesSnapshot(string UniqueId, string Name, string Notes);
 
     private static void AppendInventoryNotesTimeline(string notes, ICollection<ReportTimeEntryDto> entries, string itemName)
     {
@@ -1040,15 +1020,16 @@ public sealed class ReportsViewModel : AdminBaseViewModel
 
         bool includeAttendance = reportType is "Daily" or "Employees";
         bool includeOrders = reportType is "Daily" or "Employees" or "Tables" or "Menu";
-        bool includeInventory = reportType is "Daily" or "Inventory" or "Menu";
         bool includeReservations = reportType is "Daily" or "Tables";
 
         if (includeAttendance)
         {
+            var attendanceStartUtc = AttendanceCalendar.DayAnchorUtc(start.Date);
+            var attendanceEndExclusiveUtc = AttendanceCalendar.DayAnchorUtc(endExclusive.Date);
             var attendanceRows = db.EmployeeAttendances
                 .AsNoTracking()
                 .Include(a => a.Employee)
-                .Where(a => a.WorkDate >= start && a.WorkDate < endExclusive)
+                .Where(a => a.WorkDate >= attendanceStartUtc && a.WorkDate < attendanceEndExclusiveUtc)
                 .OrderBy(a => a.WorkDate)
                 .ThenBy(a => a.EmployeeId)
                 .ToList();
@@ -1099,7 +1080,7 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         }
 
         var orderItems = new List<OrderItem>();
-        if (includeOrders || includeInventory)
+        if (includeOrders)
         {
             orderItems = db.OrderItems
                 .AsNoTracking()
@@ -1146,50 +1127,32 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             }
         }
 
-        if (includeInventory)
+        if (reportType is "Daily" or "Inventory")
         {
-            var productIds = orderItems.Select(oi => oi.ProductId).Distinct().ToList();
-            var ingredientsByProductId = db.ProductIngredients
+            var inventoryActivityItems = db.InventoryItems
                 .AsNoTracking()
-                .Include(pi => pi.InventoryItem)
-                .Where(pi => productIds.Contains(pi.ProductId))
-                .ToList()
-                .GroupBy(pi => pi.ProductId)
-                .ToDictionary(g => g.Key, g => g.ToList());
+                .Where(i => !string.IsNullOrWhiteSpace(i.Notes))
+                .ToList();
 
-            foreach (var line in orderItems)
+            foreach (var item in inventoryActivityItems)
             {
-                var order = line.OrderRecord;
-                if (order is null || !ingredientsByProductId.TryGetValue(line.ProductId, out var ingredients))
-                    continue;
-
-                employeesById.TryGetValue(line.PreparedByEmployeeId ?? 0, out var preparedByEmployee);
-                employeesById.TryGetValue(order.ServerId ?? 0, out var serverEmployee);
-                tablesById.TryGetValue(order.TableId ?? 0, out var table);
-
-                foreach (var ingredient in ingredients)
+                foreach (var rawLine in item.Notes.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
                 {
+                    var line = rawLine.Trim();
+                    if (string.IsNullOrWhiteSpace(line))
+                        continue;
+
+                    var ts = TryParseLeadingTimestamp(line);
+                    if (ts is null || ts.Value < start || ts.Value >= endExclusive)
+                        continue;
+
+                    var orderCol = line.Length > 200 ? line[..200] + "…" : line;
                     rows.Add(BuildAnalyticalRow(
-                        eventTime: order.CreatedAt,
-                        eventType: "Inventory",
-                        employeeId: preparedByEmployee?.UniqueId ?? string.Empty,
-                        employeeName: line.PreparedByName,
-                        serverId: serverEmployee?.UniqueId ?? string.Empty,
-                        serverName: order.ServerName,
-                        orderId: order.UniqueId,
-                        tableId: table?.UniqueId ?? string.Empty,
-                        tableName: order.TableName,
-                        productId: line.Product?.UniqueId ?? string.Empty,
-                        productName: line.Product?.Name ?? string.Empty,
-                        quantity: (ingredient.Quantity * line.Quantity).ToString("0.##", CultureInfo.InvariantCulture),
-                        ingredientId: ingredient.InventoryItem?.UniqueId ?? string.Empty,
-                        ingredientName: ingredient.InventoryItem?.Name ?? string.Empty,
-                        unit: ingredient.InventoryItem?.Unit ?? string.Empty,
-                        costOrPrice: line.Product?.Price.ToString("0.00", CultureInfo.InvariantCulture) ?? string.Empty,
-                        chefId: line.PreparedByRole == "Chef" ? preparedByEmployee?.UniqueId ?? string.Empty : string.Empty,
-                        chefName: line.PreparedByRole == "Chef" ? line.PreparedByName : string.Empty,
-                        barmanId: line.PreparedByRole == "Barman" ? preparedByEmployee?.UniqueId ?? string.Empty : string.Empty,
-                        barmanName: line.PreparedByRole == "Barman" ? line.PreparedByName : string.Empty));
+                        eventTime: ts.Value,
+                        eventType: "Inventory activity",
+                        orderId: orderCol,
+                        ingredientId: item.UniqueId,
+                        ingredientName: item.Name));
                 }
             }
         }

@@ -1,8 +1,17 @@
+using System.Collections.ObjectModel;
+using System.IO;
+using System.Linq;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Utils;
+using EliteRestaurantPro.Services;
 using EliteRestaurantPro.Utils;
-using System.Collections.ObjectModel;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Win32;
 using Npgsql;
+using QRCoder;
 
 namespace EliteRestaurantPro.ViewModels;
 
@@ -46,7 +55,14 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     private string _taxPercent = "7";
     private string _servicePercent = "10";
     private string _databaseProvider = "PostgreSql";
-    private string _databaseConnectionString = string.Empty;
+    private string _databaseHost = string.Empty;
+    private string _databasePort = "5432";
+    private string _databaseName = string.Empty;
+    private string _databaseUsername = string.Empty;
+    private string _pendingDatabasePassword = string.Empty;
+    private bool _hasSavedDatabasePassword;
+    private string _publicMenuBaseUrl = "http://localhost:5223";
+    private string _customerMenuTagline = string.Empty;
 
     public override string ActivePage => "AppearanceSettings";
 
@@ -116,7 +132,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         set => SetField(ref _statusMessage, value);
     }
 
-    public ObservableCollection<string> SettingsSections { get; } = new(["All", "Business Profile", "Currency & Pricing", "Menu Backgrounds", "Database", "Appearance"]);
+    public ObservableCollection<string> SettingsSections { get; } = new(["All", "Business Profile", "Currency & Pricing", "Menu Backgrounds", "Menu QR Codes", "Database", "Appearance"]);
     public ObservableCollection<string> BackgroundMenuKeys { get; } = new(["Dashboard", "Employees", "Menu", "Inventory", "Attendance", "Tables", "Reservations", "Orders", "CreateOrder", "Money", "Salary", "Reports", "KitchenQueue", "ServerPickup"]);
     public ObservableCollection<string> DatabaseProviders { get; } = new(["PostgreSql"]);
 
@@ -132,12 +148,16 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
             OnPropertyChanged(nameof(ShowMenuBackgroundSection));
             OnPropertyChanged(nameof(ShowDatabaseSection));
             OnPropertyChanged(nameof(ShowAppearanceSection));
+            OnPropertyChanged(nameof(ShowMenuQrSection));
+            if (ShowMenuQrSection)
+                RefreshMenuQrRows();
         }
     }
 
     public bool ShowBusinessSection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Business Profile";
     public bool ShowCurrencySection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Currency & Pricing";
     public bool ShowMenuBackgroundSection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Menu Backgrounds";
+    public bool ShowMenuQrSection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Menu QR Codes";
     public bool ShowDatabaseSection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Database";
     public bool ShowAppearanceSection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Appearance";
 
@@ -231,6 +251,24 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         set => SetField(ref _taxIdLegalInfo, value);
     }
 
+    public string PublicMenuBaseUrl
+    {
+        get => _publicMenuBaseUrl;
+        set
+        {
+            if (SetField(ref _publicMenuBaseUrl, value))
+                RefreshMenuQrRows();
+        }
+    }
+
+    public string CustomerMenuTagline
+    {
+        get => _customerMenuTagline;
+        set => SetField(ref _customerMenuTagline, value);
+    }
+
+    public ObservableCollection<MenuQrTableRow> MenuQrRows { get; } = new();
+
     public string DefaultCurrencyDisplayMode
     {
         get => _defaultCurrencyDisplayMode;
@@ -285,11 +323,42 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         set => SetField(ref _databaseProvider, value);
     }
 
-    public string DatabaseConnectionString
+    public string DatabaseHost
     {
-        get => _databaseConnectionString;
-        set => SetField(ref _databaseConnectionString, value);
+        get => _databaseHost;
+        set => SetField(ref _databaseHost, value);
     }
+
+    public string DatabasePort
+    {
+        get => _databasePort;
+        set => SetField(ref _databasePort, value);
+    }
+
+    public string DatabaseName
+    {
+        get => _databaseName;
+        set => SetField(ref _databaseName, value);
+    }
+
+    public string DatabaseUsername
+    {
+        get => _databaseUsername;
+        set => SetField(ref _databaseUsername, value);
+    }
+
+    /// <summary>True when a DPAPI-protected password exists in settings (password is never shown).</summary>
+    public bool HasSavedDatabasePassword
+    {
+        get => _hasSavedDatabasePassword;
+        private set => SetField(ref _hasSavedDatabasePassword, value);
+    }
+
+    /// <summary>Called from PasswordBox code-behind; value is not exposed via a bindable property.</summary>
+    public void SetDatabasePasswordFromUi(string password)
+        => _pendingDatabasePassword = password ?? string.Empty;
+
+    public event Action? NotifyClearDatabasePassword;
 
     public string SelectedToken
     {
@@ -367,6 +436,8 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     public ICommand ClearMenuBackgroundCommand { get; }
     public ICommand SaveDatabaseSettingsCommand { get; }
     public ICommand TestDatabaseConnectionCommand { get; }
+    public ICommand PrintAllMenuQrCommand { get; }
+    public ICommand ApplyPhoneFriendlyMenuUrlCommand { get; }
 
     public AppearanceSettingsViewModel(Action<BaseViewModel> navigate) : base(navigate)
     {
@@ -385,10 +456,14 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         ClearMenuBackgroundCommand = new RelayCommand(_ => ClearMenuBackground());
         SaveDatabaseSettingsCommand = new RelayCommand(_ => SaveDatabaseSettings());
         TestDatabaseConnectionCommand = new RelayCommand(_ => TestDatabaseConnection());
+        PrintAllMenuQrCommand = new RelayCommand(_ => PrintAllMenuQrToPdf());
+        ApplyPhoneFriendlyMenuUrlCommand = new RelayCommand(_ => ApplyPhoneFriendlyMenuUrl());
         LoadBusinessAndPricingSettings();
         LoadBackgroundSettings();
         LoadDatabaseSettings();
         LoadFromCurrentTheme();
+        if (ShowMenuQrSection)
+            RefreshMenuQrRows();
     }
 
     private void LoadFromCurrentTheme()
@@ -545,6 +620,10 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         HomepageBackgroundImagePath = business.HomepageBackgroundImagePath;
         TicketFooterText = business.TicketFooterText;
         TaxIdLegalInfo = business.TaxIdLegalInfo;
+        PublicMenuBaseUrl = string.IsNullOrWhiteSpace(business.PublicMenuBaseUrl)
+            ? (PublicMenuUrlHelper.SuggestBaseUrlForPhones() ?? "http://localhost:5223")
+            : business.PublicMenuBaseUrl.Trim();
+        CustomerMenuTagline = business.CustomerMenuTagline ?? string.Empty;
 
         var pricing = _settings.CurrencyPricing;
         DefaultCurrencyDisplayMode = pricing.DefaultCurrencyDisplayMode;
@@ -568,10 +647,19 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         _settings.BusinessProfile.HomepageBackgroundImagePath = HomepageBackgroundImagePath.Trim();
         _settings.BusinessProfile.TicketFooterText = TicketFooterText.Trim();
         _settings.BusinessProfile.TaxIdLegalInfo = TaxIdLegalInfo.Trim();
+        _settings.BusinessProfile.PublicMenuBaseUrl = (PublicMenuBaseUrl ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(_settings.BusinessProfile.PublicMenuBaseUrl))
+            _settings.BusinessProfile.PublicMenuBaseUrl = "http://localhost:5223";
+        _settings.BusinessProfile.CustomerMenuTagline = string.IsNullOrWhiteSpace(CustomerMenuTagline)
+            ? null
+            : CustomerMenuTagline.Trim();
 
         SettingsManager.Save(_settings);
         RefreshBusinessProfileBindings();
-        StatusMessage = "Business profile saved.";
+        var msg = "Business profile saved.";
+        if (PublicMenuUrlHelper.LooksLikeLocalHostOnly(_settings.BusinessProfile.PublicMenuBaseUrl))
+            msg += " QR: localhost will not work on customers’ phones on Wi-Fi — set this PC’s LAN URL (e.g. “Use phone-friendly URL for QR”) and re-print QRs.";
+        StatusMessage = msg;
     }
 
     private void SaveCurrencyPricing()
@@ -703,29 +791,84 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     {
         var db = _settings.Database ?? new DatabaseSettings();
         DatabaseProvider = string.IsNullOrWhiteSpace(db.Provider) ? "PostgreSql" : db.Provider.Trim();
-        DatabaseConnectionString = db.PostgreSqlConnectionString ?? string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(db.PostgreSqlHost))
+        {
+            DatabaseHost = db.PostgreSqlHost.Trim();
+            DatabasePort = db.PostgreSqlPort > 0 ? db.PostgreSqlPort.ToString() : "5432";
+            DatabaseName = db.PostgreSqlDatabase?.Trim() ?? string.Empty;
+            DatabaseUsername = db.PostgreSqlUsername?.Trim() ?? string.Empty;
+        }
+        else if (!string.IsNullOrWhiteSpace(db.PostgreSqlConnectionString))
+        {
+            try
+            {
+                var b = new NpgsqlConnectionStringBuilder(db.PostgreSqlConnectionString.Trim());
+                DatabaseHost = b.Host ?? string.Empty;
+                DatabasePort = b.Port > 0 ? b.Port.ToString() : "5432";
+                DatabaseName = b.Database ?? string.Empty;
+                DatabaseUsername = b.Username ?? string.Empty;
+            }
+            catch
+            {
+                DatabaseHost = string.Empty;
+                DatabasePort = "5432";
+                DatabaseName = string.Empty;
+                DatabaseUsername = string.Empty;
+            }
+        }
+        else
+        {
+            DatabaseHost = string.Empty;
+            DatabasePort = "5432";
+            DatabaseName = string.Empty;
+            DatabaseUsername = string.Empty;
+        }
+
+        HasSavedDatabasePassword = !string.IsNullOrWhiteSpace(db.PostgreSqlPasswordProtected);
+        _pendingDatabasePassword = string.Empty;
     }
 
     private void SaveDatabaseSettings()
     {
-        if (string.IsNullOrWhiteSpace(DatabaseConnectionString))
+        var host = (DatabaseHost ?? string.Empty).Trim();
+        var database = (DatabaseName ?? string.Empty).Trim();
+        var username = (DatabaseUsername ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(database) || string.IsNullOrWhiteSpace(username))
         {
-            StatusMessage = "PostgreSQL connection string is required.";
+            StatusMessage = "Host, database name, and username are required.";
+            return;
+        }
+
+        if (!string.IsNullOrEmpty(_pendingDatabasePassword) && !DatabaseConnectionSecret.IsDpapiAvailable)
+        {
+            StatusMessage = "Cannot store a password on this OS. Leave password blank for trust auth, or use ELITE_POSTGRES_CONNECTION.";
             return;
         }
 
         _settings.Database.Provider = "PostgreSql";
-        _settings.Database.PostgreSqlConnectionString = DatabaseConnectionString.Trim();
+        _settings.Database.PostgreSqlHost = host;
+        _settings.Database.PostgreSqlPort = int.TryParse((DatabasePort ?? string.Empty).Trim(), out var p) ? p : 5432;
+        _settings.Database.PostgreSqlDatabase = database;
+        _settings.Database.PostgreSqlUsername = username;
+
+        if (!string.IsNullOrEmpty(_pendingDatabasePassword))
+            _settings.Database.PostgreSqlPasswordProtected = DatabaseConnectionSecret.ProtectUtf8(_pendingDatabasePassword);
+
+        _settings.Database.PostgreSqlConnectionString = null;
         SettingsManager.Save(_settings);
+        HasSavedDatabasePassword = !string.IsNullOrWhiteSpace(_settings.Database.PostgreSqlPasswordProtected);
+        _pendingDatabasePassword = string.Empty;
+        NotifyClearDatabasePassword?.Invoke();
         StatusMessage = "Database settings saved (PostgreSQL). Restart app to apply.";
     }
 
     private void TestDatabaseConnection()
     {
-        var cs = (DatabaseConnectionString ?? string.Empty).Trim();
+        var cs = BuildConnectionStringForTest();
         if (string.IsNullOrWhiteSpace(cs))
         {
-            StatusMessage = "Enter PostgreSQL connection string first.";
+            StatusMessage = "Fill host, database, and username, and enter a password (or save a password first).";
             return;
         }
 
@@ -741,6 +884,45 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         {
             StatusMessage = $"PostgreSQL connection failed: {ex.Message}";
         }
+    }
+
+    private string BuildConnectionStringForTest()
+    {
+        var host = (DatabaseHost ?? string.Empty).Trim();
+        var database = (DatabaseName ?? string.Empty).Trim();
+        var username = (DatabaseUsername ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(database) || string.IsNullOrWhiteSpace(username))
+            return string.Empty;
+
+        var port = int.TryParse((DatabasePort ?? string.Empty).Trim(), out var p) ? p : 5432;
+
+        var password = _pendingDatabasePassword;
+        if (string.IsNullOrEmpty(password))
+        {
+            var prot = _settings.Database.PostgreSqlPasswordProtected?.Trim() ?? string.Empty;
+            if (string.IsNullOrEmpty(prot))
+                return string.Empty;
+            if (!DatabaseConnectionSecret.IsDpapiAvailable)
+                return string.Empty;
+            try
+            {
+                password = DatabaseConnectionSecret.UnprotectUtf8(prot);
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        var b = new NpgsqlConnectionStringBuilder
+        {
+            Host = host,
+            Port = port,
+            Database = database,
+            Username = username,
+            Password = password
+        };
+        return b.ConnectionString;
     }
 
     private string GetHexForToken(string token)
@@ -868,4 +1050,122 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
             return false;
         }
     }
+
+    private void ApplyPhoneFriendlyMenuUrl()
+    {
+        var suggested = PublicMenuUrlHelper.SuggestBaseUrlForPhones();
+        if (string.IsNullOrEmpty(suggested))
+        {
+            var p = PublicMenuUrlHelper.QrBasePort;
+            StatusMessage =
+                $"Could not detect a LAN address. Enter your PC’s IP (e.g. http://192.168.1.50:{p}). " +
+                $"Allow inbound TCP {p} for Private networks in Windows Firewall if phones cannot connect.";
+            return;
+        }
+
+        PublicMenuBaseUrl = suggested;
+        RefreshMenuQrRows();
+        StatusMessage = $"Public menu URL set to {suggested}. Save Business Profile to keep it, then re-print QR labels. Phone must use the same Wi-Fi as this PC (or a routed path to it).";
+    }
+
+    private void RefreshMenuQrRows()
+    {
+        MenuQrRows.Clear();
+        try
+        {
+            var baseUrl = PublicMenuUrlHelper.ResolveQrBaseUrl(PublicMenuBaseUrl);
+            if (string.IsNullOrWhiteSpace(baseUrl))
+                baseUrl = PublicMenuUrlHelper.SuggestBaseUrlForPhones() ?? "http://localhost:5223";
+
+            using var db = new AppDbContext();
+            var tables = db.Tables.AsNoTracking().OrderBy(t => t.TableNumber).ToList();
+            foreach (var t in tables)
+            {
+                var url = $"{baseUrl}/menu/?table={t.Id}";
+                var png = BuildQrPngBytes(url);
+                MenuQrRows.Add(new MenuQrTableRow
+                {
+                    TableLabel = $"Table {t.TableNumber} — {t.Name}",
+                    Url = url,
+                    PngBytes = png,
+                    QrImage = BitmapImageFromPng(png)
+                });
+            }
+
+            if (PublicMenuUrlHelper.LooksLikeLocalHostOnly((PublicMenuBaseUrl ?? string.Empty).Trim()) &&
+                !PublicMenuUrlHelper.LooksLikeLocalHostOnly(baseUrl))
+            {
+                var dev =
+                    PublicMenuUrlHelper.QrBasePort == PublicMenuUrlHelper.ViteDevMenuPort
+                        ? "In development, run the customer menu with npm run dev in elite-menu (Vite must use host: true) and allow that port in Windows Firewall on Private networks."
+                        : "Allow the API (static menu) port for Private networks in Windows Firewall if phones cannot connect.";
+
+                StatusMessage =
+                    $"Settings still list localhost, but the QR links below use {baseUrl} so phones on Wi-Fi can open the menu. Save that as Public menu base URL to keep it, then re-print. {dev}";
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Could not build QR list: {ex.Message}";
+        }
+    }
+
+    private void PrintAllMenuQrToPdf()
+    {
+        if (MenuQrRows.Count == 0)
+            RefreshMenuQrRows();
+        if (MenuQrRows.Count == 0)
+        {
+            StatusMessage = "No tables in database to export.";
+            return;
+        }
+
+        var dlg = new SaveFileDialog
+        {
+            Filter = "PDF document|*.pdf",
+            FileName = "Menu-QR-codes.pdf"
+        };
+        if (dlg.ShowDialog() != true)
+            return;
+
+        var pages = MenuQrRows
+            .Select(r => new MenuQrPdfPage(r.TableLabel, r.Url, r.PngBytes))
+            .ToList();
+        try
+        {
+            MenuQrPdfExportService.Save(dlg.FileName, pages);
+            StatusMessage = $"Saved QR PDF ({pages.Count} pages).";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Could not create PDF: {ex.Message}";
+        }
+    }
+
+    private static byte[] BuildQrPngBytes(string text)
+    {
+        using var gen = new QRCodeGenerator();
+        var data = gen.CreateQrCode(text, QRCodeGenerator.ECCLevel.Q);
+        return new PngByteQRCode(data).GetGraphic(20);
+    }
+
+    private static BitmapImage BitmapImageFromPng(byte[] png)
+    {
+        var img = new BitmapImage();
+        using var ms = new MemoryStream(png);
+        img.BeginInit();
+        img.StreamSource = ms;
+        img.CacheOption = BitmapCacheOption.OnLoad;
+        img.EndInit();
+        img.Freeze();
+        return img;
+    }
+}
+
+public sealed class MenuQrTableRow
+{
+    public string TableLabel { get; init; } = string.Empty;
+    public string Url { get; init; } = string.Empty;
+    public byte[] PngBytes { get; init; } = Array.Empty<byte>();
+    public ImageSource? QrImage { get; init; }
 }

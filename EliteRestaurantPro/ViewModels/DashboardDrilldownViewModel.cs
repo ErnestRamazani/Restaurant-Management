@@ -1,7 +1,8 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
-using EliteRestaurantPro.Data;
-using EliteRestaurantPro.Models;
+using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Utils;
 using Microsoft.EntityFrameworkCore;
 
 namespace EliteRestaurantPro.ViewModels;
@@ -64,6 +65,7 @@ public class DashboardDrilldownViewModel : AdminBaseViewModel
     {
         var activities = new List<(long SortKey, ActivityItem Item)>();
         var attendanceWindowStart = DateTime.Today.AddDays(-30);
+        var attendanceWindowStartUtc = AttendanceCalendar.DayAnchorUtc(attendanceWindowStart);
 
         var latestOrders = db.Orders
             .AsNoTracking()
@@ -92,7 +94,7 @@ public class DashboardDrilldownViewModel : AdminBaseViewModel
         var latestAttendance = db.EmployeeAttendances
             .AsNoTracking()
             .Include(a => a.Employee)
-            .Where(a => a.WorkDate >= attendanceWindowStart.Date && a.ClockInTime != null)
+            .Where(a => a.WorkDate >= attendanceWindowStartUtc && a.ClockInTime != null)
             .OrderByDescending(a => a.ClockInTime)
             .Take(60)
             .ToList();

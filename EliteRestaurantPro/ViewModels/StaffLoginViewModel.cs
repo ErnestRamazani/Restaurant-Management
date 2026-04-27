@@ -1,17 +1,10 @@
 using System.Windows.Input;
-using EliteRestaurantPro.Data;
-using EliteRestaurantPro.Models;
-using EliteRestaurantPro.Utils;
+using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Staff;
+using EliteRestaurant.Core.Utils;
 using Microsoft.EntityFrameworkCore;
 
 namespace EliteRestaurantPro.ViewModels;
-
-public enum StaffPortalKind
-{
-    Server,
-    Cashier,
-    KitchenBar
-}
 
 public sealed class StaffLoginViewModel : BaseViewModel
 {
@@ -40,7 +33,8 @@ public sealed class StaffLoginViewModel : BaseViewModel
     public string Subtitle => Kind switch
     {
         StaffPortalKind.Server => "Orders are sent to the cashier — not the kitchen until validated.",
-        StaffPortalKind.KitchenBar => "Receive Waiting tickets, move them to In Kitchen, then mark Ready for pickup. Use Menu and Inventory for reference.",
+        StaffPortalKind.KitchenBar =>
+            "Receive Waiting tickets, move them to In Kitchen, then mark Ready for pickup. Use Menu and Inventory for reference.",
         _ => "Validate tickets, manage the kitchen queue, complete sales, and print — same tools as admin for orders."
     };
 
@@ -91,26 +85,11 @@ public sealed class StaffLoginViewModel : BaseViewModel
         using var db = new AppDbContext();
         var id = StaffId.Trim();
         var pin = Pin.Trim();
-        // EF Core + SQLite cannot translate Trim() or string.Equals(..., StringComparison) to SQL.
-        // Active staff sets are small; filter in memory after a narrow DB query.
-        var candidates = db.Employees.AsNoTracking()
-            .Where(e => e.EmploymentStatus == "Active")
-            .AsEnumerable()
-            .Where(e => e.PinCode.Trim() == pin)
-            .Where(e =>
-                (!string.IsNullOrWhiteSpace(e.SignInId) &&
-                 e.SignInId.Trim().Equals(id, StringComparison.OrdinalIgnoreCase))
-                || e.UniqueId.Trim().Equals(id, StringComparison.OrdinalIgnoreCase))
+        var idMatches = StaffPortalAuthentication
+            .QueryActiveEmployeesMatchingStaffId(db.Employees.AsNoTracking(), id)
             .ToList();
-
-        Employee? emp = Kind switch
-        {
-            StaffPortalKind.Server => candidates.FirstOrDefault(e =>
-                e.Role.Equals("Server", StringComparison.OrdinalIgnoreCase)),
-            StaffPortalKind.KitchenBar => candidates.FirstOrDefault(e => IsKitchenBarRole(e.Role)),
-            _ => candidates.FirstOrDefault(e =>
-                e.Role.Equals("Cashier", StringComparison.OrdinalIgnoreCase))
-        };
+        var candidates = StaffPortalAuthentication.FilterPinMatches(idMatches, pin);
+        var emp = StaffPortalAuthentication.ResolvePortalCandidate(candidates, Kind);
 
         if (emp is null)
         {
@@ -143,16 +122,5 @@ public sealed class StaffLoginViewModel : BaseViewModel
             AppSession.BeginCashierSession(emp.Id, emp.Name, emp.ProfileImagePath);
             _navigate(new AdminOrdersViewModel(_navigate));
         }
-    }
-
-    private static bool IsKitchenBarRole(string role)
-    {
-        if (string.IsNullOrWhiteSpace(role))
-            return false;
-        var r = role.Trim();
-        return r.Equals("Chef", StringComparison.OrdinalIgnoreCase)
-               || r.Equals("Barman", StringComparison.OrdinalIgnoreCase)
-               || r.Equals("Bartender", StringComparison.OrdinalIgnoreCase)
-               || r.Equals("Sous Chef", StringComparison.OrdinalIgnoreCase);
     }
 }

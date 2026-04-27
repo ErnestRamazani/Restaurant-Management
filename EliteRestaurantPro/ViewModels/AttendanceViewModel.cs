@@ -3,9 +3,9 @@ using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Input;
 using System.Linq;
-using EliteRestaurantPro.Data;
-using EliteRestaurantPro.Models;
-using EliteRestaurantPro.Utils;
+using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Utils;
 using Microsoft.EntityFrameworkCore;
 
 namespace EliteRestaurantPro.ViewModels;
@@ -218,10 +218,13 @@ public class AttendanceViewModel : AdminBaseViewModel
         HashSet<DateTime> validatedDates;
         using (var syncDb = new AppDbContext())
         {
+            var validationRangeStart = AttendanceCalendar.DayAnchorUtc(fromDate);
+            var validationRangeEndExclusive = AttendanceCalendar.DayAnchorUtc(today).AddDays(1);
             validatedDates = syncDb.AttendanceDayValidations.AsNoTracking()
-                .Where(v => v.WorkDate >= fromDate && v.WorkDate <= today.AddDays(1))
-                .AsEnumerable()
-                .Select(v => v.WorkDate.Date)
+                .Where(v => v.WorkDate >= validationRangeStart && v.WorkDate < validationRangeEndExclusive)
+                .Select(v => v.WorkDate)
+                .ToList()
+                .Select(d => d.Date)
                 .ToHashSet();
             AttendanceScheduleHelper.EnsureAutoAbsences(syncDb, fromDate, today, validatedDates);
         }
@@ -240,16 +243,21 @@ public class AttendanceViewModel : AdminBaseViewModel
             .GroupBy(t => ParseEmployeeIdFromPendingSalaryJustification(t.Justification))
             .Where(g => g.Key.HasValue)
             .ToDictionary(g => g.Key!.Value, g => g.Sum(x => x.Amount));
+        var historyStart = AttendanceCalendar.DayAnchorUtc(fromDate);
+        var historyEndExclusive = AttendanceCalendar.DayAnchorUtc(today).AddDays(1);
+        var todayStart = AttendanceCalendar.DayAnchorUtc(today);
+        var todayEndExclusive = todayStart.AddDays(1);
+
         var attendanceHistory = db.EmployeeAttendances
             .AsNoTracking()
             .Include(a => a.Employee)
-            .Where(a => a.WorkDate.Date >= fromDate && a.WorkDate.Date <= today)
+            .Where(a => a.WorkDate >= historyStart && a.WorkDate < historyEndExclusive)
             .OrderByDescending(a => a.WorkDate)
             .ThenBy(a => a.Employee!.Name)
             .ToList();
 
         var todayAttendanceByEmployee = attendanceHistory
-            .Where(a => a.WorkDate.Date == today)
+            .Where(a => a.WorkDate >= todayStart && a.WorkDate < todayEndExclusive)
             .GroupBy(a => a.EmployeeId)
             .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.Id).First());
 
@@ -276,7 +284,7 @@ public class AttendanceViewModel : AdminBaseViewModel
         AttendanceDayGroups.Add(todayGroup);
 
         var historyGroups = attendanceHistory
-            .Where(a => a.WorkDate.Date < today)
+            .Where(a => a.WorkDate < todayStart)
             .GroupBy(a => a.WorkDate.Date)
             .OrderByDescending(g => g.Key);
 
@@ -399,13 +407,12 @@ public class AttendanceViewModel : AdminBaseViewModel
                 att.AbsenceJustification = row.AbsenceJustification.Trim();
         }
 
-        var dayStart = group.WorkDate.Date;
-        var dayEnd = dayStart.AddDays(1);
-        if (!db.AttendanceDayValidations.Any(v => v.WorkDate >= dayStart && v.WorkDate < dayEnd))
+        var (dayStartUtc, dayEndExclusiveUtc) = AttendanceCalendar.DayRangeUtc(group.WorkDate);
+        if (!db.AttendanceDayValidations.Any(v => v.WorkDate >= dayStartUtc && v.WorkDate < dayEndExclusiveUtc))
         {
             db.AttendanceDayValidations.Add(new AttendanceDayValidation
             {
-                WorkDate = dayStart,
+                WorkDate = dayStartUtc,
                 ValidatedAtUtc = DateTime.UtcNow
             });
         }
@@ -453,13 +460,15 @@ public class AttendanceViewModel : AdminBaseViewModel
 
         using var db = new AppDbContext();
         var workDate = _markAbsenceWorkDate.Date;
-        var att = db.EmployeeAttendances.FirstOrDefault(a => a.EmployeeId == _markAbsenceEmployeeId && a.WorkDate >= workDate && a.WorkDate < workDate.AddDays(1));
+        var (markDayStartUtc, markDayEndExclusiveUtc) = AttendanceCalendar.DayRangeUtc(workDate);
+        var att = db.EmployeeAttendances.FirstOrDefault(a =>
+            a.EmployeeId == _markAbsenceEmployeeId && a.WorkDate >= markDayStartUtc && a.WorkDate < markDayEndExclusiveUtc);
         if (att is null)
         {
             att = new EmployeeAttendance
             {
                 EmployeeId = _markAbsenceEmployeeId,
-                WorkDate = workDate
+                WorkDate = markDayStartUtc
             };
             db.EmployeeAttendances.Add(att);
         }
@@ -534,13 +543,15 @@ public class AttendanceViewModel : AdminBaseViewModel
     {
         using var db = new AppDbContext();
         var today = DateTime.Today;
-        var attendance = db.EmployeeAttendances.FirstOrDefault(a => a.EmployeeId == employeeId && a.WorkDate.Date == today);
+        var (todayStartUtc, todayEndExclusiveUtc) = AttendanceCalendar.DayRangeUtc(today);
+        var attendance = db.EmployeeAttendances.FirstOrDefault(a =>
+            a.EmployeeId == employeeId && a.WorkDate >= todayStartUtc && a.WorkDate < todayEndExclusiveUtc);
         if (attendance is null)
         {
             attendance = new EmployeeAttendance
             {
                 EmployeeId = employeeId,
-                WorkDate = today
+                WorkDate = todayStartUtc
             };
             db.EmployeeAttendances.Add(attendance);
         }
@@ -575,7 +586,9 @@ public class AttendanceViewModel : AdminBaseViewModel
 
         using var db = new AppDbContext();
         var today = DateTime.Today;
-        var attendance = db.EmployeeAttendances.FirstOrDefault(a => a.EmployeeId == row.EmployeeId && a.WorkDate.Date == today);
+        var (todayStartUtc, todayEndExclusiveUtc) = AttendanceCalendar.DayRangeUtc(today);
+        var attendance = db.EmployeeAttendances.FirstOrDefault(a =>
+            a.EmployeeId == row.EmployeeId && a.WorkDate >= todayStartUtc && a.WorkDate < todayEndExclusiveUtc);
         if (attendance is null || attendance.ClockInTime is null)
         {
             MessageBox.Show("Employee must clock in before clocking out.", "Attendance", MessageBoxButton.OK, MessageBoxImage.Warning);

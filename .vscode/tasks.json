@@ -7,7 +7,7 @@
             "type": "process",
             "args": [
                 "build",
-                "${workspaceFolder}/EliteRestaurantPro/EliteRestaurantPro.csproj",
+                "${workspaceFolder}/EliteRestaurant.sln",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary;ForceNoAlign"
             ],
@@ -36,6 +36,20 @@
                 "${workspaceFolder}/EliteRestaurantPro/EliteRestaurantPro.csproj"
             ],
             "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "build-menu",
+            "type": "shell",
+            "command": "npm run build",
+            "options": {
+                "cwd": "${workspaceFolder}/elite-menu"
+            },
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
         }
     ]
 }

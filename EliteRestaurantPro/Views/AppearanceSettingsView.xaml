@@ -124,10 +124,68 @@
                                 <TextBox Text="{Binding TaxIdLegalInfo, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
                             </StackPanel>
 
+                            <StackPanel Margin="0,10,0,0">
+                                <TextBlock Text="Public menu base URL (QR codes for customers’ phones)" Style="{StaticResource HeadingSmall}"/>
+                                <TextBlock Text="Use this PC’s LAN address (e.g. http://192.168.1.50:5223), not localhost, so a phone on the same Wi-Fi can open the menu. The API must listen on that address (Kestrel does by default; allow port 5223 in Windows Firewall for Private networks if needed). No trailing slash."
+                                           Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox Grid.Column="0" Text="{Binding PublicMenuBaseUrl, UpdateSourceTrigger=PropertyChanged}"
+                                             Style="{StaticResource EliteTextBox}"
+                                             ToolTip="Example: http://192.168.1.50:5223 — no trailing slash"/>
+                                    <Button Grid.Column="1" Content="Use phone-friendly URL" Margin="10,0,0,0" VerticalAlignment="Top"
+                                            Command="{Binding ApplyPhoneFriendlyMenuUrlCommand}" Style="{StaticResource GhostButton}"/>
+                                </Grid>
+                            </StackPanel>
+                            <StackPanel Margin="0,10,0,0">
+                                <TextBlock Text="Customer menu tagline (optional)" Style="{StaticResource HeadingSmall}"/>
+                                <TextBox Text="{Binding CustomerMenuTagline, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
+                            </StackPanel>
+
                             <Button Content="Save Business Profile"
                                     Margin="0,14,0,0"
                                     Command="{Binding SaveBusinessProfileCommand}"
                                     Style="{StaticResource GoldPrimaryButton}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource GlassCard}" Margin="0,16,0,0" Padding="18"
+                            Visibility="{Binding ShowMenuQrSection, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <StackPanel>
+                            <TextBlock Text="Menu QR codes"
+                                       Foreground="{StaticResource GoldAccentBrush}"
+                                       FontSize="20"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Text="Each code opens the customer menu with the table preset. URL: {base URL}/menu/?table={table id}. Save Business Profile if you change the base URL."
+                                       Style="{StaticResource BodyText}"
+                                       Margin="0,4,0,12"
+                                       TextWrapping="Wrap"/>
+                            <Button Content="Print all QR codes (PDF)"
+                                    Command="{Binding PrintAllMenuQrCommand}"
+                                    Style="{StaticResource GoldPrimaryButton}"
+                                    HorizontalAlignment="Left"
+                                    Margin="0,0,0,12"/>
+                            <ItemsControl ItemsSource="{Binding MenuQrRows}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Style="{StaticResource GlassCard}" Padding="12" Margin="0,0,12,12" Width="210">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding TableLabel}" TextWrapping="Wrap" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                                <Image Source="{Binding QrImage}" Width="180" Height="180" Stretch="Uniform"/>
+                                                <TextBlock Text="{Binding Url}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
                         </StackPanel>
                     </Border>
 
@@ -303,8 +361,9 @@
                                        Foreground="{StaticResource GoldAccentBrush}"
                                        FontSize="20"
                                        FontWeight="SemiBold"/>
-                            <TextBlock Text="PostgreSQL-only runtime. Save credentials here and restart app."
+                            <TextBlock Text="PostgreSQL-only runtime. Password is stored with Windows DPAPI (CurrentUser). Prefer ELITE_POSTGRES_CONNECTION for services or automation."
                                        Style="{StaticResource BodyText}"
+                                       TextWrapping="Wrap"
                                        Margin="0,4,0,12"/>
 
                             <StackPanel>
@@ -314,20 +373,52 @@
                                           Style="{StaticResource EliteComboBox}"/>
                             </StackPanel>
 
-                            <StackPanel Margin="0,10,0,0">
-                                <TextBlock Text="PostgreSQL connection string" Style="{StaticResource HeadingSmall}"/>
-                                <TextBox Text="{Binding DatabaseConnectionString, UpdateSourceTrigger=PropertyChanged}"
-                                         Height="90"
-                                         TextWrapping="Wrap"
-                                         AcceptsReturn="True"
-                                         VerticalScrollBarVisibility="Auto"
+                            <Grid Margin="0,10,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="120"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,8,8">
+                                    <TextBlock Text="Host" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBox Text="{Binding DatabaseHost, UpdateSourceTrigger=PropertyChanged}"
+                                             Style="{StaticResource EliteTextBox}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,0,8">
+                                    <TextBlock Text="Port" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBox Text="{Binding DatabasePort, UpdateSourceTrigger=PropertyChanged}"
+                                             Style="{StaticResource EliteTextBox}"/>
+                                </StackPanel>
+                                <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2">
+                                    <TextBlock Text="Database name" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBox Text="{Binding DatabaseName, UpdateSourceTrigger=PropertyChanged}"
+                                             Style="{StaticResource EliteTextBox}"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <StackPanel Margin="0,6,0,0">
+                                <TextBlock Text="Username" Style="{StaticResource HeadingSmall}"/>
+                                <TextBox Text="{Binding DatabaseUsername, UpdateSourceTrigger=PropertyChanged}"
                                          Style="{StaticResource EliteTextBox}"/>
                             </StackPanel>
 
-                            <TextBlock Margin="0,8,0,0"
-                                       Foreground="{StaticResource TextMutedBrush}"
-                                       FontSize="11"
-                                       Text="Example: Host=192.168.1.10;Port=5432;Database=elite_restaurant;Username=elite_user;Password=your_password"/>
+                            <StackPanel Margin="0,10,0,0">
+                                <TextBlock Style="{StaticResource HeadingSmall}">
+                                    <Run Text="Password"/>
+                                    <Run Text=" (not shown after save)" Foreground="{StaticResource TextMutedBrush}" FontSize="11"/>
+                                </TextBlock>
+                                <PasswordBox x:Name="DatabasePasswordBox"
+                                             Style="{StaticResource ElitePasswordBox}"
+                                             PasswordChanged="DatabasePasswordBox_OnPasswordChanged"/>
+                                <TextBlock Margin="0,6,0,0"
+                                           Foreground="{StaticResource TextMutedBrush}"
+                                           FontSize="11"
+                                           Visibility="{Binding HasSavedDatabasePassword, Converter={StaticResource BoolToVisibilityConverter}}"
+                                           Text="A password is already saved on this PC. Enter a new password only to change it."/>
+                            </StackPanel>
 
                             <Grid Margin="0,14,0,0">
                                 <Grid.ColumnDefinitions>

@@ -2,7 +2,8 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.IO;
-using EliteRestaurantPro.Utils;
+using EliteRestaurant.Core.Staff;
+using EliteRestaurant.Core.Utils;
 
 namespace EliteRestaurantPro.ViewModels;
 

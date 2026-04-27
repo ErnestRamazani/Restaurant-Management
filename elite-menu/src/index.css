@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --midnight: #0f1923;
+  --midnight-2: #161e27;
+  --midnight-3: #1c2732;
+  --champagne: #ede8dc;
+  --gold: #c9a84c;
+  --gold-light: #d4b86a;
+  --gold-dim: rgba(200, 168, 76, 0.15);
+  --text-on-dark: #ede8dc;
+  --text-muted: rgba(237, 232, 220, 0.55);
+}
+
+@layer components {
+  .shimmer-gold {
+    background: linear-gradient(
+      110deg,
+      #c9a84c 0%,
+      #e8d5a0 45%,
+      #c9a84c 55%,
+      #a87820 100%
+    );
+    background-size: 200% 100%;
+  }
+
+  @keyframes shimmer-sweep {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+
+  .price-shimmer {
+    background-clip: text;
+    -webkit-background-clip: text;
+  }
+
+  .group:hover .price-shimmer-anim {
+    animation: shimmer-sweep 4s linear infinite;
+  }
+}
+
+/* Grain texture overlay on body (above app root visually) */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  opacity: 0.028;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* App shell: same phone width as before (~430px), then scales for tablet / desktop */
+#root {
+  width: 100%;
+  max-width: min(100%, 430px);
+  margin: 0 auto;
+  min-height: 100svh;
+  min-height: 100dvh;
+  position: relative;
+  overflow-x: hidden;
+  background: var(--midnight);
+}
+
+@media (min-width: 640px) {
+  #root {
+    max-width: min(100%, 42rem);
+  }
+}
+
+@media (min-width: 1024px) {
+  #root {
+    max-width: min(100%, 56rem);
+  }
+}
+
+@media (min-width: 1280px) {
+  #root {
+    max-width: min(100%, 72rem);
+  }
+}
+
+* {
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}

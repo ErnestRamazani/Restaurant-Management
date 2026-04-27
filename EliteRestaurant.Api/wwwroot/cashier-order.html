@@ -1,0 +1,1136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Elite Cashier · Order</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --navy: #0f1923;
+      --cream: #f7f5f2;
+      --amber: #f59e0b;
+      --amber-dim: #d97706;
+      --cancel: #374151;
+      --text-dark: #1f2937;
+      --text-muted: #64748b;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Plus Jakarta Sans", system-ui, -apple-system, Segoe UI, sans-serif;
+      background: var(--navy);
+      color: #e8eef4;
+    }
+    .layout { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+    .sidebar {
+      border-right: 1px solid #1e293b;
+      background: var(--navy);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .brand-wrap { margin-bottom: 6px; }
+    .brand-logo {
+      width: 100%;
+      max-height: 92px;
+      object-fit: cover;
+      border-radius: var(--radius);
+      border: 1px solid #334155;
+      background: #111c27;
+      margin-bottom: 8px;
+    }
+    .brand { font-weight: 700; font-size: 14px; letter-spacing: 0.5px; color: var(--amber); }
+    .nav-btn {
+      width: 100%;
+      text-align: left;
+      padding: 12px 12px;
+      min-height: 44px;
+      border: 1px solid #334155;
+      border-radius: var(--radius);
+      background: #1a2735;
+      color: #f1f5f9;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 14px;
+      text-decoration: none;
+      display: block;
+      box-sizing: border-box;
+    }
+    .nav-btn:hover { background: #243044; }
+    .who { margin-top: auto; border-top: 1px solid #334155; padding-top: 10px; font-size: 12px; color: #94a3b8; }
+    .who-top { display: flex; align-items: center; gap: 8px; }
+    .who-photo {
+      width: 40px;
+      height: 40px;
+      border-radius: 999px;
+      object-fit: cover;
+      border: 1px solid #475569;
+      background: #111c27;
+    }
+    #app .main {
+      padding: 12px 16px 16px;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      background: var(--cream);
+      color: var(--text-dark);
+      min-width: 0;
+    }
+    #loginWrap.main {
+      background: var(--cream);
+      color: var(--text-dark);
+      min-height: 100vh;
+    }
+    #loginWrap .card {
+      border: 1px solid #e5e7eb;
+      background: #fff;
+      color: var(--text-dark);
+    }
+    #loginWrap input, #loginWrap button {
+      font-family: inherit;
+      min-height: 44px;
+      border-radius: var(--radius);
+      border: 1px solid #d1d5db;
+    }
+    #loginWrap button { background: var(--amber); color: #111827; font-weight: 600; border: none; }
+    .hidden { display: none !important; }
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    .grow { flex: 1 1 180px; min-width: 160px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .muted { color: var(--text-muted); font-size: 12px; }
+    .muted.ok { color: #059669; }
+    .muted.danger { color: #dc2626; }
+    .danger { color: #dc2626; }
+    .mono { font-family: ui-monospace, Consolas, monospace; }
+
+    #takeOrder.create-order-tab {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+    }
+    .pos-shell {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+      gap: 12px;
+      align-items: stretch;
+    }
+    .pos-cart {
+      width: 35%;
+      min-width: 260px;
+      max-width: 440px;
+      background: var(--navy);
+      color: #f1f5f9;
+      border-radius: var(--radius);
+      display: flex;
+      flex-direction: column;
+      min-height: 480px;
+      max-height: calc(100vh - 100px);
+      overflow: hidden;
+      border: 1px solid #1e293b;
+    }
+    .pos-cart-top {
+      padding: 12px 14px;
+      flex-shrink: 0;
+      border-bottom: 1px solid #1e293b;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .pos-cart-top .pos-fieldset {
+      border: 1px solid #334155;
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      margin: 0;
+    }
+    .pos-cart-top .pos-fieldset legend { color: #94a3b8; font-size: 12px; padding: 0 6px; }
+    .pos-cart-top label { font-size: 13px; cursor: pointer; color: #cbd5e1; }
+    .pos-cart-top input[type="radio"] { width: 18px; height: 18px; accent-color: var(--amber); }
+    .pos-cart-controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .pos-cart-controls .full { grid-column: 1 / -1; }
+    .pos-cart input, .pos-cart select, .pos-cart textarea {
+      font-family: inherit;
+      font-size: 14px;
+      border-radius: var(--radius);
+      border: 1px solid #334155;
+      background: #1a2735;
+      color: #f1f5f9;
+      min-height: 44px;
+      padding: 10px 12px;
+      width: 100%;
+    }
+    .pos-cart textarea { min-height: 56px; resize: vertical; }
+    .pos-cart .btn-ghost {
+      background: #243044;
+      color: #e2e8f0;
+      border: 1px solid #475569;
+      min-height: 44px;
+      padding: 0 14px;
+      border-radius: var(--radius);
+      font-family: inherit;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .pos-cart-scroll {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding: 8px 12px;
+    }
+    .pos-cart-sticky {
+      flex-shrink: 0;
+      padding: 12px 14px;
+      border-top: 1px solid #1e293b;
+      background: #0c141c;
+    }
+    .cart-line {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      padding: 10px 0;
+      border-bottom: 1px solid #1e293b;
+      align-items: start;
+    }
+    .cart-line:last-child { border-bottom: 0; }
+    .cart-line-name { font-weight: 600; font-size: 14px; color: #f1f5f9; }
+    .cart-line-unit { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+    .cart-line-total { font-weight: 700; color: var(--amber); font-size: 14px; text-align: right; }
+    .cart-line-actions {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+    }
+    .qty-btn {
+      min-width: 44px;
+      min-height: 44px;
+      border-radius: var(--radius);
+      border: 1px solid #475569;
+      background: #1a2735;
+      color: var(--amber);
+      font-size: 20px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      line-height: 1;
+    }
+    .qty-val {
+      min-width: 36px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 16px;
+    }
+    .btn-remove {
+      min-height: 44px;
+      padding: 0 14px;
+      margin-left: auto;
+      border-radius: var(--radius);
+      border: 1px solid #7f1d1d;
+      background: transparent;
+      color: #fca5a5;
+      font-family: inherit;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .cart-empty { padding: 24px; text-align: center; color: #64748b; font-size: 14px; }
+
+    .tot-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+      margin-bottom: 6px;
+      color: #cbd5e1;
+    }
+    .tot-row--grand {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #334155;
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .tot-row--grand span:last-child { color: var(--amber); }
+    .tot-items-note { font-size: 12px; color: #64748b; margin-bottom: 8px; }
+    .pos-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .btn-cancel-order {
+      width: 100%;
+      min-height: 48px;
+      border-radius: var(--radius);
+      border: none;
+      background: var(--cancel);
+      color: #f9fafb;
+      font-family: inherit;
+      font-weight: 600;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    .btn-place-order {
+      width: 100%;
+      min-height: 52px;
+      border-radius: var(--radius);
+      border: none;
+      background: var(--amber);
+      color: #111827;
+      font-family: inherit;
+      font-weight: 700;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .pos-menu {
+      flex: 1;
+      min-width: 0;
+      background: var(--cream);
+      border-radius: var(--radius);
+      border: 1px solid #e5e7eb;
+      display: flex;
+      flex-direction: column;
+      min-height: 480px;
+      max-height: calc(100vh - 100px);
+      overflow: hidden;
+    }
+    .cat-tabs {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 12px 12px 8px;
+      flex-shrink: 0;
+      scrollbar-width: thin;
+      -webkit-overflow-scrolling: touch;
+    }
+    .cat-tab {
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      min-width: 72px;
+      max-width: 100px;
+      padding: 10px 12px;
+      min-height: 44px;
+      border-radius: var(--radius);
+      border: 1px solid #e5e7eb;
+      background: #fff;
+      color: var(--text-dark);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .cat-tab--active {
+      border-color: var(--amber);
+      background: #fffbeb;
+      color: #b45309;
+      box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25);
+    }
+    .cat-tab-ic { font-size: 20px; line-height: 1; }
+    .cat-tab-lb { text-align: center; line-height: 1.2; word-break: break-word; }
+    .pos-menu-tools {
+      padding: 0 12px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .pos-subcat {
+      font-family: inherit;
+      min-height: 44px;
+      border-radius: var(--radius);
+      border: 1px solid #e5e7eb;
+      padding: 0 12px;
+      background: #fff;
+      color: var(--text-dark);
+    }
+    #search.pos-search {
+      width: 100%;
+      min-height: 44px;
+      border-radius: var(--radius);
+      border: 1px solid #e5e7eb;
+      padding: 10px 14px;
+      font-family: inherit;
+      font-size: 15px;
+      background: #fff;
+      color: var(--text-dark);
+    }
+    .product-grid {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding: 8px 12px 16px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 12px;
+      align-content: start;
+    }
+    .product-grid-empty {
+      grid-column: 1 / -1;
+      padding: 32px;
+      text-align: center;
+      color: var(--text-muted);
+    }
+    .product-card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: var(--radius);
+      overflow: hidden;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .product-card:hover:not(.product-card--disabled) {
+      border-color: var(--amber);
+      box-shadow: 0 4px 14px rgba(15, 25, 35, 0.08);
+    }
+    .product-card--disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .product-card__media {
+      position: relative;
+      height: 140px;
+      background: #e7e5e0;
+      overflow: hidden;
+    }
+    .product-card__media img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .product-card__ph {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.9);
+      text-transform: uppercase;
+    }
+    .product-card__dot {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+    }
+    .product-card__dot--ok { background: #22c55e; }
+    .product-card__dot--no { background: #ef4444; }
+    .product-card__body { padding: 10px 12px 12px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+    .product-card__name {
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--text-dark);
+      line-height: 1.3;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .product-card__price { font-weight: 700; font-size: 15px; color: var(--amber-dim); }
+
+    @media (max-width: 1000px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { border-right: 0; border-bottom: 1px solid #334155; }
+    }
+    @media (max-width: 767px) {
+      .pos-shell { flex-direction: column; }
+      .pos-menu { order: 1; max-height: 55vh; width: 100%; }
+      .pos-cart { order: 2; width: 100%; max-width: none; max-height: none; }
+    }
+    @media (min-width: 1024px) {
+      .product-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <div id="loginWrap" class="main">
+    <div class="card" style="max-width:760px;margin:32px auto;">
+      <h2>Cashier · Order entry</h2>
+      <div class="row">
+        <input id="staffId" class="grow" placeholder="SignInId or EMP UniqueId">
+        <input id="pin" placeholder="PIN">
+        <button type="button" id="btnLogin">Login as Cashier</button>
+      </div>
+      <p id="loginFileWarning" class="danger hidden" style="margin-top:10px;">This page was opened as a local file. Login will not work until you open it from the API site (for example <span class="mono">http://localhost:5223/cashier-order.html</span>).</p>
+      <div id="loginMessage" class="muted" style="margin-top:10px;min-height:1.25em;white-space:pre-wrap;"></div>
+      <p class="muted">Use cashier credentials. For payments and pending tickets, open the <a href="/cashier.html" style="color:#b45309;">full Cashier Portal</a>. Servers: <a href="/index.html" style="color:#b45309;">Server Portal</a>.</p>
+    </div>
+  </div>
+
+  <div id="app" class="layout hidden">
+    <aside class="sidebar">
+      <div class="brand-wrap">
+        <img id="brandLogo" class="brand-logo hidden" alt="Restaurant logo">
+        <div id="brandName" class="brand">ELITE CASHIER ORDER</div>
+      </div>
+      <a class="nav-btn" href="/cashier.html">← Full cashier console</a>
+      <button type="button" id="btnRefreshAll" class="nav-btn">Refresh Data</button>
+      <div class="who">
+        <div class="who-top">
+          <img id="staffPhoto" class="who-photo hidden" alt="Employee photo">
+          <div id="sessionLabel" class="mono"></div>
+        </div>
+        <button type="button" id="btnLogout" style="margin-top:8px;width:100%;" class="nav-btn">Logout</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <section id="takeOrder" class="tab create-order-tab">
+        <div class="pos-shell">
+          <aside class="pos-cart" aria-label="Order cart">
+            <div class="pos-cart-top">
+              <div class="pos-cart-controls">
+                <select id="orderSource" class="full">
+                  <option value="WalkIn">WalkIn</option>
+                  <option value="Delivery">Delivery</option>
+                </select>
+                <input id="sourceReference" class="full" placeholder="Reference (for Delivery)">
+                <select id="tableSelect" class="full"></select>
+                <select id="paymentCurrency" class="full">
+                  <option value="USD">USD</option>
+                  <option value="FC">FC</option>
+                </select>
+              </div>
+              <fieldset class="pos-fieldset">
+                <legend>Send as (this table)</legend>
+                <label style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;">
+                  <input type="radio" name="ticketMode" id="ticketModeAppend" value="append" checked>
+                  <span><strong>Same ticket</strong> — add lines to the current open check</span>
+                </label>
+                <label style="display:flex;gap:8px;align-items:flex-start;">
+                  <input type="radio" name="ticketMode" id="ticketModeNew" value="new">
+                  <span><strong>New ticket</strong> — separate check on the same table</span>
+                </label>
+                <p id="ticketModeHint" class="muted" style="margin:10px 0 0;font-size:12px;line-height:1.35;color:#94a3b8;"></p>
+              </fieldset>
+              <div class="row" style="gap:10px;">
+                <button type="button" id="btnCheckOpen" class="btn-ghost">Check Open Check</button>
+                <span id="openCheckInfo" class="muted" style="color:#94a3b8;font-size:12px;flex:1;"></span>
+              </div>
+              <div class="pos-cart-controls">
+                <select id="discountMode">
+                  <option value="None">None</option>
+                  <option value="Percent">Percent</option>
+                  <option value="Usd">Usd</option>
+                </select>
+                <input id="discountValue" type="number" step="0.01" min="0" placeholder="Discount">
+              </div>
+              <textarea id="customerNotes" placeholder="Customer notes"></textarea>
+              <textarea id="allergyNotes" placeholder="Allergy notes"></textarea>
+            </div>
+            <div class="pos-cart-scroll">
+              <div id="cartItems"></div>
+            </div>
+            <div class="pos-cart-sticky">
+              <div class="tot-items-note"><span id="itemCount">0</span> items in order</div>
+              <div class="tot-row"><span>Subtotal</span><span id="subtotalUsd">$ 0.00</span></div>
+              <div id="totRowDiscount" class="tot-row hidden"><span>Discount</span><span id="discountAmount">$ 0.00</span></div>
+              <div class="tot-row"><span id="taxLabel">Tax</span><span id="taxAmount">$ 0.00</span></div>
+              <div class="tot-row"><span id="serviceLabel">Service</span><span id="serviceAmount">$ 0.00</span></div>
+              <div class="tot-row tot-row--grand"><span>Grand total</span><span id="grandTotal">$ 0.00</span></div>
+              <div class="pos-actions">
+                <button type="button" id="btnClearOrder" class="btn-cancel-order">Clear</button>
+                <button type="button" id="btnSubmit" class="btn-place-order">Place Order</button>
+              </div>
+            </div>
+          </aside>
+
+          <div class="pos-menu" aria-label="Menu">
+            <div id="categoryTabs" class="cat-tabs"></div>
+            <select id="category" class="visually-hidden" aria-hidden="true" tabindex="-1"></select>
+            <div class="pos-menu-tools">
+              <select id="subCategory" class="pos-subcat" aria-label="Subcategory"></select>
+              <input id="search" class="pos-search" placeholder="Search product by name or ID">
+            </div>
+            <div id="products" class="product-grid"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    let token = "";
+    let me = null;
+    let tables = [];
+    let products = [];
+    let config = { restaurantName: "Elite Restaurant", restaurantLogoUrl: "", employeePhotoUrl: "", currencyDisplayMode: "Dual", usdToFcRate: 2250, taxPercent: 7, servicePercent: 10 };
+    const cart = new Map();
+
+    const PLACEHOLDER_PALETTE = ["#4a5568", "#5c4d4a", "#4a5c4d", "#544a5c", "#5c5a4a", "#4a5c5c", "#565c4a", "#5c4a52"];
+    const CAT_TAB_ICONS = ["🍽", "🥖", "🥗", "🍳", "🍰", "☕", "🥤", "🍜"];
+
+    const setOut = (title, data) => console.log(`[CashierOrder] ${title}`, data);
+
+    function esc(s) {
+      return String(s ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function escAttr(s) {
+      return esc(s).replace(/'/g, "&#39;");
+    }
+
+    function categoryTabIcon(cat) {
+      if (cat === "All") return "📋";
+      let h = 0;
+      const str = String(cat);
+      for (let i = 0; i < str.length; i++) h = (h + str.charCodeAt(i) * (i + 1)) % 997;
+      return CAT_TAB_ICONS[h % CAT_TAB_ICONS.length];
+    }
+
+    function placeholderColorForCategory(cat) {
+      const str = String(cat || "");
+      let h = 0;
+      for (let i = 0; i < str.length; i++) h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+      return PLACEHOLDER_PALETTE[Math.abs(h) % PLACEHOLDER_PALETTE.length];
+    }
+
+    function productPhotoPath(p) {
+      const u = p && (p.photoUrl || p.PhotoUrl);
+      if (!u || typeof u !== "string") return "";
+      const t = u.trim();
+      if (!t.startsWith("/")) return "";
+      return t;
+    }
+
+    function productInStock(p) {
+      if (!p) return false;
+      if (p.inStock === false || p.isAvailable === false) return false;
+      return true;
+    }
+
+    function addToCart(productId) {
+      const id = Number(productId);
+      const p = products.find(x => x.id === id);
+      if (!p || !productInStock(p)) return;
+      cart.set(id, (cart.get(id) || 0) + 1);
+      renderCart();
+    }
+
+    async function tryProductCardPhoto(imgEl, phEl, path) {
+      revokeImgBlob(imgEl);
+      if (!path || !token) return;
+      try {
+        const res = await fetch(path, { headers: { Authorization: "Bearer " + token } });
+        if (!res.ok) throw new Error("bad");
+        const blob = await res.blob();
+        imgEl.src = URL.createObjectURL(blob);
+        imgEl.classList.remove("hidden");
+        phEl.classList.add("hidden");
+        imgEl.onerror = () => {
+          phEl.classList.remove("hidden");
+          imgEl.classList.add("hidden");
+        };
+      } catch {
+        /* keep placeholder */
+      }
+    }
+
+    function renderCategoryTabs() {
+      const tabs = document.getElementById("categoryTabs");
+      const category = document.getElementById("category");
+      if (!tabs || !category) return;
+      const cats = [...category.options].map(o => o.textContent || o.value);
+      const cur = category.value;
+      tabs.innerHTML = cats.map(c => {
+        const active = c === cur ? " cat-tab--active" : "";
+        return `<button type="button" class="cat-tab${active}" data-cat="${escAttr(c)}"><span class="cat-tab-ic">${categoryTabIcon(c)}</span><span class="cat-tab-lb">${esc(c)}</span></button>`;
+      }).join("");
+      tabs.querySelectorAll("[data-cat]").forEach(btn => {
+        btn.onclick = () => {
+          const v = btn.getAttribute("data-cat");
+          category.value = v;
+          category.dispatchEvent(new Event("change"));
+        };
+      });
+    }
+
+    function setLoginMessage(text, kind) {
+      const el = document.getElementById("loginMessage");
+      if (!el) return;
+      el.textContent = text || "";
+      el.className = "muted" + (kind === "error" ? " danger" : kind === "ok" ? " ok" : "");
+    }
+
+    if (window.location.protocol === "file:") {
+      document.getElementById("loginFileWarning")?.classList.remove("hidden");
+    }
+    function revokeImgBlob(el) {
+      const s = el.getAttribute("src") || "";
+      if (s.startsWith("blob:")) {
+        URL.revokeObjectURL(s);
+        el.removeAttribute("src");
+      }
+    }
+    async function setAuthImage(el, path) {
+      revokeImgBlob(el);
+      if (!path || !token) {
+        el.classList.add("hidden");
+        return;
+      }
+      try {
+        const res = await fetch(path, { headers: { Authorization: "Bearer " + token } });
+        if (!res.ok) throw new Error("unauthorized or missing");
+        const blob = await res.blob();
+        el.src = URL.createObjectURL(blob);
+        el.classList.remove("hidden");
+        el.onerror = () => el.classList.add("hidden");
+      } catch {
+        el.classList.add("hidden");
+      }
+    }
+    const fmtUsd = n => "$ " + Number(n || 0).toFixed(2);
+    const fmtFc = n => "FC " + Number(n || 0).toFixed(0);
+    const toFc = usd => Number(usd || 0) * Number(config.usdToFcRate || 2250);
+
+    async function api(url, method = "GET", body = null, auth = true) {
+      const headers = {};
+      if (body) headers["Content-Type"] = "application/json";
+      if (auth && token) headers["Authorization"] = "Bearer " + token;
+      const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined });
+      const txt = await res.text();
+      let json;
+      try { json = JSON.parse(txt); } catch { json = { raw: txt }; }
+      return { ok: res.ok, status: res.status, body: json };
+    }
+
+    function normalizeDiscount() {
+      const mode = document.getElementById("discountMode").value;
+      let value = Number(document.getElementById("discountValue").value || 0);
+      if (mode === "Percent") value = Math.max(0, Math.min(100, value));
+      if (mode === "Usd") value = Math.max(0, value);
+      if (mode === "None") value = 0;
+      return { mode, value };
+    }
+
+    function computeTotals() {
+      const lines = [...cart.entries()].map(([pid, qty]) => {
+        const p = products.find(x => x.id === pid);
+        return p ? { price: Number(p.price), qty: Number(qty) } : null;
+      }).filter(Boolean);
+      const subtotal = lines.reduce((s, x) => s + (x.price * x.qty), 0);
+      const d = normalizeDiscount();
+      let discount = 0;
+      if (d.mode === "Percent") discount = subtotal * d.value / 100;
+      if (d.mode === "Usd") discount = Math.min(subtotal, d.value);
+      const taxable = Math.max(0, subtotal - discount);
+      const tax = taxable * (Number(config.taxPercent) / 100);
+      const service = taxable * (Number(config.servicePercent) / 100);
+      const grand = taxable + tax + service;
+      return { subtotal, discount, taxable, tax, service, grand };
+    }
+
+    function renderTotals() {
+      const t = computeTotals();
+      document.getElementById("itemCount").textContent = String([...cart.values()].reduce((a, b) => a + b, 0));
+      document.getElementById("subtotalUsd").textContent = fmtUsd(t.subtotal);
+      document.getElementById("taxAmount").textContent = fmtUsd(t.tax);
+      document.getElementById("serviceAmount").textContent = fmtUsd(t.service);
+      document.getElementById("discountAmount").textContent = fmtUsd(t.discount);
+      const pay = document.getElementById("paymentCurrency").value;
+      document.getElementById("grandTotal").textContent = pay === "FC" ? fmtFc(toFc(t.grand)) : fmtUsd(t.grand);
+      const dr = document.getElementById("totRowDiscount");
+      if (dr) dr.classList.toggle("hidden", t.discount <= 0);
+      const taxLbl = document.getElementById("taxLabel");
+      if (taxLbl) taxLbl.textContent = `Tax (${Number(config.taxPercent || 0)}%)`;
+      const svcLbl = document.getElementById("serviceLabel");
+      if (svcLbl) svcLbl.textContent = `Service (${Number(config.servicePercent || 0)}%)`;
+    }
+
+    function currentFilteredProducts() {
+      const s = (document.getElementById("search").value || "").trim().toLowerCase();
+      const c = document.getElementById("category").value;
+      const sub = document.getElementById("subCategory").value;
+      return products
+        .filter(p => c === "All" || p.category === c)
+        .filter(p => sub === "All" || p.subCategory === sub)
+        .filter(p => !s || p.name.toLowerCase().includes(s) || p.uniqueId.toLowerCase().includes(s));
+    }
+
+    function renderCategories() {
+      const category = document.getElementById("category");
+      const sub = document.getElementById("subCategory");
+      const cats = ["All", ...new Set(products.map(p => p.category).filter(Boolean))];
+      category.innerHTML = cats.map(c => `<option>${esc(c)}</option>`).join("");
+      const applySub = () => {
+        const selected = category.value;
+        const subs = ["All", ...new Set(products.filter(p => selected === "All" || p.category === selected).map(p => p.subCategory).filter(Boolean))];
+        sub.innerHTML = subs.map(x => `<option>${esc(x)}</option>`).join("");
+        renderProducts();
+        renderCategoryTabs();
+      };
+      category.onchange = applySub;
+      sub.onchange = renderProducts;
+      applySub();
+    }
+
+    function renderProducts() {
+      const el = document.getElementById("products");
+      const rows = currentFilteredProducts();
+      if (!rows.length) {
+        el.innerHTML = "<div class='product-grid-empty'>No products found.</div>";
+        return;
+      }
+      el.innerHTML = rows.map(p => {
+        const ok = productInStock(p);
+        const dis = ok ? "" : " product-card--disabled";
+        const phColor = placeholderColorForCategory(p.category);
+        const initial = (p.name || "?").trim().charAt(0) || "?";
+        const dot = ok ? "product-card__dot--ok" : "product-card__dot--no";
+        const path = productPhotoPath(p);
+        return `
+        <div class="product-card${dis}" data-add-card="${p.id}" role="button" tabindex="0">
+          <div class="product-card__media">
+            <span class="product-card__dot ${dot}" title="${ok ? "In stock" : "Out of stock"}"></span>
+            <img class="hidden" alt="" data-product-img="1" data-src="${escAttr(path)}">
+            <div class="product-card__ph" style="background:${phColor}">${esc(initial)}</div>
+          </div>
+          <div class="product-card__body">
+            <div class="product-card__name">${esc(p.name)}</div>
+            <div class="product-card__price">${fmtUsd(p.price)}</div>
+          </div>
+        </div>`;
+      }).join("");
+
+      el.querySelectorAll("[data-add-card]").forEach(card => {
+        const go = () => {
+          if (card.classList.contains("product-card--disabled")) return;
+          addToCart(Number(card.getAttribute("data-add-card")));
+        };
+        card.onclick = go;
+        card.onkeydown = e => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            go();
+          }
+        };
+      });
+
+      el.querySelectorAll(".product-card__media").forEach(media => {
+        const img = media.querySelector("[data-product-img]");
+        const ph = media.querySelector(".product-card__ph");
+        const path = img && img.getAttribute("data-src");
+        if (img && ph && path) tryProductCardPhoto(img, ph, path);
+      });
+    }
+
+    function renderCart() {
+      const el = document.getElementById("cartItems");
+      const rows = [...cart.entries()].map(([pid, qty]) => {
+        const p = products.find(x => x.id === pid);
+        return p ? { p, qty } : null;
+      }).filter(Boolean);
+      if (!rows.length) {
+        el.innerHTML = "<div class='cart-empty'>Cart is empty.</div>";
+        renderTotals();
+        return;
+      }
+      el.innerHTML = rows.map(r => {
+        const lineTot = Number(r.p.price) * Number(r.qty);
+        return `
+        <div class="cart-line">
+          <div>
+            <div class="cart-line-name">${esc(r.p.name)}</div>
+            <div class="cart-line-unit">${fmtUsd(r.p.price)} each</div>
+          </div>
+          <div class="cart-line-total">${fmtUsd(lineTot)}</div>
+          <div class="cart-line-actions">
+            <button type="button" class="qty-btn" data-minus="${r.p.id}" aria-label="Decrease quantity">−</button>
+            <span class="qty-val">${r.qty}</span>
+            <button type="button" class="qty-btn" data-plus="${r.p.id}" aria-label="Increase quantity">+</button>
+            <button type="button" class="btn-remove" data-remove="${r.p.id}" aria-label="Remove">×</button>
+          </div>
+        </div>`;
+      }).join("");
+      el.querySelectorAll("[data-minus]").forEach(b => b.onclick = () => {
+        const id = Number(b.getAttribute("data-minus"));
+        const q = (cart.get(id) || 0) - 1;
+        if (q <= 0) cart.delete(id); else cart.set(id, q);
+        renderCart();
+      });
+      el.querySelectorAll("[data-plus]").forEach(b => b.onclick = () => {
+        const id = Number(b.getAttribute("data-plus"));
+        cart.set(id, (cart.get(id) || 0) + 1);
+        renderCart();
+      });
+      el.querySelectorAll("[data-remove]").forEach(b => b.onclick = () => {
+        cart.delete(Number(b.getAttribute("data-remove")));
+        renderCart();
+      });
+      renderTotals();
+    }
+
+    function renderTables() {
+      const sel = document.getElementById("tableSelect");
+      if (!tables.length) { sel.innerHTML = "<option value='0'>No tables</option>"; return; }
+      sel.innerHTML = tables.map(t => {
+        const srv = t.assignedServerName ? ` · ${t.assignedServerName}` : "";
+        return `<option value="${t.id}">Table ${t.tableNumber} - ${t.name} (${t.status})${srv}</option>`;
+      }).join("");
+    }
+
+    function getTicketMode() {
+      const n = document.getElementById("ticketModeNew");
+      return n && n.checked ? "new" : "append";
+    }
+    function setTicketMode(v) {
+      const a = document.getElementById("ticketModeAppend");
+      const n = document.getElementById("ticketModeNew");
+      if (!a || !n) return;
+      if (v === "new") { n.checked = true; a.checked = false; }
+      else { a.checked = true; n.checked = false; }
+    }
+    function updateTicketModeHint(body, tableId) {
+      const el = document.getElementById("ticketModeHint");
+      if (!el) return;
+      if (!tableId) {
+        el.textContent = "Select a table to see open-check status.";
+        return;
+      }
+      if (!body) {
+        el.textContent = "";
+        return;
+      }
+      if (!body.hasOpenCheck) {
+        el.textContent = "No open check on this table yet. Send creates a pending ticket; both options behave the same until an open check exists.";
+      } else {
+        el.textContent = `Open check ${body.orderCode} (${body.status}). Same ticket adds these lines to it. New ticket starts a separate check on this table.`;
+      }
+    }
+
+    async function checkOpenCheck() {
+      const tableId = Number(document.getElementById("tableSelect").value || "0");
+      const label = document.getElementById("openCheckInfo");
+      if (!tableId) {
+        label.textContent = "";
+        updateTicketModeHint(null, 0);
+        return;
+      }
+      const r = await api(`/api/server/open-check?tableId=${tableId}`);
+      if (!r.ok) {
+        label.textContent = "Cannot check open ticket.";
+        updateTicketModeHint(null, tableId);
+        return;
+      }
+      if (!r.body.hasOpenCheck) {
+        label.textContent = "No open check on this table.";
+        updateTicketModeHint(r.body, tableId);
+        return;
+      }
+      label.textContent = `Open check ${r.body.orderCode} (${r.body.status}) found.`;
+      updateTicketModeHint(r.body, tableId);
+    }
+
+    async function loadPortalData() {
+      const cfg = await api("/api/server/config");
+      const t = await api("/api/tables/my");
+      const p = await api("/api/server/products");
+      if (!cfg.ok || !t.ok || !p.ok) {
+        setOut("Load portal data failed", { cfg, tables: t, products: p });
+        return false;
+      }
+      config = cfg.body;
+      const brandNameEl = document.getElementById("brandName");
+      const brandLogoEl = document.getElementById("brandLogo");
+      const staffPhotoEl = document.getElementById("staffPhoto");
+      brandNameEl.textContent = (config.restaurantName || "Elite Restaurant").toUpperCase();
+      if (config.restaurantLogoUrl) {
+        await setAuthImage(brandLogoEl, config.restaurantLogoUrl);
+      } else {
+        brandLogoEl.classList.add("hidden");
+      }
+      if (config.employeePhotoUrl) {
+        await setAuthImage(staffPhotoEl, config.employeePhotoUrl);
+      } else {
+        staffPhotoEl.classList.add("hidden");
+      }
+      tables = Array.isArray(t.body) ? t.body : [];
+      products = Array.isArray(p.body) ? p.body : [];
+      renderTables();
+      renderCategories();
+      renderProducts();
+      renderCart();
+      await checkOpenCheck();
+      return true;
+    }
+
+    function clearCurrentOrder() {
+      cart.clear();
+      document.getElementById("orderSource").value = "WalkIn";
+      document.getElementById("sourceReference").value = "";
+      document.getElementById("sourceReference").disabled = true;
+      document.getElementById("discountMode").value = "None";
+      document.getElementById("discountValue").value = "";
+      setTicketMode("new");
+      document.getElementById("customerNotes").value = "";
+      document.getElementById("allergyNotes").value = "";
+      document.getElementById("search").value = "";
+      document.getElementById("category").value = "All";
+      renderCategories();
+      renderCart();
+      checkOpenCheck();
+    }
+
+    document.getElementById("search").addEventListener("input", renderProducts);
+    document.getElementById("discountMode").addEventListener("change", renderTotals);
+    document.getElementById("discountValue").addEventListener("input", renderTotals);
+    document.getElementById("paymentCurrency").addEventListener("change", renderTotals);
+    document.getElementById("tableSelect").addEventListener("change", checkOpenCheck);
+    document.getElementById("sourceReference").disabled = true;
+    document.getElementById("orderSource").addEventListener("change", () => {
+      const src = document.getElementById("orderSource").value;
+      const ref = document.getElementById("sourceReference");
+      ref.disabled = src !== "Delivery";
+      if (src !== "Delivery") ref.value = "";
+    });
+
+    document.getElementById("btnLogin").onclick = async () => {
+      const btn = document.getElementById("btnLogin");
+      const staffId = (document.getElementById("staffId").value || "").trim();
+      const pin = document.getElementById("pin").value || "";
+      if (!staffId || !pin) {
+        setLoginMessage("Enter SignInId / UniqueId and PIN.", "error");
+        return;
+      }
+      setLoginMessage("Signing in…");
+      btn.disabled = true;
+      let res;
+      try {
+        res = await api("/api/auth/login", "POST", { staffId, pin, portal: "Cashier" }, false);
+      } catch (e) {
+        setLoginMessage(
+          "Could not reach the API. Open this page from the API host (for example http://localhost:5223/cashier-order.html).\n\n"
+            + (e && e.message ? e.message : String(e)),
+          "error"
+        );
+        setOut("Login network error", { error: String(e) });
+        btn.disabled = false;
+        return;
+      }
+      btn.disabled = false;
+      if (!res.ok || !res.body?.accessToken) {
+        const hint =
+          res.body?.message ||
+          res.body?.title ||
+          res.body?.detail ||
+          (res.body?.errors ? JSON.stringify(res.body.errors) : null);
+        setLoginMessage(`Login failed (HTTP ${res.status}). ${hint || "Check credentials and Cashier portal access."}`, "error");
+        setOut("Login failed", res);
+        return;
+      }
+      setLoginMessage("");
+      token = res.body.accessToken;
+      me = res.body;
+      document.getElementById("sessionLabel").textContent = `${me.name} (${me.signInId || me.employeeUniqueId})`;
+      document.getElementById("loginWrap").classList.add("hidden");
+      document.getElementById("app").classList.remove("hidden");
+      const ok = await loadPortalData();
+      setOut("Cashier order login", { login: res, loaded: ok });
+    };
+
+    document.getElementById("btnLogout").onclick = () => {
+      token = ""; me = null; tables = []; products = []; cart.clear();
+      document.getElementById("brandName").textContent = "ELITE CASHIER ORDER";
+      revokeImgBlob(document.getElementById("brandLogo"));
+      document.getElementById("brandLogo").classList.add("hidden");
+      revokeImgBlob(document.getElementById("staffPhoto"));
+      document.getElementById("staffPhoto").classList.add("hidden");
+      document.getElementById("app").classList.add("hidden");
+      document.getElementById("loginWrap").classList.remove("hidden");
+      setOut("Logged out", { ok: true });
+    };
+
+    document.getElementById("btnRefreshAll").onclick = async () => {
+      const ok = await loadPortalData();
+      setOut("Refresh data", { ok, tables: tables.length, products: products.length });
+    };
+    document.getElementById("btnCheckOpen").onclick = checkOpenCheck;
+
+    document.getElementById("btnClearOrder").onclick = () => {
+      clearCurrentOrder();
+      setOut("Order cleared", { ok: true });
+    };
+
+    document.getElementById("btnSubmit").onclick = async () => {
+      const tableId = Number(document.getElementById("tableSelect").value || "0");
+      const lines = [...cart.entries()].map(([productId, quantity]) => ({ productId, quantity }));
+      if (!tableId) {
+        alert("Select a table first.");
+        setOut("Submit blocked", { message: "Select a table first." });
+        return;
+      }
+      if (!lines.length) {
+        alert("Cart is empty.");
+        setOut("Submit blocked", { message: "Cart is empty." });
+        return;
+      }
+      const source = document.getElementById("orderSource").value;
+      const sourceRef = document.getElementById("sourceReference").value || "";
+      if (source === "Delivery" && !sourceRef.trim()) {
+        alert("Delivery requires a reference.");
+        setOut("Submit blocked", { message: "Delivery source needs a reference." });
+        return;
+      }
+      const d = normalizeDiscount();
+      const payload = {
+        tableId,
+        orderSource: source,
+        sourceReference: sourceRef,
+        discountMode: d.mode,
+        discountValue: d.value,
+        paymentCurrencyCode: document.getElementById("paymentCurrency").value,
+        appendToOpenCheck: getTicketMode() === "append",
+        customerNotes: document.getElementById("customerNotes").value || "",
+        allergyNotes: document.getElementById("allergyNotes").value || "",
+        lines
+      };
+      const res = await api("/api/server/orders", "POST", payload);
+      setOut("Submit order result", res);
+      if (!res.ok) {
+        const m = res.body?.message || res.body?.title || res.body?.detail;
+        alert(m || `Could not place order (HTTP ${res.status}).`);
+        return;
+      }
+      clearCurrentOrder();
+      await loadPortalData();
+    };
+  </script>
+</body>
+</html>

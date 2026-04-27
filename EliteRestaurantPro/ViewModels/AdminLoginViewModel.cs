@@ -1,6 +1,7 @@
 using System.Windows.Input;
-using EliteRestaurantPro.Data;
-using EliteRestaurantPro.Utils;
+using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Staff;
+using EliteRestaurant.Core.Utils;
 using Microsoft.EntityFrameworkCore;
 
 namespace EliteRestaurantPro.ViewModels;
@@ -64,17 +65,8 @@ public class AdminLoginViewModel : BaseViewModel
         var idTrim = AdminId.Trim();
         using (var db = new AppDbContext())
         {
-            var adminOrManager = db.Employees.AsNoTracking()
-                .Where(e => e.EmploymentStatus == "Active")
-                .AsEnumerable()
-                .Where(e =>
-                    e.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase) ||
-                    e.Role.Equals("Manager", StringComparison.OrdinalIgnoreCase))
-                .Where(e =>
-                    (!string.IsNullOrWhiteSpace(e.SignInId) &&
-                     e.SignInId.Trim().Equals(idTrim, StringComparison.OrdinalIgnoreCase)) ||
-                    e.UniqueId.Trim().Equals(idTrim, StringComparison.OrdinalIgnoreCase) ||
-                    e.Name.Trim().Equals(idTrim, StringComparison.OrdinalIgnoreCase))
+            var adminOrManager = StaffPortalAuthentication
+                .QueryActiveAdminPortalCandidates(db.Employees.AsNoTracking(), idTrim)
                 .FirstOrDefault();
 
             if (adminOrManager is not null)

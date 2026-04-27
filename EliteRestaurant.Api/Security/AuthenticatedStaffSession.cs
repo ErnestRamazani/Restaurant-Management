@@ -7,4 +7,5 @@ public sealed record AuthenticatedStaffSession(
     string Name,
     string Role,
     string SignInId,
+    string Portal,
     DateTime ExpiresAtUtc);

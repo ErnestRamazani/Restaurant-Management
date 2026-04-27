@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Elite Restaurant — Comprehensive Code Review</title>
+  <style>
+    :root { --text: #1a1a1a; --muted: #444; --border: #ccc; --accent: #0b5; --warn: #a60; --danger: #a20; }
+    * { box-sizing: border-box; }
+    body { font-family: "Segoe UI", system-ui, sans-serif; line-height: 1.55; color: var(--text); max-width: 48rem; margin: 0 auto; padding: 2rem 1.5rem 4rem; font-size: 11pt; }
+    h1 { font-size: 1.75rem; border-bottom: 2px solid var(--text); padding-bottom: 0.35rem; }
+    h2 { font-size: 1.35rem; margin-top: 2rem; color: #111; }
+    h3 { font-size: 1.1rem; margin-top: 1.25rem; color: #222; }
+    .meta { color: var(--muted); font-size: 0.95rem; margin-bottom: 2rem; }
+    nav.toc { background: #f6f6f6; border: 1px solid var(--border); padding: 1rem 1.25rem; margin: 1.5rem 0; page-break-inside: avoid; }
+    nav.toc ul { margin: 0.5rem 0 0; padding-left: 1.25rem; }
+    nav.toc li { margin: 0.25rem 0; }
+    a { color: #0645ad; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.95rem; }
+    th, td { border: 1px solid var(--border); padding: 0.45rem 0.6rem; text-align: left; vertical-align: top; }
+    th { background: #eee; }
+    .tag { display: inline-block; font-size: 0.8rem; padding: 0.1rem 0.45rem; border-radius: 3px; font-weight: 600; }
+    .tag-low { background: #e8f5e9; color: #1b5e20; }
+    .tag-med { background: #fff8e1; color: #e65100; }
+    .tag-high { background: #ffebee; color: #b71c1c; }
+    blockquote.risk { margin: 1rem 0; padding: 0.75rem 1rem; border-left: 4px solid var(--danger); background: #fff5f5; }
+    blockquote.note { margin: 1rem 0; padding: 0.75rem 1rem; border-left: 4px solid var(--warn); background: #fffbf0; }
+    pre, code { font-family: Consolas, "Courier New", monospace; font-size: 0.88rem; }
+    pre { background: #f4f4f4; padding: 0.75rem; overflow-x: auto; border: 1px solid var(--border); }
+    ul.compact li { margin: 0.2rem 0; }
+    @media print {
+      body { max-width: none; font-size: 10pt; padding: 0.75in; }
+      h2 { page-break-after: avoid; }
+      nav.toc { page-break-after: always; }
+      a { color: #000; text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Elite Restaurant — Comprehensive Code Review</h1>
+  <p class="meta">
+    <strong>Document type:</strong> Independent technical review (static analysis + architecture walkthrough)<br>
+    <strong>Repository:</strong> EliteRestaurant (multi-project .NET 8 solution)<br>
+    <strong>Review date:</strong> April 2026<br>
+    <strong>Audience:</strong> Senior / staff engineers, tech leads, security reviewers<br>
+    <strong>Confidentiality:</strong> Internal use — contains assessment opinions, not legal advice.
+  </p>
+</header>
+
+<nav class="toc" aria-label="Table of contents">
+  <strong>Table of contents</strong>
+  <ul>
+    <li><a href="#exec">1. Executive summary</a></li>
+    <li><a href="#scope">2. Scope and boundaries</a></li>
+    <li><a href="#method">3. Review methodology</a></li>
+    <li><a href="#inventory">4. Asset inventory</a></li>
+    <li><a href="#strengths">5. Notable strengths</a></li>
+    <li><a href="#risks">6. Risks, gaps, and residual debt</a></li>
+    <li><a href="#security">7. Security assessment</a></li>
+    <li><a href="#correctness">8. Domain correctness and financial logic</a></li>
+    <li><a href="#quality">9. Testing and quality gates</a></li>
+    <li><a href="#perf">10. Performance and operational posture</a></li>
+    <li><a href="#maint">11. Maintainability and engineering culture</a></li>
+    <li><a href="#recs">12. Prioritized recommendations</a></li>
+    <li><a href="#api-surface">13. API surface summary</a></li>
+    <li><a href="#deps">14. Dependencies and supply chain</a></li>
+    <li><a href="#observability">15. Observability and diagnostics</a></li>
+    <li><a href="#conclusion">16. Conclusion</a></li>
+    <li><a href="#appendix">17. Appendix — remediation traceability</a></li>
+  </ul>
+</nav>
+
+<h2 id="exec">1. Executive summary</h2>
+
+<p>Elite Restaurant is a <strong>multi-surface restaurant operations system</strong>: a Windows desktop client (<strong>WPF / .NET 8</strong>), a shared <strong>domain and persistence layer</strong> (<strong>EliteRestaurant.Core</strong> with <strong>EF Core</strong> and <strong>PostgreSQL</strong>), and a <strong>LAN-oriented ASP.NET Core API</strong> supporting tablet/server workflows plus a <strong>static HTML “Server Portal”</strong> hosted from <code>wwwroot</code>. The codebase encodes non-trivial domain rules: order workflow, inventory deduction hooks, payroll math, money ledger paths, table occupancy reconciliation, and multi-currency presentation.</p>
+
+<p><strong>Overall assessment:</strong> The architecture is <em>coherent for a vertically integrated product</em> — Core cleanly centralizes EF models, migrations, and much business logic; the API is thin and CORS-locked; recent work improved <strong>safety</strong> (destructive seed confirmation), <strong>testability</strong> (xUnit + InMemory for reconciliation), and <strong>separation of concerns</strong> on the create-order path (dedicated services + Core calculators). Remaining concerns are <strong>uneven automated test depth</strong> relative to business risk, <strong>large ViewModels</strong> outside the refactored create-order flow, and <strong>operational sharp edges</strong> (any tool with a live PostgreSQL connection string can destroy data if misconfigured).</p>
+
+<p><strong>Verdict for production readiness:</strong> Suitable for <strong>controlled deployment</strong> (known connection strings, trained operators, backups) with the explicit understanding that <strong>regression risk is mitigated more by manual QA than by breadth of automated tests</strong>. Raising automated coverage around money, inventory, and order state transitions should be treated as a <span class="tag tag-med">P1</span> product risk reduction, not a cosmetic improvement.</p>
+
+<h2 id="scope">2. Scope and boundaries</h2>
+
+<h3>2.1 In scope</h3>
+<ul class="compact">
+  <li>Solution structure, layering, and dependency directions.</li>
+  <li>Representative domain modules: orders, workflow, totals, reconciliation, payroll, staff auth helpers.</li>
+  <li>API surface: controllers, auth, DbContext pooling, static front-end delivery.</li>
+  <li>Desktop client: MVVM ViewModels, views (XAML), startup and database bootstrap.</li>
+  <li>Tooling: SeedRunner, ClearActiveOrders, test project.</li>
+  <li>Recent audit-style remediations (service extraction, tests, SeedRunner guard, API configuration).</li>
+</ul>
+
+<h3>2.2 Out of scope</h3>
+<ul class="compact">
+  <li>Full line-by-line review of every ViewModel and report (millions of tokens); sampling and architectural inference apply.</li>
+  <li>Penetration testing, TLS configuration audit beyond code-level observations.</li>
+  <li>Legal/compliance certification (PCI, labor law) — only technical notes where relevant.</li>
+</ul>
+
+<h2 id="method">3. Review methodology</h2>
+
+<p>The review combined:</p>
+<ol>
+  <li><strong>Repository topology analysis</strong> — projects, references, and technology stack.</li>
+  <li><strong>Representative file reads</strong> — <code>AppDbContext</code>, API <code>Program.cs</code>, reconciliation, totals, submission helpers, create-order refactor surfaces.</li>
+  <li><strong>Test inventory</strong> — <code>EliteRestaurant.Tests</code> file list and subject matter (payroll, workflow, discount parsing, submission helper, reconciler, totals calculator).</li>
+  <li><strong>Contrast with stated remediation goals</strong> — mapping “findings” to code changes (traceability appendix).</li>
+</ol>
+
+<p>This is <strong>not</strong> a formal CMMI-style audit; it is an engineering review suitable for merge gates and roadmap planning.</p>
+
+<h2 id="inventory">4. Asset inventory</h2>
+
+<table>
+  <thead>
+    <tr><th>Project</th><th>Role</th><th>Notable tech</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>EliteRestaurant.Core</code></td><td>Domain, EF Core, migrations, shared utilities</td><td>PostgreSQL (Npgsql), closedXML, payroll/totals/workflow</td></tr>
+    <tr><td><code>EliteRestaurantPro</code></td><td>Admin / operations WPF client</td><td>WPF, MVVM, QuestPDF, multiple feature views</td></tr>
+    <tr><td><code>EliteRestaurant.Api</code></td><td>HTTP API + static Server Portal</td><td>Minimal hosting, Swagger, CORS policy, Kestrel LAN HTTPS optional</td></tr>
+    <tr><td><code>EliteRestaurant.Tests</code></td><td>Automated tests</td><td>xUnit, EF InMemory for reconciliation tests</td></tr>
+    <tr><td><code>SeedRunner</code></td><td>Destructive reseed utility</td><td>Interactive confirm + <code>--force</code></td></tr>
+    <tr><td><code>Tools/ClearActiveOrders</code></td><td>Operational maintenance</td><td>Console tool</td></tr>
+  </tbody>
+</table>
+
+<p><strong>Scale signal:</strong> <code>CreateOrderViewModel.cs</code> remains approximately <strong>1,076 lines</strong> after extraction of submission, catalog load, draft persistence, and totals orchestration — a material reduction in embedded domain logic, but the screen still coordinates many UI concerns in one class.</p>
+
+<h2 id="strengths">5. Notable strengths</h2>
+
+<h3>5.1 Clear shared kernel</h3>
+<p>Centralizing <code>AppDbContext</code>, models, migrations, and cross-cutting helpers in <strong>Core</strong> avoids the classic “copy/paste SQL” failure mode. Financial and order primitives (e.g. <code>OrderTotalsHelper</code>, <code>DataReconciler</code>, <code>OrderWorkflow</code>) are discoverable and reusable from both desktop and API paths.</p>
+
+<h3>5.2 API hardening choices</h3>
+<ul class="compact">
+  <li><strong>CORS</strong> requires explicit allowed origins (fail-fast at startup if missing).</li>
+  <li><strong><code>AddDbContextPool</code></strong> aligns with concurrent tablet traffic over network PostgreSQL.</li>
+  <li><strong>Scoped <code>TabletAuthService</code></strong> with injected <code>AppDbContext</code> matches ASP.NET Core DI lifetimes.</li>
+</ul>
+
+<h3>5.3 Incremental extractability</h3>
+<p>The create-order flow demonstrates a <strong>repeatable pattern</strong>: push pure or DB-centric logic into Core or small Pro services; leave the ViewModel as orchestration, validation messaging, and observable state. That pattern should be replicated for other “god” ViewModels.</p>
+
+<h3>5.4 Test project exists with meaningful seeds</h3>
+<p>Tests target <strong>high-leverage pure functions</strong> (discount parsing, prep estimator, workflow predicates, payroll calculator, submission assignee resolution) and now include <strong>reconciliation integration-style tests</strong> via InMemory EF. This is the right direction; breadth is the missing ingredient.</p>
+
+<h2 id="risks">6. Risks, gaps, and residual debt</h2>
+
+<h3>6.1 Test coverage vs. business risk <span class="tag tag-med">Medium</span></h3>
+<p>Automated tests cover important <em>islands</em> of logic but not the full order lifecycle, inventory edge cases, or ledger posting matrix. Silent regressions remain plausible during refactors of <code>FinancialTransactionService</code>, cashier completion paths, or admin bulk operations.</p>
+
+<h3>6.2 Large ViewModels <span class="tag tag-med">Medium</span></h3>
+<p>Beyond create-order, other ViewModels (orders, money, reports, kitchen) likely still mix UI, validation, and persistence. This increases review cost and bug coupling.</p>
+
+<h3>6.3 Dual configuration sources <span class="tag tag-low">Low–Med</span></h3>
+<p>Pricing and tax logic read <code>SettingsManager</code> in Core while the API also exposes <code>IOptions&lt;CurrencyPricingOptions&gt;</code>. The precedence rules must remain documented and tested to avoid “API says X, desktop computes Y.”</p>
+
+<h3>6.4 Operational foot-guns <span class="tag tag-high">High (operational)</span></h3>
+<blockquote class="risk">
+  <strong>Data loss risk:</strong> Any utility holding PostgreSQL credentials (SeedRunner, mis-pointed connection string, restored backup scripts) can truncate or corrupt production data. Technical mitigations (confirm prompts, <code>--force</code> documentation, least-privilege DB roles, backups) are as important as code quality.
+</blockquote>
+
+<h2 id="security">7. Security assessment</h2>
+
+<h3>7.1 Authentication model</h3>
+<p>Tablet/server flows rely on <strong>bearer tokens</strong> backed by <code>TabletSession</code> rows with expiry. This is appropriate for a LAN tablet deployment; it is <strong>not</strong> a substitute for OAuth2/OIDC in an internet-facing multi-tenant SaaS.</p>
+
+<h3>7.2 Connection strings and secrets</h3>
+<p>Desktop bootstrap supports environment variables and DPAPI-protected password storage patterns. Reviewers should verify <strong>secret rotation</strong> and <strong>machine scope</strong> of DPAPI blobs in operational runbooks.</p>
+
+<h3>7.3 Static Server Portal</h3>
+<p>The portal is plain HTML/JS/CSS under <code>wwwroot</code>. Security depends on <strong>API authorization</strong> (token checks per endpoint) and <strong>CORS</strong> — the static files themselves are not a trust boundary.</p>
+
+<h3>7.4 Swagger in production</h3>
+<p>Swagger is enabled in the hosted pipeline shown in code. For strict production hardening, consider environment-gated Swagger or authentication on the Swagger UI endpoint.</p>
+
+<h2 id="correctness">8. Domain correctness and financial logic</h2>
+
+<p>Strengths: explicit <strong>rounding modes</strong> in totals computation, <strong>discount caps</strong> relative to subtotal, and <strong>table reconciliation</strong> that treats maintenance tables as immutable. Payroll and attendance modules exist with dedicated tests — a positive signal.</p>
+
+<p>Gaps: end-to-end tests that assert <strong>double-entry consistency</strong> (order completed → ledger rows → dashboard totals) appear absent. Such tests would be high value and should use a controlled EF fixture or transaction rollback pattern.</p>
+
+<h2 id="quality">9. Testing and quality gates</h2>
+
+<p><strong>Current test modules (illustrative):</strong></p>
+<ul class="compact">
+  <li><code>PayrollCalculatorTests</code></li>
+  <li><code>OrderWorkflowTests</code></li>
+  <li><code>OrderDiscountParserTests</code>, <code>OrderPrepTimeEstimatorTests</code></li>
+  <li><code>OrderSubmissionHelperTests</code></li>
+  <li><code>StaffPortalAuthenticationTests</code></li>
+  <li><code>DataReconcilerTests</code>, <code>DataReconcilerReconcileTests</code></li>
+  <li><code>OrderTotalsCalculatorTests</code></li>
+</ul>
+
+<p><strong>Recommendation:</strong> adopt a CI job running <code>dotnet test</code> on every PR; add a <strong>minimum coverage threshold</strong> incrementally (start with Core-only).</p>
+
+<h2 id="perf">10. Performance and operational posture</h2>
+
+<ul class="compact">
+  <li><strong>DbContext pooling</strong> on the API reduces context churn — appropriate.</li>
+  <li><strong>Desktop</strong> still constructs <code>new AppDbContext()</code> in many ViewModels — acceptable for single-user admin client; watch for long-lived screens that could benefit from shared context or explicit <code>AsNoTracking</code> discipline (already used in several queries).</li>
+  <li><strong>Reports / exports</strong> (ClosedXML, QuestPDF) should be profiled on large datasets — not reviewed in depth here.</li>
+</ul>
+
+<h2 id="maint">11. Maintainability and engineering culture</h2>
+
+<p>Positive signals: migration history present, query extensions (e.g. open-check filtering) extracted, destructive tooling guarded. Negative signals: very large classes still exist; HTML portal is monolithic (single large <code>index.html</code>) which is fast to ship but harder to unit test.</p>
+
+<h2 id="recs">12. Prioritized recommendations</h2>
+
+<table>
+  <thead>
+    <tr><th>Pri</th><th>Recommendation</th><th>Rationale</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><span class="tag tag-high">P0</span></td><td>Backups + runbook for SeedRunner / connection strings</td><td>Operational data loss dominates code defects in severity.</td></tr>
+    <tr><td><span class="tag tag-med">P1</span></td><td>Expand tests: order completion → financial postings; inventory deduction edge cases</td><td>Highest silent-regression cost.</td></tr>
+    <tr><td><span class="tag tag-med">P1</span></td><td>Continue ViewModel decomposition using the create-order service pattern</td><td>Reduces defect coupling and review time.</td></tr>
+    <tr><td><span class="tag tag-low">P2</span></td><td>Environment-gated Swagger; security headers review</td><td>Production hygiene.</td></tr>
+    <tr><td><span class="tag tag-low">P2</span></td><td>Split Server Portal JS/CSS into modules + build step (optional)</td><td>Maintainability vs. simplicity trade-off.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="api-surface">13. API surface summary</h2>
+
+<p>The API is organized around <strong>role-scoped operational tasks</strong> rather than a generic CRUD facade — appropriate for a restaurant floor domain.</p>
+
+<table>
+  <thead>
+    <tr><th>Area</th><th>Representative endpoints (conceptual)</th><th>Notes</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Health</td><td><code>/api/health</code>, <code>/api/health/db</code></td><td>Connectivity probe; db counts as smoke test</td></tr>
+    <tr><td>Auth / tablet</td><td>Login under <code>AuthController</code></td><td>Issues bearer token backed by <code>TabletSession</code></td></tr>
+    <tr><td>Tables</td><td><code>/api/tables/my</code></td><td>Server-filtered assignment</td></tr>
+    <tr><td>Reservations</td><td><code>/api/reservations/arrived</code></td><td>Arrived-party pickup for tablet UX</td></tr>
+    <tr><td>Server portal</td><td><code>/api/server/*</code></td><td>Config, assets, products, drafts, order create/append, ready queue</td></tr>
+  </tbody>
+</table>
+
+<p><strong>Review guidance:</strong> For each new endpoint, explicitly decide <strong>authorization</strong> (which tablet roles may call it), <strong>idempotency</strong> (retries on poor Wi-Fi), and <strong>DTO versioning</strong> (additive fields preferred).</p>
+
+<h2 id="deps">14. Dependencies and supply chain</h2>
+
+<p>Core projects pull in <strong>EF Core 8</strong>, <strong>Npgsql</strong>, <strong>BCrypt</strong>, <strong>ClosedXML</strong>, and PDF/reporting stacks via WPF. From a senior governance perspective:</p>
+<ul class="compact">
+  <li>Keep <strong>central package management</strong> (Directory.Packages.props) under consideration if version drift appears across branches.</li>
+  <li>Run <code>dotnet list package --vulnerable</code> on a schedule; document exception handling for transitive issues.</li>
+  <li>ClosedXML and Excel-related libraries historically move quickly — pin majors intentionally.</li>
+</ul>
+
+<h2 id="observability">15. Observability and diagnostics</h2>
+
+<p>As shipped, observability is primarily <strong>application logs + health endpoint + user-visible error dialogs</strong>. For a senior rollout plan, consider:</p>
+<ul class="compact">
+  <li>Structured logging (JSON) on the API with correlation IDs per HTTP request.</li>
+  <li>Metrics for API latency and DB pool contention (Npgsql/EF events).</li>
+  <li>Client-side crash telemetry opt-in for WPF (privacy-sensitive; often skipped in LAN deployments).</li>
+</ul>
+
+<p>None of these are code defects — they are <strong>operational maturity</strong> items that differentiate a demo deployment from a multi-site franchise rollout.</p>
+
+<h2 id="conclusion">16. Conclusion</h2>
+
+<p>Elite Restaurant is a <strong>serious line-of-business codebase</strong> with a sensible Core/API/desktop split and recent improvements in safety and structure. The primary engineering debt is <strong>concentration of behavior in UI layer classes</strong> and <strong>test breadth not yet proportional to financial/order complexity</strong>. Addressing those two themes will yield the highest return for senior engineering time.</p>
+
+<h2 id="appendix">17. Appendix — remediation traceability (audit-style findings)</h2>
+
+<table>
+  <thead>
+    <tr><th>Theme</th><th>Intent</th><th>Evidence in codebase</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Create-order decomposition</td>
+      <td>Services vs. god ViewModel</td>
+      <td><code>EliteRestaurantPro/Services/TableLoadingService.cs</code>, <code>DraftPersistenceService.cs</code>, <code>OrderSubmissionService.cs</code>; <code>Core/Utils/OrderTotalsCalculator.cs</code>; slimmer <code>CreateOrderViewModel</code>.</td>
+    </tr>
+    <tr>
+      <td>Automated tests</td>
+      <td>Regression safety net</td>
+      <td><code>EliteRestaurant.Tests</code> (xUnit + InMemory reconciliation tests).</td>
+    </tr>
+    <tr>
+      <td>Seed safety</td>
+      <td>Prevent accidental prod wipe</td>
+      <td><code>SeedRunner/Program.cs</code> — restaurant name confirmation; <code>--force</code> escape hatch; header comment documents behavior.</td>
+    </tr>
+    <tr>
+      <td>Desktop DB setup UX</td>
+      <td>Replace legacy input dialogs</td>
+      <td><code>DatabasePipeSetupDialog</code> + <code>App.xaml.cs</code> retry path.</td>
+    </tr>
+    <tr>
+      <td>API persistence</td>
+      <td>Pooling + DI lifetimes</td>
+      <td><code>AddDbContextPool</code>; scoped <code>TabletAuthService</code>; controllers take <code>AppDbContext</code>.</td>
+    </tr>
+    <tr>
+      <td>Configurable pricing</td>
+      <td>API/settings alignment</td>
+      <td><code>CurrencyPricingOptions</code>, <code>appsettings.json</code> section, controller merge with file settings.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p class="meta" style="margin-top:3rem;"><em>End of document.</em></p>
+
+</body>
+</html>

@@ -2,9 +2,9 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Input;
-using EliteRestaurantPro.Data;
-using EliteRestaurantPro.Models;
-using EliteRestaurantPro.Utils;
+using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Utils;
 using Microsoft.EntityFrameworkCore;
 
 namespace EliteRestaurantPro.ViewModels;
@@ -45,6 +45,8 @@ public class MenuViewModel : AdminBaseViewModel
     private string _selectedCategory = "Drink";
     private string _selectedSubCategory = "Beer";
     private string _priceText = string.Empty;
+    private string _productDescription = string.Empty;
+    private string _productComposition = string.Empty;
     private string _selectedViewCategory = "All";
     private string _selectedViewSubCategory = "All";
     private string _searchText = string.Empty;
@@ -112,6 +114,26 @@ public class MenuViewModel : AdminBaseViewModel
         get => _priceText;
         set => SetField(ref _priceText, value);
     }
+
+    public string ProductDescription
+    {
+        get => _productDescription;
+        set
+        {
+            if (!SetField(ref _productDescription, value))
+                return;
+            OnPropertyChanged(nameof(DescriptionCharCountRemaining));
+        }
+    }
+
+    public string ProductComposition
+    {
+        get => _productComposition;
+        set => SetField(ref _productComposition, value);
+    }
+
+    /// <summary>Characters remaining for customer description (max 350).</summary>
+    public int DescriptionCharCountRemaining => Math.Max(0, 350 - (_productDescription ?? string.Empty).Length);
 
     public string SelectedViewCategory
     {
@@ -261,6 +283,8 @@ public class MenuViewModel : AdminBaseViewModel
                || Hit(p.Category)
                || Hit(sub)
                || Hit(p.UniqueId)
+               || Hit(p.Description)
+               || Hit(p.Composition)
                || priceText.Contains(q, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -313,6 +337,8 @@ public class MenuViewModel : AdminBaseViewModel
         SelectedCategory = Categories.First();
         SelectedSubCategory = SubCategories.FirstOrDefault() ?? string.Empty;
         PriceText = string.Empty;
+        ProductDescription = string.Empty;
+        ProductComposition = string.Empty;
         foreach (var ingredient in InventorySelections)
         {
             ingredient.IsSelected = false;
@@ -334,6 +360,9 @@ public class MenuViewModel : AdminBaseViewModel
             ? SubCategories.FirstOrDefault() ?? string.Empty
             : product.SubCategory;
         PriceText = product.Price.ToString("0.00", CultureInfo.InvariantCulture);
+        ProductDescription = product.Description ?? string.Empty;
+        ProductComposition = product.Composition ?? string.Empty;
+        OnPropertyChanged(nameof(DescriptionCharCountRemaining));
 
         foreach (var ingredient in InventorySelections)
         {
@@ -370,6 +399,11 @@ public class MenuViewModel : AdminBaseViewModel
             return;
         }
 
+        var desc = (ProductDescription ?? string.Empty).Trim();
+        if (desc.Length > 350)
+            desc = desc[..350];
+        var comp = (ProductComposition ?? string.Empty).Trim();
+
         using var db = new AppDbContext();
         var selectedIngredients = InventorySelections.Where(i => i.IsSelected).ToList();
         if (!selectedIngredients.Any())
@@ -389,6 +423,8 @@ public class MenuViewModel : AdminBaseViewModel
             existing.Category = SelectedCategory.Trim();
             existing.SubCategory = SelectedSubCategory.Trim();
             existing.Price = price;
+            existing.Description = string.IsNullOrWhiteSpace(desc) ? null : desc;
+            existing.Composition = string.IsNullOrWhiteSpace(comp) ? null : comp;
 
             var existingIngredients = db.ProductIngredients.Where(pi => pi.ProductId == productId);
             db.ProductIngredients.RemoveRange(existingIngredients);
@@ -419,7 +455,9 @@ public class MenuViewModel : AdminBaseViewModel
                 Name = ProductName.Trim(),
                 Category = SelectedCategory.Trim(),
                 SubCategory = SelectedSubCategory.Trim(),
-                Price = price
+                Price = price,
+                Description = string.IsNullOrWhiteSpace(desc) ? null : desc,
+                Composition = string.IsNullOrWhiteSpace(comp) ? null : comp
             };
 
             db.Products.Add(product);
