@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChefHat, CreditCard, MonitorCog, Utensils } from 'lucide-react'
+import { CreditCard, MonitorCog, Utensils } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { BrowserRouter, Link, Navigate, Route, Routes } from 'react-router-dom'
 import { useCart } from './hooks/useCart'
@@ -18,12 +18,19 @@ const spring = { type: 'spring', stiffness: 300, damping: 34 }
 /** @internal history.state key for in-app back (cart → menu → hero) */
 const H = 'elite'
 
+function portalHref(path) {
+  if (window.location.port === '5173') {
+    return `http://${window.location.hostname}:8080${path}`
+  }
+
+  return path
+}
+
 function HubHome() {
   const cards = [
     { to: '/order', title: 'Consumer Menu', desc: 'Guests scan, browse, and send orders.', icon: Utensils },
-    { to: '/server/', title: 'Server', desc: 'Take table orders and manage pickup.', icon: MonitorCog, external: true },
-    { to: '/cashier', title: 'Cashier', desc: 'Release, complete, and manage checks.', icon: CreditCard },
-    { to: '/kitchen', title: 'Kitchen', desc: 'View kitchen queue and ready orders.', icon: ChefHat },
+    { to: '/server/index.html', title: 'Server', desc: 'Take table orders and manage pickup.', icon: MonitorCog, external: true },
+    { to: '/cashier.html', title: 'Cashier', desc: 'Release, complete, and manage checks.', icon: CreditCard, external: true },
   ]
 
   return (
@@ -47,36 +54,11 @@ function HubHome() {
             )
             const className = 'rounded-3xl border border-champagne/10 bg-midnight-2 p-5 shadow-[0_10px_30px_rgba(0,0,0,0.28)] transition hover:border-gold/50 hover:bg-midnight-3'
             return external ? (
-              <a key={to} href={to} className={className}>{content}</a>
+              <a key={to} href={portalHref(to)} className={className}>{content}</a>
             ) : (
               <Link key={to} to={to} className={className}>{content}</Link>
             )
           })}
-        </div>
-      </section>
-    </main>
-  )
-}
-
-function StaffRoutePlaceholder({ title, legacyHref }) {
-  return (
-    <main className="flex min-h-[100svh] items-center justify-center bg-midnight px-5 text-champagne">
-      <section className="w-full max-w-lg rounded-3xl border border-champagne/10 bg-midnight-2 p-6 text-center shadow-[0_10px_30px_rgba(0,0,0,0.28)]">
-        <p className="font-body text-xs font-bold uppercase tracking-[0.24em] text-gold/80">Cloud Web Hub</p>
-        <h1 className="mt-3 font-display text-3xl italic">{title}</h1>
-        <p className="mt-3 font-body text-sm leading-relaxed text-champagne/65">
-          This route is reserved for the responsive React staff interface. The existing portal remains available during migration.
-        </p>
-        {legacyHref ? (
-          <a
-            href={legacyHref}
-            className="mt-6 inline-flex min-h-11 items-center justify-center rounded-xl bg-gold px-5 font-body text-sm font-extrabold uppercase tracking-[0.08em] text-black"
-          >
-            Open current portal
-          </a>
-        ) : null}
-        <div className="mt-5">
-          <Link to="/" className="font-body text-sm font-semibold text-gold/90">Back to hub</Link>
         </div>
       </section>
     </main>
@@ -279,9 +261,6 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HubOrMenu />} />
         <Route path="/order/*" element={<CustomerMenuApp />} />
-        <Route path="/server/*" element={<StaffRoutePlaceholder title="Server" legacyHref="/server/" />} />
-        <Route path="/cashier/*" element={<StaffRoutePlaceholder title="Cashier" legacyHref="/cashier.html" />} />
-        <Route path="/kitchen/*" element={<StaffRoutePlaceholder title="Kitchen" />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
