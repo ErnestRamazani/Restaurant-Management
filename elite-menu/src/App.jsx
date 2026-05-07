@@ -21,7 +21,7 @@ const H = 'elite'
 function HubHome() {
   const cards = [
     { to: '/order', title: 'Consumer Menu', desc: 'Guests scan, browse, and send orders.', icon: Utensils },
-    { to: '/server', title: 'Server', desc: 'Take table orders and manage pickup.', icon: MonitorCog },
+    { to: '/server/', title: 'Server', desc: 'Take table orders and manage pickup.', icon: MonitorCog, external: true },
     { to: '/cashier', title: 'Cashier', desc: 'Release, complete, and manage checks.', icon: CreditCard },
     { to: '/kitchen', title: 'Kitchen', desc: 'View kitchen queue and ready orders.', icon: ChefHat },
   ]
@@ -37,17 +37,21 @@ function HubHome() {
           </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          {cards.map(({ to, title, desc, icon: Icon }) => (
-            <Link
-              key={to}
-              to={to}
-              className="rounded-3xl border border-champagne/10 bg-midnight-2 p-5 shadow-[0_10px_30px_rgba(0,0,0,0.28)] transition hover:border-gold/50 hover:bg-midnight-3"
-            >
-              <Icon className="h-8 w-8 text-gold" />
-              <h2 className="mt-5 font-display text-2xl italic text-champagne">{title}</h2>
-              <p className="mt-2 font-body text-sm leading-relaxed text-champagne/60">{desc}</p>
-            </Link>
-          ))}
+          {cards.map(({ to, title, desc, icon: Icon, external }) => {
+            const content = (
+              <>
+                <Icon className="h-8 w-8 text-gold" />
+                <h2 className="mt-5 font-display text-2xl italic text-champagne">{title}</h2>
+                <p className="mt-2 font-body text-sm leading-relaxed text-champagne/60">{desc}</p>
+              </>
+            )
+            const className = 'rounded-3xl border border-champagne/10 bg-midnight-2 p-5 shadow-[0_10px_30px_rgba(0,0,0,0.28)] transition hover:border-gold/50 hover:bg-midnight-3'
+            return external ? (
+              <a key={to} href={to} className={className}>{content}</a>
+            ) : (
+              <Link key={to} to={to} className={className}>{content}</Link>
+            )
+          })}
         </div>
       </section>
     </main>
@@ -271,11 +275,11 @@ function HubOrMenu() {
 
 export default function App() {
   return (
-    <BrowserRouter basename="/menu">
+    <BrowserRouter>
       <Routes>
         <Route path="/" element={<HubOrMenu />} />
         <Route path="/order/*" element={<CustomerMenuApp />} />
-        <Route path="/server/*" element={<StaffRoutePlaceholder title="Server" legacyHref="/index.html" />} />
+        <Route path="/server/*" element={<StaffRoutePlaceholder title="Server" legacyHref="/server/" />} />
         <Route path="/cashier/*" element={<StaffRoutePlaceholder title="Cashier" legacyHref="/cashier.html" />} />
         <Route path="/kitchen/*" element={<StaffRoutePlaceholder title="Kitchen" />} />
         <Route path="*" element={<Navigate to="/" replace />} />

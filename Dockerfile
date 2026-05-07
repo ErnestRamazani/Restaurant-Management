@@ -10,7 +10,7 @@ RUN npm run build
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS dotnet-build
 WORKDIR /src
 COPY . .
-COPY --from=web-build /src/EliteRestaurant.Api/wwwroot/menu ./EliteRestaurant.Api/wwwroot/menu
+COPY --from=web-build /src/EliteRestaurant.Api/wwwroot ./EliteRestaurant.Api/wwwroot
 RUN dotnet publish EliteRestaurant.Api/EliteRestaurant.Api.csproj -c Release -o /app/publish /p:UseAppHost=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime

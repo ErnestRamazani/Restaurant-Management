@@ -8,10 +8,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/menu/',
+  base: '/',
   build: {
-    outDir: path.resolve(__dirname, '../EliteRestaurant.Api/wwwroot/menu'),
-    emptyOutDir: true,
+    outDir: path.resolve(__dirname, '../EliteRestaurant.Api/wwwroot'),
+    emptyOutDir: false,
   },
   server: {
     host: true,
@@ -20,7 +20,7 @@ export default defineConfig({
     open: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:5223',
+        target: 'http://localhost:8080',
         changeOrigin: true,
       },
     },
