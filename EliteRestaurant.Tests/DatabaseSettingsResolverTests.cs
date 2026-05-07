@@ -67,4 +67,26 @@ public class DatabaseSettingsResolverTests
             Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", previousDefaultConnection);
         }
     }
+
+    [Fact]
+    public void TryGetDatabaseUrlLastResort_UsesDatabaseUrlWhenPresent()
+    {
+        var previousDatabaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
+        try
+        {
+            Environment.SetEnvironmentVariable(
+                "DATABASE_URL",
+                "postgresql://fallback:secret@fallback.example.com:25060/defaultdb");
+
+            var ok = AppDbContext.TryGetDatabaseUrlLastResort(out var connectionString);
+
+            Assert.True(ok);
+            Assert.Contains("Host=fallback.example.com", connectionString);
+            Assert.Contains("SSL Mode=Require", connectionString);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("DATABASE_URL", previousDatabaseUrl);
+        }
+    }
 }

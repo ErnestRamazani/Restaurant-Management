@@ -60,9 +60,12 @@ try
                         out var cs,
                         builder.Configuration.GetConnectionString("DefaultConnection")))
                 {
-                    throw new InvalidOperationException(
-                        "PostgreSQL connection string is required for the API. Set DATABASE_URL, ELITE_POSTGRES_CONNECTION, " +
-                        "or ConnectionStrings:DefaultConnection.");
+                    if (!AppDbContext.TryGetDatabaseUrlLastResort(out cs))
+                    {
+                        throw new InvalidOperationException(
+                            "PostgreSQL connection string is required for the API. Set DATABASE_URL, ELITE_POSTGRES_CONNECTION, " +
+                            "or ConnectionStrings:DefaultConnection.");
+                    }
                 }
 
                 o.UseNpgsql(cs, n => n.EnableRetryOnFailure(5));

@@ -52,6 +52,14 @@ public class AppDbContext : DbContext
             return;
         }
 
+        if (TryGetDatabaseUrlLastResort(out var databaseUrlConnectionString))
+        {
+            optionsBuilder.UseNpgsql(
+                databaseUrlConnectionString,
+                npgsql => npgsql.EnableRetryOnFailure(5));
+            return;
+        }
+
         throw new InvalidOperationException(
             "PostgreSQL is required but no connection string was found. " +
             "Preferred: set ELITE_DB_PROVIDER=PostgreSql and ELITE_POSTGRES_CONNECTION. " +
@@ -259,6 +267,20 @@ public class AppDbContext : DbContext
         }
 
         return DatabaseSettingsResolver.TryBuildFromSettings(settings, out connectionString);
+    }
+
+    public static bool TryGetDatabaseUrlLastResort(out string connectionString)
+    {
+        connectionString = string.Empty;
+        var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
+        if (string.IsNullOrWhiteSpace(databaseUrl))
+            return false;
+
+        Console.WriteLine($"[EliteRestaurant] DATABASE_URL found as last resort. Length={databaseUrl.Length}.");
+        return DatabaseSettingsResolver.TryNormalizePostgreSqlConnectionString(
+            databaseUrl,
+            out connectionString,
+            ensureCloudSsl: true);
     }
 
     private static bool TryReadDefaultConnectionFromAppSettings(out string connectionString)
