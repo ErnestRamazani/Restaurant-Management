@@ -1,5 +1,4 @@
 using System.Net;
-using System.Security.Cryptography.X509Certificates;
 using System.Threading.RateLimiting;
 using EliteRestaurant.Api;
 using EliteRestaurant.Api.Hubs;
@@ -57,11 +56,13 @@ try
         builder.Services.AddDbContextPool<AppDbContext>(
             o =>
             {
-                if (!AppDbContext.TryGetPostgreSqlConnectionString(out var cs))
+                if (!AppDbContext.TryGetPostgreSqlConnectionString(
+                        out var cs,
+                        builder.Configuration.GetConnectionString("DefaultConnection")))
                 {
                     throw new InvalidOperationException(
-                        "PostgreSQL connection string is required for the API. Set ELITE_DB_PROVIDER=PostgreSql and ELITE_POSTGRES_CONNECTION, " +
-                        "or configure Database in app settings.");
+                        "PostgreSQL connection string is required for the API. Set DATABASE_URL, ELITE_POSTGRES_CONNECTION, " +
+                        "or ConnectionStrings:DefaultConnection.");
                 }
 
                 o.UseNpgsql(cs, n => n.EnableRetryOnFailure(5));
@@ -135,70 +136,23 @@ try
     static string GetPartitionKey(HttpContext context) =>
         context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
-    static int? GetCloudPort(IHostEnvironment environment)
+    static int GetHttpPort()
     {
-        var raw = Environment.GetEnvironmentVariable("PORT")
-                  ?? Environment.GetEnvironmentVariable("ASPNETCORE_PORT");
+        var raw = Environment.GetEnvironmentVariable("PORT");
         if (int.TryParse(raw, out var port) && port > 0)
             return port;
 
-        return environment.IsProduction() ? 8080 : null;
+        return 8080;
     }
 
     const string CorsPolicyRestrictToConfiguredOrigins = "RestrictToConfiguredOrigins";
     var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
                       ?? Array.Empty<string>();
 
-    var lanSection = builder.Configuration.GetSection("LanHttps");
-    var httpPort = lanSection.GetValue("HttpPort", 5223);
-    var httpsPort = lanSection.GetValue("HttpsPort", 7194);
-    var cloudPort = GetCloudPort(builder.Environment);
-    var certRelative = lanSection["CertificatePath"] ?? "certs/elite-lan.pfx";
-    var certPath = Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, certRelative));
-    var certPassword = Environment.GetEnvironmentVariable("ELITE_LAN_CERTIFICATE_PASSWORD")
-                       ?? lanSection["CertificatePassword"]
-                       ?? "";
-
-    var lanHttpsEnabled = cloudPort is null && File.Exists(certPath);
-    var redirectHttpToHttps = lanSection.GetValue("RedirectHttpToHttps", true);
-    if (lanHttpsEnabled)
-    {
-        builder.Services.AddHttpsRedirection(options =>
-        {
-            options.HttpsPort = httpsPort;
-        });
-    }
+    var httpPort = GetHttpPort();
 
     builder.WebHost.ConfigureKestrel((_, options) =>
     {
-        if (cloudPort is { } port)
-        {
-            options.Listen(IPAddress.Any, port);
-            return;
-        }
-
-        if (lanHttpsEnabled)
-        {
-            try
-            {
-                var cert = new X509Certificate2(certPath, certPassword, X509KeyStorageFlags.EphemeralKeySet);
-                options.Listen(IPAddress.Any, httpsPort, listen => listen.UseHttps(cert));
-            }
-            catch (Exception ex)
-            {
-                throw new InvalidOperationException(
-                    $"Failed to load HTTPS certificate '{certPath}'. " +
-                    "Set ELITE_LAN_CERTIFICATE_PASSWORD if the PFX is password-protected. See docs/HTTPS-LAN.md.",
-                    ex);
-            }
-        }
-        else
-        {
-            Console.WriteLine(
-                $"[EliteRestaurant.Api] LAN HTTPS certificate not found at '{certPath}'. " +
-                $"HTTP only on port {httpPort}. Export a PFX and restart (docs/HTTPS-LAN.md).");
-        }
-
         options.Listen(IPAddress.Any, httpPort);
     });
 
@@ -263,11 +217,6 @@ try
 
         await next();
     });
-
-    // In Development, LanHttps:RedirectHttpToHttps defaults false via appsettings.Development.json so
-    // http://localhost:5223 works without trusting the LAN certificate (fetch + static files stay on HTTP).
-    if (lanHttpsEnabled && redirectHttpToHttps)
-        app.UseHttpsRedirection();
 
     if (app.Environment.IsDevelopment())
     {

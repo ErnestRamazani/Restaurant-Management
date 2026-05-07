@@ -1,4 +1,5 @@
 using System;
+using System.Text.Json;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Utils;
 using Microsoft.EntityFrameworkCore;
@@ -221,21 +222,31 @@ public class AppDbContext : DbContext
             _ => DateTime.SpecifyKind(v, DateTimeKind.Utc)
         };
 
-    public static bool TryGetPostgreSqlConnectionString(out string connectionString)
+    public static bool TryGetPostgreSqlConnectionString(out string connectionString, string? defaultConnection = null)
     {
         connectionString = string.Empty;
 
-        var envProvider = Environment.GetEnvironmentVariable("ELITE_DB_PROVIDER");
-        var envConnection = Environment.GetEnvironmentVariable("ELITE_POSTGRES_CONNECTION");
-        var providerIsPostgreSql = string.Equals(envProvider, "PostgreSql", StringComparison.OrdinalIgnoreCase);
-        if (!string.IsNullOrWhiteSpace(envConnection)
-            && (providerIsPostgreSql || string.IsNullOrWhiteSpace(envProvider)))
-        {
-            return DatabaseSettingsResolver.TryNormalizePostgreSqlConnectionString(envConnection, out connectionString);
-        }
+        var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
+        if (DatabaseSettingsResolver.TryNormalizePostgreSqlConnectionString(
+                databaseUrl,
+                out connectionString,
+                ensureCloudSsl: true))
+            return true;
 
-        if (providerIsPostgreSql)
-            return false;
+        var eliteConnection = Environment.GetEnvironmentVariable("ELITE_POSTGRES_CONNECTION");
+        if (DatabaseSettingsResolver.TryNormalizePostgreSqlConnectionString(
+                eliteConnection,
+                out connectionString,
+                ensureCloudSsl: true))
+            return true;
+
+        defaultConnection ??= Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection");
+        defaultConnection ??= TryReadDefaultConnectionFromAppSettings(out var appSettingsConnection)
+            ? appSettingsConnection
+            : null;
+
+        if (DatabaseSettingsResolver.TryNormalizePostgreSqlConnectionString(defaultConnection, out connectionString))
+            return true;
 
         DatabaseSettings settings;
         try
@@ -248,6 +259,46 @@ public class AppDbContext : DbContext
         }
 
         return DatabaseSettingsResolver.TryBuildFromSettings(settings, out connectionString);
+    }
+
+    private static bool TryReadDefaultConnectionFromAppSettings(out string connectionString)
+    {
+        connectionString = string.Empty;
+        var environmentName = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+                              ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT");
+        var fileNames = string.IsNullOrWhiteSpace(environmentName)
+            ? new[] { "appsettings.json" }
+            : new[] { $"appsettings.{environmentName}.json", "appsettings.json" };
+
+        foreach (var basePath in new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory }.Distinct())
+        {
+            foreach (var fileName in fileNames)
+            {
+                var path = Path.Combine(basePath, fileName);
+                if (!File.Exists(path))
+                    continue;
+
+                try
+                {
+                    using var stream = File.OpenRead(path);
+                    using var document = JsonDocument.Parse(stream);
+                    if (document.RootElement.TryGetProperty("ConnectionStrings", out var connectionStrings)
+                        && connectionStrings.TryGetProperty("DefaultConnection", out var defaultConnection)
+                        && defaultConnection.ValueKind == JsonValueKind.String
+                        && !string.IsNullOrWhiteSpace(defaultConnection.GetString()))
+                    {
+                        connectionString = defaultConnection.GetString()!;
+                        return true;
+                    }
+                }
+                catch
+                {
+                    // Invalid local config should not block environment-variable based deployments.
+                }
+            }
+        }
+
+        return false;
     }
 
     /// <summary>

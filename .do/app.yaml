@@ -18,9 +18,7 @@ services:
     envs:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
-      - key: ELITE_DB_PROVIDER
-        value: PostgreSql
-      - key: ELITE_POSTGRES_CONNECTION
+      - key: DATABASE_URL
         scope: RUN_TIME
         type: SECRET
         value: REPLACE_WITH_MANAGED_POSTGRES_CONNECTION_STRING

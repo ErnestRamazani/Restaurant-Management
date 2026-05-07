@@ -8,7 +8,10 @@ public static class DatabaseSettingsResolver
     /// <summary>
     /// Accepts either an Npgsql key/value connection string or a PostgreSQL URL such as DigitalOcean's DATABASE_URL format.
     /// </summary>
-    public static bool TryNormalizePostgreSqlConnectionString(string? raw, out string connectionString)
+    public static bool TryNormalizePostgreSqlConnectionString(
+        string? raw,
+        out string connectionString,
+        bool ensureCloudSsl = false)
     {
         connectionString = string.Empty;
         raw = raw?.Trim();
@@ -18,8 +21,7 @@ public static class DatabaseSettingsResolver
         if (!raw.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase)
             && !raw.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase))
         {
-            connectionString = raw;
-            return true;
+            return TryBuildConnectionString(raw, ensureCloudSsl, out connectionString);
         }
 
         if (!Uri.TryCreate(raw, UriKind.Absolute, out var uri)
@@ -48,6 +50,7 @@ public static class DatabaseSettingsResolver
             }
         }
 
+        EnsureCloudSsl(builder, ensureCloudSsl);
         connectionString = builder.ConnectionString;
         return true;
     }
@@ -115,5 +118,30 @@ public static class DatabaseSettingsResolver
             var value = pair.Length > 1 ? Uri.UnescapeDataString(pair[1]) : string.Empty;
             yield return (key, value);
         }
+    }
+
+    private static bool TryBuildConnectionString(string raw, bool ensureCloudSsl, out string connectionString)
+    {
+        connectionString = string.Empty;
+        try
+        {
+            var builder = new NpgsqlConnectionStringBuilder(raw);
+            EnsureCloudSsl(builder, ensureCloudSsl);
+            connectionString = builder.ConnectionString;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void EnsureCloudSsl(NpgsqlConnectionStringBuilder builder, bool ensureCloudSsl)
+    {
+        if (!ensureCloudSsl)
+            return;
+
+        if (builder.SslMode is SslMode.Disable or SslMode.Allow or SslMode.Prefer)
+            builder.SslMode = SslMode.Require;
     }
 }
