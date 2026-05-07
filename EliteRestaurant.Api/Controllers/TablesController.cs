@@ -1,6 +1,7 @@
 using EliteRestaurant.Api.Dtos;
 using EliteRestaurant.Api.Security;
 using EliteRestaurant.Core.Data;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,6 +9,7 @@ namespace EliteRestaurant.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Policy = "StaffAny")]
 public sealed class TablesController(TabletAuthService authService, AppDbContext db) : ControllerBase
 {
     [HttpGet("my")]

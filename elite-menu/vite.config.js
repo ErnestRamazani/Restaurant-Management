@@ -16,7 +16,7 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
-    // Browser opens to the app once the server is ready (works with base: '/menu/')
+    // Browser opens to the app once the server is ready.
     open: true,
     proxy: {
       '/api': {

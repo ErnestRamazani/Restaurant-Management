@@ -1,0 +1,39 @@
+name: elite-restaurant
+region: nyc
+services:
+  - name: elite-api
+    dockerfile_path: Dockerfile
+    source_dir: /
+    github:
+      repo: ErnestRamazani/Restaurant-Management
+      branch: main
+      deploy_on_push: true
+    http_port: 8080
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    routes:
+      - path: /
+    health_check:
+      http_path: /api/health
+    envs:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ELITE_DB_PROVIDER
+        value: PostgreSql
+      - key: ELITE_POSTGRES_CONNECTION
+        scope: RUN_TIME
+        type: SECRET
+        value: REPLACE_WITH_MANAGED_POSTGRES_CONNECTION_STRING
+      - key: JWT__Issuer
+        scope: RUN_TIME
+        value: REPLACE_WITH_DIGITALOCEAN_APP_URL
+      - key: JWT__Audience
+        scope: RUN_TIME
+        value: EliteRestaurant
+      - key: JWT__SigningKey
+        scope: RUN_TIME
+        type: SECRET
+        value: REPLACE_WITH_LONG_RANDOM_SECRET
+      - key: Cors__AllowedOrigins__0
+        scope: RUN_TIME
+        value: REPLACE_WITH_DIGITALOCEAN_APP_URL

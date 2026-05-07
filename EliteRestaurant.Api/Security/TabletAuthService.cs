@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EliteRestaurant.Api.Security;
 
-public sealed class TabletAuthService(AppDbContext db)
+public sealed class TabletAuthService(AppDbContext db, JwtTokenService jwtTokenService)
 {
     private static readonly TimeSpan SessionDuration = TimeSpan.FromHours(12);
 
@@ -54,6 +54,10 @@ public sealed class TabletAuthService(AppDbContext db)
             return null;
 
         var t = token.Trim();
+        var jwtSession = jwtTokenService.ValidateToken(t);
+        if (jwtSession is not null)
+            return jwtSession;
+
         var row = db.TabletSessions.FirstOrDefault(s => s.Token == t);
         if (row is null)
             return null;

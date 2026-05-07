@@ -17,6 +17,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClearActiveOrders", "Tools\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EliteRestaurant.Tests", "EliteRestaurant.Tests\EliteRestaurant.Tests.csproj", "{37C97D24-9268-4D28-8EF1-110788913D85}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EliteRestaurant.Contracts", "EliteRestaurant.Contracts\EliteRestaurant.Contracts.csproj", "{2C84E88E-7613-464D-9D54-93A298FD03F2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -50,6 +52,10 @@ Global
 		{37C97D24-9268-4D28-8EF1-110788913D85}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{37C97D24-9268-4D28-8EF1-110788913D85}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{37C97D24-9268-4D28-8EF1-110788913D85}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2C84E88E-7613-464D-9D54-93A298FD03F2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2C84E88E-7613-464D-9D54-93A298FD03F2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2C84E88E-7613-464D-9D54-93A298FD03F2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2C84E88E-7613-464D-9D54-93A298FD03F2}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{E4B37FCF-E0CC-4C51-931E-E8230B40ECC2} = {F5CA5593-D5FA-4208-A95C-9534B5D41A3D}

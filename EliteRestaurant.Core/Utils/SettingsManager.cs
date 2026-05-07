@@ -19,6 +19,7 @@ public static class SettingsManager
             var json = File.ReadAllText(path);
             var loaded = JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
             loaded.Database ??= new DatabaseSettings();
+            loaded.CloudApi ??= new CloudApiSettings();
             if (DatabaseSettingsMigration.TryMigrateInMemory(loaded.Database))
                 Save(loaded);
             return loaded;

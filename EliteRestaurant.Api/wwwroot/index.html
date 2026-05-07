@@ -1721,7 +1721,7 @@
         orderHubConnection = null;
       }
       const conn = new signalR.HubConnectionBuilder()
-        .withUrl(`${location.origin}/hubs/order`)
+        .withUrl(`${location.origin}/hubs/order`, { accessTokenFactory: () => token || "" })
         .withAutomaticReconnect()
         .build();
       conn.on("CustomerDraftArrived", async p => {

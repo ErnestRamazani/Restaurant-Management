@@ -8,6 +8,7 @@ public sealed class AppSettings
     public CurrencyPricingSettings CurrencyPricing { get; set; } = new();
     public NavigationBackgroundSettings NavigationBackgrounds { get; set; } = new();
     public DatabaseSettings Database { get; set; } = new();
+    public CloudApiSettings CloudApi { get; set; } = new();
 }
 
 public sealed class DatabaseSettings
@@ -26,6 +27,13 @@ public sealed class DatabaseSettings
 
     /// <summary>Windows DPAPI-protected password (Base64), CurrentUser scope.</summary>
     public string PostgreSqlPasswordProtected { get; set; } = string.Empty;
+}
+
+public sealed class CloudApiSettings
+{
+    public string BaseUrl { get; set; } = "http://localhost:5223";
+    public string AccessToken { get; set; } = string.Empty;
+    public DateTime? TokenExpiresAtUtc { get; set; }
 }
 
 public sealed class BusinessProfileSettings

@@ -1,24 +1,20 @@
-const BASE = '/api/public/menu'
+import { apiFetch } from './apiClient'
+
+const BASE = '/public/menu'
 
 /** @returns {Promise<Record<string, unknown>>} */
 export async function fetchConfig() {
-  const r = await fetch(`${BASE}/config`)
-  if (!r.ok) throw new Error('Failed to load restaurant config')
-  return r.json()
+  return apiFetch(`${BASE}/config`)
 }
 
 /** @returns {Promise<Record<string, unknown>[]>} */
 export async function fetchProducts() {
-  const r = await fetch(`${BASE}/products`)
-  if (!r.ok) throw new Error('Failed to load menu')
-  return r.json()
+  return apiFetch(`${BASE}/products`)
 }
 
 /** @returns {Promise<Record<string, unknown>[]>} */
 export async function fetchTables() {
-  const r = await fetch(`${BASE}/tables`)
-  if (!r.ok) throw new Error('Failed to load tables')
-  return r.json()
+  return apiFetch(`${BASE}/tables`)
 }
 
 /**
@@ -26,17 +22,12 @@ export async function fetchTables() {
  * @returns {Promise<{ success: boolean; label?: string; message?: string; errors?: string[] }>}
  */
 export async function submitDraft(payload) {
-  const r = await fetch(`${BASE}/draft`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  })
-  const data = await r.json().catch(() => ({}))
-  if (!r.ok) {
-    const msg = Array.isArray(data.errors) && data.errors.length
-      ? data.errors.join('. ')
-      : 'Failed to send order'
-    throw new Error(msg)
+  try {
+    return await apiFetch(`${BASE}/draft`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  } catch (error) {
+    throw new Error(error instanceof Error ? error.message : 'Failed to send order', { cause: error })
   }
-  return data
 }

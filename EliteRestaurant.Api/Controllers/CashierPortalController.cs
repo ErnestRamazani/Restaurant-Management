@@ -4,6 +4,7 @@ using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Orders;
 using EliteRestaurant.Core.Utils;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,6 +12,7 @@ namespace EliteRestaurant.Api.Controllers;
 
 [ApiController]
 [Route("api/cashier")]
+[Authorize(Policy = "CashierOnly")]
 public sealed class CashierPortalController(
     TabletAuthService authService,
     AppDbContext db) : ControllerBase

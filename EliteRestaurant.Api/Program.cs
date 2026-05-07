@@ -5,8 +5,11 @@ using EliteRestaurant.Api;
 using EliteRestaurant.Api.Hubs;
 using EliteRestaurant.Api.Security;
 using EliteRestaurant.Core.Data;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Serilog;
 using Serilog.Context;
 
@@ -35,6 +38,14 @@ try
         DatabaseInitializer.Initialize();
 
     builder.Services.Configure<CurrencyPricingOptions>(builder.Configuration.GetSection("CurrencyPricing"));
+    builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        // Cloud load balancers/proxies are dynamic. Limit exposure by only enabling this in deployed environments.
+        options.KnownNetworks.Clear();
+        options.KnownProxies.Clear();
+    });
 
     if (builder.Environment.IsEnvironment("Testing"))
     {
@@ -66,6 +77,36 @@ try
     }
 
     builder.Services.AddScoped<TabletAuthService>();
+    builder.Services.AddSingleton<JwtTokenService>();
+    var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>() ?? new JwtOptions();
+    var jwtValidation = new JwtTokenService(Options.Create(jwtOptions)).BuildValidationParameters();
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(options =>
+        {
+            options.TokenValidationParameters = jwtValidation;
+            options.Events = new JwtBearerEvents
+            {
+                OnMessageReceived = context =>
+                {
+                    var accessToken = context.Request.Query["access_token"].ToString();
+                    if (!string.IsNullOrWhiteSpace(accessToken)
+                        && context.HttpContext.Request.Path.StartsWithSegments("/hubs/order"))
+                    {
+                        context.Token = accessToken;
+                    }
+
+                    return Task.CompletedTask;
+                }
+            };
+        });
+    builder.Services.AddAuthorization(options =>
+    {
+        options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin", "Manager"));
+        options.AddPolicy("ServerOnly", policy => policy.RequireRole("Server"));
+        options.AddPolicy("CashierOnly", policy => policy.RequireRole("Cashier"));
+        options.AddPolicy("KitchenOnly", policy => policy.RequireRole("Chef", "Barman", "Bartender", "Sous Chef"));
+        options.AddPolicy("StaffAny", policy => policy.RequireAuthenticatedUser());
+    });
     builder.Services.AddSignalR();
 
     builder.Services.AddRateLimiter(options =>
@@ -94,23 +135,28 @@ try
     static string GetPartitionKey(HttpContext context) =>
         context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
+    static int? GetCloudPort()
+    {
+        var raw = Environment.GetEnvironmentVariable("PORT")
+                  ?? Environment.GetEnvironmentVariable("ASPNETCORE_PORT");
+        return int.TryParse(raw, out var port) && port > 0 ? port : null;
+    }
+
     const string CorsPolicyRestrictToConfiguredOrigins = "RestrictToConfiguredOrigins";
     var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
                       ?? Array.Empty<string>();
-    if (corsOrigins.Length == 0)
-        throw new InvalidOperationException(
-            "Cors:AllowedOrigins must list at least one origin (e.g. https://192.168.x.x:7194 for tablets).");
 
     var lanSection = builder.Configuration.GetSection("LanHttps");
     var httpPort = lanSection.GetValue("HttpPort", 5223);
     var httpsPort = lanSection.GetValue("HttpsPort", 7194);
+    var cloudPort = GetCloudPort();
     var certRelative = lanSection["CertificatePath"] ?? "certs/elite-lan.pfx";
     var certPath = Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, certRelative));
     var certPassword = Environment.GetEnvironmentVariable("ELITE_LAN_CERTIFICATE_PASSWORD")
                        ?? lanSection["CertificatePassword"]
                        ?? "";
 
-    var lanHttpsEnabled = File.Exists(certPath);
+    var lanHttpsEnabled = cloudPort is null && File.Exists(certPath);
     var redirectHttpToHttps = lanSection.GetValue("RedirectHttpToHttps", true);
     if (lanHttpsEnabled)
     {
@@ -122,6 +168,12 @@ try
 
     builder.WebHost.ConfigureKestrel((_, options) =>
     {
+        if (cloudPort is { } port)
+        {
+            options.Listen(IPAddress.Any, port);
+            return;
+        }
+
         if (lanHttpsEnabled)
         {
             try
@@ -150,12 +202,26 @@ try
     builder.Services.AddCors(options =>
     {
         options.AddPolicy(CorsPolicyRestrictToConfiguredOrigins, policy =>
-            policy.WithOrigins(corsOrigins)
-                .AllowAnyHeader()
-                .AllowAnyMethod());
+        {
+            if (corsOrigins.Length > 0)
+            {
+                policy.WithOrigins(corsOrigins)
+                    .AllowAnyHeader()
+                    .AllowAnyMethod();
+            }
+            else
+            {
+                // Same-origin browser hosting does not require CORS. Empty origin list means no cross-origin access.
+                policy.SetIsOriginAllowed(_ => false)
+                    .AllowAnyHeader()
+                    .AllowAnyMethod();
+            }
+        });
     });
 
     var app = builder.Build();
+
+    app.UseForwardedHeaders();
 
     app.UseSerilogRequestLogging(opts =>
     {
@@ -212,10 +278,13 @@ try
 
     app.UseCors(CorsPolicyRestrictToConfiguredOrigins);
     app.UseRateLimiter();
+    app.UseAuthentication();
+    app.UseAuthorization();
     app.UseDefaultFiles();
     app.UseStaticFiles();
     app.MapControllers();
     app.MapHub<OrderHub>("/hubs/order");
+    app.MapFallbackToFile("index.html");
 
     app.Run();
 }

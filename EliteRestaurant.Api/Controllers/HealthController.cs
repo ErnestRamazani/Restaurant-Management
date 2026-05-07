@@ -1,10 +1,12 @@
 using EliteRestaurant.Core.Data;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EliteRestaurant.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[AllowAnonymous]
 public sealed class HealthController(AppDbContext db) : ControllerBase
 {
     [HttpGet]

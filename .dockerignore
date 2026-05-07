@@ -1,0 +1,11 @@
+.git
+.vs
+.cursor
+**/bin
+**/obj
+**/node_modules
+EliteRestaurant.Api/logs
+EliteRestaurant.Api/certs/*.pfx
+EliteRestaurant.Api/certs/*.p12
+*.user
+*.suo

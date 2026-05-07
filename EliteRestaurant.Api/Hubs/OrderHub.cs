@@ -1,8 +1,21 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using System.Security.Claims;
 
 namespace EliteRestaurant.Api.Hubs;
 
+[Authorize(Policy = "StaffAny")]
 public sealed class OrderHub : Hub
 {
-    public Task JoinServer() => Groups.AddToGroupAsync(Context.ConnectionId, "Server");
+    public async Task JoinServer()
+    {
+        var role = Context.User?.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
+        if (role.Equals("Server", StringComparison.OrdinalIgnoreCase)
+            || role.Equals("Cashier", StringComparison.OrdinalIgnoreCase)
+            || role.Equals("Admin", StringComparison.OrdinalIgnoreCase)
+            || role.Equals("Manager", StringComparison.OrdinalIgnoreCase))
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, "Server");
+        }
+    }
 }

@@ -1,23 +1,26 @@
-using EliteRestaurant.Api.Dtos;
 using EliteRestaurant.Api.Security;
+using EliteRestaurant.Contracts.Auth;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EliteRestaurant.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public sealed class AuthController(TabletAuthService authService) : ControllerBase
+[AllowAnonymous]
+public sealed class AuthController(TabletAuthService authService, JwtTokenService jwtTokenService) : ControllerBase
 {
     [HttpPost("login")]
-    public ActionResult<LoginResponse> Login([FromBody] LoginRequest request)
+    public ActionResult<CloudLoginResponse> Login([FromBody] CloudLoginRequest request)
     {
         var session = authService.Login(request.StaffId, request.Pin, request.Portal);
         if (session is null)
             return Unauthorized(new { message = "Invalid staff ID / PIN for selected portal." });
 
-        return Ok(new LoginResponse(
-            AccessToken: session.Token,
-            ExpiresAtUtc: session.ExpiresAtUtc,
+        var jwt = jwtTokenService.CreateToken(session, out var expiresAtUtc);
+        return Ok(new CloudLoginResponse(
+            AccessToken: jwt,
+            ExpiresAtUtc: expiresAtUtc,
             EmployeeId: session.EmployeeId,
             EmployeeUniqueId: session.EmployeeUniqueId,
             Name: session.Name,

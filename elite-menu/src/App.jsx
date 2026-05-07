@@ -1,5 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
+import { ChefHat, CreditCard, MonitorCog, Utensils } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { BrowserRouter, Link, Navigate, Route, Routes } from 'react-router-dom'
 import { useCart } from './hooks/useCart'
 import { useMenu } from './hooks/useMenu'
 import { useTable } from './hooks/useTable'
@@ -16,7 +18,68 @@ const spring = { type: 'spring', stiffness: 300, damping: 34 }
 /** @internal history.state key for in-app back (cart → menu → hero) */
 const H = 'elite'
 
-export default function App() {
+function HubHome() {
+  const cards = [
+    { to: '/order', title: 'Consumer Menu', desc: 'Guests scan, browse, and send orders.', icon: Utensils },
+    { to: '/server', title: 'Server', desc: 'Take table orders and manage pickup.', icon: MonitorCog },
+    { to: '/cashier', title: 'Cashier', desc: 'Release, complete, and manage checks.', icon: CreditCard },
+    { to: '/kitchen', title: 'Kitchen', desc: 'View kitchen queue and ready orders.', icon: ChefHat },
+  ]
+
+  return (
+    <main className="min-h-[100svh] bg-midnight px-5 py-8 text-champagne">
+      <section className="mx-auto flex max-w-4xl flex-col gap-8">
+        <div className="text-center">
+          <p className="font-body text-xs font-bold uppercase tracking-[0.28em] text-gold/80">EliteRestaurant Cloud</p>
+          <h1 className="mt-3 font-display text-4xl italic text-champagne">Choose your workspace</h1>
+          <p className="mx-auto mt-3 max-w-2xl font-body text-sm leading-relaxed text-champagne/65">
+            One online entry point for guests and staff. Staff areas require sign-in; the consumer menu remains public.
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {cards.map(({ to, title, desc, icon: Icon }) => (
+            <Link
+              key={to}
+              to={to}
+              className="rounded-3xl border border-champagne/10 bg-midnight-2 p-5 shadow-[0_10px_30px_rgba(0,0,0,0.28)] transition hover:border-gold/50 hover:bg-midnight-3"
+            >
+              <Icon className="h-8 w-8 text-gold" />
+              <h2 className="mt-5 font-display text-2xl italic text-champagne">{title}</h2>
+              <p className="mt-2 font-body text-sm leading-relaxed text-champagne/60">{desc}</p>
+            </Link>
+          ))}
+        </div>
+      </section>
+    </main>
+  )
+}
+
+function StaffRoutePlaceholder({ title, legacyHref }) {
+  return (
+    <main className="flex min-h-[100svh] items-center justify-center bg-midnight px-5 text-champagne">
+      <section className="w-full max-w-lg rounded-3xl border border-champagne/10 bg-midnight-2 p-6 text-center shadow-[0_10px_30px_rgba(0,0,0,0.28)]">
+        <p className="font-body text-xs font-bold uppercase tracking-[0.24em] text-gold/80">Cloud Web Hub</p>
+        <h1 className="mt-3 font-display text-3xl italic">{title}</h1>
+        <p className="mt-3 font-body text-sm leading-relaxed text-champagne/65">
+          This route is reserved for the responsive React staff interface. The existing portal remains available during migration.
+        </p>
+        {legacyHref ? (
+          <a
+            href={legacyHref}
+            className="mt-6 inline-flex min-h-11 items-center justify-center rounded-xl bg-gold px-5 font-body text-sm font-extrabold uppercase tracking-[0.08em] text-black"
+          >
+            Open current portal
+          </a>
+        ) : null}
+        <div className="mt-5">
+          <Link to="/" className="font-body text-sm font-semibold text-gold/90">Back to hub</Link>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+function CustomerMenuApp() {
   const { tableId: tableIdFromUrl, hadInvalidTableParam } = useTable()
   const { config, products, loading, error, refetch } = useMenu()
   const cart = useCart(config)
@@ -197,5 +260,26 @@ export default function App() {
         {cart.sectionConflict?.message ?? ''}
       </ConfirmDialog>
     </>
+  )
+}
+
+function HubOrMenu() {
+  const params = new URLSearchParams(window.location.search)
+  const table = params.get('table')
+  return table ? <CustomerMenuApp /> : <HubHome />
+}
+
+export default function App() {
+  return (
+    <BrowserRouter basename="/menu">
+      <Routes>
+        <Route path="/" element={<HubOrMenu />} />
+        <Route path="/order/*" element={<CustomerMenuApp />} />
+        <Route path="/server/*" element={<StaffRoutePlaceholder title="Server" legacyHref="/index.html" />} />
+        <Route path="/cashier/*" element={<StaffRoutePlaceholder title="Cashier" legacyHref="/cashier.html" />} />
+        <Route path="/kitchen/*" element={<StaffRoutePlaceholder title="Kitchen" />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
   )
 }
