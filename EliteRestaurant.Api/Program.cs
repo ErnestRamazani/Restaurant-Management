@@ -135,11 +135,14 @@ try
     static string GetPartitionKey(HttpContext context) =>
         context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
-    static int? GetCloudPort()
+    static int? GetCloudPort(IHostEnvironment environment)
     {
         var raw = Environment.GetEnvironmentVariable("PORT")
                   ?? Environment.GetEnvironmentVariable("ASPNETCORE_PORT");
-        return int.TryParse(raw, out var port) && port > 0 ? port : null;
+        if (int.TryParse(raw, out var port) && port > 0)
+            return port;
+
+        return environment.IsProduction() ? 8080 : null;
     }
 
     const string CorsPolicyRestrictToConfiguredOrigins = "RestrictToConfiguredOrigins";
@@ -149,7 +152,7 @@ try
     var lanSection = builder.Configuration.GetSection("LanHttps");
     var httpPort = lanSection.GetValue("HttpPort", 5223);
     var httpsPort = lanSection.GetValue("HttpsPort", 7194);
-    var cloudPort = GetCloudPort();
+    var cloudPort = GetCloudPort(builder.Environment);
     var certRelative = lanSection["CertificatePath"] ?? "certs/elite-lan.pfx";
     var certPath = Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, certRelative));
     var certPassword = Environment.GetEnvironmentVariable("ELITE_LAN_CERTIFICATE_PASSWORD")

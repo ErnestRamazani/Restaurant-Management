@@ -227,12 +227,15 @@ public class AppDbContext : DbContext
 
         var envProvider = Environment.GetEnvironmentVariable("ELITE_DB_PROVIDER");
         var envConnection = Environment.GetEnvironmentVariable("ELITE_POSTGRES_CONNECTION");
-        if (string.Equals(envProvider, "PostgreSql", StringComparison.OrdinalIgnoreCase)
-            && !string.IsNullOrWhiteSpace(envConnection))
+        var providerIsPostgreSql = string.Equals(envProvider, "PostgreSql", StringComparison.OrdinalIgnoreCase);
+        if (!string.IsNullOrWhiteSpace(envConnection)
+            && (providerIsPostgreSql || string.IsNullOrWhiteSpace(envProvider)))
         {
-            connectionString = envConnection.Trim();
-            return true;
+            return DatabaseSettingsResolver.TryNormalizePostgreSqlConnectionString(envConnection, out connectionString);
         }
+
+        if (providerIsPostgreSql)
+            return false;
 
         DatabaseSettings settings;
         try

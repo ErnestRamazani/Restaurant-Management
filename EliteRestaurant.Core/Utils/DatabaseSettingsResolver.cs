@@ -6,6 +6,53 @@ namespace EliteRestaurant.Core.Utils;
 public static class DatabaseSettingsResolver
 {
     /// <summary>
+    /// Accepts either an Npgsql key/value connection string or a PostgreSQL URL such as DigitalOcean's DATABASE_URL format.
+    /// </summary>
+    public static bool TryNormalizePostgreSqlConnectionString(string? raw, out string connectionString)
+    {
+        connectionString = string.Empty;
+        raw = raw?.Trim();
+        if (string.IsNullOrWhiteSpace(raw))
+            return false;
+
+        if (!raw.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase)
+            && !raw.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase))
+        {
+            connectionString = raw;
+            return true;
+        }
+
+        if (!Uri.TryCreate(raw, UriKind.Absolute, out var uri)
+            || (uri.Scheme != "postgres" && uri.Scheme != "postgresql"))
+        {
+            return false;
+        }
+
+        var userInfo = uri.UserInfo.Split(':', 2);
+        var builder = new NpgsqlConnectionStringBuilder
+        {
+            Host = uri.Host,
+            Port = uri.Port > 0 ? uri.Port : 5432,
+            Database = Uri.UnescapeDataString(uri.AbsolutePath.TrimStart('/')),
+            Username = userInfo.Length > 0 ? Uri.UnescapeDataString(userInfo[0]) : string.Empty,
+            Password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : string.Empty
+        };
+
+        foreach (var (key, value) in ParseQuery(uri.Query))
+        {
+            if (key.Equals("sslmode", StringComparison.OrdinalIgnoreCase))
+            {
+                builder.SslMode = Enum.TryParse<SslMode>(value, ignoreCase: true, out var sslMode)
+                    ? sslMode
+                    : builder.SslMode;
+            }
+        }
+
+        connectionString = builder.ConnectionString;
+        return true;
+    }
+
+    /// <summary>
     /// Resolves a connection string from app settings (not environment variables).
     /// </summary>
     public static bool TryBuildFromSettings(DatabaseSettings? db, out string connectionString)
@@ -17,8 +64,7 @@ public static class DatabaseSettingsResolver
         var legacy = db.PostgreSqlConnectionString?.Trim() ?? string.Empty;
         if (!string.IsNullOrEmpty(legacy) && string.IsNullOrWhiteSpace(db.PostgreSqlHost))
         {
-            connectionString = legacy;
-            return true;
+            return TryNormalizePostgreSqlConnectionString(legacy, out connectionString);
         }
 
         var host = db.PostgreSqlHost?.Trim() ?? string.Empty;
@@ -55,5 +101,19 @@ public static class DatabaseSettingsResolver
         };
         connectionString = b.ConnectionString;
         return true;
+    }
+
+    private static IEnumerable<(string Key, string Value)> ParseQuery(string query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+            yield break;
+
+        foreach (var part in query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var pair = part.Split('=', 2);
+            var key = Uri.UnescapeDataString(pair[0]);
+            var value = pair.Length > 1 ? Uri.UnescapeDataString(pair[1]) : string.Empty;
+            yield return (key, value);
+        }
     }
 }
