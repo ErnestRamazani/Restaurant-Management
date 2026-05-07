@@ -52,18 +52,17 @@ public class AppDbContext : DbContext
             return;
         }
 
-        if (TryGetDatabaseUrlLastResort(out var databaseUrlConnectionString))
+        if (TryGetDatabaseUrlLastResort(out var databaseUrl))
         {
             optionsBuilder.UseNpgsql(
-                databaseUrlConnectionString,
+                databaseUrl,
                 npgsql => npgsql.EnableRetryOnFailure(5));
             return;
         }
 
-        throw new InvalidOperationException(
-            "PostgreSQL is required but no connection string was found. " +
-            "Preferred: set ELITE_DB_PROVIDER=PostgreSql and ELITE_POSTGRES_CONNECTION. " +
-            "Alternatively configure Database (host, port, database, user, DPAPI password) in app settings.");
+        Console.WriteLine(
+            "[EliteRestaurant] Warning: no PostgreSQL connection string was found. " +
+            "Continuing without configuring a database provider.");
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -277,10 +276,8 @@ public class AppDbContext : DbContext
             return false;
 
         Console.WriteLine($"[EliteRestaurant] DATABASE_URL found as last resort. Length={databaseUrl.Length}.");
-        return DatabaseSettingsResolver.TryNormalizePostgreSqlConnectionString(
-            databaseUrl,
-            out connectionString,
-            ensureCloudSsl: true);
+        connectionString = databaseUrl;
+        return true;
     }
 
     private static bool TryReadDefaultConnectionFromAppSettings(out string connectionString)

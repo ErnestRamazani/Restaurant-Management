@@ -56,19 +56,22 @@ try
         builder.Services.AddDbContextPool<AppDbContext>(
             o =>
             {
-                if (!AppDbContext.TryGetPostgreSqlConnectionString(
+                if (AppDbContext.TryGetPostgreSqlConnectionString(
                         out var cs,
                         builder.Configuration.GetConnectionString("DefaultConnection")))
                 {
-                    if (!AppDbContext.TryGetDatabaseUrlLastResort(out cs))
-                    {
-                        throw new InvalidOperationException(
-                            "PostgreSQL connection string is required for the API. Set DATABASE_URL, ELITE_POSTGRES_CONNECTION, " +
-                            "or ConnectionStrings:DefaultConnection.");
-                    }
+                    o.UseNpgsql(cs, n => n.EnableRetryOnFailure());
                 }
-
-                o.UseNpgsql(cs, n => n.EnableRetryOnFailure(5));
+                else if (AppDbContext.TryGetDatabaseUrlLastResort(out var databaseUrl))
+                {
+                    o.UseNpgsql(databaseUrl, n => n.EnableRetryOnFailure());
+                }
+                else
+                {
+                    Console.WriteLine(
+                        "[EliteRestaurant] Warning: no PostgreSQL connection string was found during API startup. " +
+                        "Continuing without configuring a database provider.");
+                }
             },
             poolSize: 32);
     }
