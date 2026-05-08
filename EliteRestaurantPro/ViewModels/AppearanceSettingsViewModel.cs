@@ -857,6 +857,12 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
             return;
         }
 
+        if (IsLocalDatabaseHost(host))
+        {
+            StatusMessage = "Local PostgreSQL is disabled for live data. Enter the DigitalOcean PostgreSQL host.";
+            return;
+        }
+
         if (!string.IsNullOrEmpty(_pendingDatabasePassword) && !DatabaseConnectionSecret.IsDpapiAvailable)
         {
             StatusMessage = "Cannot store a password on this OS. Leave password blank for trust auth, or use ELITE_POSTGRES_CONNECTION.";
@@ -877,8 +883,13 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         HasSavedDatabasePassword = !string.IsNullOrWhiteSpace(_settings.Database.PostgreSqlPasswordProtected);
         _pendingDatabasePassword = string.Empty;
         NotifyClearDatabasePassword?.Invoke();
-        StatusMessage = "Database settings saved (PostgreSQL). Restart app to apply.";
+        StatusMessage = "Cloud database settings saved (PostgreSQL). Restart app to apply.";
     }
+
+    private static bool IsLocalDatabaseHost(string host) =>
+        host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+        || host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase)
+        || host.Equals("::1", StringComparison.OrdinalIgnoreCase);
 
     private void TestDatabaseConnection()
     {

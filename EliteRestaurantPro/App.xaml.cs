@@ -2,7 +2,6 @@ using System.Windows;
 using System.IO;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Utils;
-using EliteRestaurantPro.Services;
 using EliteRestaurantPro.Utils;
 using EliteRestaurantPro.Views;
 using Npgsql;
@@ -52,23 +51,36 @@ public partial class App : Application
             return;
         }
 
-        CloudFirstSyncService.Start();
         ThemeManager.ApplySavedPalette();
         base.OnStartup(e);
     }
 
     private static bool EnsureDatabaseConnectionConfigured()
     {
-        if (AppDbContext.TryGetPostgreSqlConnectionString(out _))
+        if (AppDbContext.TryGetPostgreSqlConnectionString(out var configuredConnectionString)
+            && IsCloudDatabaseTarget(configuredConnectionString))
+        {
             return true;
+        }
 
-        var dialog = new DatabasePipeSetupDialog();
+        if (!string.IsNullOrWhiteSpace(configuredConnectionString))
+        {
+            MessageBox.Show(
+                "The desktop app is now configured to use the cloud PostgreSQL database only.\n\n" +
+                "The current saved database target appears to be local, so it will not be used for live operations. " +
+                "Please enter the DigitalOcean PostgreSQL connection details.",
+                "Cloud Database Required",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+
+        var dialog = new DatabasePipeSetupDialog(GetCloudDatabasePipeHint());
         if (Current.MainWindow != null)
             dialog.Owner = Current.MainWindow;
         if (dialog.ShowDialog() != true || string.IsNullOrWhiteSpace(dialog.PipeInput))
         {
             MessageBox.Show(
-                "A PostgreSQL connection is required. Set environment variables or complete this dialog.",
+                "A cloud PostgreSQL connection is required. Set DATABASE_URL / ELITE_POSTGRES_CONNECTION, or complete this dialog.",
                 "Database Setup Required",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
@@ -78,6 +90,16 @@ public partial class App : Application
         var input = dialog.PipeInput;
         if (!PostgresBootstrapPipe.TryParse(input.Trim(), out var host, out var port, out var database, out var user, out var password))
             return false;
+
+        if (IsLocalDatabaseHost(host))
+        {
+            MessageBox.Show(
+                "Local PostgreSQL is no longer used for live restaurant data. Please enter the DigitalOcean PostgreSQL host.",
+                "Cloud Database Required",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return false;
+        }
 
         if (!string.IsNullOrEmpty(password) && !DatabaseConnectionSecret.IsDpapiAvailable)
         {
@@ -93,6 +115,30 @@ public partial class App : Application
         ApplyBootstrapDatabaseSettings(settings.Database, host, port, database, user, password);
         SettingsManager.Save(settings);
         return true;
+    }
+
+    private static string GetCloudDatabasePipeHint() =>
+        "elite-restaurant-db-postgresql-er4124-do-user-36989587-0.f.db.ondigitalocean.com|25060|defaultdb|doadmin|";
+
+    private static bool IsCloudDatabaseTarget(string connectionString)
+    {
+        try
+        {
+            var builder = new NpgsqlConnectionStringBuilder(connectionString);
+            return !IsLocalDatabaseHost(builder.Host);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool IsLocalDatabaseHost(string? host)
+    {
+        host = (host ?? string.Empty).Trim();
+        return host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+               || host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase)
+               || host.Equals("::1", StringComparison.OrdinalIgnoreCase);
     }
 
     private static void ApplyBootstrapDatabaseSettings(
@@ -150,8 +196,8 @@ public partial class App : Application
 
                 var settings = SettingsManager.Load();
                 var db = settings.Database ?? new DatabaseSettings();
-                var defaultPipe = string.IsNullOrWhiteSpace(db.PostgreSqlHost)
-                    ? "localhost|5432|elite_restaurant|postgres|"
+                var defaultPipe = string.IsNullOrWhiteSpace(db.PostgreSqlHost) || IsLocalDatabaseHost(db.PostgreSqlHost)
+                    ? GetCloudDatabasePipeHint()
                     : $"{db.PostgreSqlHost}|{db.PostgreSqlPort}|{db.PostgreSqlDatabase}|{db.PostgreSqlUsername}|";
 
                 var setupDialog = new DatabasePipeSetupDialog(defaultPipe);
@@ -166,6 +212,16 @@ public partial class App : Application
                     MessageBox.Show(
                         "Invalid format. Use: host|port|database|username|password",
                         "Database Setup",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    continue;
+                }
+
+                if (IsLocalDatabaseHost(host))
+                {
+                    MessageBox.Show(
+                        "Local PostgreSQL is no longer used for live restaurant data. Please enter the DigitalOcean PostgreSQL host.",
+                        "Cloud Database Required",
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
                     continue;

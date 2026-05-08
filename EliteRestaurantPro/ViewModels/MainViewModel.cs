@@ -17,7 +17,7 @@ public class MainViewModel : BaseViewModel
     private double _menuBackgroundImageOpacity = 0.22;
     private string _cloudStatusText = "Cloud: Checking";
     private Brush _cloudStatusBrush = Brushes.Gray;
-    private string _syncStatusText = "Sync: 0 pending";
+    private string _syncStatusText = "Cloud DB only";
     private Brush _syncStatusBrush = Brushes.Gray;
     private readonly DispatcherTimer _cloudStatusTimer;
 
@@ -136,7 +136,7 @@ public class MainViewModel : BaseViewModel
         }
 
         var pending = CloudFirstSyncService.PendingCount;
-        SyncStatusText = pending == 0 ? "Sync: Up to date" : $"Sync: {pending} pending";
+        SyncStatusText = pending == 0 ? "Cloud DB only" : $"Sync: {pending} pending";
         SyncStatusBrush = pending == 0 ? Brushes.LimeGreen : Brushes.Goldenrod;
     }
 
