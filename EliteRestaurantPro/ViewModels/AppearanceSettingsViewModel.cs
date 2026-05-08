@@ -6,6 +6,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Utils;
+using EliteRestaurantPro.ApiClients;
 using EliteRestaurantPro.Services;
 using EliteRestaurantPro.Utils;
 using Microsoft.EntityFrameworkCore;
@@ -669,6 +670,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
             : StaffLoginPasscode.Trim();
 
         SettingsManager.Save(_settings);
+        _ = new AdminSettingsApiClient().PushSettingsAsync(_settings);
         RefreshBusinessProfileBindings();
         var msg = "Business profile saved.";
         if (PublicMenuUrlHelper.LooksLikeLocalHostOnly(_settings.BusinessProfile.PublicMenuBaseUrl))
@@ -706,6 +708,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         _settings.CurrencyPricing.ServicePercent = service;
 
         SettingsManager.Save(_settings);
+        _ = new AdminSettingsApiClient().PushSettingsAsync(_settings);
         ExchangeRateLastUpdated = _settings.CurrencyPricing.ExchangeRateLastUpdatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
         StatusMessage = "Currency & pricing settings saved.";
     }

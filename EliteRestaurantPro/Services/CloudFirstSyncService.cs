@@ -10,6 +10,7 @@ public static class CloudFirstSyncService
 {
     private static readonly SemaphoreSlim SyncLock = new(1, 1);
     private static readonly AdminSyncApiClient SyncClient = new();
+    private static readonly AdminSettingsApiClient SettingsClient = new();
     private static Timer? _timer;
 
     public static event Action? StatusChanged;
@@ -26,6 +27,7 @@ public static class CloudFirstSyncService
             TimeSpan.FromSeconds(10),
             TimeSpan.FromSeconds(30));
         _ = RefreshStatusAsync();
+        _ = BootstrapLocalBackupToCloudAsync();
     }
 
     public static void Stop()
@@ -128,6 +130,65 @@ public static class CloudFirstSyncService
         finally
         {
             SyncLock.Release();
+        }
+    }
+
+    public static async Task BootstrapLocalBackupToCloudAsync(CancellationToken cancellationToken = default)
+    {
+        if (!await SyncLock.WaitAsync(0, cancellationToken))
+            return;
+
+        try
+        {
+            await SettingsClient.PushSettingsAsync(EliteRestaurant.Core.Utils.SettingsManager.Load(), cancellationToken);
+
+            using var db = new AppDbContext();
+            var operations = new List<CloudSyncOperation>();
+            AddBootstrapOperations(operations, "Employee", db.Employees.AsNoTracking().OrderBy(e => e.Id).ToList(), e => e.UniqueId);
+            AddBootstrapOperations(operations, "InventoryItem", db.InventoryItems.AsNoTracking().OrderBy(i => i.Id).ToList(), i => i.UniqueId);
+            AddBootstrapOperations(operations, "Product", db.Products.AsNoTracking().OrderBy(p => p.Id).ToList(), p => p.UniqueId);
+            AddBootstrapOperations(operations, "Table", db.Tables.AsNoTracking().OrderBy(t => t.Id).ToList(), t => t.UniqueId);
+            AddBootstrapOperations(operations, "ReservationBooking", db.Reservations.AsNoTracking().OrderBy(r => r.Id).ToList(), r => r.UniqueId);
+            AddBootstrapOperations(operations, "OrderRecord", db.Orders.AsNoTracking().OrderBy(o => o.Id).ToList(), o => o.UniqueId);
+            AddBootstrapOperations(operations, "MoneyTransaction", db.Transactions.AsNoTracking().OrderBy(t => t.Id).ToList(), t => t.Id.ToString());
+            AddBootstrapOperations(operations, "EmployeeAttendance", db.EmployeeAttendances.AsNoTracking().OrderBy(a => a.Id).ToList(), a => $"{a.EmployeeId}-{a.WorkDate:yyyyMMdd}");
+            AddBootstrapOperations(operations, "SalaryAdvance", db.SalaryAdvances.AsNoTracking().OrderBy(a => a.Id).ToList(), a => a.Id.ToString());
+            AddBootstrapOperations(operations, "PayrollPaymentRecord", db.PayrollPaymentRecords.AsNoTracking().OrderBy(p => p.Id).ToList(), p => $"{p.EmployeeId}-{p.Year}-{p.Month}");
+
+            foreach (var batch in operations.Chunk(50))
+                await SyncClient.PushAsync(batch, cancellationToken);
+
+            LastSyncError = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            LastSyncError = ex.GetBaseException().Message;
+        }
+        finally
+        {
+            SyncLock.Release();
+            await RefreshStatusAsync(cancellationToken);
+        }
+    }
+
+    private static void AddBootstrapOperations<T>(
+        List<CloudSyncOperation> operations,
+        string entityName,
+        IEnumerable<T> rows,
+        Func<T, string?> identity)
+    {
+        foreach (var row in rows)
+        {
+            var keyPart = identity(row);
+            if (string.IsNullOrWhiteSpace(keyPart))
+                continue;
+
+            operations.Add(new CloudSyncOperation(
+                $"bootstrap-{entityName}-{keyPart}".ToLowerInvariant(),
+                entityName,
+                "Upsert",
+                System.Text.Json.JsonSerializer.Serialize(row, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)),
+                DateTime.UtcNow));
         }
     }
 

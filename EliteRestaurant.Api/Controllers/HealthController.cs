@@ -24,12 +24,16 @@ public sealed class HealthController(AppDbContext db) : ControllerBase
         {
             var employeeCount = db.Employees.Count();
             var tableCount = db.Tables.Count();
+            var productCount = db.Products.Count();
+            var reservationCount = db.Reservations.Count();
             return Ok(new
             {
                 status = "ok",
                 db = "connected",
                 employees = employeeCount,
                 tables = tableCount,
+                products = productCount,
+                reservations = reservationCount,
                 utc = DateTime.UtcNow
             });
         }

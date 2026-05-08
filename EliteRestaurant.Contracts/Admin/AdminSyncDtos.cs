@@ -29,3 +29,26 @@ public sealed record AdminEntityListResponse(
     string EntityName,
     IReadOnlyList<JsonElement> Items,
     DateTime SnapshotAtUtc);
+
+public sealed record AdminCloudSettingsRequest(
+    string RestaurantName,
+    string Phone,
+    string Address,
+    string WebsiteDomain,
+    string SocialMedia,
+    string? CustomerMenuTagline,
+    string StaffLoginPasscode,
+    string TicketFooterText,
+    string TaxIdLegalInfo,
+    string DefaultCurrencyDisplayMode,
+    decimal UsdToFcRate,
+    string RoundingLine,
+    string RoundingSubtotal,
+    string RoundingGrandTotal,
+    decimal TaxPercent,
+    decimal ServicePercent,
+    string? LogoFileName,
+    string? LogoContentType,
+    string? LogoBase64);
+
+public sealed record AdminCloudSettingsResponse(bool Success, string? LogoUrl, string Message);
