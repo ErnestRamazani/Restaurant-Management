@@ -51,6 +51,9 @@ public sealed class BusinessProfileSettings
     /// <summary>Optional tagline for the public customer menu (e.g. Fine Dining · Est. 2024).</summary>
     public string? CustomerMenuTagline { get; set; }
 
+    /// <summary>Simple gate before exposing staff/admin workspace links from the public menu.</summary>
+    public string StaffLoginPasscode { get; set; } = "er4124";
+
     public string HomepageBackgroundImagePath { get; set; } = string.Empty;
     public string TicketFooterText { get; set; } = "MERCI / THANK YOU";
     public string TaxIdLegalInfo { get; set; } = string.Empty;

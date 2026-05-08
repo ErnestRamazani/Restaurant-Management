@@ -145,6 +145,14 @@
                                 <TextBox Text="{Binding CustomerMenuTagline, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
                             </StackPanel>
 
+                            <StackPanel Margin="0,10,0,0">
+                                <TextBlock Text="Staff login passcode" Style="{StaticResource HeadingSmall}"/>
+                                <TextBlock Text="Customers see the menu first. Staff must enter this code before the workplace chooser opens."
+                                           Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                <TextBox Text="{Binding StaffLoginPasscode, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource EliteTextBox}"/>
+                            </StackPanel>
+
                             <Button Content="Save Business Profile"
                                     Margin="0,14,0,0"
                                     Command="{Binding SaveBusinessProfileCommand}"

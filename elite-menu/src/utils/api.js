@@ -17,6 +17,11 @@ export async function fetchTables() {
   return apiFetch(`${BASE}/tables`)
 }
 
+/** @param {string} code */
+export async function validateStaffLoginCode(code) {
+  return apiFetch(`${BASE}/staff-login-code/${encodeURIComponent(code)}`)
+}
+
 /**
  * @param {object} payload
  * @returns {Promise<{ success: boolean; label?: string; message?: string; errors?: string[] }>}

@@ -13,6 +13,10 @@ public sealed record PublicMenuConfigDto(
     string? Phone,
     string? Address);
 
+public sealed record StaffLoginCodeRequest(string? Code);
+
+public sealed record StaffLoginCodeResponse(bool Success, string? Message = null);
+
 public sealed class PublicProductDto
 {
     public int Id { get; set; }

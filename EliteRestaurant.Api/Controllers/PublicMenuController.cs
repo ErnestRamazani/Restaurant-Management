@@ -57,6 +57,40 @@ public sealed class PublicMenuController(
             string.IsNullOrWhiteSpace(business.Address) ? null : business.Address.Trim()));
     }
 
+    [HttpPost("staff-login-code")]
+    [EnableRateLimiting("PublicMenuDraft")]
+    [ProducesResponseType(typeof(StaffLoginCodeResponse), 200)]
+    [ProducesResponseType(typeof(StaffLoginCodeResponse), 400)]
+    public ActionResult<StaffLoginCodeResponse> ValidateStaffLoginCode([FromBody] StaffLoginCodeRequest request)
+        => ValidateStaffLoginCodeValue(request.Code);
+
+    [HttpPost("staff-login-code/{code}")]
+    [EnableRateLimiting("PublicMenuDraft")]
+    [ProducesResponseType(typeof(StaffLoginCodeResponse), 200)]
+    [ProducesResponseType(typeof(StaffLoginCodeResponse), 400)]
+    public ActionResult<StaffLoginCodeResponse> ValidateStaffLoginCodeFromPath(string code)
+        => ValidateStaffLoginCodeValue(code);
+
+    [HttpGet("staff-login-code/{code}")]
+    [EnableRateLimiting("PublicMenuRead")]
+    [ProducesResponseType(typeof(StaffLoginCodeResponse), 200)]
+    [ProducesResponseType(typeof(StaffLoginCodeResponse), 400)]
+    public ActionResult<StaffLoginCodeResponse> ValidateStaffLoginCodeFromPathGet(string code)
+        => ValidateStaffLoginCodeValue(code);
+
+    private ActionResult<StaffLoginCodeResponse> ValidateStaffLoginCodeValue(string? code)
+    {
+        var configured = SettingsManager.Load().BusinessProfile.StaffLoginPasscode;
+        var expected = string.IsNullOrWhiteSpace(configured) ? "er4124" : configured.Trim();
+        var submitted = code?.Trim() ?? string.Empty;
+        if (!string.Equals(submitted, expected, StringComparison.Ordinal))
+        {
+            return BadRequest(new StaffLoginCodeResponse(false, "Incorrect staff passcode."));
+        }
+
+        return Ok(new StaffLoginCodeResponse(true));
+    }
+
     [HttpGet("products")]
     [EnableRateLimiting("PublicMenuRead")]
     [ProducesResponseType(typeof(IReadOnlyList<PublicProductDto>), 200)]

@@ -63,6 +63,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     private bool _hasSavedDatabasePassword;
     private string _publicMenuBaseUrl = "http://localhost:5223";
     private string _customerMenuTagline = string.Empty;
+    private string _staffLoginPasscode = "er4124";
 
     public override string ActivePage => "AppearanceSettings";
 
@@ -265,6 +266,12 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     {
         get => _customerMenuTagline;
         set => SetField(ref _customerMenuTagline, value);
+    }
+
+    public string StaffLoginPasscode
+    {
+        get => _staffLoginPasscode;
+        set => SetField(ref _staffLoginPasscode, value);
     }
 
     public ObservableCollection<MenuQrTableRow> MenuQrRows { get; } = new();
@@ -624,6 +631,9 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
             ? (PublicMenuUrlHelper.SuggestBaseUrlForPhones() ?? "http://localhost:5223")
             : business.PublicMenuBaseUrl.Trim();
         CustomerMenuTagline = business.CustomerMenuTagline ?? string.Empty;
+        StaffLoginPasscode = string.IsNullOrWhiteSpace(business.StaffLoginPasscode)
+            ? "er4124"
+            : business.StaffLoginPasscode.Trim();
 
         var pricing = _settings.CurrencyPricing;
         DefaultCurrencyDisplayMode = pricing.DefaultCurrencyDisplayMode;
@@ -653,6 +663,9 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         _settings.BusinessProfile.CustomerMenuTagline = string.IsNullOrWhiteSpace(CustomerMenuTagline)
             ? null
             : CustomerMenuTagline.Trim();
+        _settings.BusinessProfile.StaffLoginPasscode = string.IsNullOrWhiteSpace(StaffLoginPasscode)
+            ? "er4124"
+            : StaffLoginPasscode.Trim();
 
         SettingsManager.Save(_settings);
         RefreshBusinessProfileBindings();

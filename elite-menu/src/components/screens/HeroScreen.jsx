@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { BottomSheet } from '../ui/BottomSheet'
 import { GoldDivider } from '../ui/GoldDivider'
@@ -40,14 +40,26 @@ function FooterLink({ href, children, onSelect }) {
         e.preventDefault()
         onSelect()
       }}
-      className="inline-block min-h-[44px] cursor-pointer py-1.5 font-body text-[0.8rem] font-semibold uppercase tracking-[0.12em] text-gold/90 underline decoration-gold/40 decoration-1 underline-offset-[5px] transition-colors hover:text-gold hover:decoration-gold/70 active:opacity-80"
+      className="inline-block min-h-[44px] cursor-pointer py-1.5 font-body text-[0.68rem] font-medium uppercase tracking-[0.14em] text-champagne/45 transition-colors hover:text-champagne/70 active:opacity-80"
     >
       {children}
     </a>
   )
 }
 
-export function HeroScreen({ config, onEnterMenu }) {
+function RoyalDivider({ className = '' }) {
+  return (
+    <div className={`flex w-full items-center justify-center ${className}`} aria-hidden>
+      <div className="h-px w-20 bg-gradient-to-r from-transparent via-gold/45 to-gold/20" />
+      <span className="mx-2 h-2 w-2 rotate-45 border border-gold/45" />
+      <span className="h-1.5 w-1.5 rounded-full bg-gold/55" />
+      <span className="mx-2 h-2 w-2 rotate-45 border border-gold/45" />
+      <div className="h-px w-20 bg-gradient-to-l from-transparent via-gold/45 to-gold/20" />
+    </div>
+  )
+}
+
+export function HeroScreen({ config, onEnterMenu, onReservation, onStaffLogin }) {
   const [info, setInfo] = useState(/** @type {null | 'about' | 'contact' | 'notes'} */ (null))
 
   const tagline =
@@ -77,12 +89,12 @@ export function HeroScreen({ config, onEnterMenu }) {
             <img
               src={logoSrc}
               alt=""
-              className="mb-3 h-auto w-full max-w-[min(100%,32rem)] object-contain"
+              className="mb-1 h-auto w-full max-w-[min(100%,32rem)] object-contain"
               style={{ maxHeight: 'min(300px, 55vw)', minHeight: 'min(150px, 28vw)' }}
             />
           ) : null}
           <h1
-            className="text-center font-display text-[clamp(1.65rem,6.5vw,2.75rem)] italic leading-[1.12] tracking-[0.04em] text-champagne"
+            className="-mt-4 text-center font-display text-[clamp(1.65rem,6.5vw,2.75rem)] italic leading-[1.12] tracking-[0.04em] text-champagne"
             style={{ fontFamily: '"Playfair Display", serif' }}
           >
             {name}
@@ -90,23 +102,25 @@ export function HeroScreen({ config, onEnterMenu }) {
         </motion.div>
 
         <motion.div
-          className="mt-4 flex flex-col items-center"
+          className="mt-2 flex flex-col items-center"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.45 }}
         >
           <motion.div
-            className="h-px w-[40%] bg-gold/50"
+            className="w-full"
             initial={{ scaleX: 0 }}
             animate={{ scaleX: 1 }}
             transition={{ delay: 0.45, duration: 0.45 }}
-          />
+          >
+            <RoyalDivider />
+          </motion.div>
           <p className="mt-3 max-w-[min(100%,22rem)] text-center font-body text-[0.78rem] font-light uppercase leading-relaxed tracking-[0.18em] text-[var(--text-muted)]">
             {tagline}
           </p>
         </motion.div>
 
-        <div className="min-h-[3rem] flex-1" aria-hidden />
+        <div className="min-h-[5rem] flex-1" aria-hidden />
 
         <motion.div
           className="mb-4 flex flex-col items-center"
@@ -117,18 +131,38 @@ export function HeroScreen({ config, onEnterMenu }) {
           <button
             type="button"
             onClick={onEnterMenu}
-            className="min-h-[56px] rounded-sm border-2 border-gold/45 bg-gold/5 px-12 py-3.5 font-body text-[0.95rem] font-semibold uppercase tracking-[0.2em] text-gold shadow-[0_6px_28px_rgba(200,168,76,0.12)] transition-colors hover:border-gold hover:bg-[var(--gold-dim)] active:scale-[0.98]"
+            className="relative min-h-[56px] min-w-[15rem] border border-gold/50 bg-gold/5 px-12 py-3.5 font-display text-[0.95rem] font-semibold uppercase tracking-[0.22em] text-gold shadow-[0_6px_28px_rgba(200,168,76,0.12)] transition-colors hover:border-gold hover:bg-[var(--gold-dim)] active:scale-[0.98]"
+            style={{ fontFamily: '"Cinzel", "Playfair Display", serif' }}
           >
+            <span className="pointer-events-none absolute left-[-3px] top-[-3px] h-3 w-3 border-l border-t border-gold/70" />
+            <span className="pointer-events-none absolute right-[-3px] top-[-3px] h-3 w-3 border-r border-t border-gold/70" />
+            <span className="pointer-events-none absolute bottom-[-3px] left-[-3px] h-3 w-3 border-b border-l border-gold/70" />
+            <span className="pointer-events-none absolute bottom-[-3px] right-[-3px] h-3 w-3 border-b border-r border-gold/70" />
             Explore our menu
           </button>
         </motion.div>
 
-        <div className="relative z-20 mt-12 border-t border-champagne/10 pt-10 sm:mt-14 sm:pt-12">
-          <p className="text-center font-body text-[0.7rem] font-medium uppercase tracking-[0.2em] text-champagne/50">
-            Information
-          </p>
+        <div className="relative z-20 mt-16 pt-8 sm:mt-16 sm:pt-10">
+          <RoyalDivider className="mb-10" />
+          <div className="flex justify-center">
+            <a
+              href="/reservation"
+              onClick={(e) => {
+                e.preventDefault()
+                onReservation()
+              }}
+              className="relative inline-flex min-h-[48px] min-w-[13rem] items-center justify-center border border-gold/50 bg-gold/5 px-8 py-3 font-display text-[0.78rem] font-semibold uppercase tracking-[0.22em] text-gold shadow-[0_6px_28px_rgba(200,168,76,0.10)] transition-colors hover:border-gold hover:bg-[var(--gold-dim)] active:scale-[0.98]"
+              style={{ fontFamily: '"Cinzel", "Playfair Display", serif' }}
+            >
+              <span className="pointer-events-none absolute left-[-3px] top-[-3px] h-3 w-3 border-l border-t border-gold/70" />
+              <span className="pointer-events-none absolute right-[-3px] top-[-3px] h-3 w-3 border-r border-t border-gold/70" />
+              <span className="pointer-events-none absolute bottom-[-3px] left-[-3px] h-3 w-3 border-b border-l border-gold/70" />
+              <span className="pointer-events-none absolute bottom-[-3px] right-[-3px] h-3 w-3 border-b border-r border-gold/70" />
+              Reservation
+            </a>
+          </div>
           <nav
-            className="mt-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2"
+            className="mt-20 flex flex-wrap items-center justify-center gap-x-8 gap-y-3"
             aria-label="Footer"
           >
             <FooterLink href="#info-about" onSelect={() => setInfo('about')}>
@@ -141,7 +175,17 @@ export function HeroScreen({ config, onEnterMenu }) {
               Notes
             </FooterLink>
           </nav>
-          <p className="mt-6 text-center font-body text-[0.65rem] text-champagne/25">© {new Date().getFullYear()}</p>
+          <div className="mt-2 flex flex-col items-center text-center font-body text-[0.65rem] text-champagne/25">
+            {onStaffLogin ? (
+              <button
+                type="button"
+                onClick={onStaffLogin}
+                className="rounded-full border border-champagne/10 px-3 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-champagne/40 transition hover:border-gold/40 hover:text-gold"
+              >
+                Staff login
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -155,7 +199,7 @@ export function HeroScreen({ config, onEnterMenu }) {
               <GoldDivider className="my-3" />
               <p className="font-body text-[0.9rem] leading-relaxed text-champagne/85">
                 {name} is dedicated to quality ingredients, thoughtful preparation, and warm hospitality. Our menu
-                changes with the best of the season. Scan your table’s code to order — your server is always there to
+                changes with the best of the season. Scan your table's code to order - your server is always there to
                 help with wine, timing, and special requests.
               </p>
             </>
