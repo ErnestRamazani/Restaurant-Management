@@ -2,12 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Utils;
-using Microsoft.EntityFrameworkCore;
+using EliteRestaurantPro.ApiClients;
+using EliteRestaurantPro.Services;
 
 namespace EliteRestaurantPro.ViewModels;
 
@@ -80,6 +82,7 @@ public sealed class SalaryAdvanceEmployeePickVm
 
 public sealed class SalaryViewModel : AdminBaseViewModel
 {
+    private readonly AdminDataApiClient _data = new();
     private int _payrollYear;
     private int _payrollMonth;
     private int _daysPastPayDay;
@@ -153,7 +156,7 @@ public sealed class SalaryViewModel : AdminBaseViewModel
         {
             if (!SetField(ref _payrollMonth, value))
                 return;
-            ReloadRows();
+            _ = ReloadRowsAsync();
         }
     }
 
@@ -164,7 +167,7 @@ public sealed class SalaryViewModel : AdminBaseViewModel
         {
             if (!SetField(ref _payrollYear, value))
                 return;
-            ReloadRows();
+            _ = ReloadRowsAsync();
         }
     }
 
@@ -254,15 +257,15 @@ public sealed class SalaryViewModel : AdminBaseViewModel
         _payrollYear = prev.Year;
         _payrollMonth = prev.Month;
 
-        RefreshPayrollCommand = new RelayCommand(_ => ReloadRows());
+        RefreshPayrollCommand = new RelayCommand(_ => _ = ReloadRowsAsync());
         ConfirmAllPayrollCommand = new RelayCommand(_ => ConfirmAllPayments());
         ConfirmSinglePayrollCommand = new RelayCommand(
             p => ConfirmSinglePayment(p as SalaryEmployeeRowVm),
             p => p is SalaryEmployeeRowVm r && r.CanConfirmPayroll);
-        RecordSalaryAdvanceCommand = new RelayCommand(_ => RecordSalaryAdvance());
-        SubmitPayrollPaymentDialogCommand = new RelayCommand(_ => SubmitPayrollPaymentDialog());
+        RecordSalaryAdvanceCommand = new RelayCommand(_ => _ = RecordSalaryAdvanceAsync());
+        SubmitPayrollPaymentDialogCommand = new RelayCommand(_ => _ = SubmitPayrollPaymentDialogAsync());
         CancelPayrollPaymentDialogCommand = new RelayCommand(_ => ClosePayrollPaymentDialog());
-        ReloadRows();
+        _ = ReloadRowsAsync();
     }
 
     public bool IsPayrollPaymentDialogOpen
@@ -307,13 +310,12 @@ public sealed class SalaryViewModel : AdminBaseViewModel
             Rows.Add(r);
     }
 
-    private void ReloadRows()
+    private async Task ReloadRowsAsync()
     {
         _allPayrollRows.Clear();
         Rows.Clear();
         AdvanceEmployees.Clear();
 
-        using var db = new AppDbContext();
         var start = new DateTime(SelectedPayrollYear, SelectedPayrollMonth, 1).Date;
         var endExclusive = start.AddMonths(1);
         var monthStartUtc = AttendanceCalendar.DayAnchorUtc(start);
@@ -323,56 +325,72 @@ public sealed class SalaryViewModel : AdminBaseViewModel
             SelectedPayrollMonth,
             DateTime.DaysInMonth(SelectedPayrollYear, SelectedPayrollMonth)).Date;
 
-        var employees = db.Employees.AsNoTracking()
-            .Where(e => e.EmploymentStatus == "Active")
-            .OrderBy(e => e.Name)
-            .ToList();
-
-        foreach (var e in employees)
+        try
         {
-            if (FinancialTransactionService.HasMonthlySalaryPayment(db, e.Id, SelectedPayrollYear, SelectedPayrollMonth))
-                continue;
-            AdvanceEmployees.Add(new SalaryAdvanceEmployeePickVm
+            var employeesTask = _data.GetEmployeesAsync();
+            var attendanceTask = _data.GetAttendanceAsync();
+            var payrollTask = _data.GetPayrollAsync();
+            var ordersTask = _data.GetOrdersAsync();
+            var productsTask = _data.GetProductsAsync();
+            var advancesTask = _data.GetSalaryAdvancesAsync();
+            var moneyTask = _data.GetMoneyTransactionsAsync();
+            await Task.WhenAll(employeesTask, attendanceTask, payrollTask, ordersTask, productsTask, advancesTask, moneyTask).ConfigureAwait(true);
+
+            var employees = (await employeesTask.ConfigureAwait(true))
+                .Where(e => e.EmploymentStatus == "Active")
+                .OrderBy(e => e.Name)
+                .ToList();
+            var attendanceAll = (await attendanceTask.ConfigureAwait(true)).ToList();
+            var payrollList = (await payrollTask.ConfigureAwait(true)).ToList();
+            var orders = (await ordersTask.ConfigureAwait(true)).ToList();
+            var productPriceById = (await productsTask.ConfigureAwait(true)).ToDictionary(p => p.Id, p => p.Price);
+            var advances = (await advancesTask.ConfigureAwait(true)).ToList();
+            var transactions = (await moneyTask.ConfigureAwait(true)).ToList();
+
+            foreach (var e in employees)
             {
-                Id = e.Id,
-                DisplayName = $"{e.Name} ({e.UniqueId})"
-            });
-        }
+                if (FinancialTransactionService.HasMonthlySalaryPayment(payrollList, transactions, e.Id, SelectedPayrollYear, SelectedPayrollMonth))
+                    continue;
+                AdvanceEmployees.Add(new SalaryAdvanceEmployeePickVm
+                {
+                    Id = e.Id,
+                    DisplayName = $"{e.Name} ({e.UniqueId})"
+                });
+            }
 
-        var prevId = SelectedAdvanceEmployee?.Id;
-        SelectedAdvanceEmployee = AdvanceEmployees.FirstOrDefault(x => x.Id == prevId)
-                                  ?? AdvanceEmployees.FirstOrDefault();
+            var prevId = SelectedAdvanceEmployee?.Id;
+            SelectedAdvanceEmployee = AdvanceEmployees.FirstOrDefault(x => x.Id == prevId)
+                                      ?? AdvanceEmployees.FirstOrDefault();
 
-        var attendancesByEmployee = db.EmployeeAttendances.AsNoTracking()
-            .Where(a => a.WorkDate >= monthStartUtc && a.WorkDate < monthEndExclusiveUtc)
-            .ToList()
-            .GroupBy(a => a.EmployeeId)
-            .ToDictionary(g => g.Key, g => (IEnumerable<EmployeeAttendance>)g);
+            var attendancesByEmployee = attendanceAll
+                .Where(a => a.WorkDate >= monthStartUtc && a.WorkDate < monthEndExclusiveUtc)
+                .GroupBy(a => a.EmployeeId)
+                .ToDictionary(g => g.Key, g => (IEnumerable<EmployeeAttendance>)g);
 
-        var payrollRecords = db.PayrollPaymentRecords.AsNoTracking()
-            .Where(p => p.Year == SelectedPayrollYear && p.Month == SelectedPayrollMonth)
-            .ToDictionary(p => p.EmployeeId);
+            var payrollRecords = payrollList
+                .Where(p => p.Year == SelectedPayrollYear && p.Month == SelectedPayrollMonth)
+                .ToDictionary(p => p.EmployeeId);
 
-        foreach (var emp in employees)
-        {
-            attendancesByEmployee.TryGetValue(emp.Id, out var attRows);
-            var rows = attRows ?? Enumerable.Empty<EmployeeAttendance>();
-            var (absLive, lateLive, penLive, totalLive) =
-                PayrollCalculator.CountAttendanceUnitsForPayroll(emp, SelectedPayrollYear, SelectedPayrollMonth, rows);
+            foreach (var emp in employees)
+            {
+                attendancesByEmployee.TryGetValue(emp.Id, out var attRows);
+                var rows = attRows ?? Enumerable.Empty<EmployeeAttendance>();
+                var (absLive, lateLive, penLive, totalLive) =
+                    PayrollCalculator.CountAttendanceUnitsForPayroll(emp, SelectedPayrollYear, SelectedPayrollMonth, rows);
 
-            var (schedHours, workdays, grossLive) =
-                PayrollCalculator.GetHourlyGrossForPayrollMonth(emp, SelectedPayrollYear, SelectedPayrollMonth);
+                var (schedHours, workdays, grossLive) =
+                    PayrollCalculator.GetHourlyGrossForPayrollMonth(emp, SelectedPayrollYear, SelectedPayrollMonth);
 
-            var moneyLive = PayrollSupport.SumServerCompletedOrderMerchandiseUsd(db, emp.Id, start, endExclusive);
-            var bonusLive = PayrollCalculator.ComputeBonusUsd(moneyLive);
-            var advancesPending = PayrollSupport.SumPendingAdvancesForPayrollMonth(
-                db,
-                emp.Id,
-                SelectedPayrollYear,
-                SelectedPayrollMonth);
+                var moneyLive = PayrollSupport.SumServerCompletedOrderMerchandiseUsd(orders, productPriceById, emp.Id, start, endExclusive);
+                var bonusLive = PayrollCalculator.ComputeBonusUsd(moneyLive);
+                var advancesPending = PayrollSupport.SumPendingAdvancesForPayrollMonth(
+                    advances,
+                    emp.Id,
+                    SelectedPayrollYear,
+                    SelectedPayrollMonth);
 
-            payrollRecords.TryGetValue(emp.Id, out var payRec);
-            var fullyPaid = FinancialTransactionService.IsPayrollFullyPaid(db, emp.Id, SelectedPayrollYear, SelectedPayrollMonth);
+                payrollRecords.TryGetValue(emp.Id, out var payRec);
+                var fullyPaid = FinancialTransactionService.IsPayrollFullyPaid(payrollList, transactions, emp.Id, SelectedPayrollYear, SelectedPayrollMonth);
 
             decimal baseGrossUsd;
             int abs;
@@ -525,18 +543,27 @@ public sealed class SalaryViewModel : AdminBaseViewModel
             });
         }
 
-        ApplyEmployeeFilter();
+            ApplyEmployeeFilter();
 
-        var anyUnpaid = _allPayrollRows.Any(r => !r.AlreadyPaid && r.NetPay > 0.005m);
-        var pastMonthEnd = DateTime.Today > monthEnd;
-        ShowPayrollOverdueWarning = anyUnpaid && pastMonthEnd;
-        DaysPastPayDay = ShowPayrollOverdueWarning ? Math.Max(0, (DateTime.Today - monthEnd).Days) : 0;
-        PayrollOverdueWarningText = ShowPayrollOverdueWarning
-            ? $"Payroll for {PayrollPeriodLabel} is overdue. You are {DaysPastPayDay} day(s) past the pay date (last day of the month). Confirm payments below."
-            : string.Empty;
+            var anyUnpaid = _allPayrollRows.Any(r => !r.AlreadyPaid && r.NetPay > 0.005m);
+            var pastMonthEnd = DateTime.Today > monthEnd;
+            ShowPayrollOverdueWarning = anyUnpaid && pastMonthEnd;
+            DaysPastPayDay = ShowPayrollOverdueWarning ? Math.Max(0, (DateTime.Today - monthEnd).Days) : 0;
+            PayrollOverdueWarningText = ShowPayrollOverdueWarning
+                ? $"Payroll for {PayrollPeriodLabel} is overdue. You are {DaysPastPayDay} day(s) past the pay date (last day of the month). Confirm payments below."
+                : string.Empty;
 
-        OnPropertyChanged(nameof(PayrollPeriodLabel));
-        CommandManager.InvalidateRequerySuggested();
+            OnPropertyChanged(nameof(PayrollPeriodLabel));
+            CommandManager.InvalidateRequerySuggested();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                ex.GetBaseException().Message,
+                "Salary load failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private void ConfirmAllPayments()
@@ -560,7 +587,7 @@ public sealed class SalaryViewModel : AdminBaseViewModel
         if (confirm != MessageBoxResult.Yes)
             return;
 
-        RunPayrollForRows(pending, r => r.NetPay);
+        _ = RunPayrollForRowsAsync(pending, r => r.NetPay);
     }
 
     private void ConfirmSinglePayment(SalaryEmployeeRowVm? row)
@@ -593,7 +620,7 @@ public sealed class SalaryViewModel : AdminBaseViewModel
         PayrollPaymentDialogEmployee = string.Empty;
     }
 
-    private void SubmitPayrollPaymentDialog()
+    private async Task SubmitPayrollPaymentDialogAsync()
     {
         var row = _payrollPaymentDialogRow;
         if (row is null)
@@ -616,62 +643,155 @@ public sealed class SalaryViewModel : AdminBaseViewModel
 
         amt = Math.Round(amt, 2);
 
-        using var db = new AppDbContext();
-        var err = FinancialTransactionService.TryRecordMonthlySalaryPayment(
-            db,
-            row.EmployeeId,
-            SelectedPayrollYear,
-            SelectedPayrollMonth,
-            amt);
-        if (err is not null)
+        try
         {
-            MessageBox.Show(err, "Salary", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
-
-        db.SaveChanges();
-        ClosePayrollPaymentDialog();
-        MessageBox.Show(
-            "Payroll payment saved. Money shows a Salary expense for the amount you entered. Run Refresh if amounts look stale.",
-            "Salary",
-            MessageBoxButton.OK,
-            MessageBoxImage.Information);
-        ReloadRows();
-    }
-
-    private void RunPayrollForRows(IReadOnlyList<SalaryEmployeeRowVm> rows, Func<SalaryEmployeeRowVm, decimal> amountSelector)
-    {
-        using var db = new AppDbContext();
-        foreach (var row in rows)
-        {
-            var amt = Math.Round(amountSelector(row), 2);
-            var err = FinancialTransactionService.TryRecordMonthlySalaryPayment(
-                db,
-                row.EmployeeId,
-                SelectedPayrollYear,
-                SelectedPayrollMonth,
-                amt);
-            if (err is not null)
+            var employees = (await _data.GetEmployeesAsync().ConfigureAwait(true)).ToList();
+            var employee = employees.FirstOrDefault(e => e.Id == row.EmployeeId);
+            if (employee is null)
             {
-                MessageBox.Show(
-                    $"{row.EmployeeName}: {err}",
-                    "Salary",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                MessageBox.Show("Employee not found.", "Salary", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-        }
 
-        db.SaveChanges();
-        MessageBox.Show(
-            "Payroll saved. Daily and Employees reports include Money salary lines for each payment. Employee timeline shows advances and payments.",
-            "Salary",
-            MessageBoxButton.OK,
-            MessageBoxImage.Information);
-        ReloadRows();
+            var start = new DateTime(SelectedPayrollYear, SelectedPayrollMonth, 1).Date;
+            var endExclusive = start.AddMonths(1);
+            var monthStartUtc = AttendanceCalendar.DayAnchorUtc(start);
+            var monthEndExclusiveUtc = AttendanceCalendar.DayAnchorUtc(endExclusive);
+
+            var attendance = (await _data.GetAttendanceAsync().ConfigureAwait(true))
+                .Where(a => a.EmployeeId == row.EmployeeId && a.WorkDate >= monthStartUtc && a.WorkDate < monthEndExclusiveUtc)
+                .ToList();
+            var orders = (await _data.GetOrdersAsync().ConfigureAwait(true)).ToList();
+            var productPriceById = (await _data.GetProductsAsync().ConfigureAwait(true)).ToDictionary(p => p.Id, p => p.Price);
+            var moneyGenerated = PayrollSupport.SumServerCompletedOrderMerchandiseUsd(
+                orders,
+                productPriceById,
+                row.EmployeeId,
+                start,
+                endExclusive);
+
+            var advances = (await _data.GetSalaryAdvancesAsync().ConfigureAwait(true)).ToList();
+            var transactions = (await _data.GetMoneyTransactionsAsync().ConfigureAwait(true)).ToList();
+            var payrollList = (await _data.GetPayrollAsync().ConfigureAwait(true)).ToList();
+            var existing = payrollList.FirstOrDefault(p =>
+                p.EmployeeId == row.EmployeeId && p.Year == SelectedPayrollYear && p.Month == SelectedPayrollMonth);
+
+            var err = FinancialTransactionService.TryRecordMonthlySalaryPaymentMemory(
+                employee,
+                attendance,
+                moneyGenerated,
+                advances,
+                existing,
+                amt,
+                SelectedPayrollYear,
+                SelectedPayrollMonth,
+                transactions,
+                out var upserts);
+            if (err is not null)
+            {
+                MessageBox.Show(err, "Salary", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            DesktopCloudPersistence.PushBatchBlocking(DesktopCloudPersistence.ToUpsertOperations(upserts));
+            ClosePayrollPaymentDialog();
+            MessageBox.Show(
+                "Payroll payment saved. Money shows a Salary expense for the amount you entered. Run Refresh if amounts look stale.",
+                "Salary",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            await ReloadRowsAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                ex.GetBaseException().Message,
+                "Salary",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
-    private void RecordSalaryAdvance()
+    private async Task RunPayrollForRowsAsync(IReadOnlyList<SalaryEmployeeRowVm> rows, Func<SalaryEmployeeRowVm, decimal> amountSelector)
+    {
+        try
+        {
+            foreach (var row in rows)
+            {
+                var amt = Math.Round(amountSelector(row), 2);
+                var employees = (await _data.GetEmployeesAsync().ConfigureAwait(true)).ToList();
+                var employee = employees.FirstOrDefault(e => e.Id == row.EmployeeId);
+                if (employee is null)
+                {
+                    MessageBox.Show($"{row.EmployeeName}: Employee not found.", "Salary", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                var start = new DateTime(SelectedPayrollYear, SelectedPayrollMonth, 1).Date;
+                var endExclusive = start.AddMonths(1);
+                var monthStartUtc = AttendanceCalendar.DayAnchorUtc(start);
+                var monthEndExclusiveUtc = AttendanceCalendar.DayAnchorUtc(endExclusive);
+
+                var attendance = (await _data.GetAttendanceAsync().ConfigureAwait(true))
+                    .Where(a => a.EmployeeId == row.EmployeeId && a.WorkDate >= monthStartUtc && a.WorkDate < monthEndExclusiveUtc)
+                    .ToList();
+                var orders = (await _data.GetOrdersAsync().ConfigureAwait(true)).ToList();
+                var productPriceById = (await _data.GetProductsAsync().ConfigureAwait(true)).ToDictionary(p => p.Id, p => p.Price);
+                var moneyGenerated = PayrollSupport.SumServerCompletedOrderMerchandiseUsd(
+                    orders,
+                    productPriceById,
+                    row.EmployeeId,
+                    start,
+                    endExclusive);
+
+                var advances = (await _data.GetSalaryAdvancesAsync().ConfigureAwait(true)).ToList();
+                var transactions = (await _data.GetMoneyTransactionsAsync().ConfigureAwait(true)).ToList();
+                var payrollList = (await _data.GetPayrollAsync().ConfigureAwait(true)).ToList();
+                var existing = payrollList.FirstOrDefault(p =>
+                    p.EmployeeId == row.EmployeeId && p.Year == SelectedPayrollYear && p.Month == SelectedPayrollMonth);
+
+                var err = FinancialTransactionService.TryRecordMonthlySalaryPaymentMemory(
+                    employee,
+                    attendance,
+                    moneyGenerated,
+                    advances,
+                    existing,
+                    amt,
+                    SelectedPayrollYear,
+                    SelectedPayrollMonth,
+                    transactions,
+                    out var upserts);
+                if (err is not null)
+                {
+                    MessageBox.Show(
+                        $"{row.EmployeeName}: {err}",
+                        "Salary",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                DesktopCloudPersistence.PushBatchBlocking(DesktopCloudPersistence.ToUpsertOperations(upserts));
+            }
+
+            MessageBox.Show(
+                "Payroll saved. Daily and Employees reports include Money salary lines for each payment. Employee timeline shows advances and payments.",
+                "Salary",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            await ReloadRowsAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                ex.GetBaseException().Message,
+                "Salary",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+    }
+
+    private async Task RecordSalaryAdvanceAsync()
     {
         if (SelectedAdvanceEmployee is null)
         {
@@ -688,85 +808,131 @@ public sealed class SalaryViewModel : AdminBaseViewModel
 
         amt = Math.Round(amt, 2);
 
-        using var db = new AppDbContext();
-        if (FinancialTransactionService.HasMonthlySalaryPayment(db, SelectedAdvanceEmployee.Id, SelectedPayrollYear, SelectedPayrollMonth))
+        try
         {
+            var payrollList = (await _data.GetPayrollAsync().ConfigureAwait(true)).ToList();
+            var transactions = (await _data.GetMoneyTransactionsAsync().ConfigureAwait(true)).ToList();
+            if (FinancialTransactionService.HasMonthlySalaryPayment(
+                    payrollList,
+                    transactions,
+                    SelectedAdvanceEmployee.Id,
+                    SelectedPayrollYear,
+                    SelectedPayrollMonth))
+            {
+                MessageBox.Show(
+                    "Payroll is already confirmed for this employee for the selected month. Advances are not allowed for that period.",
+                    "Salary advance",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var emp = (await _data.GetEmployeesAsync().ConfigureAwait(true)).FirstOrDefault(e => e.Id == SelectedAdvanceEmployee.Id);
+            if (emp is null)
+            {
+                MessageBox.Show("Employee not found.", "Salary advance", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var (_, workdays, scheduledGrossUsd) =
+                PayrollCalculator.GetHourlyGrossForPayrollMonth(emp, SelectedPayrollYear, SelectedPayrollMonth);
+
+            if (emp.HourlyRate <= 0m || workdays == 0)
+            {
+                MessageBox.Show(
+                    "Advances are limited to 30% of scheduled gross pay for the month. This employee has no scheduled gross for the selected period — set a positive hourly rate (USD) and at least one scheduled workday (not Off) in Employees, then try again.",
+                    "Salary advance",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var advances = (await _data.GetSalaryAdvancesAsync().ConfigureAwait(true)).ToList();
+            var advanceCapUsd = Math.Round(PayrollCalculator.MaxAdvanceFractionOfScheduledGross * scheduledGrossUsd, 2);
+            var existingPendingUsd = PayrollSupport.SumPendingAdvancesForPayrollMonth(
+                advances,
+                SelectedAdvanceEmployee.Id,
+                SelectedPayrollYear,
+                SelectedPayrollMonth);
+            var remainingUsd = Math.Round(advanceCapUsd - existingPendingUsd, 2);
+            if (remainingUsd < 0m)
+                remainingUsd = 0m;
+
+            if (amt > remainingUsd)
+            {
+                MessageBox.Show(
+                    $"Each employee’s advances for this payroll month cannot exceed 30% of scheduled gross pay (hourly wage × scheduled shift hours on working days).{Environment.NewLine}{Environment.NewLine}" +
+                    $"Scheduled gross for {PayrollPeriodLabel}: ${scheduledGrossUsd:N2}{Environment.NewLine}" +
+                    $"30% cap: ${advanceCapUsd:N2}{Environment.NewLine}" +
+                    $"Pending advances already recorded for this month: ${existingPendingUsd:N2}{Environment.NewLine}" +
+                    $"You can add at most ${remainingUsd:N2} now (requested ${amt:N2}).",
+                    "Salary advance",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
+            var empName = emp.Name;
+
+            var adv = new SalaryAdvance
+            {
+                EmployeeId = SelectedAdvanceEmployee.Id,
+                AmountUsd = amt,
+                GivenAt = DateTime.Now,
+                ForPayrollYear = SelectedPayrollYear,
+                ForPayrollMonth = SelectedPayrollMonth,
+                Note = AdvanceNoteText.Trim()
+            };
+
+            DesktopCloudPersistence.PushUpsertBlocking(adv);
+
+            var refreshedAdvances = (await _data.GetSalaryAdvancesAsync().ConfigureAwait(true)).ToList();
+            var created = refreshedAdvances
+                .Where(a =>
+                    a.EmployeeId == SelectedAdvanceEmployee.Id &&
+                    a.ForPayrollYear == SelectedPayrollYear &&
+                    a.ForPayrollMonth == SelectedPayrollMonth &&
+                    Math.Abs(a.AmountUsd - amt) < 0.001m)
+                .OrderByDescending(a => a.Id)
+                .FirstOrDefault();
+
+            if (created is null)
+            {
+                MessageBox.Show(
+                    "Advance was saved but could not be confirmed from the server. Refresh Salary and check Money.",
+                    "Salary advance",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                _ = ReloadRowsAsync();
+                return;
+            }
+
+            var refreshedTx = (await _data.GetMoneyTransactionsAsync().ConfigureAwait(true)).ToList();
+            var expense = FinancialTransactionService.BuildSalaryAdvanceExpenseIfMissing(
+                created.Id,
+                created.EmployeeId,
+                empName,
+                amt,
+                refreshedTx);
+            if (expense is not null)
+                DesktopCloudPersistence.PushUpsertBlocking(expense);
+
+            AdvanceAmountText = string.Empty;
+            AdvanceNoteText = string.Empty;
             MessageBox.Show(
-                "Payroll is already confirmed for this employee for the selected month. Advances are not allowed for that period.",
+                $"Advance recorded for payroll {PayrollPeriodLabel} and posted to Money. It is deducted when you confirm that month for this employee.",
                 "Salary advance",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
-            return;
+            _ = ReloadRowsAsync();
         }
-
-        var emp = db.Employees.AsNoTracking().SingleOrDefault(e => e.Id == SelectedAdvanceEmployee.Id);
-        if (emp is null)
-        {
-            MessageBox.Show("Employee not found.", "Salary advance", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
-
-        var (_, workdays, scheduledGrossUsd) =
-            PayrollCalculator.GetHourlyGrossForPayrollMonth(emp, SelectedPayrollYear, SelectedPayrollMonth);
-
-        if (emp.HourlyRate <= 0m || workdays == 0)
+        catch (Exception ex)
         {
             MessageBox.Show(
-                "Advances are limited to 30% of scheduled gross pay for the month. This employee has no scheduled gross for the selected period — set a positive hourly rate (USD) and at least one scheduled workday (not Off) in Employees, then try again.",
+                ex.GetBaseException().Message,
                 "Salary advance",
                 MessageBoxButton.OK,
-                MessageBoxImage.Information);
-            return;
+                MessageBoxImage.Warning);
         }
-
-        var advanceCapUsd = Math.Round(PayrollCalculator.MaxAdvanceFractionOfScheduledGross * scheduledGrossUsd, 2);
-        var existingPendingUsd = PayrollSupport.SumPendingAdvancesForPayrollMonth(
-            db,
-            SelectedAdvanceEmployee.Id,
-            SelectedPayrollYear,
-            SelectedPayrollMonth);
-        var remainingUsd = Math.Round(advanceCapUsd - existingPendingUsd, 2);
-        if (remainingUsd < 0m)
-            remainingUsd = 0m;
-
-        if (amt > remainingUsd)
-        {
-            MessageBox.Show(
-                $"Each employee’s advances for this payroll month cannot exceed 30% of scheduled gross pay (hourly wage × scheduled shift hours on working days).{Environment.NewLine}{Environment.NewLine}" +
-                $"Scheduled gross for {PayrollPeriodLabel}: ${scheduledGrossUsd:N2}{Environment.NewLine}" +
-                $"30% cap: ${advanceCapUsd:N2}{Environment.NewLine}" +
-                $"Pending advances already recorded for this month: ${existingPendingUsd:N2}{Environment.NewLine}" +
-                $"You can add at most ${remainingUsd:N2} now (requested ${amt:N2}).",
-                "Salary advance",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
-            return;
-        }
-
-        var empName = emp.Name;
-
-        var adv = new SalaryAdvance
-        {
-            EmployeeId = SelectedAdvanceEmployee.Id,
-            AmountUsd = amt,
-            GivenAt = DateTime.Now,
-            ForPayrollYear = SelectedPayrollYear,
-            ForPayrollMonth = SelectedPayrollMonth,
-            Note = AdvanceNoteText.Trim()
-        };
-        db.SalaryAdvances.Add(adv);
-        db.SaveChanges();
-
-        FinancialTransactionService.RecordSalaryAdvanceExpense(db, adv.Id, adv.EmployeeId, empName, amt);
-        db.SaveChanges();
-
-        AdvanceAmountText = string.Empty;
-        AdvanceNoteText = string.Empty;
-        MessageBox.Show(
-            $"Advance recorded for payroll {PayrollPeriodLabel} and posted to Money. It is deducted when you confirm that month for this employee.",
-            "Salary advance",
-            MessageBoxButton.OK,
-            MessageBoxImage.Information);
-        ReloadRows();
     }
 }

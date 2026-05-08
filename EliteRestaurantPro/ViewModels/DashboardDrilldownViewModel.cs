@@ -1,9 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
-using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Utils;
-using Microsoft.EntityFrameworkCore;
 
 namespace EliteRestaurantPro.ViewModels;
 
@@ -61,14 +59,17 @@ public class DashboardDrilldownViewModel : AdminBaseViewModel
 
     public const int RecentActivityMaxItems = 25;
 
-    public static List<ActivityItem> BuildRecentActivities(AppDbContext db)
+    public static List<ActivityItem> BuildRecentActivities(
+        IReadOnlyList<OrderRecord> allOrders,
+        IReadOnlyList<EmployeeAttendance> allAttendance,
+        IReadOnlyDictionary<int, Employee> employeesById,
+        IReadOnlyList<InventoryItem> allInventory)
     {
         var activities = new List<(long SortKey, ActivityItem Item)>();
         var attendanceWindowStart = DateTime.Today.AddDays(-30);
         var attendanceWindowStartUtc = AttendanceCalendar.DayAnchorUtc(attendanceWindowStart);
 
-        var latestOrders = db.Orders
-            .AsNoTracking()
+        var latestOrders = allOrders
             .OrderByDescending(o => o.CreatedAt)
             .Take(60)
             .ToList();
@@ -91,9 +92,7 @@ public class DashboardDrilldownViewModel : AdminBaseViewModel
             }));
         }
 
-        var latestAttendance = db.EmployeeAttendances
-            .AsNoTracking()
-            .Include(a => a.Employee)
+        var latestAttendance = allAttendance
             .Where(a => a.WorkDate >= attendanceWindowStartUtc && a.ClockInTime != null)
             .OrderByDescending(a => a.ClockInTime)
             .Take(60)
@@ -102,19 +101,18 @@ public class DashboardDrilldownViewModel : AdminBaseViewModel
         {
             var at = attendance.ClockInTime ?? DateTime.Now;
             var status = string.IsNullOrWhiteSpace(attendance.ClockInStatus) ? "Recorded" : attendance.ClockInStatus;
+            var empName = employeesById.TryGetValue(attendance.EmployeeId, out var e) ? e.Name : "Employee";
             activities.Add((at.Ticks, new ActivityItem
             {
                 Time = at.ToString("MMM dd, yyyy · HH:mm", CultureInfo.InvariantCulture),
-                Title = attendance.Employee?.Name ?? "Employee",
+                Title = empName,
                 Description = $"Clocked in ({status})\nShift date: {attendance.WorkDate:yyyy-MM-dd}",
                 ActivityKind = "Attendance",
                 NavigationTarget = DashboardActivityNav.Attendance
             }));
         }
 
-        // Cap rows: sort key uses latest timestamp inside Notes (not DB column); high Id skews toward recently added SKUs.
-        var inventoryWithNotes = db.InventoryItems
-            .AsNoTracking()
+        var inventoryWithNotes = allInventory
             .Where(i => !string.IsNullOrWhiteSpace(i.Notes))
             .OrderByDescending(i => i.Id)
             .Take(400)

@@ -1,4 +1,5 @@
 using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Utils;
 using Microsoft.EntityFrameworkCore;
 
 namespace EliteRestaurant.Core.Data;
@@ -201,6 +202,103 @@ public static class OrderInventoryDeduction
                     "Not enough inventory to complete this deduction (stock may have changed). Please refresh and try again:\n\n" +
                     name;
             }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Cloud/desktop sync path: validates stock and mutates <paramref name="inventoryById"/> (quantity + notes). Does not use EF.
+    /// </summary>
+    public static string? TryApplyForPlacedOrderMemory(
+        OrderRecord order,
+        Dictionary<int, InventoryItem> inventoryById,
+        IReadOnlyList<ProductIngredient> ingredientRows,
+        IReadOnlyList<Employee> activeStaff,
+        IReadOnlyDictionary<int, Product> productById)
+    {
+        var selectedLines = order.Items
+            .GroupBy(i => i.ProductId)
+            .Select(g => (ProductId: g.Key, Quantity: g.Sum(i => i.Quantity)))
+            .ToList();
+
+        if (selectedLines.Count == 0)
+            return "Order has no line items.";
+
+        (int? EmployeeId, string Role, string Name) ResolvePreparationAssignee(int productId)
+        {
+            if (!productById.TryGetValue(productId, out var product))
+                return (null, "Unknown", "Unassigned");
+
+            var isDrink = string.Equals(product.Category, "Drink", StringComparison.OrdinalIgnoreCase);
+            if (isDrink)
+            {
+                var barman = activeStaff.FirstOrDefault(e =>
+                    e.Role.Equals("Barman", StringComparison.OrdinalIgnoreCase) ||
+                    e.Role.Equals("Bartender", StringComparison.OrdinalIgnoreCase));
+                return barman is null ? (null, "Barman", "Unassigned Barman") : (barman.Id, "Barman", barman.Name);
+            }
+
+            var chef = activeStaff.FirstOrDefault(e =>
+                e.Role.Equals("Chef", StringComparison.OrdinalIgnoreCase));
+            return chef is null ? (null, "Chef", "Unassigned Chef") : (chef.Id, "Chef", chef.Name);
+        }
+
+        var requiredByInventory = new Dictionary<int, decimal>();
+        var requiredByInventoryAndAssignee =
+            new Dictionary<(int InventoryItemId, int? EmployeeId, string Role, string Name), decimal>();
+        foreach (var line in selectedLines)
+        {
+            var assignee = ResolvePreparationAssignee(line.ProductId);
+            foreach (var ingredient in ingredientRows.Where(i => i.ProductId == line.ProductId))
+            {
+                var required = ingredient.Quantity * line.Quantity;
+                if (!requiredByInventory.TryAdd(ingredient.InventoryItemId, required))
+                    requiredByInventory[ingredient.InventoryItemId] += required;
+
+                var actorKey = (ingredient.InventoryItemId, assignee.EmployeeId, assignee.Role, assignee.Name);
+                if (!requiredByInventoryAndAssignee.TryAdd(actorKey, required))
+                    requiredByInventoryAndAssignee[actorKey] += required;
+            }
+        }
+
+        var insufficient = new List<string>();
+        foreach (var (inventoryItemId, req) in requiredByInventory)
+        {
+            if (!inventoryById.TryGetValue(inventoryItemId, out var inv))
+                continue;
+            if (inv.StockQuantity < req)
+                insufficient.Add(
+                    $"{inv.Name} (need {req:0.##} {inv.Unit}, have {inv.StockQuantity:0.##})");
+        }
+
+        if (insufficient.Count > 0)
+            return "Not enough inventory for this order:\n\n" + string.Join("\n", insufficient.Distinct());
+
+        foreach (var (inventoryItemId, required) in requiredByInventory)
+        {
+            if (!inventoryById.TryGetValue(inventoryItemId, out var inventoryItem))
+                continue;
+
+            var actorNotes = requiredByInventoryAndAssignee
+                .Where(x => x.Key.InventoryItemId == inventoryItemId)
+                .Select(x => $"{x.Key.Role} {x.Key.Name}: {x.Value:0.##}")
+                .ToList();
+            var actorText = actorNotes.Count == 0 ? "Unassigned" : string.Join(", ", actorNotes);
+            var deductionNote =
+                $"{DateTime.UtcNow:yyyy-MM-dd HH:mm}Z - {required:0.##} {inventoryItem.Name} deducted from order {order.UniqueId}. Used by {actorText}.";
+
+            if (inventoryItem.StockQuantity < required)
+            {
+                return
+                    "Not enough inventory to complete this deduction (stock may have changed). Please refresh and try again:\n\n" +
+                    inventoryItem.Name;
+            }
+
+            inventoryItem.StockQuantity -= required;
+            inventoryItem.Notes = string.IsNullOrWhiteSpace(inventoryItem.Notes)
+                ? deductionNote
+                : $"{inventoryItem.Notes.Trim()}\n{deductionNote}";
         }
 
         return null;

@@ -310,18 +310,19 @@
                                         </Border>
                                     </StackPanel>
 
-                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="12,0,8,0"
-                                                Visibility="{Binding DataContext.ShowInventoryManagementChrome, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="12,0,8,0">
                                         <Button Width="90" Margin="0,0,8,0"
                                                 Content="Edit"
                                                 Command="{Binding DataContext.EditItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}"
-                                                Style="{StaticResource SapphireButton}"/>
+                                                Style="{StaticResource SapphireButton}"
+                                                Visibility="{Binding DataContext.ShowInventoryManagementChrome, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                         <Button Width="90"
                                                 Content="Add/Deduct"
                                                 Command="{Binding DataContext.OpenAdjustDialogCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}"
-                                                Style="{StaticResource GoldPrimaryButton}"/>
+                                                Style="{StaticResource GoldPrimaryButton}"
+                                                Visibility="{Binding DataContext.ShowInventoryAdjustmentChrome, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                     </StackPanel>
                                     <Button Grid.Column="2" Width="90"
                                             Content="Delete"

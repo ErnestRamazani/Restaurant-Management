@@ -5,15 +5,16 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
-using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Utils;
-using Microsoft.EntityFrameworkCore;
+using EliteRestaurantPro.ApiClients;
+using EliteRestaurantPro.Services;
 
 namespace EliteRestaurantPro.ViewModels;
 
 public class InventoryViewModel : AdminBaseViewModel
 {
+    private readonly AdminDataApiClient _data = new();
     private bool _isLoadingItems;
     private int? _editingItemId;
     private bool _isDialogOpen;
@@ -36,8 +37,12 @@ public class InventoryViewModel : AdminBaseViewModel
 
     public override string ActivePage => "Inventory";
 
-    /// <summary>Add, edit, delete, and adjustments — not available on staff tablets (including kitchen view).</summary>
+    /// <summary>Add, edit, delete — admin only (not server/cashier/kitchen).</summary>
     public bool ShowInventoryManagementChrome => !AppSession.IsStaffTablet;
+
+    /// <summary>Stock add/deduct with note — admin and kitchen/bar tablets.</summary>
+    public bool ShowInventoryAdjustmentChrome =>
+        !AppSession.IsStaffTablet || AppSession.IsKitchenBarTablet;
 
     /// <summary>When true, list is sorted by expiration urgency and cards show red / orange / blue accents.</summary>
     public bool ExpirationViewActive
@@ -161,7 +166,7 @@ public class InventoryViewModel : AdminBaseViewModel
         ToggleExpirationViewCommand = new RelayCommand(_ => SetInventoryViewMode(ExpirationViewActive ? "Default" : "Expiration"));
         ToggleQuantityViewCommand = new RelayCommand(_ => SetInventoryViewMode(QuantityViewActive ? "Default" : "Quantity"));
         EditItemCommand = new RelayCommand(item => OpenEditDialog(item as InventoryItem));
-        DeleteItemCommand = new RelayCommand(item => DeleteItem(item as InventoryItem));
+        DeleteItemCommand = new RelayCommand(item => _ = DeleteItemAsync(item as InventoryItem));
         OpenAdjustDialogCommand = new RelayCommand(item => OpenAdjustDialog(item as InventoryItem));
         ApplyAdjustmentCommand = new RelayCommand(_ => ApplyAdjustment());
         CancelAdjustmentDialogCommand = new RelayCommand(_ => CloseAdjustmentDialog());
@@ -179,11 +184,9 @@ public class InventoryViewModel : AdminBaseViewModel
         _isLoadingItems = true;
         try
         {
-            var items = await Task.Run(() =>
-            {
-                using var db = new AppDbContext();
-                return db.InventoryItems.AsNoTracking().OrderBy(i => i.Name).ToList();
-            });
+            var items = (await _data.GetInventoryItemsAsync().ConfigureAwait(true))
+                .OrderBy(i => i.Name)
+                .ToList();
 
             _allInventoryItems.Clear();
             _allInventoryItems.AddRange(items);
@@ -338,44 +341,61 @@ public class InventoryViewModel : AdminBaseViewModel
             expirationDate = parsedExpiration.Date;
         }
 
-        using var db = new AppDbContext();
-
-        if (_editingItemId is int itemId)
+        try
         {
-            var existing = db.InventoryItems.Single(i => i.Id == itemId);
-            existing.Name = ItemName.Trim();
-            existing.Unit = Unit.Trim();
-            existing.ExpirationDate = expirationDate;
-            existing.Notes = Notes.Trim();
-        }
-        else
-        {
-            var confirm = MessageBox.Show(
-                "Add this inventory item?",
-                "Confirm Add Inventory Item",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            if (confirm != MessageBoxResult.Yes)
-                return;
-
-            db.InventoryItems.Add(new InventoryItem
+            if (_editingItemId is int itemId)
             {
-                UniqueId = UniqueIdGenerator.NewId("INV"),
-                Name = ItemName.Trim(),
-                Unit = Unit.Trim(),
-                StockQuantity = qty,
-                ExpirationDate = expirationDate,
-                Notes = Notes.Trim()
-            });
-        }
+                var shell = _allInventoryItems.FirstOrDefault(i => i.Id == itemId)
+                    ?? throw new InvalidOperationException("Item not found. Refresh and try again.");
+                var toSave = new InventoryItem
+                {
+                    Id = shell.Id,
+                    UniqueId = shell.UniqueId,
+                    Name = ItemName.Trim(),
+                    Unit = Unit.Trim(),
+                    StockQuantity = shell.StockQuantity,
+                    ExpirationDate = expirationDate,
+                    Notes = Notes.Trim()
+                };
+                DesktopCloudPersistence.PushUpsertBlocking(toSave);
+            }
+            else
+            {
+                var confirm = MessageBox.Show(
+                    "Add this inventory item?",
+                    "Confirm Add Inventory Item",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
 
-        db.SaveChanges();
-        CloseDialog();
-        _ = LoadItemsAsync();
+                if (confirm != MessageBoxResult.Yes)
+                    return;
+
+                var newItem = new InventoryItem
+                {
+                    UniqueId = UniqueIdGenerator.NewId("INV"),
+                    Name = ItemName.Trim(),
+                    Unit = Unit.Trim(),
+                    StockQuantity = qty,
+                    ExpirationDate = expirationDate,
+                    Notes = Notes.Trim()
+                };
+                DesktopCloudPersistence.PushUpsertBlocking(newItem);
+            }
+
+            CloseDialog();
+            _ = LoadItemsAsync();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                ex.GetBaseException().Message,
+                "Save inventory failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
-    private void DeleteItem(InventoryItem? item)
+    private async Task DeleteItemAsync(InventoryItem? item)
     {
         if (item is null || AppSession.IsStaffTablet) return;
 
@@ -388,28 +408,35 @@ public class InventoryViewModel : AdminBaseViewModel
         if (confirm != MessageBoxResult.Yes)
             return;
 
-        using var db = new AppDbContext();
-        var existing = db.InventoryItems.Include(i => i.ProductIngredients).SingleOrDefault(i => i.Id == item.Id);
-        if (existing is null) return;
+        try
+        {
+            var links = await _data.GetProductIngredientsAsync().ConfigureAwait(true);
+            if (links.Any(pi => pi.InventoryItemId == item.Id))
+            {
+                MessageBox.Show(
+                    "This ingredient is used by menu items and cannot be deleted.",
+                    "Delete Blocked",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
 
-        if (existing.ProductIngredients.Any())
+            DesktopCloudPersistence.PushDeleteBlocking(new InventoryItem { Id = item.Id, UniqueId = item.UniqueId });
+            _ = LoadItemsAsync();
+        }
+        catch (Exception ex)
         {
             MessageBox.Show(
-                "This ingredient is used by menu items and cannot be deleted.",
-                "Delete Blocked",
+                ex.GetBaseException().Message,
+                "Delete inventory failed",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
-            return;
         }
-
-        db.InventoryItems.Remove(existing);
-        db.SaveChanges();
-        _ = LoadItemsAsync();
     }
 
     private void OpenAdjustDialog(InventoryItem? item)
     {
-        if (item is null || AppSession.IsStaffTablet) return;
+        if (item is null || (AppSession.IsStaffTablet && !AppSession.IsKitchenBarTablet)) return;
         _adjustingItemId = item.Id;
         AdjustmentItemName = $"{item.Name} ({item.UniqueId})";
         SelectedAdjustmentType = "Deduct";
@@ -420,7 +447,7 @@ public class InventoryViewModel : AdminBaseViewModel
 
     private void ApplyAdjustment()
     {
-        if (AppSession.IsStaffTablet) return;
+        if (AppSession.IsStaffTablet && !AppSession.IsKitchenBarTablet) return;
 
         if (_adjustingItemId is null)
             return;
@@ -438,33 +465,54 @@ public class InventoryViewModel : AdminBaseViewModel
             return;
         }
 
-        using var db = new AppDbContext();
-        var item = db.InventoryItems.SingleOrDefault(i => i.Id == _adjustingItemId.Value);
-        if (item is null) return;
+        try
+        {
+            var shell = _allInventoryItems.FirstOrDefault(i => i.Id == _adjustingItemId.Value);
+            if (shell is null)
+                return;
 
-        var adjustmentType = SelectedAdjustmentType.Trim();
-        if (adjustmentType == "Deduct" && item.StockQuantity < deductionQty)
+            var adjustmentType = SelectedAdjustmentType.Trim();
+            if (adjustmentType == "Deduct" && shell.StockQuantity < deductionQty)
+            {
+                MessageBox.Show(
+                    $"Cannot deduct {deductionQty:0.##} {shell.Unit}. Current stock is {shell.StockQuantity:0.##} {shell.Unit}.",
+                    "Insufficient Stock",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            var newQty = adjustmentType == "Add"
+                ? shell.StockQuantity + deductionQty
+                : shell.StockQuantity - deductionQty;
+
+            var verb = adjustmentType == "Add" ? "Stock added" : "Manual deduction";
+            var logEntry = $"{DateTime.Now:yyyy-MM-dd HH:mm} - {verb} {deductionQty:0.##} {shell.Unit}: {AdjustmentComment.Trim()}";
+            var mergedNotes = string.IsNullOrWhiteSpace(shell.Notes) ? logEntry : $"{shell.Notes}\n{logEntry}";
+
+            var toSave = new InventoryItem
+            {
+                Id = shell.Id,
+                UniqueId = shell.UniqueId,
+                Name = shell.Name,
+                Unit = shell.Unit,
+                StockQuantity = newQty,
+                ExpirationDate = shell.ExpirationDate,
+                Notes = mergedNotes
+            };
+
+            DesktopCloudPersistence.PushUpsertBlocking(toSave);
+            CloseAdjustmentDialog();
+            _ = LoadItemsAsync();
+        }
+        catch (Exception ex)
         {
             MessageBox.Show(
-                $"Cannot deduct {deductionQty:0.##} {item.Unit}. Current stock is {item.StockQuantity:0.##} {item.Unit}.",
-                "Insufficient Stock",
+                ex.GetBaseException().Message,
+                "Adjustment failed",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
-            return;
         }
-
-        if (adjustmentType == "Add")
-            item.StockQuantity += deductionQty;
-        else
-            item.StockQuantity -= deductionQty;
-
-        var verb = adjustmentType == "Add" ? "Stock added" : "Manual deduction";
-        var logEntry = $"{DateTime.Now:yyyy-MM-dd HH:mm} - {verb} {deductionQty:0.##} {item.Unit}: {AdjustmentComment.Trim()}";
-        item.Notes = string.IsNullOrWhiteSpace(item.Notes) ? logEntry : $"{item.Notes}\n{logEntry}";
-
-        db.SaveChanges();
-        CloseAdjustmentDialog();
-        _ = LoadItemsAsync();
     }
 
     private void CloseDialog()

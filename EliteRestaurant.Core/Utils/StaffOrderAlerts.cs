@@ -11,6 +11,13 @@ public static class StaffOrderAlerts
         if (!AppSession.IsServerTablet && !AppSession.IsCashierTablet)
             return string.Empty;
 
+        var useLocalAlerts = string.Equals(
+            Environment.GetEnvironmentVariable("ELITE_DESKTOP_USE_LOCAL_ALERTS"),
+            "1",
+            StringComparison.OrdinalIgnoreCase);
+        if (!useLocalAlerts)
+            return string.Empty;
+
         using var db = new AppDbContext();
 
         static string Label(string? uid, string? tableCode)

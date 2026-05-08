@@ -1,7 +1,6 @@
-using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Utils;
-using Microsoft.EntityFrameworkCore;
+using EliteRestaurantPro.Services;
 
 namespace EliteRestaurantPro.Services;
 
@@ -18,41 +17,26 @@ public sealed class FinancialPostingService
         string justification,
         bool isFixed)
     {
-        using var db = new AppDbContext();
         try
         {
-            return DatabaseResilientTransaction.Execute(db, () =>
+            DesktopCloudPersistence.PushUpsertBlocking(new MoneyTransaction
             {
-                using var tx = db.Database.BeginTransaction();
-                try
-                {
-                    db.Transactions.Add(new MoneyTransaction
-                    {
-                        Amount = amount,
-                        AmountUsd = CurrencyHelper.ResolveUsdAmount(amount, selectedCurrency),
-                        AmountFc = CurrencyHelper.ResolveFcAmount(amount, selectedCurrency),
-                        Date = entryDate.Date.AddHours(DateTime.Now.Hour).AddMinutes(DateTime.Now.Minute),
-                        Type = selectedType,
-                        Category = selectedCategory,
-                        CurrencyCode = selectedCurrency,
-                        ExchangeRateUsed = CurrencyHelper.FcPerUsd,
-                        Justification = justification,
-                        IsFixed = isFixed
-                    });
-                    db.SaveChanges();
-                    tx.Commit();
-                    return new ManualLedgerResult(true, string.Empty);
-                }
-                catch (Exception ex)
-                {
-                    tx.Rollback();
-                    return new ManualLedgerResult(false, ex.Message);
-                }
+                Amount = amount,
+                AmountUsd = CurrencyHelper.ResolveUsdAmount(amount, selectedCurrency),
+                AmountFc = CurrencyHelper.ResolveFcAmount(amount, selectedCurrency),
+                Date = entryDate.Date.AddHours(DateTime.Now.Hour).AddMinutes(DateTime.Now.Minute),
+                Type = selectedType,
+                Category = selectedCategory,
+                CurrencyCode = selectedCurrency,
+                ExchangeRateUsed = CurrencyHelper.FcPerUsd,
+                Justification = justification,
+                IsFixed = isFixed
             });
+            return new ManualLedgerResult(true, string.Empty);
         }
         catch (Exception ex)
         {
-            return new ManualLedgerResult(false, ex.Message);
+            return new ManualLedgerResult(false, ex.GetBaseException().Message);
         }
     }
 }

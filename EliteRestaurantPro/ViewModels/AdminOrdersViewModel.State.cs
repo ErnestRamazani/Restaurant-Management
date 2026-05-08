@@ -5,12 +5,11 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Input;
-using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
-using EliteRestaurant.Core.Orders;
 using EliteRestaurant.Core.Utils;
+using EliteRestaurantPro.ApiClients;
+using EliteRestaurantPro.Services;
 using Microsoft.Win32;
-using Microsoft.EntityFrameworkCore;
 using ModelTable = EliteRestaurant.Core.Models.Table;
 
 namespace EliteRestaurantPro.ViewModels;
@@ -75,7 +74,7 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
     private readonly List<OrderEntry> _masterPastOrders = [];
     private string _activeOrdersSearchFilter = string.Empty;
     private string _pastOrdersSearchFilter = string.Empty;
-    private readonly AdminOrderOperationsService _orderOps = new();
+    private readonly AdminOrderCloudOperations _cloudOps = new();
 
     public override string ActivePage => "Orders";
 

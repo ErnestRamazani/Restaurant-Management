@@ -1,10 +1,8 @@
-using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Orders;
 using EliteRestaurant.Core.Utils;
+using EliteRestaurantPro.ApiClients;
 using EliteRestaurantPro.ViewModels;
-using Microsoft.EntityFrameworkCore;
-using ModelTable = EliteRestaurant.Core.Models.Table;
 
 namespace EliteRestaurantPro.Services;
 
@@ -12,45 +10,67 @@ public static class AdminOrdersSnapshotLoader
 {
     private const int MaxPastOrdersToDisplay = 250;
 
-    public static AdminOrdersLoadedSnapshot Load(bool showAdminAdvance, bool canViewTicket)
+    public static async Task<AdminOrdersLoadedSnapshot> LoadAsync(
+        bool showAdminAdvance,
+        bool canViewTicket,
+        CancellationToken cancellationToken = default)
     {
-        using var db = new AppDbContext();
+        var data = new AdminDataApiClient();
+        var ordersTask = data.GetOrdersAsync(cancellationToken);
+        var tablesTask = data.GetTablesAsync(cancellationToken);
+        var productsTask = data.GetProductsAsync(cancellationToken);
+        var employeesTask = data.GetEmployeesAsync(cancellationToken);
+        await Task.WhenAll(ordersTask, tablesTask, productsTask, employeesTask).ConfigureAwait(false);
 
-        var activeOrders = db.Orders
-            .AsNoTracking()
-            .Include(o => o.Table)
-            .Include(o => o.Server)
-            .Include(o => o.Items)
-            .ThenInclude(i => i.Product)
+        var orders = (await ordersTask.ConfigureAwait(false)).ToList();
+        var tables = (await tablesTask.ConfigureAwait(false)).ToList();
+        var products = (await productsTask.ConfigureAwait(false)).ToList();
+        var employees = (await employeesTask.ConfigureAwait(false)).ToList();
+
+        var productById = products.ToDictionary(p => p.Id);
+        var tablesById = tables.ToDictionary(t => t.Id);
+        var employeesById = employees.ToDictionary(e => e.Id);
+
+        foreach (var t in tables)
+        {
+            if (t.AssignedServerId is int aid && employeesById.TryGetValue(aid, out var srv))
+                t.AssignedServer = srv;
+        }
+
+        foreach (var o in orders)
+        {
+            if (o.TableId is int tid && tablesById.TryGetValue(tid, out var tbl))
+                o.Table = tbl;
+            if (o.ServerId is int sid && employeesById.TryGetValue(sid, out var emp))
+                o.Server = emp;
+            foreach (var item in o.Items)
+            {
+                if (productById.TryGetValue(item.ProductId, out var p))
+                    item.Product = p;
+            }
+        }
+
+        var activeOrders = orders
             .Where(o => o.Status == "Waiting" || o.Status == "In Kitchen" || o.Status == "Ready" ||
                         o.Status == OrderWorkflow.Served)
             .OrderByDescending(o => o.CreatedAt)
-            .ToList()
             .Select(o => AdminOrdersViewMapper.MapOrder(o, false, showAdminAdvance, canViewTicket))
             .ToList();
 
-        var pastOrders = db.Orders
-            .AsNoTracking()
-            .Include(o => o.Table)
-            .Include(o => o.Server)
-            .Include(o => o.Items)
-            .ThenInclude(i => i.Product)
-            .Where(o => o.Status == "Completed" || o.Status == "Cancelled")
+        var pastOrders = orders
+            .Where(o => string.Equals(o.Status, "Completed", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(o.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(o => o.CreatedAt)
             .Take(MaxPastOrdersToDisplay)
-            .ToList()
             .Select(o => AdminOrdersViewMapper.MapOrder(o, true, showAdminAdvance, canViewTicket))
             .ToList();
 
-        var tables = db.Tables
-            .AsNoTracking()
-            .Include(t => t.AssignedServer)
+        var availableTables = tables
             .Where(t => t.Status == "Available" && t.AssignedServerId != null)
             .OrderBy(t => t.TableNumber)
             .ToList();
 
-        var products = db.Products
-            .AsNoTracking()
+        var productSelections = products
             .OrderBy(p => p.Category)
             .ThenBy(p => p.Name)
             .Select(product => new ProductSelectionItemViewModel
@@ -62,11 +82,8 @@ public static class AdminOrdersSnapshotLoader
             })
             .ToList();
 
-        var pendingOrders = db.Orders
-            .AsNoTracking()
-            .Include(o => o.Items)
-            .ThenInclude(i => i.Product)
-            .Where(o => o.Status == OrderWorkflow.PendingCashier)
+        var pendingOrders = orders
+            .Where(o => OrderWorkflow.IsPendingCashier(o.Status))
             .OrderByDescending(o => o.CreatedAt)
             .ToList();
 
@@ -97,8 +114,8 @@ public static class AdminOrdersSnapshotLoader
             PendingCashier = pendingRows,
             ActiveOrders = activeOrders,
             PastOrders = pastOrders,
-            AvailableTables = tables,
-            ProductSelections = products
+            AvailableTables = availableTables,
+            ProductSelections = productSelections
         };
     }
 }

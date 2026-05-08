@@ -40,6 +40,8 @@ public class AppDbContext : DbContext
     public DbSet<SharedOrderDraft> SharedOrderDrafts => Set<SharedOrderDraft>();
     public DbSet<TabletSession> TabletSessions => Set<TabletSession>();
     public DbSet<SyncOutbox> SyncOutbox => Set<SyncOutbox>();
+    public DbSet<PublicMenuSetting> PublicMenuSettings => Set<PublicMenuSetting>();
+    public DbSet<PublicMenuAsset> PublicMenuAssets => Set<PublicMenuAsset>();
 
     public static Func<IReadOnlyList<CloudSyncOperation>, CancellationToken, Task<IReadOnlyList<CloudSyncResult>>>?
         CloudSyncDispatcher { get; set; }
@@ -131,6 +133,8 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<SharedOrderDraft>().ToTable("SharedOrderDrafts");
         modelBuilder.Entity<TabletSession>().ToTable("TabletSessions");
         modelBuilder.Entity<SyncOutbox>().ToTable("SyncOutbox");
+        modelBuilder.Entity<PublicMenuSetting>().ToTable("PublicMenuSettings");
+        modelBuilder.Entity<PublicMenuAsset>().ToTable("PublicMenuAssets");
         modelBuilder.Entity<TabletSession>().HasKey(t => t.Token);
 
         modelBuilder.Entity<TabletSession>()
@@ -168,6 +172,8 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<SharedOrderDraft>().HasIndex(d => new { d.EmployeeId, d.Portal, d.UpdatedAtUtc });
         modelBuilder.Entity<SyncOutbox>().HasIndex(o => o.IdempotencyKey).IsUnique();
         modelBuilder.Entity<SyncOutbox>().HasIndex(o => new { o.Status, o.QueuedAtUtc });
+        modelBuilder.Entity<PublicMenuSetting>().HasIndex(s => s.Key).IsUnique();
+        modelBuilder.Entity<PublicMenuAsset>().HasIndex(a => a.Key).IsUnique();
         modelBuilder.Entity<EmployeeAttendance>()
             .HasIndex(a => new { a.EmployeeId, a.WorkDate })
             .IsUnique();

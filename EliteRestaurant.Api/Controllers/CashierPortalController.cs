@@ -1,4 +1,5 @@
 using EliteRestaurant.Api.Dtos;
+using EliteRestaurant.Api.Hubs;
 using EliteRestaurant.Api.Security;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
@@ -6,6 +7,7 @@ using EliteRestaurant.Core.Orders;
 using EliteRestaurant.Core.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace EliteRestaurant.Api.Controllers;
@@ -15,9 +17,10 @@ namespace EliteRestaurant.Api.Controllers;
 [Authorize(Policy = "CashierOnly")]
 public sealed class CashierPortalController(
     TabletAuthService authService,
-    AppDbContext db) : ControllerBase
+    AppDbContext db,
+    IHubContext<OrderHub> orderHub) : ControllerBase
 {
-    private readonly AdminOrderOperationsService _ops = new();
+    private readonly AdminOrderOperationsService _ops = new(db);
 
     [HttpGet("alerts")]
     public ActionResult<IReadOnlyList<string>> GetAlerts()
@@ -66,7 +69,7 @@ public sealed class CashierPortalController(
     }
 
     [HttpPost("orders/pending/{orderId:int}/release")]
-    public ActionResult ReleaseToKitchen(int orderId)
+    public async Task<ActionResult> ReleaseToKitchen(int orderId)
     {
         var session = RequireCashierSession();
         if (session is null)
@@ -75,6 +78,8 @@ public sealed class CashierPortalController(
         var result = _ops.TryReleasePendingToKitchen(orderId);
         if (!result.Ok)
             return BadRequest(new { message = result.ErrorMessage ?? "Release failed." });
+
+        await orderHub.Clients.Group("Kitchen").SendAsync("KitchenQueueChanged", new { reason = "cashier-release", orderId });
 
         return Ok(new { ok = true, orderCode = result.ReleasedOrderCode });
     }

@@ -4,10 +4,10 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
-using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Utils;
-using Microsoft.EntityFrameworkCore;
+using EliteRestaurantPro.ApiClients;
+using EliteRestaurantPro.Services;
 
 namespace EliteRestaurantPro.ViewModels;
 
@@ -15,6 +15,7 @@ public sealed class ReservationsViewModel : AdminBaseViewModel
 {
     private bool _initialized;
     private readonly List<ReservationBooking> _allReservations = [];
+    private readonly AdminDataApiClient _data = new();
 
     private string _searchText = string.Empty;
     private string _selectedStatusFilter = "All";
@@ -241,14 +242,14 @@ public sealed class ReservationsViewModel : AdminBaseViewModel
     {
         OpenReservationDialogCommand = new RelayCommand(_ => OpenReservationDialog(), _ => CanManageReservations);
         EditReservationCommand = new RelayCommand(x => OpenEditReservation(x as ReservationBooking), _ => CanManageReservations);
-        SaveReservationCommand = new RelayCommand(_ => SaveReservation(), _ => CanManageReservations);
+        SaveReservationCommand = new RelayCommand(_ => _ = SaveReservationAsync(), _ => CanManageReservations);
         CancelReservationDialogCommand = new RelayCommand(_ => IsReservationDialogOpen = false);
-        ConfirmReservationCommand = new RelayCommand(x => UpdateReservationStatus(x as ReservationBooking, "Confirmed"), _ => CanManageReservations);
-        MarkArrivedCommand = new RelayCommand(x => UpdateReservationStatus(x as ReservationBooking, "Arrived"), _ => CanManageReservations);
-        MarkCompletedCommand = new RelayCommand(x => UpdateReservationStatus(x as ReservationBooking, "Completed"), _ => CanManageReservations);
-        MarkCancelledCommand = new RelayCommand(x => UpdateReservationStatus(x as ReservationBooking, "Cancelled"), _ => CanManageReservations);
-        MarkNoShowCommand = new RelayCommand(x => UpdateReservationStatus(x as ReservationBooking, "NoShow"), _ => CanManageReservations);
-        MarkPendingCommand = new RelayCommand(x => UpdateReservationStatus(x as ReservationBooking, "Pending"), _ => CanManageReservations);
+        ConfirmReservationCommand = new RelayCommand(x => _ = UpdateReservationStatusAsync(x as ReservationBooking, "Confirmed"), _ => CanManageReservations);
+        MarkArrivedCommand = new RelayCommand(x => _ = UpdateReservationStatusAsync(x as ReservationBooking, "Arrived"), _ => CanManageReservations);
+        MarkCompletedCommand = new RelayCommand(x => _ = UpdateReservationStatusAsync(x as ReservationBooking, "Completed"), _ => CanManageReservations);
+        MarkCancelledCommand = new RelayCommand(x => _ = UpdateReservationStatusAsync(x as ReservationBooking, "Cancelled"), _ => CanManageReservations);
+        MarkNoShowCommand = new RelayCommand(x => _ = UpdateReservationStatusAsync(x as ReservationBooking, "NoShow"), _ => CanManageReservations);
+        MarkPendingCommand = new RelayCommand(x => _ = UpdateReservationStatusAsync(x as ReservationBooking, "Pending"), _ => CanManageReservations);
 
         Log("ReservationsViewModel constructed.");
     }
@@ -275,33 +276,38 @@ public sealed class ReservationsViewModel : AdminBaseViewModel
                 .Select(r => r.Id)
                 .ToHashSet();
 
-            var snapshot = await Task.Run(() =>
+            Log("Cloud API query started.");
+            var tablesTask = _data.GetTablesAsync();
+            var reservationsTask = _data.GetReservationsAsync();
+            await Task.WhenAll(tablesTask, reservationsTask).ConfigureAwait(false);
+
+            var tableList = (await tablesTask.ConfigureAwait(false)).OrderBy(t => t.TableNumber).ToList();
+            var now = DateTime.Now;
+            var minDate = now.AddDays(-30);
+            var maxDate = now.AddDays(30);
+            var reservationList = (await reservationsTask.ConfigureAwait(false))
+                .Where(r => r.ReservedFor >= minDate && r.ReservedFor <= maxDate)
+                .OrderByDescending(r => r.ReservedFor)
+                .Take(120)
+                .ToList();
+
+            var tableById = tableList.ToDictionary(t => t.Id);
+            foreach (var r in reservationList)
             {
-                Log("Background DB query started.");
-                using var db = new AppDbContext();
-                var tables = db.Tables.AsNoTracking().OrderBy(t => t.TableNumber).ToList();
-                var now = DateTime.Now;
-                var minDate = now.AddDays(-30);
-                var maxDate = now.AddDays(30);
-                var reservations = db.Reservations
-                    .AsNoTracking()
-                    .Include(r => r.Table)
-                    .Where(r => r.ReservedFor >= minDate && r.ReservedFor <= maxDate)
-                    .OrderByDescending(r => r.ReservedFor)
-                    .Take(120)
-                    .ToList();
-                Log($"Background DB query finished. tables={tables.Count}, reservations={reservations.Count}");
-                return (tables, reservations);
-            });
+                if (r.TableId is int tid && tableById.TryGetValue(tid, out var t))
+                    r.Table = t;
+            }
+
+            Log($"Cloud API query finished. tables={tableList.Count}, reservations={reservationList.Count}");
 
             Tables.Clear();
-            foreach (var table in snapshot.tables)
+            foreach (var table in tableList)
                 Tables.Add(table);
 
             _allReservations.Clear();
-            foreach (var reservation in snapshot.reservations)
+            foreach (var reservation in reservationList)
                 reservation.IsExpanded = expandedIds.Contains(reservation.Id);
-            _allReservations.AddRange(snapshot.reservations);
+            _allReservations.AddRange(reservationList);
 
             ApplyReservationFilters();
             if (SelectedReservation is null && Reservations.Count > 0)
@@ -392,7 +398,7 @@ public sealed class ReservationsViewModel : AdminBaseViewModel
         IsReservationDialogOpen = true;
     }
 
-    private void SaveReservation()
+    private async Task SaveReservationAsync()
     {
         if (!CanManageReservations)
             return;
@@ -437,159 +443,201 @@ public sealed class ReservationsViewModel : AdminBaseViewModel
         if (!ReservationDepositPaid)
             depositAmount = 0m;
 
-        using var db = new AppDbContext();
-        var tableLookup = ReservationTableId.HasValue
-            ? db.Tables.AsNoTracking().SingleOrDefault(t => t.Id == ReservationTableId.Value)
-            : null;
-        if (ReservationTableId.HasValue && tableLookup is null)
+        try
         {
-            MessageBox.Show("Selected table no longer exists. Please select another table.", "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
-
-        if (tableLookup is not null && string.Equals(tableLookup.Status, "Maintenance", StringComparison.OrdinalIgnoreCase))
-        {
-            MessageBox.Show("This table is in Maintenance and cannot be assigned to a reservation.", "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
-
-        var customer = UpsertCustomerProfile(db, guestName, ReservationGuestPhone, ReservationChannel);
-        ReservationBooking reservation;
-        var previousDepositPaid = false;
-        var previousDepositAmount = 0m;
-        if (_editingReservationId is int reservationId)
-        {
-            reservation = db.Reservations.Single(r => r.Id == reservationId);
-            previousDepositPaid = reservation.DepositPaid;
-            previousDepositAmount = reservation.DepositAmountUsd;
-        }
-        else
-        {
-            reservation = new ReservationBooking
+            var tableLookup = ReservationTableId.HasValue
+                ? Tables.FirstOrDefault(t => t.Id == ReservationTableId.Value)
+                : null;
+            if (ReservationTableId.HasValue && tableLookup is null)
             {
-                UniqueId = UniqueIdGenerator.NewId("RSV"),
-                CreatedAt = DateTime.Now
-            };
-            db.Reservations.Add(reservation);
-        }
-
-        if (ReservationTableId.HasValue)
-        {
-            var windowLow = reservedFor.AddMinutes(-120);
-            var windowHigh = reservedFor.AddMinutes(120);
-            var blocked = db.Reservations.Any(r =>
-                r.Id != reservation.Id &&
-                r.TableId == ReservationTableId &&
-                (r.Status == "Pending" || r.Status == "Confirmed" || r.Status == "Arrived") &&
-                r.ReservedFor > windowLow &&
-                r.ReservedFor < windowHigh);
-
-            if (blocked)
-            {
-                MessageBox.Show("Selected table already has a nearby active booking. Choose another table.", "Table conflict", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Selected table no longer exists. Please select another table.", "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
+
+            if (tableLookup is not null && string.Equals(tableLookup.Status, "Maintenance", StringComparison.OrdinalIgnoreCase))
+            {
+                MessageBox.Show("This table is in Maintenance and cannot be assigned to a reservation.", "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            bool previousDepositPaid;
+            decimal previousDepositAmount;
+            ReservationBooking reservation;
+
+            if (_editingReservationId is int reservationId)
+            {
+                reservation = _allReservations.First(r => r.Id == reservationId);
+                previousDepositPaid = reservation.DepositPaid;
+                previousDepositAmount = reservation.DepositAmountUsd;
+            }
+            else
+            {
+                reservation = new ReservationBooking
+                {
+                    UniqueId = UniqueIdGenerator.NewId("RSV"),
+                    CreatedAt = DateTime.Now
+                };
+                previousDepositPaid = false;
+                previousDepositAmount = 0m;
+            }
+
+            if (ReservationTableId.HasValue)
+            {
+                var windowLow = reservedFor.AddMinutes(-120);
+                var windowHigh = reservedFor.AddMinutes(120);
+                var blocked = _allReservations.Any(r =>
+                    r.Id != reservation.Id &&
+                    r.TableId == ReservationTableId &&
+                    (r.Status == "Pending" || r.Status == "Confirmed" || r.Status == "Arrived") &&
+                    r.ReservedFor > windowLow &&
+                    r.ReservedFor < windowHigh);
+
+                if (blocked)
+                {
+                    MessageBox.Show("Selected table already has a nearby active booking. Choose another table.", "Table conflict", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+            }
+
+            var customer = await UpsertCustomerProfileCloudAsync(guestName, ReservationGuestPhone, ReservationChannel).ConfigureAwait(true);
+
+            reservation.CustomerProfileId = customer?.Id;
+            reservation.ReservationName = reservationName;
+            reservation.GuestName = guestName;
+            reservation.GuestPhone = (ReservationGuestPhone ?? string.Empty).Trim();
+            reservation.PartySize = partySize;
+            reservation.ReservedFor = reservedFor;
+            reservation.Channel = ReservationChannel;
+            reservation.Status = _editingReservationId.HasValue ? reservation.Status : "Pending";
+            reservation.UserNotes = ReservationNotes ?? string.Empty;
+            reservation.TableId = ReservationTableId;
+            reservation.DepositPaid = ReservationDepositPaid;
+            reservation.DepositAmountUsd = decimal.Round(depositAmount, 2);
+            reservation.DepositCurrencyCode = "USD";
+            reservation.DepositForfeited = reservation.Status == "NoShow" && reservation.DepositPaid && reservation.DepositAmountUsd > 0;
+            reservation.CreatedByEmployeeId = AppSession.StaffEmployeeId;
+            reservation.CreatedByName = SidebarUserDisplayName;
+            reservation.UpdatedAt = DateTime.Now;
+
+            DesktopCloudPersistence.PushUpsertBlocking(reservation);
+            await SyncDepositLedgerCloudAsync(reservation, previousDepositPaid, previousDepositAmount).ConfigureAwait(true);
+
+            IsReservationDialogOpen = false;
+            _ = LoadAllAsync();
         }
-
-        reservation.CustomerProfileId = customer?.Id;
-        reservation.ReservationName = reservationName;
-        reservation.GuestName = guestName;
-        reservation.GuestPhone = (ReservationGuestPhone ?? string.Empty).Trim();
-        reservation.PartySize = partySize;
-        reservation.ReservedFor = reservedFor;
-        reservation.Channel = ReservationChannel;
-        reservation.Status = _editingReservationId.HasValue ? reservation.Status : "Pending";
-        reservation.UserNotes = ReservationNotes ?? string.Empty;
-        reservation.TableId = ReservationTableId;
-        reservation.DepositPaid = ReservationDepositPaid;
-        reservation.DepositAmountUsd = decimal.Round(depositAmount, 2);
-        reservation.DepositCurrencyCode = "USD";
-        reservation.DepositForfeited = reservation.Status == "NoShow" && reservation.DepositPaid && reservation.DepositAmountUsd > 0;
-        reservation.CreatedByEmployeeId = AppSession.StaffEmployeeId;
-        reservation.CreatedByName = SidebarUserDisplayName;
-        reservation.UpdatedAt = DateTime.Now;
-        SyncDepositLedger(db, reservation, previousDepositPaid, previousDepositAmount);
-
-        db.SaveChanges();
-        IsReservationDialogOpen = false;
-        _ = LoadAllAsync();
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Could not save reservation in the cloud.\n\n{ex.Message}",
+                "Reservations",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
-    private void UpdateReservationStatus(ReservationBooking? reservation, string targetStatus)
+    private async Task UpdateReservationStatusAsync(ReservationBooking? reservation, string targetStatus)
     {
         if (!CanManageReservations || reservation is null)
             return;
 
-        using var db = new AppDbContext();
-        var existing = db.Reservations.SingleOrDefault(r => r.Id == reservation.Id);
-        if (existing is null)
-            return;
-
-        var previousStatus = existing.Status;
-        if (!CanTransition(existing, targetStatus, out var transitionError))
+        try
         {
-            MessageBox.Show(transitionError, "Reservation status", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
+            var existing = _allReservations.FirstOrDefault(r => r.Id == reservation.Id);
+            if (existing is null)
+                return;
 
-        existing.Status = targetStatus;
-        existing.UpdatedAt = DateTime.Now;
-        if (string.Equals(targetStatus, "NoShow", StringComparison.OrdinalIgnoreCase)
-            && existing.DepositPaid
-            && existing.DepositAmountUsd > 0)
-        {
-            existing.DepositForfeited = true;
-        }
-
-        SyncDepositLedger(db, existing, previousStatus == "NoShow" && existing.DepositPaid, existing.DepositAmountUsd);
-
-        if (existing.CustomerProfileId is int customerId)
-        {
-            var customer = db.CustomerProfiles.SingleOrDefault(c => c.Id == customerId);
-            if (customer is not null)
+            var previousStatus = existing.Status;
+            if (!CanTransition(existing, targetStatus, out var transitionError))
             {
-                if (!string.Equals(previousStatus, "NoShow", StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(targetStatus, "NoShow", StringComparison.OrdinalIgnoreCase))
-                    customer.NoShowCount += 1;
+                MessageBox.Show(transitionError, "Reservation status", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
 
-                if (!string.Equals(previousStatus, "Completed", StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(targetStatus, "Completed", StringComparison.OrdinalIgnoreCase))
+            existing.Status = targetStatus;
+            existing.UpdatedAt = DateTime.Now;
+            if (string.Equals(targetStatus, "NoShow", StringComparison.OrdinalIgnoreCase)
+                && existing.DepositPaid
+                && existing.DepositAmountUsd > 0)
+            {
+                existing.DepositForfeited = true;
+            }
+
+            await SyncDepositLedgerCloudAsync(existing, previousStatus == "NoShow" && existing.DepositPaid, existing.DepositAmountUsd).ConfigureAwait(true);
+
+            if (existing.CustomerProfileId is int customerId)
+            {
+                var profiles = await _data.GetCustomerProfilesAsync().ConfigureAwait(true);
+                var customer = profiles.FirstOrDefault(c => c.Id == customerId);
+                if (customer is not null)
                 {
-                    customer.CompletedReservationCount += 1;
-                    customer.LastVisitAt = DateTime.Now;
+                    if (!string.Equals(previousStatus, "NoShow", StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(targetStatus, "NoShow", StringComparison.OrdinalIgnoreCase))
+                        customer.NoShowCount += 1;
+
+                    if (!string.Equals(previousStatus, "Completed", StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(targetStatus, "Completed", StringComparison.OrdinalIgnoreCase))
+                    {
+                        customer.CompletedReservationCount += 1;
+                        customer.LastVisitAt = DateTime.Now;
+                    }
+
+                    DesktopCloudPersistence.PushUpsertBlocking(customer);
                 }
             }
-        }
 
-        db.SaveChanges();
-        _ = LoadAllAsync();
+            DesktopCloudPersistence.PushUpsertBlocking(existing);
+            _ = LoadAllAsync();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Could not update reservation in the cloud.\n\n{ex.Message}",
+                "Reservations",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
-    private static CustomerProfile? UpsertCustomerProfile(AppDbContext db, string guestName, string guestPhone, string channel)
+    private async Task<CustomerProfile?> UpsertCustomerProfileCloudAsync(string guestName, string guestPhone, string channel)
     {
         var normalizedPhone = (guestPhone ?? string.Empty).Trim();
         if (string.IsNullOrWhiteSpace(normalizedPhone))
             return null;
 
-        var existing = db.CustomerProfiles.FirstOrDefault(c => c.PrimaryPhone == normalizedPhone);
+        var profiles = await _data.GetCustomerProfilesAsync().ConfigureAwait(true);
+        var existing = profiles.FirstOrDefault(c =>
+            string.Equals(c.PrimaryPhone, normalizedPhone, StringComparison.Ordinal));
         if (existing is not null)
         {
+            var push = false;
             if (string.IsNullOrWhiteSpace(existing.FullName))
+            {
                 existing.FullName = guestName;
-            existing.PreferredContactChannel = channel;
+                push = true;
+            }
+
+            if (!string.Equals(existing.PreferredContactChannel ?? string.Empty, channel, StringComparison.Ordinal))
+            {
+                existing.PreferredContactChannel = channel;
+                push = true;
+            }
+
+            if (push)
+                DesktopCloudPersistence.PushUpsertBlocking(existing);
             return existing;
         }
 
+        var uniqueId = UniqueIdGenerator.NewId("CUS");
         var profile = new CustomerProfile
         {
-            UniqueId = UniqueIdGenerator.NewId("CUS"),
+            UniqueId = uniqueId,
             FullName = guestName,
             PrimaryPhone = normalizedPhone,
             PreferredContactChannel = channel
         };
-        db.CustomerProfiles.Add(profile);
-        db.SaveChanges();
-        return profile;
+        DesktopCloudPersistence.PushUpsertBlocking(profile);
+        profiles = await _data.GetCustomerProfilesAsync().ConfigureAwait(true);
+        return profiles.FirstOrDefault(c => c.UniqueId == uniqueId) ?? profile;
     }
 
     private static decimal ParseDecimalOrZero(string input)
@@ -686,20 +734,20 @@ public sealed class ReservationsViewModel : AdminBaseViewModel
         return true;
     }
 
-    private static void SyncDepositLedger(
-        AppDbContext db,
+    private async Task SyncDepositLedgerCloudAsync(
         ReservationBooking reservation,
         bool previousDepositPaid,
         decimal previousDepositAmountUsd)
     {
         var marker = $"|RSV:{reservation.UniqueId}|DEPOSIT|";
-        var existingTx = db.Transactions.SingleOrDefault(t => t.Justification.Contains(marker));
+        var txs = await _data.GetMoneyTransactionsAsync().ConfigureAwait(true);
+        var existingTx = txs.FirstOrDefault(t => t.Justification?.Contains(marker, StringComparison.Ordinal) == true);
         var hasDeposit = reservation.DepositPaid && reservation.DepositAmountUsd > 0m;
 
         if (!hasDeposit)
         {
             if (existingTx is not null)
-                db.Transactions.Remove(existingTx);
+                DesktopCloudPersistence.PushDeleteBlocking(existingTx);
             return;
         }
 
@@ -713,7 +761,7 @@ public sealed class ReservationsViewModel : AdminBaseViewModel
 
         if (existingTx is null)
         {
-            db.Transactions.Add(new MoneyTransaction
+            DesktopCloudPersistence.PushUpsertBlocking(new MoneyTransaction
             {
                 Amount = amountUsd,
                 AmountUsd = amountUsd,
@@ -730,9 +778,7 @@ public sealed class ReservationsViewModel : AdminBaseViewModel
         }
 
         if (previousDepositPaid && previousDepositAmountUsd > 0m && amountUsd != previousDepositAmountUsd)
-        {
             existingTx.Date = DateTime.Now;
-        }
 
         existingTx.Amount = amountUsd;
         existingTx.AmountUsd = amountUsd;
@@ -743,6 +789,7 @@ public sealed class ReservationsViewModel : AdminBaseViewModel
         existingTx.ExchangeRateUsed = CurrencyHelper.FcPerUsd;
         existingTx.IsFixed = false;
         existingTx.Justification = justification;
+        DesktopCloudPersistence.PushUpsertBlocking(existingTx);
     }
 
     private static void Log(string message)

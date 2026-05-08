@@ -1,14 +1,14 @@
 using System.Windows.Input;
-using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Staff;
 using EliteRestaurant.Core.Utils;
-using Microsoft.EntityFrameworkCore;
+using EliteRestaurantPro.ApiClients;
 
 namespace EliteRestaurantPro.ViewModels;
 
 public sealed class StaffLoginViewModel : BaseViewModel
 {
     private readonly Action<BaseViewModel> _navigate;
+    private readonly AuthApiClient _authApiClient = new();
     private string _staffId = string.Empty;
     private string _pin = string.Empty;
     private string _errorMessage = string.Empty;
@@ -69,11 +69,11 @@ public sealed class StaffLoginViewModel : BaseViewModel
     {
         _navigate = navigate;
         Kind = kind;
-        LoginCommand = new RelayCommand(_ => ExecuteLogin());
+        LoginCommand = new RelayCommand(async _ => await ExecuteLoginAsync());
         BackCommand = new RelayCommand(_ => navigate(new RoleSelectionViewModel(navigate)));
     }
 
-    private void ExecuteLogin()
+    private async Task ExecuteLoginAsync()
     {
         if (string.IsNullOrWhiteSpace(StaffId) || string.IsNullOrWhiteSpace(Pin))
         {
@@ -82,26 +82,53 @@ public sealed class StaffLoginViewModel : BaseViewModel
             return;
         }
 
-        using var db = new AppDbContext();
         var id = StaffId.Trim();
         var pin = Pin.Trim();
-        var idMatches = StaffPortalAuthentication
-            .QueryActiveEmployeesMatchingStaffId(db.Employees.AsNoTracking(), id)
-            .ToList();
-        var candidates = StaffPortalAuthentication.FilterPinMatches(idMatches, pin);
-        var emp = StaffPortalAuthentication.ResolvePortalCandidate(candidates, Kind);
-
-        if (emp is null)
+        var portal = Kind switch
         {
-            ErrorMessage = Kind switch
-            {
-                StaffPortalKind.Server =>
-                    "No active server matches this sign-in ID and PIN. Set role, Sign-in ID, and PIN in Admin → Employees.",
-                StaffPortalKind.KitchenBar =>
-                    "No active Chef / Barman / Sous Chef matches this sign-in ID and PIN. Assign Sign-in ID and PIN in Admin → Employees.",
-                _ =>
-                    "No active cashier matches this sign-in ID and PIN. Set role, Sign-in ID, and PIN in Admin → Employees."
-            };
+            StaffPortalKind.Cashier => "Cashier",
+            StaffPortalKind.KitchenBar => "KitchenBar",
+            _ => "Server"
+        };
+
+        EliteRestaurant.Contracts.Auth.CloudAuthResult auth;
+        try
+        {
+            auth = await _authApiClient.LoginAsync(id, pin, portal);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Cloud login failed: {ex.GetBaseException().Message}";
+            HasError = true;
+            return;
+        }
+
+        var login = auth.Response;
+        if (login is null)
+        {
+            ErrorMessage = !string.IsNullOrWhiteSpace(auth.ErrorMessage)
+                ? auth.ErrorMessage
+                : Kind switch
+                {
+                    StaffPortalKind.Server =>
+                        "No active server matches this sign-in ID and PIN. Set role, Sign-in ID, and PIN in Admin → Employees.",
+                    StaffPortalKind.KitchenBar =>
+                        "No active Chef / Barman / Sous Chef matches this sign-in ID and PIN. Assign Sign-in ID and PIN in Admin → Employees.",
+                    _ =>
+                        "No active cashier matches this sign-in ID and PIN. Set role, Sign-in ID, and PIN in Admin → Employees."
+                };
+            HasError = true;
+            return;
+        }
+
+        var sessionPortal = string.IsNullOrWhiteSpace(login.Portal)
+            ? StaffPortalAuthentication.CanonicalPortalForRole(login.Role)
+            : login.Portal.Trim();
+
+        if (!string.Equals(sessionPortal, portal, StringComparison.OrdinalIgnoreCase))
+        {
+            ErrorMessage =
+                $"This account is not set up for this workspace. The cloud session is for portal “{sessionPortal}”, but you chose “{portal}”. Use the matching role tile or update the employee’s role in Admin → Employees.";
             HasError = true;
             return;
         }
@@ -109,17 +136,17 @@ public sealed class StaffLoginViewModel : BaseViewModel
         HasError = false;
         if (Kind == StaffPortalKind.Server)
         {
-            AppSession.BeginServerSession(emp.Id, emp.Name, emp.ProfileImagePath);
+            AppSession.BeginServerSession(login.EmployeeId, login.Name);
             _navigate(new CreateOrderViewModel(_navigate));
         }
         else if (Kind == StaffPortalKind.KitchenBar)
         {
-            AppSession.BeginKitchenBarSession(emp.Id, emp.Name, emp.ProfileImagePath);
+            AppSession.BeginKitchenBarSession(login.EmployeeId, login.Name);
             _navigate(new KitchenOrdersViewModel(_navigate));
         }
         else
         {
-            AppSession.BeginCashierSession(emp.Id, emp.Name, emp.ProfileImagePath);
+            AppSession.BeginCashierSession(login.EmployeeId, login.Name);
             _navigate(new AdminOrdersViewModel(_navigate));
         }
     }

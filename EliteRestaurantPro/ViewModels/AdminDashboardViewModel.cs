@@ -6,7 +6,7 @@ using System.Windows.Threading;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Utils;
-using Microsoft.EntityFrameworkCore;
+using EliteRestaurantPro.ApiClients;
 
 namespace EliteRestaurantPro.ViewModels;
 
@@ -172,61 +172,70 @@ public class AdminDashboardViewModel : AdminBaseViewModel
 
     private void OpenFromActivity(ActivityItem? activity)
     {
-        if (activity is null)
-        {
-            OpenDrilldown(DashboardDrilldownType.RecentActivity);
-            return;
-        }
-
-        switch (activity.NavigationTarget)
-        {
-            case DashboardActivityNav.Orders:
-                NavigateAction(new AdminOrdersViewModel(NavigateAction));
-                return;
-            case DashboardActivityNav.Attendance:
-                NavigateAction(new AttendanceViewModel(NavigateAction));
-                return;
-            case DashboardActivityNav.Inventory:
-                NavigateAction(new InventoryViewModel(NavigateAction));
-                return;
-            case DashboardActivityNav.Money:
-                NavigateAction(new MoneyViewModel(NavigateAction));
-                return;
-        }
-
-        if (activity.Title.StartsWith("ORD-", StringComparison.OrdinalIgnoreCase) ||
-            activity.Title.StartsWith("Order", StringComparison.OrdinalIgnoreCase))
-        {
-            NavigateAction(new AdminOrdersViewModel(NavigateAction));
-        }
-        else if (activity.Description.Contains("Clocked", StringComparison.OrdinalIgnoreCase))
-        {
-            NavigateAction(new AttendanceViewModel(NavigateAction));
-        }
-        else
-        {
-            OpenDrilldown(DashboardDrilldownType.RecentActivity);
-        }
+        OpenDrilldown(DashboardDrilldownType.RecentActivity);
     }
 
     private async Task LoadDashboardDataAsync()
     {
         try
         {
-            var snapshot = await Task.Run(() =>
+            var snapshot = await Task.Run(async () =>
             {
-                using var db = new AppDbContext();
                 var dbOk = true;
+                var today = DateTime.Today;
+                var data = new AdminDataApiClient();
+                List<OrderRecord> allOrders;
+                List<Table> dbTablesSnapshot;
+                List<Product> products;
+                List<OrderItem> orderItems;
+                List<InventoryItem> inventorySnapshot;
+                List<Employee> employeesSnapshot;
+                List<EmployeeAttendance> attendancesSnapshot;
+                List<MoneyTransaction> allMoneyRows;
+                List<PayrollPaymentRecord> payrollSnapshot;
                 try
                 {
-                    db.Database.CanConnect();
+                    var ordersTask = data.GetOrdersAsync();
+                    var tablesTask = data.GetTablesAsync();
+                    var productsTask = data.GetProductsAsync();
+                    var inventoryTask = data.GetInventoryItemsAsync();
+                    var employeesTask = data.GetEmployeesAsync();
+                    var attendanceTask = data.GetAttendanceAsync();
+                    var moneyTask = data.GetMoneyTransactionsAsync();
+                    var payrollTask = data.GetPayrollAsync();
+                    await Task.WhenAll(
+                        ordersTask,
+                        tablesTask,
+                        productsTask,
+                        inventoryTask,
+                        employeesTask,
+                        attendanceTask,
+                        moneyTask,
+                        payrollTask).ConfigureAwait(false);
+                    allOrders = (await ordersTask.ConfigureAwait(false)).ToList();
+                    dbTablesSnapshot = (await tablesTask.ConfigureAwait(false)).ToList();
+                    products = (await productsTask.ConfigureAwait(false)).ToList();
+                    inventorySnapshot = (await inventoryTask.ConfigureAwait(false)).ToList();
+                    employeesSnapshot = (await employeesTask.ConfigureAwait(false)).ToList();
+                    attendancesSnapshot = (await attendanceTask.ConfigureAwait(false)).ToList();
+                    allMoneyRows = (await moneyTask.ConfigureAwait(false)).ToList();
+                    payrollSnapshot = (await payrollTask.ConfigureAwait(false)).ToList();
+                    orderItems = allOrders.SelectMany(o => o.Items).ToList();
                 }
                 catch
                 {
                     dbOk = false;
+                    allOrders = [];
+                    dbTablesSnapshot = [];
+                    products = [];
+                    orderItems = [];
+                    inventorySnapshot = [];
+                    employeesSnapshot = [];
+                    attendancesSnapshot = [];
+                    allMoneyRows = [];
+                    payrollSnapshot = [];
                 }
 
-                var today = DateTime.Today;
                 var (attendanceTodayStartUtc, attendanceTodayEndExclusiveUtc) = AttendanceCalendar.DayRangeUtc(today);
                 var tomorrow = today.AddDays(1);
                 var yesterday = today.AddDays(-1);
@@ -235,17 +244,6 @@ public class AdminDashboardViewModel : AdminBaseViewModel
                     "Waiting", "In Kitchen", "Ready", OrderWorkflow.Served, OrderWorkflow.PendingCashier
                 };
 
-                var allOrders = db.Orders.AsNoTracking().ToList();
-                var todaysOrders = allOrders
-                    .Where(o => o.CreatedAt >= today && o.CreatedAt < tomorrow && !string.Equals(o.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
-                    .OrderByDescending(o => o.CreatedAt)
-                    .ToList();
-                var yesterdaysOrders = allOrders
-                    .Where(o => o.CreatedAt >= yesterday && o.CreatedAt < today && !string.Equals(o.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-
-                var products = db.Products.AsNoTracking().ToList();
-                var orderItems = db.OrderItems.AsNoTracking().ToList();
                 var productPriceById = products.ToDictionary(p => p.Id, p => p.Price);
 
                 var orderTotals = orderItems
@@ -260,11 +258,16 @@ public class AdminDashboardViewModel : AdminBaseViewModel
                 static bool IsCompleted(OrderRecord o)
                     => string.Equals(o.Status, "Completed", StringComparison.OrdinalIgnoreCase);
 
-                MoneyDashboardTotals.EnsureSaleRevenueBackfill(db);
                 var moneyWindowStart = today.AddDays(-6);
-                var txMoneyWindow = db.Transactions
-                    .AsNoTracking()
+                var txMoneyWindow = allMoneyRows
                     .Where(t => t.Date >= moneyWindowStart && t.Date < tomorrow)
+                    .ToList();
+                var todaysOrders = allOrders
+                    .Where(o => o.CreatedAt >= today && o.CreatedAt < tomorrow && !string.Equals(o.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(o => o.CreatedAt)
+                    .ToList();
+                var yesterdaysOrders = allOrders
+                    .Where(o => o.CreatedAt >= yesterday && o.CreatedAt < today && !string.Equals(o.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
                     .ToList();
                 var txToday = txMoneyWindow.Where(t => t.Date >= today).ToList();
                 var txYesterday = txMoneyWindow.Where(t => t.Date >= yesterday && t.Date < today).ToList();
@@ -301,12 +304,12 @@ public class AdminDashboardViewModel : AdminBaseViewModel
 
                 var activeOrdersCount = allOrders.Count(o => activeStatuses.Contains(o.Status));
                 var inKitchenCount = allOrders.Count(o => string.Equals(o.Status, "In Kitchen", StringComparison.OrdinalIgnoreCase));
-                var lowStockAlerts = db.InventoryItems.AsNoTracking().Count(i => i.StockQuantity <= 10);
-                var totalActiveEmployees = db.Employees.AsNoTracking().Count(e => e.EmploymentStatus == "Active");
-                var clockedInCount = db.EmployeeAttendances.AsNoTracking().Count(a =>
+                var lowStockAlerts = inventorySnapshot.Count(i => i.StockQuantity <= 10);
+                var totalActiveEmployees = employeesSnapshot.Count(e => e.EmploymentStatus == "Active");
+                var clockedInCount = attendancesSnapshot.Count(a =>
                     a.WorkDate >= attendanceTodayStartUtc && a.WorkDate < attendanceTodayEndExclusiveUtc && a.ClockInTime != null);
-                var occupiedTables = db.Tables.AsNoTracking().Count(t => t.Status == "Occupied");
-                var totalTables = db.Tables.AsNoTracking().Count();
+                var occupiedTables = dbTablesSnapshot.Count(t => t.Status == "Occupied");
+                var totalTables = dbTablesSnapshot.Count;
 
                 var weekStart = today.AddDays(-(((int)today.DayOfWeek + 6) % 7));
                 var weekDays = Enumerable.Range(0, 5).Select(i => weekStart.AddDays(i)).ToList();
@@ -345,7 +348,7 @@ public class AdminDashboardViewModel : AdminBaseViewModel
                     .ToList();
                 var maxDishQty = topDishes.Count == 0 ? 1 : topDishes.Max(d => d.Qty);
 
-                var inventoryItems = db.InventoryItems.AsNoTracking().OrderBy(i => i.Name).ToList();
+                var inventoryItems = inventorySnapshot.OrderBy(i => i.Name).ToList();
                 var criticalAlerts = new List<DashboardAlertItem>();
                 var reorderAlerts = new List<DashboardAlertItem>();
                 foreach (var item in inventoryItems)
@@ -376,13 +379,13 @@ public class AdminDashboardViewModel : AdminBaseViewModel
                     }
                 }
 
-                var todayAttendance = db.EmployeeAttendances
-                    .AsNoTracking()
+                var todayAttendance = attendancesSnapshot
                     .Where(a => a.WorkDate >= attendanceTodayStartUtc && a.WorkDate < attendanceTodayEndExclusiveUtc)
                     .ToDictionary(a => a.EmployeeId, a => a);
 
-                var staffPresence = db.Employees
-                    .AsNoTracking()
+                var employeesById = employeesSnapshot.ToDictionary(e => e.Id);
+
+                var staffPresence = employeesSnapshot
                     .Where(e => e.EmploymentStatus == "Active")
                     .OrderBy(e => e.Name)
                     .ToList()
@@ -397,7 +400,11 @@ public class AdminDashboardViewModel : AdminBaseViewModel
                 List<ActivityItem> activities;
                 try
                 {
-                    activities = DashboardDrilldownViewModel.BuildRecentActivities(db);
+                    activities = DashboardDrilldownViewModel.BuildRecentActivities(
+                        allOrders,
+                        attendancesSnapshot,
+                        employeesById,
+                        inventorySnapshot);
                 }
                 catch
                 {
@@ -440,10 +447,8 @@ public class AdminDashboardViewModel : AdminBaseViewModel
                     })
                     .ToList();
 
-                var lowStockItems = db.InventoryItems
-                    .AsNoTracking()
+                var lowStockItems = inventorySnapshot
                     .Where(i => i.StockQuantity <= 10)
-                    .ToList()
                     .OrderBy(i => i.StockQuantity)
                     .ThenBy(i => i.Name)
                     .Select(item => new DashboardDrilldownItem
@@ -456,19 +461,21 @@ public class AdminDashboardViewModel : AdminBaseViewModel
                     })
                     .ToList();
 
-                var attendanceItems = db.EmployeeAttendances
-                    .AsNoTracking()
-                    .Include(a => a.Employee)
+                var attendanceItems = attendancesSnapshot
                     .Where(a =>
                         a.WorkDate >= attendanceTodayStartUtc && a.WorkDate < attendanceTodayEndExclusiveUtc && a.ClockInTime != null)
                     .OrderBy(a => a.ClockInTime)
-                    .Select(row => new DashboardDrilldownItem
+                    .Select(row =>
                     {
-                        Title = row.Employee != null ? row.Employee.Name : "Unknown Employee",
-                        Subtitle = row.Employee != null ? row.Employee.UniqueId : string.Empty,
-                        Detail = $"Clock In: {row.ClockInTime:HH:mm} · Clock Out: {(row.ClockOutTime.HasValue ? row.ClockOutTime.Value.ToString("HH:mm") : "Not clocked out")}",
-                        Meta = string.IsNullOrWhiteSpace(row.ClockInStatus) ? "Status: Pending" : $"Status: {row.ClockInStatus}",
-                        AccentColor = row.ClockInStatus == "Late" ? "#F44336" : "#2196F3"
+                        var emp = employeesById.TryGetValue(row.EmployeeId, out var e) ? e : null;
+                        return new DashboardDrilldownItem
+                        {
+                            Title = emp != null ? emp.Name : "Unknown Employee",
+                            Subtitle = emp != null ? emp.UniqueId : string.Empty,
+                            Detail = $"Clock In: {row.ClockInTime:HH:mm} · Clock Out: {(row.ClockOutTime.HasValue ? row.ClockOutTime.Value.ToString("HH:mm") : "Not clocked out")}",
+                            Meta = string.IsNullOrWhiteSpace(row.ClockInStatus) ? "Status: Pending" : $"Status: {row.ClockInStatus}",
+                            AccentColor = row.ClockInStatus == "Late" ? "#F44336" : "#2196F3"
+                        };
                     })
                     .ToList();
 
@@ -503,7 +510,11 @@ public class AdminDashboardViewModel : AdminBaseViewModel
                     })
                     .ToList();
 
-                var salaryOverdue = FinancialTransactionService.GetSalaryOverdueState(db, DateTime.Now);
+                var salaryOverdue = FinancialTransactionService.GetSalaryOverdueState(
+                    DateTime.Now,
+                    employeesSnapshot,
+                    payrollSnapshot,
+                    allMoneyRows);
 
                 return new
                 {
@@ -552,7 +563,7 @@ public class AdminDashboardViewModel : AdminBaseViewModel
             await Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 DatabaseConnected = snapshot.dbOk;
-                DatabaseStatusText = snapshot.dbOk ? "PostgreSQL · Connected" : "PostgreSQL · Offline";
+                DatabaseStatusText = snapshot.dbOk ? "Cloud API · Connected" : "Cloud API · Offline";
 
                 ShowSalaryPayrollWarning = snapshot.salaryWarningShow;
                 SalaryPayrollWarningText = snapshot.salaryWarningMessage;
@@ -648,7 +659,7 @@ public class AdminDashboardViewModel : AdminBaseViewModel
             await Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 DatabaseConnected = false;
-                DatabaseStatusText = "Local database · Error";
+                DatabaseStatusText = "Cloud API · Error";
                 OnPropertyChanged(nameof(DatabaseConnected));
                 OnPropertyChanged(nameof(DatabaseStatusText));
                 RecentActivities.Clear();

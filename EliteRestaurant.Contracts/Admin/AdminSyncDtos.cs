@@ -30,6 +30,14 @@ public sealed record AdminEntityListResponse(
     IReadOnlyList<JsonElement> Items,
     DateTime SnapshotAtUtc);
 
+/// <summary>Single response for desktop Create Order — one HTTP round-trip vs four separate list calls.</summary>
+public sealed record AdminCreateOrderCatalogBundleResponse(
+    IReadOnlyList<JsonElement> Tables,
+    IReadOnlyList<JsonElement> Products,
+    IReadOnlyList<JsonElement> Reservations,
+    IReadOnlyList<JsonElement> Orders,
+    DateTime SnapshotAtUtc);
+
 public sealed record AdminCloudSettingsRequest(
     string RestaurantName,
     string Phone,

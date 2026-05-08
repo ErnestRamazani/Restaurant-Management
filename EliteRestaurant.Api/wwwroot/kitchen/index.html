@@ -1,0 +1,1263 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Elite Kitchen / Bar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --navy: #0f1923;
+      --cream: #f7f5f0;
+      --amber: #f59e0b;
+      --amber-dim: #d97706;
+      --text-dark: #1f2937;
+      --text-muted: #64748b;
+      --radius: 12px;
+      --waiting: #2196f3;
+      --kitchen: #ff9800;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Plus Jakarta Sans", system-ui, -apple-system, Segoe UI, sans-serif;
+      background: var(--navy);
+      color: #e8eef4;
+    }
+    .layout { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+    .sidebar {
+      border-right: 1px solid #1e293b;
+      background: var(--navy);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .brand { font-weight: 700; font-size: 15px; letter-spacing: 0.04em; color: var(--amber); }
+    .brand-sub { font-size: 11px; color: #94a3b8; line-height: 1.4; margin-top: 6px; }
+    .nav-btn {
+      width: 100%; text-align: left; padding: 12px 14px; min-height: 44px;
+      border: none; border-radius: var(--radius); border-left: 3px solid transparent;
+      background: transparent; color: #6b7280; cursor: pointer; font-family: inherit; font-size: 14px;
+    }
+    .nav-btn:hover { color: #d1d5db; background: rgba(255,255,255,0.04); }
+    .nav-btn.active { border-left-color: var(--amber); background: rgba(245,158,11,0.1); color: #fff; font-weight: 600; }
+    .who { margin-top: auto; border-top: 1px solid #334155; padding-top: 12px; font-size: 12px; color: #94a3b8; }
+    #sessionLabel { font-weight: 600; color: #d1d5db; font-size: 13px; word-break: break-word; }
+    .staff-role-chip {
+      font-size: 0.68rem; background: #374151; color: #9ca3af; padding: 2px 8px; border-radius: 4px;
+      text-transform: uppercase; letter-spacing: 0.06em; display: inline-block; margin-top: 6px;
+    }
+    #app .main-area {
+      padding: 12px 16px 20px;
+      min-height: 100vh;
+      background: var(--cream);
+      color: var(--text-dark);
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    #loginWrap.main-area {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    #loginWrap .card {
+      max-width: 420px; width: 100%;
+      border: 1px solid #e5e7eb; border-radius: var(--radius); background: #fff;
+      padding: 22px; color: var(--text-dark);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.08);
+    }
+    #loginWrap h1 { margin: 0 0 8px; font-size: 1.35rem; }
+    #loginWrap .lead { color: var(--text-muted); font-size: 14px; margin: 0 0 18px; line-height: 1.5; }
+    label { display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.12em; color: #64748b; margin-bottom: 6px; }
+    input {
+      width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid #d1d5db; border-radius: var(--radius);
+      font-family: inherit; font-size: 15px; margin-bottom: 14px;
+    }
+    .btn {
+      min-height: 44px; padding: 0 16px; border-radius: var(--radius); font-family: inherit; font-weight: 600;
+      font-size: 14px; cursor: pointer; border: none;
+    }
+    .btn-primary { background: var(--amber); color: #111827; }
+    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-ghost { background: #f1f5f9; color: var(--text-dark); border: 1px solid #e2e8f0; }
+    .btn-block { width: 100%; }
+    .hidden { display: none !important; }
+    .muted { color: var(--text-muted); font-size: 12px; }
+    .danger { color: #dc2626; background: #fef2f2; border: 1px solid #fecaca; padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+    .toolbar-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-end; flex: 1; min-width: 200px; }
+    .search-field {
+      flex: 1; min-width: 160px; max-width: 360px; min-height: 44px; padding: 0 14px;
+      border: 1px solid #d1d5db; border-radius: var(--radius); font-family: inherit; font-size: 15px;
+      background: #fff; color: var(--text-dark);
+    }
+    .search-field::placeholder { color: #94a3b8; }
+    .toolbar h2 { margin: 0; font-size: 1.15rem; }
+    .hub-pill {
+      font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em;
+      padding: 4px 10px; border-radius: 999px; font-weight: 600;
+    }
+    .hub-pill.ok { background: #d1fae5; color: #065f46; }
+    .hub-pill.warn { background: #fef3c7; color: #92400e; }
+    .hub-pill.off { background: #e5e7eb; color: #4b5563; }
+    .kanban {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+      flex: 1;
+      min-height: 280px;
+      align-items: stretch;
+    }
+    .queue-col--ready h3 .dot { background: #4caf50; }
+    @media (max-width: 1100px) {
+      .kanban { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { flex-direction: row; flex-wrap: wrap; align-items: center; border-right: none; border-bottom: 1px solid #1e293b; }
+      .who { width: 100%; }
+      .kanban { grid-template-columns: 1fr; }
+    }
+    .queue-col {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: var(--radius);
+      display: flex;
+      flex-direction: column;
+      min-height: 220px;
+      overflow: hidden;
+    }
+    .queue-col h3 {
+      margin: 0; padding: 12px 14px; font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase;
+      border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between;
+    }
+    .queue-col h3 .dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; }
+    .queue-col--waiting h3 .dot { background: var(--waiting); }
+    .queue-col--prep h3 .dot { background: var(--kitchen); }
+    .queue-body { flex: 1; overflow-y: auto; max-height: min(70vh, 920px); min-height: 52vh; -webkit-overflow-scrolling: touch; }
+    .ticket {
+      padding: 12px 14px; border-bottom: 1px solid #f1f5f9; cursor: pointer; transition: background 0.12s;
+    }
+    .ticket:hover { background: #fafafa; }
+    .ticket.selected { background: rgba(245,158,11,0.12); border-left: 3px solid var(--amber); padding-left: 11px; }
+    .ticket-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+    .ticket-code { font-weight: 700; font-size: 15px; }
+    .ticket-time { font-size: 12px; color: var(--text-muted); }
+    .ticket-meta { font-size: 12px; color: #475569; margin-top: 4px; line-height: 1.35; }
+    .ticket-lines { font-size: 12px; color: var(--text-muted); margin-top: 6px; max-height: 2.6em; overflow: hidden; }
+    .empty-col { padding: 24px; text-align: center; color: var(--text-muted); font-size: 14px; }
+    .detail-card {
+      background: #fff; border: 1px solid #e5e7eb; border-radius: var(--radius); padding: 16px;
+    }
+    .detail-card h4 { margin: 0 0 12px; font-size: 1rem; }
+    .detail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; font-size: 13px; margin-bottom: 12px; }
+    .detail-grid div span { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 2px; }
+    .line-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .line-table th { text-align: left; padding: 8px 6px; border-bottom: 1px solid #e5e7eb; color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; }
+    .line-table td { padding: 10px 6px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+    .actions-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid #e5e7eb; }
+    .btn-waiting { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
+    .btn-ready { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+    .mono { font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+    .view-panel { flex: 1; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+    .nav-stack { display: flex; flex-direction: column; gap: 6px; }
+    .sort-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .sort-bar .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
+    .sort-btn {
+      padding: 8px 12px; border-radius: 8px; border: 1px solid #e2e8f0; background: #fff;
+      font-family: inherit; font-size: 13px; cursor: pointer; color: var(--text-dark);
+    }
+    .sort-btn:hover { background: #f8fafc; }
+    .sort-btn.active { border-color: var(--amber); background: rgba(245,158,11,0.12); font-weight: 600; }
+    .menu-section { margin-bottom: 18px; }
+    .menu-section h3 { margin: 0 0 10px; font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; }
+    .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+    .menu-card {
+      background: #fff; border: 1px solid #e5e7eb; border-radius: var(--radius); padding: 12px 14px;
+      font-size: 13px; line-height: 1.4;
+      display: grid; grid-template-columns: 76px 1fr; gap: 12px; align-items: start;
+    }
+    .menu-card-text { min-width: 0; }
+    .menu-thumb {
+      width: 76px; height: 76px; border-radius: 10px; overflow: hidden;
+      background: linear-gradient(145deg, #e2e8f0, #f8fafc); flex-shrink: 0;
+    }
+    .menu-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .menu-thumb img.hidden { display: none !important; }
+    .menu-thumb-ph {
+      width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+      font-size: 1.35rem; opacity: 0.4;
+    }
+    .menu-thumb-ph.hidden { display: none !important; }
+    .menu-card .title { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+    .menu-card .price { color: var(--amber-dim); font-weight: 600; margin-bottom: 8px; }
+    .menu-card .ing { font-size: 12px; color: var(--text-muted); }
+    .inv-list { display: flex; flex-direction: column; gap: 10px; max-height: min(72vh, 940px); overflow-y: auto; }
+    .inv-card {
+      background: #fff; border: 1px solid #e5e7eb; border-radius: var(--radius); padding: 12px 14px;
+      display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: start; font-size: 13px;
+    }
+    .inv-card .name { font-weight: 700; font-size: 15px; }
+    .inv-card .meta { color: var(--text-muted); font-size: 12px; margin-top: 4px; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; margin-right: 6px; }
+    .badge-exp-expired { background: #fef2f2; color: #991b1b; }
+    .badge-exp-critical { background: #fff7ed; color: #c2410c; }
+    .badge-exp-bad { background: #fefce8; color: #a16207; }
+    .badge-exp-good { background: #ecfdf5; color: #047857; }
+    .badge-exp-none { background: #f1f5f9; color: #64748b; }
+    .badge-qty-out { background: #fef2f2; color: #991b1b; }
+    .badge-qty-critical { background: #fff7ed; color: #c2410c; }
+    .badge-qty-low { background: #fefce8; color: #a16207; }
+    .badge-qty-ok { background: #ecfdf5; color: #047857; }
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(15,24,35,0.45); display: flex; align-items: center; justify-content: center;
+      padding: 16px; z-index: 200;
+    }
+    .modal-backdrop.hidden { display: none !important; }
+    .modal-card {
+      background: #fff; color: var(--text-dark); border-radius: var(--radius); max-width: 420px; width: 100%;
+      padding: 20px 22px; box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+    }
+    .modal-card h3 { margin: 0 0 12px; font-size: 1.05rem; }
+    .modal-card label { color: #64748b; }
+    .modal-card .row { margin-bottom: 12px; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap; }
+    .modal-actions .btn { min-width: 100px; }
+  </style>
+</head>
+<body>
+  <div id="loginWrap" class="main-area">
+    <div class="card">
+      <h1>Kitchen / Bar</h1>
+      <p class="lead">Sign in with your kitchen or bar station ID. Receive tickets into prep, then mark ready for server pickup.</p>
+      <div id="loginErr" class="danger hidden"></div>
+      <label for="staffId">Sign-in ID</label>
+      <input id="staffId" type="text" autocomplete="username">
+      <label for="pin">PIN</label>
+      <input id="pin" type="password" autocomplete="current-password">
+      <button type="button" class="btn btn-primary btn-block" id="btnLogin">Sign in</button>
+      <p class="muted" style="margin-top:14px;">Use the same credentials as the desktop Kitchen / Bar role. Open this page from your API host so login can reach <span class="mono">/api</span>.</p>
+    </div>
+  </div>
+
+  <div id="app" class="layout hidden">
+    <aside class="sidebar">
+      <div>
+        <div class="brand">ELITE KITCHEN</div>
+        <div class="brand-sub">Queue &amp; prep workspace — aligned with the desktop kitchen flow.</div>
+      </div>
+      <div class="nav-stack">
+        <button type="button" class="nav-btn active" id="navQueue" data-view="queue">Queue</button>
+        <button type="button" class="nav-btn" id="navMenu" data-view="menu">Menu</button>
+        <button type="button" class="nav-btn" id="navInventory" data-view="inventory">Inventory</button>
+      </div>
+      <div class="who">
+        <div id="sessionLabel"></div>
+        <span class="staff-role-chip" id="roleChip"></span>
+        <button type="button" class="btn btn-ghost btn-block" id="btnLogout" style="margin-top:12px;">Sign out</button>
+      </div>
+    </aside>
+    <main class="main-area">
+      <div id="viewQueue" class="view-panel">
+        <div class="toolbar">
+          <h2>Ticket queue</h2>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+            <span id="hubStatus" class="hub-pill off">Live: …</span>
+            <span id="lastUpdated" class="muted"></span>
+            <button type="button" class="btn btn-ghost" id="btnRefresh">Refresh</button>
+          </div>
+        </div>
+        <div class="kanban">
+          <div class="queue-col queue-col--waiting">
+            <h3><span style="display:flex;align-items:center;"><span class="dot"></span> Incoming</span><span id="countWaiting" class="muted">0</span></h3>
+            <div class="queue-body" id="listWaiting"></div>
+          </div>
+          <div class="queue-col queue-col--prep">
+            <h3><span style="display:flex;align-items:center;"><span class="dot"></span> In kitchen</span><span id="countPrep" class="muted">0</span></h3>
+            <div class="queue-body" id="listPrep"></div>
+          </div>
+          <div class="queue-col queue-col--ready">
+            <h3><span style="display:flex;align-items:center;"><span class="dot"></span> Picked up</span><span id="countReady" class="muted">0</span></h3>
+            <div class="queue-body" id="listReady"></div>
+          </div>
+        </div>
+        <div class="detail-card" id="detailPane">
+          <h4>Ticket detail</h4>
+        <p id="detailEmpty" class="muted">Select a ticket from Incoming, In kitchen, or Picked up to view items and notes.</p>
+        <div id="detailContent" class="hidden">
+          <div class="detail-grid">
+            <div><span>Code</span><strong id="dCode"></strong></div>
+            <div><span>Table</span><span id="dTable"></span></div>
+            <div><span>Server</span><span id="dServer"></span></div>
+            <div><span>Status</span><span id="dStatus"></span></div>
+            <div><span>Created</span><span id="dTime"></span></div>
+            <div><span>Grand total</span><strong id="dTotal"></strong></div>
+          </div>
+          <div>
+            <span class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;">Customer notes</span>
+            <p id="dCust" style="margin:6px 0 10px;font-size:13px;"></p>
+            <span class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;">Allergy notes</span>
+            <p id="dAllergy" style="margin:6px 0 0;font-size:13px;"></p>
+          </div>
+          <table class="line-table" style="margin-top:14px;">
+            <thead><tr><th>Item</th><th>Qty</th><th>Station</th></tr></thead>
+            <tbody id="dLines"></tbody>
+          </table>
+          <div class="actions-row" id="detailActions"></div>
+        </div>
+      </div>
+      </div>
+
+      <div id="viewMenu" class="view-panel hidden">
+        <div class="toolbar">
+          <h2>Menu</h2>
+          <div class="toolbar-row">
+            <input type="search" id="menuSearch" class="search-field" placeholder="Search menu…" autocomplete="off">
+            <button type="button" class="btn btn-ghost" id="btnRefreshMenu">Refresh</button>
+          </div>
+        </div>
+        <p class="muted" style="margin:0;">Products, photos when stored for the public menu, and linked inventory ingredients (read-only).</p>
+        <div id="menuBody"></div>
+      </div>
+
+      <div id="viewInventory" class="view-panel hidden">
+        <div class="toolbar">
+          <h2>Inventory</h2>
+          <div class="toolbar-row">
+            <input type="search" id="invSearch" class="search-field" placeholder="Search inventory…" autocomplete="off">
+            <button type="button" class="btn btn-ghost" id="btnRefreshInventory">Refresh</button>
+          </div>
+        </div>
+        <div class="sort-bar">
+          <span class="label">Sort</span>
+          <button type="button" class="sort-btn active" data-sort="name" id="sortName">Name (A–Z)</button>
+          <button type="button" class="sort-btn" data-sort="expiration" id="sortExpiration">Expiration</button>
+          <button type="button" class="sort-btn" data-sort="quantity" id="sortQuantity">Quantity</button>
+        </div>
+        <p class="muted" style="margin:0;">Add or deduct stock with a justification (same audit trail as admin desktop).</p>
+        <div id="invBody" class="inv-list"></div>
+      </div>
+    </main>
+  </div>
+
+  <div id="adjustModal" class="modal-backdrop hidden" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-labelledby="adjTitle">
+      <h3 id="adjTitle">Adjust stock</h3>
+      <p id="adjItemLabel" class="muted" style="margin:0 0 12px;"></p>
+      <div class="row">
+        <label for="adjType">Type</label>
+        <select id="adjType" style="width:100%;min-height:44px;border:1px solid #d1d5db;border-radius:var(--radius);padding:0 10px;font-family:inherit;font-size:15px;">
+          <option value="Add">Add</option>
+          <option value="Deduct" selected>Deduct</option>
+        </select>
+      </div>
+      <div class="row">
+        <label for="adjQty">Quantity</label>
+        <input id="adjQty" type="text" inputmode="decimal" autocomplete="off">
+      </div>
+      <div class="row">
+        <label for="adjComment">Justification (required)</label>
+        <input id="adjComment" type="text" autocomplete="off" placeholder="Why is stock changing?">
+      </div>
+      <div id="adjErr" class="danger hidden" style="margin:0;"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="adjCancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="adjSubmit">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.7/dist/browser/signalr.min.js" crossorigin="anonymous"></script>
+  <script>
+(function () {
+  let token = "";
+  let me = null;
+  let products = {};
+  let tables = {};
+  let employees = {};
+  let ordersCache = [];
+  let taxPct = 0.07;
+  let servicePct = 0.10;
+  let selectedOrderId = null;
+  let orderHubConnection = null;
+  let pollTimer = null;
+  let refreshDebounce = null;
+  let currentView = "queue";
+  let inventoryCache = [];
+  let inventorySortMode = "name";
+  let adjustingItemId = null;
+  let invByIdForMenu = {};
+  let menuCatalogRows = [];
+
+  function $(id) { return document.getElementById(id); }
+
+  function sameOrderId(a, b) {
+    if (a == null || b == null) return false;
+    return Number(a) === Number(b);
+  }
+
+  function newIdempotencyKey() {
+    if (typeof crypto !== "undefined" && crypto.randomUUID)
+      return crypto.randomUUID().replace(/-/g, "");
+    return "k" + Date.now().toString(36) + Math.random().toString(36).slice(2, 14);
+  }
+
+  function invNormItem(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    return {
+      id: raw.id ?? raw.Id,
+      uniqueId: String(raw.uniqueId ?? raw.UniqueId ?? ""),
+      name: String(raw.name ?? raw.Name ?? ""),
+      unit: String(raw.unit ?? raw.Unit ?? ""),
+      stockQuantity: Number(raw.stockQuantity ?? raw.StockQuantity ?? 0),
+      expirationDate: raw.expirationDate ?? raw.ExpirationDate ?? null,
+      notes: String(raw.notes ?? raw.Notes ?? "")
+    };
+  }
+
+  function invDaysUntilExpiration(item) {
+    const exp = item.expirationDate;
+    if (exp == null || exp === "") return null;
+    const d = new Date(exp);
+    if (isNaN(d.getTime())) return null;
+    const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const t = new Date();
+    const today = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+    return Math.round((day - today) / 86400000);
+  }
+
+  function invExpirationStatus(item) {
+    const days = invDaysUntilExpiration(item);
+    if (days == null) return "No Expiry";
+    if (days <= 0) return "Expired";
+    if (days <= 7) return "Critical";
+    if (days <= 14) return "Bad";
+    return "Good";
+  }
+
+  function invQuantityStatus(item) {
+    const q = Number(item.stockQuantity) || 0;
+    if (q <= 0) return "Out";
+    if (q <= 3) return "Critical";
+    if (q <= 10) return "Low";
+    return "Healthy";
+  }
+
+  function expirationSortRank(status) {
+    switch (status) {
+      case "Expired": return 0;
+      case "Critical": return 1;
+      case "Bad": return 2;
+      case "Good": return 3;
+      default: return 4;
+    }
+  }
+
+  function quantitySortRank(status) {
+    switch (status) {
+      case "Out": return 0;
+      case "Critical": return 1;
+      case "Low": return 2;
+      default: return 3;
+    }
+  }
+
+  function sortedInventoryCopy() {
+    const arr = inventoryCache.map(invNormItem).filter(Boolean);
+    const mode = inventorySortMode;
+    if (mode === "expiration") {
+      return arr.sort((a, b) => {
+        const ra = expirationSortRank(invExpirationStatus(a));
+        const rb = expirationSortRank(invExpirationStatus(b));
+        if (ra !== rb) return ra - rb;
+        return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+      });
+    }
+    if (mode === "quantity") {
+      return arr.sort((a, b) => {
+        const ra = quantitySortRank(invQuantityStatus(a));
+        const rb = quantitySortRank(invQuantityStatus(b));
+        if (ra !== rb) return ra - rb;
+        return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+      });
+    }
+    return arr.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+  }
+
+  function expBadgeClass(status) {
+    if (status === "Expired") return "badge-exp-expired";
+    if (status === "Critical") return "badge-exp-critical";
+    if (status === "Bad") return "badge-exp-bad";
+    if (status === "Good") return "badge-exp-good";
+    return "badge-exp-none";
+  }
+
+  function qtyBadgeClass(status) {
+    if (status === "Out") return "badge-qty-out";
+    if (status === "Critical") return "badge-qty-critical";
+    if (status === "Low") return "badge-qty-low";
+    return "badge-qty-ok";
+  }
+
+  function formatInvExpiration(item) {
+    const exp = item.expirationDate;
+    if (exp == null || exp === "") return "No expiry";
+    const d = new Date(exp);
+    if (isNaN(d.getTime())) return "—";
+    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  }
+
+  function setView(view) {
+    currentView = view;
+    $("viewQueue").classList.toggle("hidden", view !== "queue");
+    $("viewMenu").classList.toggle("hidden", view !== "menu");
+    $("viewInventory").classList.toggle("hidden", view !== "inventory");
+    $("navQueue").classList.toggle("active", view === "queue");
+    $("navMenu").classList.toggle("active", view === "menu");
+    $("navInventory").classList.toggle("active", view === "inventory");
+    if (view === "menu")
+      loadMenu().catch(e => alert(e.message || String(e)));
+    if (view === "inventory")
+      loadInventory().catch(e => alert(e.message || String(e)));
+  }
+
+  async function loadInventory() {
+    const res = await api("/api/admin/data/inventory", "GET", null, true);
+    if (!res.ok) throw new Error(res.body?.message || "Failed to load inventory");
+    inventoryCache = (res.body.items || res.body.Items || []).map(invNormItem).filter(Boolean);
+    renderInventory();
+  }
+
+  function renderInventory() {
+    const root = $("invBody");
+    const q = invSearchQuery();
+    let rows = sortedInventoryCopy();
+    if (q) {
+      rows = rows.filter(it => {
+        const hay = (it.name + "\n" + it.uniqueId + "\n" + it.unit + "\n" + (it.notes || "")).toLowerCase();
+        return hay.includes(q);
+      });
+    }
+    if (!rows.length) {
+      root.innerHTML =
+        q
+          ? '<div class="empty-col" style="padding:20px;">No rows match your search.</div>'
+          : '<div class="empty-col" style="padding:20px;">No inventory rows.</div>';
+      return;
+    }
+    root.innerHTML = "";
+    for (const it of rows) {
+      const expSt = invExpirationStatus(it);
+      const qtySt = invQuantityStatus(it);
+      const card = document.createElement("div");
+      card.className = "inv-card";
+      const left = document.createElement("div");
+      left.innerHTML =
+        '<div class="name">' + escapeHtml(it.name) + '</div>' +
+        '<div class="meta"><span class="badge ' + expBadgeClass(expSt) + '">' + escapeHtml(expSt) + '</span>' +
+        '<span class="badge ' + qtyBadgeClass(qtySt) + '">' + escapeHtml(qtySt) + '</span>' +
+        escapeHtml(String(it.stockQuantity)) + " " + escapeHtml(it.unit) + " · exp. " + escapeHtml(formatInvExpiration(it)) + "</div>";
+      const right = document.createElement("div");
+      right.style.display = "flex";
+      right.style.flexDirection = "column";
+      right.style.gap = "6px";
+      const adj = document.createElement("button");
+      adj.type = "button";
+      adj.className = "btn btn-ghost";
+      adj.style.whiteSpace = "nowrap";
+      adj.textContent = "Add / deduct";
+      adj.onclick = () => openAdjustModal(it.id);
+      right.appendChild(adj);
+      card.appendChild(left);
+      card.appendChild(right);
+      root.appendChild(card);
+    }
+  }
+
+  function openAdjustModal(itemId) {
+    const shell = inventoryCache.find(x => Number(x.id) === Number(itemId));
+    if (!shell) return;
+    adjustingItemId = shell.id;
+    $("adjItemLabel").textContent = shell.name + " (" + shell.uniqueId + ") — " + shell.stockQuantity + " " + shell.unit;
+    $("adjType").value = "Deduct";
+    $("adjQty").value = "";
+    $("adjComment").value = "";
+    $("adjErr").classList.add("hidden");
+    $("adjustModal").classList.remove("hidden");
+    $("adjustModal").setAttribute("aria-hidden", "false");
+  }
+
+  function closeAdjustModal() {
+    adjustingItemId = null;
+    $("adjustModal").classList.add("hidden");
+    $("adjustModal").setAttribute("aria-hidden", "true");
+  }
+
+  async function submitInventoryAdjustment() {
+    $("adjErr").classList.add("hidden");
+    if (adjustingItemId == null) return;
+    const shell = inventoryCache.find(x => Number(x.id) === Number(adjustingItemId));
+    if (!shell) {
+      $("adjErr").textContent = "Item no longer loaded. Refresh inventory.";
+      $("adjErr").classList.remove("hidden");
+      return;
+    }
+    const adjType = ($("adjType").value || "Deduct").trim();
+    const qtyText = ($("adjQty").value || "").trim();
+    const comment = ($("adjComment").value || "").trim();
+    const qty = parseFloat(qtyText.replace(",", "."));
+    if (!isFinite(qty) || qty <= 0) {
+      $("adjErr").textContent = "Enter a positive quantity.";
+      $("adjErr").classList.remove("hidden");
+      return;
+    }
+    if (!comment) {
+      $("adjErr").textContent = "Add a justification for this change.";
+      $("adjErr").classList.remove("hidden");
+      return;
+    }
+    const stock = Number(shell.stockQuantity) || 0;
+    if (adjType === "Deduct" && stock < qty) {
+      $("adjErr").textContent = "Cannot deduct " + qty + " " + shell.unit + ". Current stock is " + stock + " " + shell.unit + ".";
+      $("adjErr").classList.remove("hidden");
+      return;
+    }
+    const newQty = adjType === "Add" ? stock + qty : stock - qty;
+    const verb = adjType === "Add" ? "Stock added" : "Manual deduction";
+    const now = new Date();
+    const logEntry =
+      now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0") + " " +
+      String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0") +
+      " - " + verb + " " + qty + " " + shell.unit + ": " + comment;
+    const mergedNotes = (shell.notes || "").trim() ? (shell.notes.trim() + "\n" + logEntry) : logEntry;
+
+    const exp = shell.expirationDate;
+    let expOut = null;
+    if (exp != null && exp !== "") {
+      const d = new Date(exp);
+      if (!isNaN(d.getTime())) expOut = d.toISOString();
+    }
+
+    const payload = {
+      id: shell.id,
+      uniqueId: shell.uniqueId,
+      name: shell.name,
+      unit: shell.unit,
+      stockQuantity: newQty,
+      expirationDate: expOut,
+      notes: mergedNotes
+    };
+
+    const op = {
+      idempotencyKey: newIdempotencyKey(),
+      entityName: "InventoryItem",
+      operation: "Upsert",
+      payload,
+      queuedAtUtc: new Date().toISOString()
+    };
+    const res = await api("/api/admin/sync", "POST", { operations: [op] }, true);
+    if (!res.ok) {
+      $("adjErr").textContent = res.body?.message || ("Sync failed (" + res.status + ")");
+      $("adjErr").classList.remove("hidden");
+      return;
+    }
+    const results = res.body.results ?? res.body.Results;
+    const first = Array.isArray(results) && results.length ? results[0] : null;
+    if (first && (first.success === false || first.Success === false)) {
+      $("adjErr").textContent = first.message || first.Message || "Sync rejected.";
+      $("adjErr").classList.remove("hidden");
+      return;
+    }
+    closeAdjustModal();
+    await loadInventory();
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]));
+  }
+
+  function absMediaUrl(u) {
+    const t = (u || "").trim();
+    if (!t) return "";
+    if (t.startsWith("http://") || t.startsWith("https://")) return t;
+    if (t.startsWith("/")) return location.origin + t;
+    return t;
+  }
+
+  function menuSearchQuery() {
+    return ($("menuSearch").value || "").trim().toLowerCase();
+  }
+
+  function invSearchQuery() {
+    return ($("invSearch").value || "").trim().toLowerCase();
+  }
+
+  function renderMenuFromCatalog() {
+    const q = menuSearchQuery();
+    let rows = menuCatalogRows;
+    if (q) {
+      rows = menuCatalogRows.filter(row => {
+        const p = row.p;
+        const hay = (
+          p.name + "\n" + row.category + "\n" + row.subCategory + "\n" +
+          (p.description || "") + "\n" + (p.composition || "") + "\n" + row.ingText
+        ).toLowerCase();
+        return hay.includes(q);
+      });
+    }
+    if (!rows.length) {
+      $("menuBody").innerHTML =
+        q ? '<p class="muted">No dishes match your search.</p>' : '<p class="muted">No products.</p>';
+      return;
+    }
+    const byCat = {};
+    for (const row of rows) {
+      const c = row.category;
+      const sc = row.subCategory;
+      if (!byCat[c]) byCat[c] = {};
+      if (!byCat[c][sc]) byCat[c][sc] = [];
+      byCat[c][sc].push(row);
+    }
+    const catNames = Object.keys(byCat).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+    let html = "";
+    for (const c of catNames) {
+      html += '<div class="menu-section"><h3>' + escapeHtml(c) + '</h3>';
+      const subs = byCat[c];
+      const subNames = Object.keys(subs).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+      for (const sc of subNames) {
+        if (subNames.length > 1 || sc !== "General")
+          html += '<h4 style="margin:12px 0 8px;font-size:0.8rem;color:#64748b;">' + escapeHtml(sc) + '</h4>';
+        html += '<div class="menu-grid">';
+        const list = subs[sc].slice().sort((a, b) => a.p.name.localeCompare(b.p.name, undefined, { sensitivity: "base" }));
+        for (const row of list) {
+          const p = row.p;
+          const photoFull = row.photoUrl ? absMediaUrl(row.photoUrl) : "";
+          let thumb = '<div class="menu-thumb"><div class="menu-thumb-ph">🍽</div></div>';
+          if (photoFull) {
+            thumb =
+              '<div class="menu-thumb">' +
+              '<img src="' + escapeHtml(photoFull) + '" alt="" loading="lazy" ' +
+              'onerror="this.classList.add(\'hidden\');var n=this.nextElementSibling;if(n)n.classList.remove(\'hidden\');">' +
+              '<div class="menu-thumb-ph hidden" aria-hidden="true">🍽</div></div>';
+          }
+          html += '<div class="menu-card">' + thumb + '<div class="menu-card-text">';
+          html += '<div class="title">' + escapeHtml(p.name) + '</div>';
+          html += '<div class="price">$ ' + p.price.toFixed(2) + '</div>';
+          if (p.description)
+            html += '<div class="muted" style="margin-bottom:8px;font-size:12px;">' + escapeHtml(p.description) + '</div>';
+          html += '<div class="ing"><strong>Ingredients</strong> · ' + escapeHtml(row.ingText) + '</div>';
+          html += '</div></div>';
+        }
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+    $("menuBody").innerHTML = html;
+  }
+
+  async function loadMenu() {
+    const [rp, rpi, ri, rpub] = await Promise.all([
+      api("/api/admin/data/products", "GET", null, true),
+      api("/api/admin/data/productingredients", "GET", null, true),
+      api("/api/admin/data/inventory", "GET", null, true),
+      api("/api/public/menu/products", "GET", null, false)
+    ]);
+    if (!rp.ok) throw new Error(rp.body?.message || "Failed to load products");
+    if (!rpi.ok) throw new Error(rpi.body?.message || "Failed to load product ingredients");
+    const photoById = {};
+    if (rpub.ok && Array.isArray(rpub.body)) {
+      for (const x of rpub.body) {
+        const id = x.id ?? x.Id;
+        const u = x.photoUrl ?? x.PhotoUrl;
+        if (id != null && u != null && String(u).trim())
+          photoById[id] = String(u).trim();
+      }
+    }
+    const invItems = (ri.ok ? (ri.body.items || ri.body.Items) : []) || [];
+    invByIdForMenu = {};
+    for (const raw of invItems) {
+      const n = invNormItem(raw);
+      if (n) invByIdForMenu[n.id] = n;
+    }
+    const prodList = (rp.body.items || rp.body.Items || []).map(p => ({
+      id: p.id ?? p.Id,
+      name: p.name ?? p.Name ?? "",
+      category: (p.category ?? p.Category ?? "").trim() || "Menu",
+      subCategory: (p.subCategory ?? p.SubCategory ?? "").trim() || "General",
+      price: Number(p.price ?? p.Price ?? 0),
+      description: (p.description ?? p.Description ?? "").trim(),
+      composition: (p.composition ?? p.Composition ?? "").trim()
+    }));
+    const byProd = {};
+    for (const row of (rpi.body.items || rpi.body.Items || [])) {
+      const pid = row.productId ?? row.ProductId;
+      const iid = row.inventoryItemId ?? row.InventoryItemId;
+      const q = Number(row.quantity ?? row.Quantity ?? 0);
+      if (!byProd[pid]) byProd[pid] = [];
+      const inv = invByIdForMenu[iid];
+      const nm = inv ? inv.name : ("#" + iid);
+      const un = inv ? inv.unit : "";
+      byProd[pid].push({ name: nm, qty: q, unit: un });
+    }
+    menuCatalogRows = [];
+    for (const p of prodList) {
+      const ing = byProd[p.id] || [];
+      const ingText = ing.length
+        ? ing.map(x => x.name + (x.qty ? " (" + x.qty + (x.unit ? " " + x.unit : "") + ")" : "")).join(", ")
+        : (p.composition || "—");
+      const photoUrl = photoById[p.id] || "";
+      menuCatalogRows.push({
+        p,
+        category: p.category,
+        subCategory: p.subCategory,
+        ingText,
+        photoUrl
+      });
+    }
+    renderMenuFromCatalog();
+  }
+
+  async function api(path, method, body, auth) {
+    const headers = {};
+    if (body) headers["Content-Type"] = "application/json";
+    if (auth !== false && token) headers["Authorization"] = "Bearer " + token;
+    const res = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+    const txt = await res.text();
+    let json;
+    try { json = JSON.parse(txt); } catch { json = { raw: txt }; }
+    return { ok: res.ok, status: res.status, body: json };
+  }
+
+  async function loadSettingsPricing() {
+    const res = await api("/api/admin/data/settings", "GET", null, true);
+    if (!res.ok || !res.body?.items?.length) return;
+    const s = res.body.items[0];
+    const cp = s.currencyPricing || s.CurrencyPricing;
+    if (cp) {
+      const t = cp.taxPercent ?? cp.TaxPercent;
+      const sv = cp.servicePercent ?? cp.ServicePercent;
+      if (typeof t === "number" && t > 0) taxPct = t / 100;
+      if (typeof sv === "number" && sv > 0) servicePct = sv / 100;
+    }
+  }
+
+  function round2(n) { return Math.round(n * 100) / 100; }
+
+  function lineSubtotal(order) {
+    const items = order.items || order.Items || [];
+    let s = 0;
+    for (const it of items) {
+      const pid = it.productId ?? it.ProductId;
+      const q = it.quantity ?? it.Quantity ?? 0;
+      const p = products[pid];
+      const price = p ? (p.price ?? p.Price ?? 0) : 0;
+      s += Number(price) * q;
+    }
+    return s;
+  }
+
+  function computeGrandTotal(order) {
+    const sub = lineSubtotal(order);
+    const mode = (order.discountMode || order.DiscountMode || "None").trim();
+    const dv = Number(order.discountValue ?? order.DiscountValue ?? 0);
+    let disc = 0;
+    if (mode.toLowerCase() === "percent" && dv > 0) disc = round2(sub * Math.min(100, Math.max(0, dv)) / 100);
+    else if (mode.toLowerCase() === "usd" && dv > 0) disc = round2(Math.min(dv, sub));
+    disc = Math.min(disc, sub);
+    const taxable = round2(sub - disc);
+    const tax = round2(taxable * taxPct);
+    const service = round2(taxable * servicePct);
+    return round2(taxable + tax + service);
+  }
+
+  function hydrateOrder(o) {
+    const tid = o.tableId ?? o.TableId;
+    if (tid && tables[tid] && !o.table && !o.Table) o._table = tables[tid];
+    else o._table = o.table || o.Table;
+    const sid = o.serverId ?? o.ServerId;
+    if (sid && employees[sid] && !o.server && !o.Server) o._server = employees[sid];
+    else o._server = o.server || o.Server;
+    const items = o.items || o.Items || [];
+    for (const it of items) {
+      const pid = it.productId ?? it.ProductId;
+      if (pid && products[pid] && !it.product && !it.Product) it._product = products[pid];
+      else it._product = it.product || it.Product;
+    }
+  }
+
+  function orderCode(o) {
+    const uid = o.uniqueId || o.UniqueId;
+    return (uid && String(uid).trim()) ? uid : ("#" + String(o.id ?? o.Id).padStart(3, "0"));
+  }
+
+  function tableLabel(o) {
+    hydrateOrder(o);
+    const tc = o.tableCode || o.TableCode || "";
+    const tn = o.tableName || o.TableName || "";
+    if (tc && tn) return tc + " · " + tn;
+    const t = o._table;
+    if (t) {
+      const num = t.tableNumber ?? t.TableNumber ?? "?";
+      const nm = t.name || t.Name || "";
+      return nm ? ("Table " + num + " · " + nm) : ("Table " + num);
+    }
+    return tc || "—";
+  }
+
+  function serverName(o) {
+    hydrateOrder(o);
+    const sn = o.serverName || o.ServerName;
+    if (sn) return sn;
+    const s = o._server;
+    return s ? (s.name || s.Name || "—") : "—";
+  }
+
+  function formatTime(iso) {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "—";
+    return d.toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  }
+
+  function shortenLines(o) {
+    const items = o.items || o.Items || [];
+    const parts = [];
+    for (const it of items) {
+      hydrateOrder(o);
+      const pid = it.productId ?? it.ProductId;
+      const q = it.quantity ?? it.Quantity ?? 0;
+      const pr = it._product || products[pid];
+      const name = pr ? (pr.name || pr.Name) : ("#" + pid);
+      parts.push(name + " ×" + q);
+    }
+    return parts.join(", ") || "—";
+  }
+
+  async function loadQueue() {
+    await loadSettingsPricing();
+    const [ro, rp, rt, re] = await Promise.all([
+      api("/api/admin/data/orders", "GET", null, true),
+      api("/api/admin/data/products", "GET", null, true),
+      api("/api/admin/data/tables", "GET", null, true),
+      api("/api/admin/data/employees", "GET", null, true)
+    ]);
+    if (!ro.ok) throw new Error(ro.body?.message || "Failed to load orders");
+    products = {};
+    for (const p of (rp.body?.items || [])) {
+      const id = p.id ?? p.Id;
+      products[id] = p;
+    }
+    tables = {};
+    for (const t of (rt.body?.items || [])) {
+      const id = t.id ?? t.Id;
+      tables[id] = t;
+    }
+    employees = {};
+    for (const e of (re.body?.items || [])) {
+      const id = e.id ?? e.Id;
+      employees[id] = e;
+    }
+    ordersCache = (ro.body.items || []).map(raw => {
+      const o = typeof raw === "object" && raw !== null ? { ...raw } : {};
+      hydrateOrder(o);
+      return o;
+    });
+    renderLists();
+    renderDetail();
+    $("lastUpdated").textContent = "Updated " + new Date().toLocaleTimeString();
+  }
+
+  function renderLists() {
+    const waiting = ordersCache.filter(o => (o.status || o.Status) === "Waiting").sort((a, b) => {
+      const ca = new Date(a.createdAt || a.CreatedAt).getTime();
+      const cb = new Date(b.createdAt || b.CreatedAt).getTime();
+      return ca - cb;
+    });
+    const prep = ordersCache.filter(o => (o.status || o.Status) === "In Kitchen").sort((a, b) => {
+      const ca = new Date(a.createdAt || a.CreatedAt).getTime();
+      const cb = new Date(b.createdAt || b.CreatedAt).getTime();
+      return ca - cb;
+    });
+    const ready = ordersCache.filter(o => (o.status || o.Status) === "Ready").sort((a, b) => {
+      const ca = new Date(a.createdAt || a.CreatedAt).getTime();
+      const cb = new Date(b.createdAt || b.CreatedAt).getTime();
+      return ca - cb;
+    });
+    $("countWaiting").textContent = String(waiting.length);
+    $("countPrep").textContent = String(prep.length);
+    $("countReady").textContent = String(ready.length);
+    $("listWaiting").innerHTML = waiting.length ? "" : '<div class="empty-col">No tickets waiting.</div>';
+    $("listPrep").innerHTML = prep.length ? "" : '<div class="empty-col">Nothing in prep.</div>';
+    $("listReady").innerHTML = ready.length ? "" : '<div class="empty-col">Nothing ready for pickup.</div>';
+    if (waiting.length) {
+      $("listWaiting").innerHTML = "";
+      for (const o of waiting) $("listWaiting").appendChild(ticketEl(o, "waiting"));
+    }
+    if (prep.length) {
+      $("listPrep").innerHTML = "";
+      for (const o of prep) $("listPrep").appendChild(ticketEl(o, "prep"));
+    }
+    if (ready.length) {
+      $("listReady").innerHTML = "";
+      for (const o of ready) $("listReady").appendChild(ticketEl(o, "ready"));
+    }
+  }
+
+  function ticketEl(o, kind) {
+    const id = o.id ?? o.Id;
+    const el = document.createElement("div");
+    el.className = "ticket" + (sameOrderId(selectedOrderId, id) ? " selected" : "");
+    el.dataset.orderId = String(id);
+    const st = o.status || o.Status;
+    const created = o.createdAt || o.CreatedAt;
+    const timeShort = created ? new Date(created).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+    el.innerHTML =
+      '<div class="ticket-top"><span class="ticket-code">' + escapeHtml(orderCode(o)) + '</span>' +
+      '<span class="ticket-time">' + escapeHtml(timeShort) + '</span></div>' +
+      '<div class="ticket-meta">' + escapeHtml(tableLabel(o)) + " · " + escapeHtml(serverName(o)) + '</div>' +
+      '<div class="ticket-lines">' + escapeHtml(shortenLines(o)) + '</div>';
+    el.onclick = () => { selectedOrderId = id; renderLists(); renderDetail(); };
+    return el;
+  }
+
+  function selectedOrder() {
+    if (selectedOrderId == null || selectedOrderId === "") return null;
+    return ordersCache.find(o => sameOrderId(o.id ?? o.Id, selectedOrderId)) || null;
+  }
+
+  function renderDetail() {
+    const o = selectedOrder();
+    if (!o) {
+      $("detailEmpty").classList.remove("hidden");
+      $("detailContent").classList.add("hidden");
+      return;
+    }
+    $("detailEmpty").classList.add("hidden");
+    $("detailContent").classList.remove("hidden");
+    hydrateOrder(o);
+    const st = o.status || o.Status;
+    $("dCode").textContent = orderCode(o);
+    $("dTable").textContent = tableLabel(o);
+    $("dServer").textContent = serverName(o);
+    $("dStatus").textContent = st;
+    $("dTime").textContent = formatTime(o.createdAt || o.CreatedAt);
+    $("dTotal").textContent = "$ " + computeGrandTotal(o).toFixed(2);
+    $("dCust").textContent = (o.customerNotes || o.CustomerNotes || "").trim() || "—";
+    $("dAllergy").textContent = (o.allergyNotes || o.AllergyNotes || "").trim() || "—";
+
+    const tbody = $("dLines");
+    tbody.innerHTML = "";
+    const items = o.items || o.Items || [];
+    const sorted = [...items].sort((a, b) => {
+      const na = ((a._product || {}).name || (a._product || {}).Name || "").localeCompare(((b._product || {}).name || (b._product || {}).Name || ""));
+      return na;
+    });
+    for (const it of sorted) {
+      const pid = it.productId ?? it.ProductId;
+      const pr = it._product || products[pid];
+      const name = pr ? (pr.name || pr.Name || "Item") : "Item";
+      const qty = it.quantity ?? it.Quantity ?? 0;
+      const station = it.preparedByRole || it.PreparedByRole || "—";
+      const tr = document.createElement("tr");
+      tr.innerHTML = "<td>" + escapeHtml(name) + "</td><td>" + escapeHtml(String(qty)) + "</td><td>" + escapeHtml(station) + "</td>";
+      tbody.appendChild(tr);
+    }
+
+    const actions = $("detailActions");
+    actions.innerHTML = "";
+    const id = o.id ?? o.Id;
+    if (st === "Waiting") {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "btn btn-waiting";
+      b.textContent = "Receive → In kitchen";
+      b.onclick = () => advanceOrder(id, "waiting");
+      actions.appendChild(b);
+    } else if (st === "In Kitchen") {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "btn btn-ready";
+      b.textContent = "Mark ready for pickup";
+      b.onclick = () => advanceOrder(id, "prep");
+      actions.appendChild(b);
+    } else if (st === "Ready") {
+      const p = document.createElement("p");
+      p.className = "muted";
+      p.style.margin = "0";
+      p.textContent = "This ticket is ready for server pickup. Advance it from a server tablet or the admin orders screen.";
+      actions.appendChild(p);
+    }
+  }
+
+  async function advanceOrder(orderId, from) {
+    const o = ordersCache.find(x => (x.id ?? x.Id) === orderId);
+    const st = o ? (o.status || o.Status) : "";
+    if (from === "waiting" && st !== "Waiting") { await loadQueue(); return; }
+    if (from === "prep" && st !== "In Kitchen") { await loadQueue(); return; }
+    const msg = from === "waiting"
+      ? "Start preparing this ticket? Status moves from Waiting to In kitchen."
+      : "Mark this ticket ready for pickup? Servers and cashier will see it.";
+    if (!confirm(msg)) return;
+    const res = await api("/api/admin/orders/" + orderId + "/advance", "POST", {}, true);
+    const r = res.body?.result ?? res.body?.Result;
+    if (!res.ok) {
+      alert(res.body?.message || "Request failed (" + res.status + ")");
+      return;
+    }
+    if (r === "missing") { alert("This ticket changed or is gone. Refresh."); await loadQueue(); return; }
+    if (r === "error") { alert(res.body?.errorMessage || res.body?.ErrorMessage || "Advance failed."); return; }
+    await loadQueue();
+  }
+
+  function setHubPill(state) {
+    const el = $("hubStatus");
+    el.classList.remove("ok", "warn", "off");
+    if (state === "live") { el.textContent = "Live: connected"; el.classList.add("ok"); }
+    else if (state === "degraded") { el.textContent = "Live: reconnecting"; el.classList.add("warn"); }
+    else { el.textContent = "Live: polling"; el.classList.add("off"); }
+  }
+
+  function scheduleRefreshFromHub() {
+    if (refreshDebounce) clearTimeout(refreshDebounce);
+    refreshDebounce = setTimeout(() => {
+      refreshDebounce = null;
+      loadQueue().catch(e => console.warn(e));
+      if (currentView === "inventory")
+        loadInventory().catch(e => console.warn(e));
+    }, 400);
+  }
+
+  async function startOrderHub() {
+    if (typeof signalR === "undefined") return;
+    if (orderHubConnection) {
+      try { await orderHubConnection.stop(); } catch (_) {}
+      orderHubConnection = null;
+    }
+    const conn = new signalR.HubConnectionBuilder()
+      .withUrl(location.origin + "/hubs/order", { accessTokenFactory: () => token || "" })
+      .withAutomaticReconnect()
+      .build();
+    conn.on("KitchenQueueChanged", () => scheduleRefreshFromHub());
+    conn.onreconnecting(() => setHubPill("degraded"));
+    conn.onreconnected(() => { setHubPill("live"); conn.invoke("JoinKitchen").catch(() => {}); });
+    conn.onclose(() => setHubPill("off"));
+    try {
+      await conn.start();
+      await conn.invoke("JoinKitchen");
+      orderHubConnection = conn;
+      setHubPill("live");
+    } catch (e) {
+      console.warn("[Kitchen] hub failed", e);
+      orderHubConnection = null;
+      setHubPill("off");
+    }
+  }
+
+  function stopOrderHubAndPolling() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    if (orderHubConnection) {
+      try { orderHubConnection.stop(); } catch (_) {}
+      orderHubConnection = null;
+    }
+  }
+
+  function startPollingFallback() {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(() => {
+      if (!token) return;
+      if (orderHubConnection && orderHubConnection.state === signalR.HubConnectionState.Connected) return;
+      loadQueue().catch(() => {});
+    }, 28000);
+  }
+
+  $("btnLogin").onclick = async () => {
+    $("loginErr").classList.add("hidden");
+    const staffId = ($("staffId").value || "").trim();
+    const pin = $("pin").value || "";
+    if (!staffId || !pin) {
+      $("loginErr").textContent = "Enter sign-in ID and PIN.";
+      $("loginErr").classList.remove("hidden");
+      return;
+    }
+    const res = await api("/api/auth/login", "POST", { staffId, pin, portal: "KitchenBar" }, false);
+    if (!res.ok || !res.body?.accessToken) {
+      const hint = res.body?.message || res.body?.title || "Check credentials and kitchen/bar role.";
+      $("loginErr").textContent = "Login failed (HTTP " + res.status + "). " + hint;
+      $("loginErr").classList.remove("hidden");
+      return;
+    }
+    token = res.body.accessToken;
+    me = res.body;
+    $("sessionLabel").textContent = (me.name || "") + " (" + (me.signInId || me.employeeUniqueId || "") + ")";
+    $("roleChip").textContent = me.role || "Kitchen";
+    $("loginWrap").classList.add("hidden");
+    $("app").classList.remove("hidden");
+    setView("queue");
+    try {
+      await loadQueue();
+    } catch (e) {
+      alert("Could not load queue: " + (e.message || e));
+    }
+    void startOrderHub();
+    startPollingFallback();
+  };
+
+  $("btnLogout").onclick = () => {
+    stopOrderHubAndPolling();
+    token = ""; me = null; ordersCache = []; selectedOrderId = null;
+    inventoryCache = []; invByIdForMenu = {}; menuCatalogRows = [];
+    if ($("menuSearch")) $("menuSearch").value = "";
+    if ($("invSearch")) $("invSearch").value = "";
+    if ($("menuBody")) $("menuBody").innerHTML = "";
+    closeAdjustModal();
+    setView("queue");
+    $("loginWrap").classList.remove("hidden");
+    $("app").classList.add("hidden");
+    setHubPill("off");
+  };
+
+  $("btnRefresh").onclick = async () => {
+    try {
+      if (currentView === "queue") await loadQueue();
+      else if (currentView === "menu") await loadMenu();
+      else await loadInventory();
+    } catch (e) { alert(e.message || String(e)); }
+  };
+
+  $("navQueue").onclick = () => setView("queue");
+  $("navMenu").onclick = () => setView("menu");
+  $("navInventory").onclick = () => setView("inventory");
+  $("btnRefreshMenu").onclick = $("btnRefresh").onclick;
+  $("btnRefreshInventory").onclick = $("btnRefresh").onclick;
+
+  $("menuSearch").oninput = () => renderMenuFromCatalog();
+  $("invSearch").oninput = () => renderInventory();
+
+  document.querySelectorAll(".sort-btn").forEach(btn => {
+    btn.onclick = () => {
+      const m = btn.getAttribute("data-sort");
+      if (!m) return;
+      inventorySortMode = m;
+      document.querySelectorAll(".sort-btn").forEach(b => b.classList.toggle("active", b.getAttribute("data-sort") === m));
+      renderInventory();
+    };
+  });
+
+  $("adjCancel").onclick = () => closeAdjustModal();
+  $("adjSubmit").onclick = () => { void submitInventoryAdjustment().catch(e => { $("adjErr").textContent = e.message || String(e); $("adjErr").classList.remove("hidden"); }); };
+
+  if (window.location.protocol === "file:") {
+    $("loginErr").textContent = "Open this page from the API site (e.g. http://localhost:8080/kitchen/) so /api and SignalR work.";
+    $("loginErr").classList.remove("hidden");
+  }
+})();
+  </script>
+</body>
+</html>

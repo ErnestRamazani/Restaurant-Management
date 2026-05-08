@@ -1,6 +1,6 @@
-using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
-using Microsoft.EntityFrameworkCore;
+using EliteRestaurant.Core.Orders;
+using EliteRestaurantPro.ApiClients;
 using ModelTable = EliteRestaurant.Core.Models.Table;
 
 namespace EliteRestaurantPro.Services;
@@ -26,24 +26,27 @@ public sealed record CreateOrderPageCatalog(
     IReadOnlyList<ModelTable> Tables,
     IReadOnlyList<CreateOrderCatalogProduct> Products,
     IReadOnlyList<CreateOrderArrivedReservationRow> ArrivedReservations,
-    IReadOnlyList<string> DeliveryReferences);
+    IReadOnlyList<string> DeliveryReferences,
+    IReadOnlyList<OrderRecord> OrdersSnapshot);
 
 /// <summary>Loads tables, menu, reservations, and delivery references for the create-order page.</summary>
 public sealed class TableLoadingService
 {
-    public CreateOrderPageCatalog LoadCatalog(int? restrictToServerEmployeeId)
-    {
-        using var db = new AppDbContext();
+    private readonly AdminDataApiClient _dataClient = new();
 
-        var tableQuery = db.Tables.AsNoTracking()
-            .Include(t => t.AssignedServer)
+    public async Task<CreateOrderPageCatalog> LoadCatalogAsync(int? restrictToServerEmployeeId, CancellationToken cancellationToken = default)
+    {
+        var (allTables, allProducts, allReservations, allOrders) =
+            await _dataClient.GetCreateOrderCatalogAsync(cancellationToken).ConfigureAwait(false);
+
+        var tableQuery = allTables
             .Where(t => t.Status != "Maintenance" && t.AssignedServerId != null);
         if (restrictToServerEmployeeId.HasValue)
             tableQuery = tableQuery.Where(t => t.AssignedServerId == restrictToServerEmployeeId.Value);
 
         var tables = tableQuery.OrderBy(t => t.TableNumber).ToList();
 
-        var products = db.Products.AsNoTracking()
+        var products = allProducts
             .OrderBy(p => p.Category)
             .ThenBy(p => p.SubCategory)
             .ThenBy(p => p.Name)
@@ -56,9 +59,8 @@ public sealed class TableLoadingService
                 p.Price))
             .ToList();
 
-        var arrivedReservations = db.Reservations
-            .AsNoTracking()
-            .Include(r => r.Table)
+        var tableNames = tables.ToDictionary(t => t.Id, t => string.IsNullOrWhiteSpace(t.Name) ? $"Table #{t.Id}" : t.Name);
+        var arrivedReservations = allReservations
             .Where(r => r.Status == "Arrived")
             .OrderBy(r => r.ReservedFor)
             .Take(60)
@@ -69,13 +71,12 @@ public sealed class TableLoadingService
                 r.GuestName,
                 r.ReservedFor,
                 r.TableId,
-                r.Table != null && !string.IsNullOrWhiteSpace(r.Table.Name)
-                    ? r.Table.Name
+                r.TableId.HasValue && tableNames.TryGetValue(r.TableId.Value, out var tableName)
+                    ? tableName
                     : (r.TableId.HasValue ? $"Table #{r.TableId.Value}" : "-")))
             .ToList();
 
-        var deliveryReferences = db.Orders
-            .AsNoTracking()
+        var deliveryReferences = allOrders
             .Where(o => o.OrderSource == "Delivery")
             .OrderByDescending(o => o.CreatedAt)
             .Select(o => !string.IsNullOrWhiteSpace(o.ReservationGuestName)
@@ -86,6 +87,6 @@ public sealed class TableLoadingService
             .Take(40)
             .ToList();
 
-        return new CreateOrderPageCatalog(tables, products, arrivedReservations, deliveryReferences);
+        return new CreateOrderPageCatalog(tables, products, arrivedReservations, deliveryReferences, allOrders);
     }
 }

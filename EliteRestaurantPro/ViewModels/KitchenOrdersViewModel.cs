@@ -1,10 +1,11 @@
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Windows;
 using System.Windows.Input;
-using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Utils;
-using Microsoft.EntityFrameworkCore;
+using EliteRestaurantPro.ApiClients;
+using EliteRestaurantPro.Services;
 
 namespace EliteRestaurantPro.ViewModels;
 
@@ -17,8 +18,12 @@ public sealed class KitchenOrderLineVm
 
 public sealed class KitchenOrdersViewModel : AdminBaseViewModel
 {
+    private readonly AdminDataApiClient _data = new();
+    private readonly AdminOrderCloudOperations _cloudOps = new();
+    private readonly List<OrderRecord> _ordersCache = [];
     private OrderEntry? _selectedIncoming;
     private OrderEntry? _selectedPreparing;
+    private OrderEntry? _selectedReady;
     private bool _isLoading;
     private bool _hasDetail;
 
@@ -26,6 +31,7 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
 
     public ObservableCollection<OrderEntry> IncomingOrders { get; } = new();
     public ObservableCollection<OrderEntry> PreparingOrders { get; } = new();
+    public ObservableCollection<OrderEntry> ReadyPickupOrders { get; } = new();
     public ObservableCollection<KitchenOrderLineVm> DetailLines { get; } = new();
 
     public OrderEntry? SelectedIncoming
@@ -38,7 +44,9 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
             if (value != null)
             {
                 _selectedPreparing = null;
+                _selectedReady = null;
                 OnPropertyChanged(nameof(SelectedPreparing));
+                OnPropertyChanged(nameof(SelectedReady));
             }
 
             LoadDetailForSelection();
@@ -55,7 +63,28 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
             if (value != null)
             {
                 _selectedIncoming = null;
+                _selectedReady = null;
                 OnPropertyChanged(nameof(SelectedIncoming));
+                OnPropertyChanged(nameof(SelectedReady));
+            }
+
+            LoadDetailForSelection();
+        }
+    }
+
+    public OrderEntry? SelectedReady
+    {
+        get => _selectedReady;
+        set
+        {
+            if (!SetField(ref _selectedReady, value))
+                return;
+            if (value != null)
+            {
+                _selectedIncoming = null;
+                _selectedPreparing = null;
+                OnPropertyChanged(nameof(SelectedIncoming));
+                OnPropertyChanged(nameof(SelectedPreparing));
             }
 
             LoadDetailForSelection();
@@ -96,12 +125,12 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
         StartPreparingCommand = new RelayCommand(p =>
         {
             if (p is OrderEntry e)
-                StartPreparing(e);
+                _ = StartPreparingAsync(e);
         });
         MarkReadyForPickupCommand = new RelayCommand(p =>
         {
             if (p is OrderEntry e)
-                MarkReadyForPickup(e);
+                _ = MarkReadyForPickupAsync(e);
         });
         ViewFullOrderCommand = new RelayCommand(p =>
         {
@@ -119,35 +148,49 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
         IsLoading = true;
         try
         {
-            var (incoming, preparing) = await Task.Run(() =>
+            var ordersTask = _data.GetOrdersAsync();
+            var productsTask = _data.GetProductsAsync();
+            var tablesTask = _data.GetTablesAsync();
+            var employeesTask = _data.GetEmployeesAsync();
+            await Task.WhenAll(ordersTask, productsTask, tablesTask, employeesTask).ConfigureAwait(false);
+
+            var orders = (await ordersTask.ConfigureAwait(false)).ToList();
+            var productById = (await productsTask.ConfigureAwait(false)).ToDictionary(p => p.Id);
+            var tableById = (await tablesTask.ConfigureAwait(false)).ToDictionary(t => t.Id);
+            var empById = (await employeesTask.ConfigureAwait(false)).ToDictionary(e => e.Id);
+            foreach (var o in orders)
             {
-                using var db = new AppDbContext();
-                var incomingList = db.Orders
-                    .AsNoTracking()
-                    .Include(o => o.Table)
-                    .Include(o => o.Server)
-                    .Include(o => o.Items)
-                    .ThenInclude(i => i.Product)
-                    .Where(o => o.Status == "Waiting")
-                    .OrderBy(o => o.CreatedAt)
-                    .ToList()
-                    .Select(MapKitchenOrder)
-                    .ToList();
+                if (o.Table is null && o.TableId is int tid && tableById.TryGetValue(tid, out var tbl))
+                    o.Table = tbl;
+                if (o.Server is null && o.ServerId is int sid && empById.TryGetValue(sid, out var emp))
+                    o.Server = emp;
+                foreach (var i in o.Items)
+                {
+                    if (i.Product is null && productById.TryGetValue(i.ProductId, out var p))
+                        i.Product = p;
+                }
+            }
 
-                var preparingList = db.Orders
-                    .AsNoTracking()
-                    .Include(o => o.Table)
-                    .Include(o => o.Server)
-                    .Include(o => o.Items)
-                    .ThenInclude(i => i.Product)
-                    .Where(o => o.Status == "In Kitchen")
-                    .OrderBy(o => o.CreatedAt)
-                    .ToList()
-                    .Select(MapKitchenOrder)
-                    .ToList();
+            _ordersCache.Clear();
+            _ordersCache.AddRange(orders);
 
-                return (incomingList, preparingList);
-            });
+            var incoming = orders
+                .Where(o => o.Status == "Waiting")
+                .OrderBy(o => o.CreatedAt)
+                .Select(MapKitchenOrder)
+                .ToList();
+
+            var preparing = orders
+                .Where(o => o.Status == "In Kitchen")
+                .OrderBy(o => o.CreatedAt)
+                .Select(MapKitchenOrder)
+                .ToList();
+
+            var pickedUp = orders
+                .Where(o => o.Status == "Ready")
+                .OrderBy(o => o.CreatedAt)
+                .Select(MapKitchenOrder)
+                .ToList();
 
             IncomingOrders.Clear();
             foreach (var o in incoming)
@@ -157,11 +200,16 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
             foreach (var o in preparing)
                 PreparingOrders.Add(o);
 
-            // Keep selection if still present
+            ReadyPickupOrders.Clear();
+            foreach (var o in pickedUp)
+                ReadyPickupOrders.Add(o);
+
             var keepIn = _selectedIncoming is { Id: var inId } &&
                          incoming.Any(x => x.Id == inId);
             var keepPr = _selectedPreparing is { Id: var prId } &&
                          preparing.Any(x => x.Id == prId);
+            var keepRd = _selectedReady is { Id: var rdId } &&
+                         pickedUp.Any(x => x.Id == rdId);
             if (!keepIn)
             {
                 _selectedIncoming = null;
@@ -172,6 +220,12 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
             {
                 _selectedPreparing = null;
                 OnPropertyChanged(nameof(SelectedPreparing));
+            }
+
+            if (!keepRd)
+            {
+                _selectedReady = null;
+                OnPropertyChanged(nameof(SelectedReady));
             }
 
             LoadDetailForSelection();
@@ -185,21 +239,14 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
 
     private void LoadDetailForSelection()
     {
-        var entry = SelectedPreparing ?? SelectedIncoming;
+        var entry = SelectedReady ?? SelectedPreparing ?? SelectedIncoming;
         if (entry is null)
         {
             ClearDetail();
             return;
         }
 
-        using var db = new AppDbContext();
-        var order = db.Orders
-            .AsNoTracking()
-            .Include(o => o.Table)
-            .Include(o => o.Items)
-            .ThenInclude(i => i.Product)
-            .FirstOrDefault(o => o.Id == entry.Id);
-
+        var order = _ordersCache.FirstOrDefault(o => o.Id == entry.Id);
         if (order is null)
         {
             ClearDetail();
@@ -263,7 +310,7 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
         OnPropertyChanged(nameof(DetailAllergyNotes));
     }
 
-    private void StartPreparing(OrderEntry entry)
+    private async Task StartPreparingAsync(OrderEntry entry)
     {
         var confirm = MessageBox.Show(
             $"Start preparing order {entry.OrderId}?\n\nStatus will move from Waiting to In Kitchen.",
@@ -273,23 +320,35 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
         if (confirm != MessageBoxResult.Yes)
             return;
 
-        using var db = new AppDbContext();
-        var order = db.Orders.FirstOrDefault(o => o.Id == entry.Id && o.Status == "Waiting");
-        if (order is null)
+        var status = _ordersCache.FirstOrDefault(o => o.Id == entry.Id)?.Status;
+        if (status != "Waiting")
         {
             MessageBox.Show("Order is no longer waiting (refresh the list).", "Kitchen", MessageBoxButton.OK,
                 MessageBoxImage.Information);
-            _ = LoadAsync();
+            await LoadAsync();
             return;
         }
 
-        order.Status = "In Kitchen";
-        db.SaveChanges();
+        var err = await _cloudOps.TryAdvanceOrderAsync(entry.Id).ConfigureAwait(false);
+        if (err == string.Empty)
+        {
+            MessageBox.Show("Order is no longer waiting (refresh the list).", "Kitchen", MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            await LoadAsync();
+            return;
+        }
+
+        if (err is not null)
+        {
+            MessageBox.Show(err, "Kitchen", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
         RefreshReadyPickupBanner();
-        _ = LoadAsync();
+        await LoadAsync();
     }
 
-    private void MarkReadyForPickup(OrderEntry entry)
+    private async Task MarkReadyForPickupAsync(OrderEntry entry)
     {
         var confirm = MessageBox.Show(
             $"Mark order {entry.OrderId} ready for pickup?\n\nServer and cashier will see it in their pickup banner.",
@@ -299,20 +358,32 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
         if (confirm != MessageBoxResult.Yes)
             return;
 
-        using var db = new AppDbContext();
-        var order = db.Orders.FirstOrDefault(o => o.Id == entry.Id && o.Status == "In Kitchen");
-        if (order is null)
+        var status = _ordersCache.FirstOrDefault(o => o.Id == entry.Id)?.Status;
+        if (status != "In Kitchen")
         {
             MessageBox.Show("Order is no longer in kitchen (refresh the list).", "Kitchen", MessageBoxButton.OK,
                 MessageBoxImage.Information);
-            _ = LoadAsync();
+            await LoadAsync();
             return;
         }
 
-        order.Status = "Ready";
-        db.SaveChanges();
+        var err = await _cloudOps.TryAdvanceOrderAsync(entry.Id).ConfigureAwait(false);
+        if (err == string.Empty)
+        {
+            MessageBox.Show("Order is no longer in kitchen (refresh the list).", "Kitchen", MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            await LoadAsync();
+            return;
+        }
+
+        if (err is not null)
+        {
+            MessageBox.Show(err, "Kitchen", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
         RefreshReadyPickupBanner();
-        _ = LoadAsync();
+        await LoadAsync();
     }
 
     private static OrderEntry MapKitchenOrder(OrderRecord order)

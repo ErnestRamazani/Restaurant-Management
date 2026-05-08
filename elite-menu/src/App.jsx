@@ -15,18 +15,28 @@ import { ConfirmDialog } from './components/ui/ConfirmDialog'
 import { ErrorScreen } from './components/ui/ErrorScreen'
 import { LoadingScreen } from './components/ui/LoadingScreen'
 import { validateStaffLoginCode } from './utils/api'
-import { pingApi } from './utils/apiClient'
+import { API_ORIGIN, pingApi } from './utils/apiClient'
 
 const spring = { type: 'spring', stiffness: 300, damping: 34 }
 /** @internal history.state key for in-app back (cart → menu → hero) */
 const H = 'elite'
 
+/** Staff HTML portals live on the API host (`wwwroot`). Never use a relative path when the menu PWA is on another origin. */
 function portalHref(path) {
   if (window.location.port === '5173') {
     return `http://${window.location.hostname}:8080${path}`
   }
 
-  return path
+  try {
+    const apiOrigin = new URL(API_ORIGIN).origin
+    if (apiOrigin !== window.location.origin) {
+      return `${apiOrigin}${path.startsWith('/') ? path : `/${path}`}`
+    }
+  } catch {
+    /* fall through */
+  }
+
+  return path.startsWith('/') ? path : `/${path}`
 }
 
 function CloudStatus({ className = '' }) {
@@ -67,10 +77,10 @@ function CloudStatus({ className = '' }) {
 
 function HubHome() {
   const cards = [
-    { to: '/menu', title: 'Consumer Menu', desc: 'Guests scan, browse, and send orders.', icon: Utensils },
-    { to: '/server', title: 'Server', desc: 'Take table orders and manage pickup.', icon: MonitorCog },
-    { to: '/cashier', title: 'Cashier', desc: 'Release, complete, and manage checks.', icon: CreditCard },
-    { to: '/kitchen', title: 'Kitchen', desc: 'Kitchen web workspace is coming soon.', icon: ChefHat },
+    { to: '/', title: 'Consumer Menu', desc: 'Guests scan, browse, and send orders.', icon: Utensils },
+    { to: '/staff/server', title: 'Server', desc: 'Take table orders and manage pickup.', icon: MonitorCog },
+    { to: '/staff/cashier', title: 'Cashier', desc: 'Release, complete, and manage checks.', icon: CreditCard },
+    { to: '/staff/kitchen', title: 'Kitchen', desc: 'Prep queue, receive tickets, mark ready — opens the kitchen portal.', icon: ChefHat },
   ]
 
   return (
@@ -78,10 +88,10 @@ function HubHome() {
       <CloudStatus className="absolute right-5 top-5" />
       <section className="mx-auto flex max-w-4xl flex-col gap-8">
         <div className="text-center">
-          <p className="font-body text-xs font-bold uppercase tracking-[0.28em] text-gold/80">EliteRestaurant Cloud</p>
+          <p className="font-body text-xs font-bold uppercase tracking-[0.28em] text-gold/80">EliteRestaurant Staff</p>
           <h1 className="mt-3 font-display text-4xl italic text-champagne">Choose your workspace</h1>
           <p className="mx-auto mt-3 max-w-2xl font-body text-sm leading-relaxed text-champagne/65">
-            One online entry point for guests and staff. Staff areas require sign-in; the consumer menu remains public.
+            Staff areas require sign-in. The public website opens directly to the consumer menu.
           </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -113,24 +123,6 @@ function PortalRedirect({ path }) {
         <CloudStatus className="mb-5" />
         <p className="font-body text-sm text-champagne/65">Opening staff portal...</p>
       </div>
-    </main>
-  )
-}
-
-function KitchenPage() {
-  return (
-    <main className="relative flex min-h-[100svh] items-center justify-center bg-midnight px-5 text-center text-champagne">
-      <CloudStatus className="absolute right-5 top-5" />
-      <section className="max-w-md rounded-3xl border border-champagne/10 bg-midnight-2 p-6">
-        <ChefHat className="mx-auto h-10 w-10 text-gold" />
-        <h1 className="mt-4 font-display text-3xl italic">Kitchen</h1>
-        <p className="mt-3 font-body text-sm leading-relaxed text-champagne/60">
-          Kitchen web workspace is coming soon. The cloud API connection is monitored above.
-        </p>
-        <Link to="/" className="mt-5 inline-flex min-h-[44px] items-center font-body text-xs font-bold uppercase tracking-[0.18em] text-gold">
-          Back to hub
-        </Link>
-      </section>
     </main>
   )
 }
@@ -244,7 +236,7 @@ function CustomerMenuApp() {
       await validateStaffLoginCode(code)
       setStaffLoginOpen(false)
       setStaffLoginCode('')
-      navigate('/login')
+      navigate('/staff')
     } catch (error) {
       setStaffLoginError(error instanceof Error ? error.message : 'Incorrect staff passcode.')
     } finally {
@@ -437,14 +429,16 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<HubHome />} />
+        <Route path="/" element={<CustomerMenuApp />} />
         <Route path="/menu/*" element={<CustomerMenuApp />} />
         <Route path="/order/*" element={<CustomerMenuApp />} />
-        <Route path="/server" element={<PortalRedirect path="/server/index.html" />} />
-        <Route path="/cashier" element={<PortalRedirect path="/cashier.html" />} />
-        <Route path="/kitchen" element={<KitchenPage />} />
+        <Route path="/staff" element={<HubHome />} />
+        <Route path="/staff/server" element={<PortalRedirect path="/server/index.html" />} />
+        <Route path="/staff/cashier" element={<PortalRedirect path="/cashier/index.html" />} />
+        <Route path="/staff/kitchen" element={<PortalRedirect path="/kitchen/index.html" />} />
+        <Route path="/kitchen" element={<Navigate to="/staff/kitchen" replace />} />
         <Route path="/reservation" element={<ReservationPage />} />
-        <Route path="/login" element={<HubHome />} />
+        <Route path="/login" element={<Navigate to="/staff" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

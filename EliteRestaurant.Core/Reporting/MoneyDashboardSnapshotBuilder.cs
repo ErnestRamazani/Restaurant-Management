@@ -1,5 +1,6 @@
 using System.IO;
 using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Utils;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,11 +19,24 @@ public static class MoneyDashboardSnapshotBuilder
         db.Database.SetCommandTimeout(5);
         FinancialTransactionService.EnsureCompletedOrderRevenues(db);
         db.SaveChanges();
+        var txs = db.Transactions.AsNoTracking().ToList();
+        var result = BuildFromTransactions(txs, selectedPeriod, maxLedgerRows);
+        LogMoneyDebug($"Build snapshot done in {(DateTime.UtcNow - startedAt).TotalMilliseconds:N0} ms");
+        return result;
+    }
+
+    /// <summary>Desktop HTTP path: same dashboard as <see cref="Build"/> without opening SQL.</summary>
+    public static MoneyDashboardSnapshotData BuildFromTransactions(
+        IReadOnlyList<MoneyTransaction> transactions,
+        string selectedPeriod,
+        int maxLedgerRows = 200)
+    {
+        LogMoneyDebug($"Build snapshot (in-memory) start | period={selectedPeriod}");
+        var startedAt = DateTime.UtcNow;
         var today = DateTime.Today;
         var tomorrow = today.AddDays(1);
 
-        var todaysTransactions = db.Transactions
-            .AsNoTracking()
+        var todaysTransactions = transactions
             .Where(t => t.Date >= today && t.Date < tomorrow)
             .ToList();
         LogMoneyDebug($"Loaded today transactions: {todaysTransactions.Count}");
@@ -38,9 +52,8 @@ public static class MoneyDashboardSnapshotBuilder
         var todayExpensesUsd = MoneyReportingHelpers.SumByCurrency(todayExpenses, CurrencyHelper.Usd);
         var todayExpensesFc = MoneyReportingHelpers.SumByCurrency(todayExpenses, CurrencyHelper.CongoleseFranc);
 
-        var period = ResolvePeriodRange(db, today, selectedPeriod);
-        var periodRows = db.Transactions
-            .AsNoTracking()
+        var period = ResolvePeriodRange(transactions, today, selectedPeriod);
+        var periodRows = transactions
             .Where(t => t.Date >= period.FromDate && t.Date < period.ToExclusive)
             .Select(t => new
             {
@@ -132,9 +145,21 @@ public static class MoneyDashboardSnapshotBuilder
             TipsSummaryText = CurrencyHelper.FormatDualCurrency(tipsUsd, tipsFc),
             PayrollSummaryText = CurrencyHelper.FormatDualCurrency(payrollUsd, payrollFc)
         };
-        LogMoneyDebug($"Build snapshot done in {(DateTime.UtcNow - startedAt).TotalMilliseconds:N0} ms");
+        LogMoneyDebug($"Build snapshot (in-memory) done in {(DateTime.UtcNow - startedAt).TotalMilliseconds:N0} ms");
         return snapshot;
     }
+
+    private static (DateTime FromDate, DateTime ToDate, DateTime ToExclusive, string Label) ResolvePeriodRange(
+        IReadOnlyList<MoneyTransaction> transactions,
+        DateTime today,
+        string selectedPeriod)
+        => selectedPeriod switch
+        {
+            "Month" => ResolveMonthRange(today),
+            "Year" => ResolveYearRange(today),
+            "All" => ResolveAllRange(transactions, today),
+            _ => ResolveWeekRange(today)
+        };
 
     private static (DateTime FromDate, DateTime ToDate, DateTime ToExclusive, string Label) ResolvePeriodRange(
         AppDbContext db,
@@ -168,6 +193,15 @@ public static class MoneyDashboardSnapshotBuilder
         var from = new DateTime(today.Year, 1, 1);
         var to = today.Date;
         return (from, to, to.AddDays(1), "This Year");
+    }
+
+    private static (DateTime FromDate, DateTime ToDate, DateTime ToExclusive, string Label) ResolveAllRange(
+        IReadOnlyList<MoneyTransaction> transactions,
+        DateTime today)
+    {
+        var from = transactions.Count == 0 ? today.Date : transactions.Min(t => t.Date).Date;
+        var to = today.Date;
+        return (from, to, to.AddDays(1), "All Time");
     }
 
     private static (DateTime FromDate, DateTime ToDate, DateTime ToExclusive, string Label) ResolveAllRange(AppDbContext db, DateTime today)

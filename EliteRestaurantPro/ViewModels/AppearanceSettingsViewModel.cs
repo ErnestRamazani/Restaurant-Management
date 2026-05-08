@@ -1,17 +1,15 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Utils;
 using EliteRestaurantPro.ApiClients;
 using EliteRestaurantPro.Services;
 using EliteRestaurantPro.Utils;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Win32;
-using Npgsql;
 using QRCoder;
 
 namespace EliteRestaurantPro.ViewModels;
@@ -19,6 +17,7 @@ namespace EliteRestaurantPro.ViewModels;
 public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
 {
     private readonly AppSettings _settings;
+    private readonly AdminDataApiClient _adminData = new();
 
     private string _backgroundDarkHex = string.Empty;
     private string _backgroundMediumHex = string.Empty;
@@ -152,7 +151,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
             OnPropertyChanged(nameof(ShowAppearanceSection));
             OnPropertyChanged(nameof(ShowMenuQrSection));
             if (ShowMenuQrSection)
-                RefreshMenuQrRows();
+                _ = RefreshMenuQrRowsAsync();
         }
     }
 
@@ -259,7 +258,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         set
         {
             if (SetField(ref _publicMenuBaseUrl, value))
-                RefreshMenuQrRows();
+                _ = RefreshMenuQrRowsAsync();
         }
     }
 
@@ -463,15 +462,15 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         SaveMenuBackgroundCommand = new RelayCommand(_ => SaveMenuBackground());
         ClearMenuBackgroundCommand = new RelayCommand(_ => ClearMenuBackground());
         SaveDatabaseSettingsCommand = new RelayCommand(_ => SaveDatabaseSettings());
-        TestDatabaseConnectionCommand = new RelayCommand(_ => TestDatabaseConnection());
-        PrintAllMenuQrCommand = new RelayCommand(_ => PrintAllMenuQrToPdf());
+        TestDatabaseConnectionCommand = new RelayCommand(_ => _ = TestDatabaseConnectionAsync());
+        PrintAllMenuQrCommand = new RelayCommand(_ => _ = PrintAllMenuQrToPdfAsync());
         ApplyPhoneFriendlyMenuUrlCommand = new RelayCommand(_ => ApplyPhoneFriendlyMenuUrl());
         LoadBusinessAndPricingSettings();
         LoadBackgroundSettings();
         LoadDatabaseSettings();
         LoadFromCurrentTheme();
         if (ShowMenuQrSection)
-            RefreshMenuQrRows();
+            _ = RefreshMenuQrRowsAsync();
     }
 
     private void LoadFromCurrentTheme()
@@ -818,20 +817,24 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         }
         else if (!string.IsNullOrWhiteSpace(db.PostgreSqlConnectionString))
         {
-            try
+            DatabaseHost = string.Empty;
+            DatabasePort = "5432";
+            DatabaseName = string.Empty;
+            DatabaseUsername = string.Empty;
+            foreach (var part in db.PostgreSqlConnectionString.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             {
-                var b = new NpgsqlConnectionStringBuilder(db.PostgreSqlConnectionString.Trim());
-                DatabaseHost = b.Host ?? string.Empty;
-                DatabasePort = b.Port > 0 ? b.Port.ToString() : "5432";
-                DatabaseName = b.Database ?? string.Empty;
-                DatabaseUsername = b.Username ?? string.Empty;
-            }
-            catch
-            {
-                DatabaseHost = string.Empty;
-                DatabasePort = "5432";
-                DatabaseName = string.Empty;
-                DatabaseUsername = string.Empty;
+                var eq = part.IndexOf('=');
+                if (eq <= 0) continue;
+                var key = part[..eq].Trim();
+                var val = part[(eq + 1)..].Trim();
+                if (key.Equals("Host", StringComparison.OrdinalIgnoreCase) && val.Length > 0)
+                    DatabaseHost = val;
+                else if (key.Equals("Port", StringComparison.OrdinalIgnoreCase) && int.TryParse(val, out var parsedPort))
+                    DatabasePort = parsedPort > 0 ? parsedPort.ToString() : "5432";
+                else if (key.Equals("Database", StringComparison.OrdinalIgnoreCase) && val.Length > 0)
+                    DatabaseName = val;
+                else if ((key.Equals("Username", StringComparison.OrdinalIgnoreCase) || key.Equals("User ID", StringComparison.OrdinalIgnoreCase)) && val.Length > 0)
+                    DatabaseUsername = val;
             }
         }
         else
@@ -891,26 +894,16 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         || host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase)
         || host.Equals("::1", StringComparison.OrdinalIgnoreCase);
 
-    private void TestDatabaseConnection()
+    private async Task TestDatabaseConnectionAsync()
     {
-        var cs = BuildConnectionStringForTest();
-        if (string.IsNullOrWhiteSpace(cs))
-        {
-            StatusMessage = "Fill host, database, and username, and enter a password (or save a password first).";
-            return;
-        }
-
         try
         {
-            using var conn = new NpgsqlConnection(cs);
-            conn.Open();
-            using var cmd = new NpgsqlCommand("SELECT 1;", conn);
-            _ = cmd.ExecuteScalar();
-            StatusMessage = "PostgreSQL connection successful.";
+            _ = await _adminData.GetProductsAsync().ConfigureAwait(true);
+            StatusMessage = "API reachable (sample read succeeded). The desktop uses HTTP only; data lives on the API host.";
         }
         catch (Exception ex)
         {
-            StatusMessage = $"PostgreSQL connection failed: {ex.Message}";
+            StatusMessage = $"API request failed: {ex.GetBaseException().Message}";
         }
     }
 
@@ -942,15 +935,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
             }
         }
 
-        var b = new NpgsqlConnectionStringBuilder
-        {
-            Host = host,
-            Port = port,
-            Database = database,
-            Username = username,
-            Password = password
-        };
-        return b.ConnectionString;
+        return $"Host={host};Port={port};Database={database};Username={username};Password={password}";
     }
 
     private string GetHexForToken(string token)
@@ -1092,11 +1077,11 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         }
 
         PublicMenuBaseUrl = suggested;
-        RefreshMenuQrRows();
+        _ = RefreshMenuQrRowsAsync();
         StatusMessage = $"Public menu URL set to {suggested}. Save Business Profile to keep it, then re-print QR labels. Phone must use the same Wi-Fi as this PC (or a routed path to it).";
     }
 
-    private void RefreshMenuQrRows()
+    private async Task RefreshMenuQrRowsAsync()
     {
         MenuQrRows.Clear();
         try
@@ -1105,8 +1090,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
             if (string.IsNullOrWhiteSpace(baseUrl))
                 baseUrl = PublicMenuUrlHelper.SuggestBaseUrlForPhones() ?? CloudEndpoints.ProductionApiBaseUrl;
 
-            using var db = new AppDbContext();
-            var tables = db.Tables.AsNoTracking().OrderBy(t => t.TableNumber).ToList();
+            var tables = (await _adminData.GetTablesAsync().ConfigureAwait(true)).OrderBy(t => t.TableNumber).ToList();
             foreach (var t in tables)
             {
                 var url = $"{baseUrl}/menu/?table={t.Id}";
@@ -1138,10 +1122,10 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         }
     }
 
-    private void PrintAllMenuQrToPdf()
+    private async Task PrintAllMenuQrToPdfAsync()
     {
         if (MenuQrRows.Count == 0)
-            RefreshMenuQrRows();
+            await RefreshMenuQrRowsAsync().ConfigureAwait(true);
         if (MenuQrRows.Count == 0)
         {
             StatusMessage = "No tables in database to export.";

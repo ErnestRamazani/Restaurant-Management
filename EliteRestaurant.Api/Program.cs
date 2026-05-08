@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Serilog.Context;
@@ -77,6 +78,7 @@ try
     }
 
     builder.Services.AddControllers();
+    builder.Services.AddResponseCompression(options => options.EnableForHttps = true);
     if (builder.Environment.IsDevelopment())
     {
         builder.Services.AddEndpointsApiExplorer();
@@ -175,6 +177,8 @@ try
 
     app.UseForwardedHeaders();
 
+    app.UseResponseCompression();
+
     app.UseSerilogRequestLogging(opts =>
     {
         opts.MessageTemplate =
@@ -229,9 +233,82 @@ try
     app.UseAuthorization();
     app.UseDefaultFiles();
     app.UseStaticFiles();
+    app.MapGet("/server", () => Results.Redirect("/server/index.html"));
+    app.MapGet("/cashier", () => Results.Redirect("/cashier/index.html"));
+    app.MapGet("/server/", async (IWebHostEnvironment env, HttpContext context) =>
+    {
+        var serverPortal = Path.Combine(env.WebRootPath, "server", "index.html");
+        context.Response.ContentType = "text/html; charset=utf-8";
+        await context.Response.SendFileAsync(serverPortal);
+    });
+    app.MapGet("/server/index.html", async (IWebHostEnvironment env, HttpContext context) =>
+    {
+        var serverPortal = Path.Combine(env.WebRootPath, "server", "index.html");
+        context.Response.ContentType = "text/html; charset=utf-8";
+        await context.Response.SendFileAsync(serverPortal);
+    });
+    app.MapGet("/cashier/", async (IWebHostEnvironment env, HttpContext context) =>
+    {
+        var cashierPortal = Path.Combine(env.WebRootPath, "cashier", "index.html");
+        context.Response.ContentType = "text/html; charset=utf-8";
+        await context.Response.SendFileAsync(cashierPortal);
+    });
+    app.MapGet("/cashier/index.html", async (IWebHostEnvironment env, HttpContext context) =>
+    {
+        var cashierPortal = Path.Combine(env.WebRootPath, "cashier", "index.html");
+        context.Response.ContentType = "text/html; charset=utf-8";
+        await context.Response.SendFileAsync(cashierPortal);
+    });
+    app.MapGet("/kitchen", () => Results.Redirect("/kitchen/index.html"));
+    app.MapGet("/kitchen/", async (IWebHostEnvironment env, HttpContext context) =>
+    {
+        var path = Path.Combine(env.WebRootPath, "kitchen", "index.html");
+        context.Response.ContentType = "text/html; charset=utf-8";
+        await context.Response.SendFileAsync(path);
+    });
+    app.MapGet("/kitchen/index.html", async (IWebHostEnvironment env, HttpContext context) =>
+    {
+        var path = Path.Combine(env.WebRootPath, "kitchen", "index.html");
+        context.Response.ContentType = "text/html; charset=utf-8";
+        await context.Response.SendFileAsync(path);
+    });
     app.MapControllers();
     app.MapHub<OrderHub>("/hubs/order");
-    app.MapFallbackToFile("index.html");
+    // Do not serve SPA index.html for /api/* — unknown API routes used to fall through and return HTML with 200,
+    // which broke JSON clients (e.g. Create Order bundle on older deployments).
+    app.MapFallback(async (HttpContext context) =>
+    {
+        if (context.Request.Path.StartsWithSegments("/api"))
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            await context.Response.WriteAsJsonAsync(new
+            {
+                message = $"No API endpoint matches '{context.Request.Path.Value}'.",
+                path = context.Request.Path.Value
+            });
+            return;
+        }
+
+        // Staff portals live under /server/, /cashier/, /kitchen/. Do not serve the customer SPA for unknown paths there.
+        if (context.Request.Path.StartsWithSegments("/cashier")
+            || context.Request.Path.StartsWithSegments("/kitchen")
+            || context.Request.Path.StartsWithSegments("/server"))
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        var env = context.RequestServices.GetRequiredService<IWebHostEnvironment>();
+        var file = Path.Combine(env.WebRootPath, "index.html");
+        if (!System.IO.File.Exists(file))
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        context.Response.ContentType = "text/html; charset=utf-8";
+        await context.Response.SendFileAsync(file);
+    });
 
     app.Run();
 }

@@ -1,10 +1,10 @@
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Input;
-using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Utils;
-using Microsoft.EntityFrameworkCore;
+using EliteRestaurantPro.ApiClients;
+using EliteRestaurantPro.Services;
 
 namespace EliteRestaurantPro.ViewModels;
 
@@ -12,6 +12,8 @@ namespace EliteRestaurantPro.ViewModels;
 public sealed class ServerPickupViewModel : AdminBaseViewModel
 {
     private bool _isLoading;
+    private readonly AdminDataApiClient _data = new();
+    private readonly AdminOrderCloudOperations _cloudOps = new();
 
     public override string ActivePage => "ServerPickup";
 
@@ -39,7 +41,7 @@ public sealed class ServerPickupViewModel : AdminBaseViewModel
         MarkServedCommand = new RelayCommand(p =>
         {
             if (p is OrderEntry e)
-                MarkServed(e);
+                _ = MarkServedAsync(e);
         });
         _ = LoadAsync();
     }
@@ -53,21 +55,32 @@ public sealed class ServerPickupViewModel : AdminBaseViewModel
         try
         {
             var serverId = AppSession.StaffEmployeeId;
-            var list = await Task.Run(() =>
+            var orders = (await _data.GetOrdersAsync().ConfigureAwait(false)).ToList();
+            var tables = (await _data.GetTablesAsync().ConfigureAwait(false)).ToList();
+            var employees = (await _data.GetEmployeesAsync().ConfigureAwait(false)).ToList();
+            var products = (await _data.GetProductsAsync().ConfigureAwait(false)).ToList();
+            var productById = products.ToDictionary(p => p.Id);
+            var tablesById = tables.ToDictionary(t => t.Id);
+            var empById = employees.ToDictionary(e => e.Id);
+
+            foreach (var o in orders)
             {
-                using var db = new AppDbContext();
-                return db.Orders
-                    .AsNoTracking()
-                    .Include(o => o.Table)
-                    .Include(o => o.Server)
-                    .Include(o => o.Items)
-                    .ThenInclude(i => i.Product)
-                    .Where(o => o.Status == "Ready" && o.ServerId == serverId)
-                    .OrderBy(o => o.CreatedAt)
-                    .ToList()
-                    .Select(MapRow)
-                    .ToList();
-            });
+                if (o.TableId is int tid && tablesById.TryGetValue(tid, out var tbl))
+                    o.Table = tbl;
+                if (o.ServerId is int sid && empById.TryGetValue(sid, out var emp))
+                    o.Server = emp;
+                foreach (var item in o.Items)
+                {
+                    if (productById.TryGetValue(item.ProductId, out var p))
+                        item.Product = p;
+                }
+            }
+
+            var list = orders
+                .Where(o => o.Status == "Ready" && o.ServerId == serverId)
+                .OrderBy(o => o.CreatedAt)
+                .Select(MapRow)
+                .ToList();
 
             ReadyOrders.Clear();
             foreach (var o in list)
@@ -81,7 +94,7 @@ public sealed class ServerPickupViewModel : AdminBaseViewModel
         }
     }
 
-    private void MarkServed(OrderEntry entry)
+    private async Task MarkServedAsync(OrderEntry entry)
     {
         var confirm = MessageBox.Show(
             $"Mark order {entry.OrderId} as served to the table?\n\nIt will appear in Active orders as Served so the cashier can complete payment.",
@@ -91,37 +104,34 @@ public sealed class ServerPickupViewModel : AdminBaseViewModel
         if (confirm != MessageBoxResult.Yes)
             return;
 
-        using var db = new AppDbContext();
-        var order = db.Orders.FirstOrDefault(o =>
-            o.Id == entry.Id && o.Status == "Ready" && o.ServerId == AppSession.StaffEmployeeId);
-        if (order is null)
+        try
         {
-            MessageBox.Show("Order is no longer Ready or not assigned to you.", "Pick up", MessageBoxButton.OK,
-                MessageBoxImage.Information);
-            _ = LoadAsync();
-            return;
+            var orders = (await _data.GetOrdersAsync().ConfigureAwait(false)).ToList();
+            var order = orders.FirstOrDefault(o =>
+                o.Id == entry.Id && o.Status == "Ready" && o.ServerId == AppSession.StaffEmployeeId);
+            if (order is null)
+            {
+                MessageBox.Show("Order is no longer Ready or not assigned to you.", "Pick up", MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                await LoadAsync();
+                return;
+            }
+
+            var msg = await _cloudOps.TryAdvanceOrderAsync(entry.Id).ConfigureAwait(true);
+            if (msg is not null && msg != string.Empty)
+            {
+                MessageBox.Show(msg, "Pick up", MessageBoxButton.OK, MessageBoxImage.Information);
+                await LoadAsync();
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.GetBaseException().Message, "Pick up", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
-        order.Status = OrderWorkflow.Served;
-        DatabaseResilientTransaction.Execute(db, () =>
-        {
-            using var tx = db.Database.BeginTransaction();
-            try
-            {
-                db.SaveChanges();
-                DataReconciler.ReconcileTableStatusesWithOrders(db);
-                db.SaveChanges();
-                tx.Commit();
-            }
-            catch
-            {
-                tx.Rollback();
-                throw;
-            }
-        });
-
         OrderDetail.Close();
-        _ = LoadAsync();
+        await LoadAsync();
     }
 
     private static OrderEntry MapRow(OrderRecord order)

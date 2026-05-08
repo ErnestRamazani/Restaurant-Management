@@ -3,11 +3,11 @@ using System.Globalization;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
-using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Reporting;
 using EliteRestaurant.Core.Utils;
+using EliteRestaurantPro.ApiClients;
 using EliteRestaurantPro.Services;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Win32;
 
 namespace EliteRestaurantPro.ViewModels;
@@ -259,8 +259,8 @@ public class MoneyViewModel : AdminBaseViewModel
         AddEntryCommand = new RelayCommand(_ => AddEntry());
         RefreshLedgerCommand = new RelayCommand(_ => LoadData());
         GenerateReportCommand = new RelayCommand(_ => GenerateReport());
-        ExportExcelCommand = new RelayCommand(_ => ExportExcel());
-        BulkExportExcelCommand = new RelayCommand(_ => BulkExportExcelWorkbook());
+        ExportExcelCommand = new RelayCommand(_ => _ = ExportExcelAsync());
+        BulkExportExcelCommand = new RelayCommand(_ => _ = BulkExportExcelWorkbookAsync());
         SelectPeriodCommand = new RelayCommand(period => SetPeriod(period as string));
 
         ApplyCategoryRules();
@@ -332,7 +332,12 @@ public class MoneyViewModel : AdminBaseViewModel
         try
         {
             var selectedPeriod = SelectedPeriod;
-            var snapshotTask = Task.Run(() => MoneyDashboardSnapshotBuilder.Build(selectedPeriod, MaxLedgerRows));
+            var snapshotTask = Task.Run(async () =>
+            {
+                var data = new AdminDataApiClient();
+                var txs = await data.GetMoneyTransactionsAsync().ConfigureAwait(false);
+                return MoneyDashboardSnapshotBuilder.BuildFromTransactions(txs.ToList(), selectedPeriod, MaxLedgerRows);
+            });
             var completedTask = await Task.WhenAny(snapshotTask, Task.Delay(5000));
             if (completedTask != snapshotTask)
             {
@@ -420,7 +425,7 @@ public class MoneyViewModel : AdminBaseViewModel
             MessageBoxImage.Information);
     }
 
-    private void ExportExcel()
+    private async Task ExportExcelAsync()
     {
         var range = TryGetReportRange();
         if (range is null)
@@ -445,18 +450,33 @@ public class MoneyViewModel : AdminBaseViewModel
         if (saveDialog.ShowDialog() != true)
             return;
 
-        using var db = new AppDbContext();
-        FinancialTransactionService.EnsureCompletedOrderRevenues(db);
-        FinancialTransactionService.EnsureScheduledSalaryExpenses(db, fromDate, toDate);
-        db.SaveChanges();
+        var data = new AdminDataApiClient();
+        var moneyTask = data.GetMoneyTransactionsAsync();
+        var ordersTask = data.GetOrdersAsync();
+        var productsTask = data.GetProductsAsync();
+        var ingTask = data.GetProductIngredientsAsync();
+        var invTask = data.GetInventoryItemsAsync();
+        var attTask = data.GetAttendanceAsync();
+        var empTask = data.GetEmployeesAsync();
+        await Task.WhenAll(moneyTask, ordersTask, productsTask, ingTask, invTask, attTask, empTask).ConfigureAwait(true);
+        var rows = MoneyExcelReportRowsBuilder.BuildReportRowsFromData(
+            SelectedReportType,
+            fromDate,
+            rangeEndExclusive,
+            (await moneyTask.ConfigureAwait(true)).ToList(),
+            (await ordersTask.ConfigureAwait(true)).ToList(),
+            (await productsTask.ConfigureAwait(true)).ToList(),
+            (await ingTask.ConfigureAwait(true)).ToList(),
+            (await invTask.ConfigureAwait(true)).ToList(),
+            (await attTask.ConfigureAwait(true)).ToList(),
+            (await empTask.ConfigureAwait(true)).ToList());
 
-        var data = MoneyExcelReportRowsBuilder.BuildReportRows(db, SelectedReportType, fromDate, rangeEndExclusive);
-        ExcelExportService.ExportSingleSheet(saveDialog.FileName, SelectedReportType, data.Headers, data.Rows);
+        ExcelExportService.ExportSingleSheet(saveDialog.FileName, SelectedReportType, rows.Headers, rows.Rows);
 
         MessageBox.Show($"Excel exported:\n{saveDialog.FileName}", "Excel Export", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
-    private void BulkExportExcelWorkbook()
+    private async Task BulkExportExcelWorkbookAsync()
     {
         var range = TryGetReportRange();
         if (range is null)
@@ -475,19 +495,31 @@ public class MoneyViewModel : AdminBaseViewModel
         if (saveDialog.ShowDialog() != true)
             return;
 
-        using var db = new AppDbContext();
-        FinancialTransactionService.EnsureCompletedOrderRevenues(db);
-        FinancialTransactionService.EnsureScheduledSalaryExpenses(db, fromDate, toDate);
-        db.SaveChanges();
+        var data = new AdminDataApiClient();
+        var moneyTask = data.GetMoneyTransactionsAsync();
+        var ordersTask = data.GetOrdersAsync();
+        var productsTask = data.GetProductsAsync();
+        var ingTask = data.GetProductIngredientsAsync();
+        var invTask = data.GetInventoryItemsAsync();
+        var attTask = data.GetAttendanceAsync();
+        var empTask = data.GetEmployeesAsync();
+        await Task.WhenAll(moneyTask, ordersTask, productsTask, ingTask, invTask, attTask, empTask).ConfigureAwait(true);
+        var money = (await moneyTask.ConfigureAwait(true)).ToList();
+        var orders = (await ordersTask.ConfigureAwait(true)).ToList();
+        var products = (await productsTask.ConfigureAwait(true)).ToList();
+        var ing = (await ingTask.ConfigureAwait(true)).ToList();
+        var inv = (await invTask.ConfigureAwait(true)).ToList();
+        var att = (await attTask.ConfigureAwait(true)).ToList();
+        var emp = (await empTask.ConfigureAwait(true)).ToList();
 
-        var transactions = MoneyExcelReportRowsBuilder.BuildReportRows(db, "Transactions", fromDate, rangeEndExclusive);
-        var orders = MoneyExcelReportRowsBuilder.BuildReportRows(db, "Orders", fromDate, rangeEndExclusive);
-        var inventory = MoneyExcelReportRowsBuilder.BuildReportRows(db, "Inventory", fromDate, rangeEndExclusive);
-        var attendance = MoneyExcelReportRowsBuilder.BuildReportRows(db, "Attendance", fromDate, rangeEndExclusive);
+        var transactions = MoneyExcelReportRowsBuilder.BuildReportRowsFromData("Transactions", fromDate, rangeEndExclusive, money, orders, products, ing, inv, att, emp);
+        var ordersRows = MoneyExcelReportRowsBuilder.BuildReportRowsFromData("Orders", fromDate, rangeEndExclusive, money, orders, products, ing, inv, att, emp);
+        var inventory = MoneyExcelReportRowsBuilder.BuildReportRowsFromData("Inventory", fromDate, rangeEndExclusive, money, orders, products, ing, inv, att, emp);
+        var attendance = MoneyExcelReportRowsBuilder.BuildReportRowsFromData("Attendance", fromDate, rangeEndExclusive, money, orders, products, ing, inv, att, emp);
 
         ExcelExportService.ExportWorkbook(saveDialog.FileName, [
             ("Transactions", transactions.Headers, transactions.Rows),
-            ("Orders", orders.Headers, orders.Rows),
+            ("Orders", ordersRows.Headers, ordersRows.Rows),
             ("Inventory", inventory.Headers, inventory.Rows),
             ("Attendance", attendance.Headers, attendance.Rows)
         ]);

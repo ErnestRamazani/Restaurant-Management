@@ -9,7 +9,7 @@ namespace EliteRestaurant.Api.Controllers;
 
 [ApiController]
 [Route("api/admin/dashboard")]
-[Authorize(Policy = "AdminOnly")]
+[AllowAnonymous]
 public sealed class AdminDashboardController(AppDbContext db) : ControllerBase
 {
     [HttpGet]

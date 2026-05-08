@@ -27,7 +27,7 @@
                         <Run Text=" / Bar" Foreground="{StaticResource GoldAccentBrush}"/>
                         <Run Text=" Queue" Foreground="{StaticResource TextPrimaryBrush}"/>
                     </TextBlock>
-                    <TextBlock Text="Confirm Waiting tickets into In Kitchen, then mark Ready for pickup. Select any order to review lines, notes, and station."
+                    <TextBlock Text="Confirm Waiting tickets into In Kitchen, mark Ready for pickup, then track Picked up (ready for servers). Select any ticket to review lines, notes, and station."
                                Style="{StaticResource BodyText}" FontSize="13" Margin="0,6,0,0" TextWrapping="Wrap"/>
                 </StackPanel>
                 <Button Grid.Column="1" VerticalAlignment="Top" Content="Refresh"
@@ -35,12 +35,17 @@
             </Grid>
 
             <Grid Grid.Row="1" Margin="24,0,24,24">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid Grid.Row="0" MinHeight="280">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="12"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="12"/>
-                    <ColumnDefinition Width="340"/>
+                    <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
                 <!-- Incoming: Waiting -->
@@ -198,8 +203,82 @@
                     </Grid>
                 </Border>
 
+                <!-- Picked up: Ready -->
+                <Border Grid.Column="4" Style="{StaticResource GlassCard}" Padding="0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <Border Grid.Row="0" Padding="14,12" CornerRadius="14,14,0,0">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                    <GradientStop Color="#334CAF50" Offset="0"/>
+                                    <GradientStop Color="#114CAF50" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Picked up (ready)" Foreground="{StaticResource TextPrimaryBrush}"
+                                           FontWeight="SemiBold" FontSize="14"/>
+                                <Border Margin="10,0,0,0" Background="{StaticResource StatGreenBrush}" CornerRadius="8" Padding="8,2">
+                                    <TextBlock Text="{Binding ReadyPickupOrders.Count}" Foreground="White" FontSize="12" FontWeight="SemiBold"/>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                        <ListBox Grid.Row="1" ItemsSource="{Binding ReadyPickupOrders}"
+                                 SelectedItem="{Binding SelectedReady}"
+                                 BorderThickness="0" Background="Transparent" Padding="8"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                    <Setter Property="Padding" Value="0,0,0,8"/>
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListBoxItem">
+                                                <Border x:Name="Bd" Background="Transparent" Padding="4">
+                                                    <ContentPresenter/>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsSelected" Value="True">
+                                                        <Setter TargetName="Bd" Property="Background" Value="#334CAF50"/>
+                                                        <Setter TargetName="Bd" Property="CornerRadius" Value="10"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Bd" Property="Background" Value="#224CAF50"/>
+                                                        <Setter TargetName="Bd" Property="CornerRadius" Value="10"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Border CornerRadius="10" Padding="12,10" Background="#FF1A1A2E">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding OrderId}" Foreground="{StaticResource GoldAccentBrush}" FontWeight="SemiBold"/>
+                                            <TextBlock Text="{Binding TableNumber}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,4,0,0"/>
+                                            <TextBlock Text="{Binding ServerName, StringFormat=Server: {0}}" Foreground="{StaticResource StatBlueBrush}" FontSize="11" Margin="0,2,0,0"/>
+                                            <TextBlock Text="{Binding Items}" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,6,0,0" TextWrapping="Wrap" MaxHeight="36" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding Total, StringFormat=$ {0:N2}}" Foreground="{StaticResource GoldAccentBrush}" Margin="0,6,0,8"/>
+                                            <Button Content="View order"
+                                                    Command="{Binding DataContext.ViewFullOrderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}"
+                                                    Style="{StaticResource SapphireButton}"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
+                </Border>
+                </Grid>
+
                 <!-- Detail panel -->
-                <Border Grid.Column="4" Style="{StaticResource GlassCard}" Padding="16">
+                <Border Grid.Row="1" Margin="0,16,0,0" Style="{StaticResource GlassCard}" Padding="16">
                     <Grid>
                         <ScrollViewer VerticalScrollBarVisibility="Auto" Style="{StaticResource EliteScrollViewer}">
                             <StackPanel Visibility="{Binding HasDetail, Converter={StaticResource BoolToVisibilityConverter}}">
@@ -242,7 +321,7 @@
                                 </ItemsControl>
                             </StackPanel>
                         </ScrollViewer>
-                        <TextBlock Text="Select an order in Waiting or In Kitchen to view full ticket detail here."
+                        <TextBlock Text="Select a ticket from Incoming, In kitchen, or Picked up to view full detail here."
                                    Foreground="{StaticResource TextMutedBrush}" FontSize="13" TextWrapping="Wrap"
                                    VerticalAlignment="Center" TextAlignment="Center" Margin="8">
                             <TextBlock.Style>

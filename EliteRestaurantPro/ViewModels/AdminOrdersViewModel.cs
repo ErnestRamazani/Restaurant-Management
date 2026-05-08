@@ -5,14 +5,11 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Input;
-using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Orders;
 using EliteRestaurant.Core.Utils;
 using EliteRestaurantPro.Services;
 using Microsoft.Win32;
-using Microsoft.EntityFrameworkCore;
-using ModelTable = EliteRestaurant.Core.Models.Table;
 
 namespace EliteRestaurantPro.ViewModels;
 
@@ -73,7 +70,7 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
         {
             var showAdminAdvance = ShowFullAdminNav;
             var canViewTicket = ShowFullAdminNav || AppSession.IsCashierTablet;
-            var snapshot = await Task.Run(() => AdminOrdersSnapshotLoader.Load(showAdminAdvance, canViewTicket));
+            var snapshot = await AdminOrdersSnapshotLoader.LoadAsync(showAdminAdvance, canViewTicket);
 
             PendingCashierOrders.Clear();
             foreach (var row in snapshot.PendingCashier)
@@ -182,18 +179,31 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
         if (confirm != MessageBoxResult.Yes)
             return;
 
-        var result = _orderOps.TryReleasePendingToKitchen(row.OrderId);
-        if (!result.Ok)
-        {
-            MessageBox.Show(result.ErrorMessage ?? "Cannot release order.", "Orders", MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-            _ = LoadOrdersAsync();
-            return;
-        }
+        _ = ReleasePendingToKitchenCoreAsync(row);
+    }
 
-        MessageBox.Show($"Order {result.ReleasedOrderCode} sent to the kitchen.", "Orders", MessageBoxButton.OK,
-            MessageBoxImage.Information);
-        _ = LoadOrdersAsync();
+    private async Task ReleasePendingToKitchenCoreAsync(CashierQueueRow row)
+    {
+        try
+        {
+            var result = await _cloudOps.TryReleasePendingToKitchenAsync(row.OrderId);
+            if (!result.Ok)
+            {
+                MessageBox.Show(result.ErrorMessage ?? "Cannot release order.", "Orders", MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                await LoadOrdersAsync();
+                return;
+            }
+
+            MessageBox.Show($"Order {result.ReleasedOrderCode} sent to the kitchen.", "Orders", MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            await LoadOrdersAsync();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.GetBaseException().Message, "Orders", MessageBoxButton.OK, MessageBoxImage.Warning);
+            await LoadOrdersAsync();
+        }
     }
 
     private void CancelPendingCashier(CashierQueueRow? row)
@@ -209,15 +219,28 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
         if (confirm != MessageBoxResult.Yes)
             return;
 
-        var err = _orderOps.TryCancelPendingCashier(row.OrderId);
-        if (err is not null)
-        {
-            MessageBox.Show(err, "Orders", MessageBoxButton.OK, MessageBoxImage.Information);
-            _ = LoadOrdersAsync();
-            return;
-        }
+        _ = CancelPendingCashierCoreAsync(row);
+    }
 
-        _ = LoadOrdersAsync();
+    private async Task CancelPendingCashierCoreAsync(CashierQueueRow row)
+    {
+        try
+        {
+            var err = await _cloudOps.TryCancelPendingCashierAsync(row.OrderId);
+            if (err is not null)
+            {
+                MessageBox.Show(err, "Orders", MessageBoxButton.OK, MessageBoxImage.Information);
+                await LoadOrdersAsync();
+                return;
+            }
+
+            await LoadOrdersAsync();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.GetBaseException().Message, "Orders", MessageBoxButton.OK, MessageBoxImage.Warning);
+            await LoadOrdersAsync();
+        }
     }
 
     private void CreateOrder()
@@ -228,21 +251,41 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
             return;
         }
 
-        using var db = new AppDbContext();
-        var table = db.Tables.Include(t => t.AssignedServer).SingleOrDefault(t => t.Id == SelectedTableId);
-        if (table is null)
+        _ = CreateOrderCoreAsync(selectedProducts);
+    }
+
+    private async Task CreateOrderCoreAsync(List<ProductSelectionItemViewModel> selectedProducts)
+    {
+        var data = new ApiClients.AdminDataApiClient();
+        List<Table> tables;
+        List<Employee> employees;
+        try
         {
+            tables = (await data.GetTablesAsync().ConfigureAwait(false)).ToList();
+            employees = (await data.GetEmployeesAsync().ConfigureAwait(false)).ToList();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.GetBaseException().Message, "Orders", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
-        // Business rule: one server per table, order inherits that table's server
-        if (table.AssignedServerId is null || table.AssignedServer is null)
+        var table = tables.SingleOrDefault(t => t.Id == SelectedTableId);
+        if (table is null)
+            return;
+
+        Employee? assigned = null;
+        if (table.AssignedServerId is int sid)
+            assigned = employees.FirstOrDefault(e => e.Id == sid);
+        if (assigned is null)
         {
+            MessageBox.Show("This table must have an assigned server.", "Orders", MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 
         var confirmAdd = MessageBox.Show(
-            $"Create order for Table {table.TableNumber} ({table.Name}) assigned to {table.AssignedServer.Name}?",
+            $"Create order for Table {table.TableNumber} ({table.Name}) assigned to {assigned.Name}?",
             "Confirm Create Order",
             MessageBoxButton.YesNo,
             MessageBoxImage.Question);
@@ -254,10 +297,18 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
             .Select(p => new AdminWalkInLine(p.ProductId, p.Quantity))
             .ToList();
 
-        var errCreate = _orderOps.TryCreateWalkInOrder(table.Id, SelectedOrderStatus, lines);
-        if (errCreate is not null)
+        try
         {
-            MessageBox.Show(errCreate, "Insufficient Inventory", MessageBoxButton.OK, MessageBoxImage.Warning);
+            var errCreate = await _cloudOps.TryCreateWalkInOrderAsync(table.Id, SelectedOrderStatus, lines);
+            if (errCreate is not null)
+            {
+                MessageBox.Show(errCreate, "Insufficient Inventory", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.GetBaseException().Message, "Orders", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
@@ -267,7 +318,7 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
             selection.Quantity = 1;
         }
 
-        _ = LoadOrdersAsync();
+        await LoadOrdersAsync();
     }
 
     private void AdvanceOrder(OrderEntry? entry)
@@ -277,16 +328,29 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
         if (!ShowFullAdminNav)
             return;
 
-        var msg = _orderOps.TryAdvanceOrder(entry.Id);
-        if (msg == string.Empty)
-            return;
-        if (msg is not null)
-        {
-            MessageBox.Show(msg, "Orders", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
+        _ = AdvanceOrderCoreAsync(entry);
+    }
 
-        _ = LoadOrdersAsync();
+    private async Task AdvanceOrderCoreAsync(OrderEntry entry)
+    {
+        try
+        {
+            var msg = await _cloudOps.TryAdvanceOrderAsync(entry.Id);
+            if (msg == string.Empty)
+                return;
+            if (msg is not null)
+            {
+                MessageBox.Show(msg, "Orders", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            await LoadOrdersAsync();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.GetBaseException().Message, "Orders", MessageBoxButton.OK, MessageBoxImage.Warning);
+            await LoadOrdersAsync();
+        }
     }
 
     private void CompleteOrder(OrderEntry? entry)
@@ -332,11 +396,23 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
         decimal changeGivenUsd = 0m,
         decimal changeGivenFc = 0m)
     {
+        _ = UpdateOrderStatusAsync(entry, status, paymentCurrencyOverride, paidUsd, paidFc, changeGivenUsd, changeGivenFc);
+    }
+
+    private async Task UpdateOrderStatusAsync(
+        OrderEntry? entry,
+        string status,
+        string? paymentCurrencyOverride = null,
+        decimal paidUsd = 0m,
+        decimal paidFc = 0m,
+        decimal changeGivenUsd = 0m,
+        decimal changeGivenFc = 0m)
+    {
         if (entry is null) return;
 
         try
         {
-            _orderOps.UpdateOrderStatus(
+            await _cloudOps.UpdateOrderStatusAsync(
                 entry.Id,
                 status,
                 paymentCurrencyOverride,
@@ -350,8 +426,13 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
             MessageBox.Show(ex.Message, "Orders", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.GetBaseException().Message, "Orders", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
 
-        _ = LoadOrdersAsync();
+        await LoadOrdersAsync();
     }
 
     private void OpenTicketPreview(OrderEntry? entry)
@@ -361,17 +442,47 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
         if (!entry.ShowViewTicketInOrders)
             return;
 
-        using var db = new AppDbContext();
-        var order = db.Orders
-            .Include(o => o.Items)
-            .ThenInclude(i => i.Product)
-            .Include(o => o.Table)
-            .Include(o => o.Server)
-            .SingleOrDefault(o => o.Id == entry.Id);
+        _ = OpenTicketPreviewAsync(entry);
+    }
 
-        if (order is null)
-            return;
+    private async Task OpenTicketPreviewAsync(OrderEntry entry)
+    {
+        try
+        {
+            var data = new ApiClients.AdminDataApiClient();
+            var ordersTask = data.GetOrdersAsync();
+            var productsTask = data.GetProductsAsync();
+            var tablesTask = data.GetTablesAsync();
+            var employeesTask = data.GetEmployeesAsync();
+            await Task.WhenAll(ordersTask, productsTask, tablesTask, employeesTask).ConfigureAwait(false);
 
+            var order = (await ordersTask.ConfigureAwait(false)).FirstOrDefault(o => o.Id == entry.Id);
+            if (order is null)
+                return;
+
+            var products = await productsTask.ConfigureAwait(false);
+            var productById = products.ToDictionary(p => p.Id);
+            foreach (var item in order.Items)
+            {
+                if (productById.TryGetValue(item.ProductId, out var p))
+                    item.Product = p;
+            }
+
+            if (order.TableId is int tid)
+                order.Table = (await tablesTask.ConfigureAwait(false)).FirstOrDefault(t => t.Id == tid);
+            if (order.ServerId is int sid)
+                order.Server = (await employeesTask.ConfigureAwait(false)).FirstOrDefault(e => e.Id == sid);
+
+            await Application.Current.Dispatcher.InvokeAsync(() => ApplyTicketPreview(order));
+        }
+        catch
+        {
+            // Best-effort preview
+        }
+    }
+
+    private void ApplyTicketPreview(OrderRecord order)
+    {
         TicketLines.Clear();
         foreach (var item in order.Items)
         {
@@ -417,7 +528,8 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
             $"Paid USD: {CurrencyHelper.FormatAmount(order.CustomerPaidUsd, CurrencyHelper.Usd)} | Paid FC: {CurrencyHelper.FormatAmount(order.CustomerPaidFc, CurrencyHelper.CongoleseFranc)}";
         TicketChangeBreakdownText =
             $"Change USD: {CurrencyHelper.FormatAmount(order.ChangeGivenUsd, CurrencyHelper.Usd)} | Change FC: {CurrencyHelper.FormatAmount(order.ChangeGivenFc, CurrencyHelper.CongoleseFranc)}";
-        TicketVerification = $"ERP-DB-{order.Id}-{order.UniqueId[..Math.Min(4, order.UniqueId.Length)]}";
+        var uid = string.IsNullOrWhiteSpace(order.UniqueId) ? string.Empty : order.UniqueId;
+        TicketVerification = $"ERP-DB-{order.Id}-{uid[..Math.Min(4, uid.Length)]}";
         var settings = SettingsManager.Load();
         TicketRestaurantName = string.IsNullOrWhiteSpace(settings.BusinessProfile.RestaurantName)
             ? "ELITE RESTAURANT PRO"
@@ -425,6 +537,8 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
         TicketTaxLabel = $"TVA ({settings.CurrencyPricing.TaxPercent:0.##}%)";
         TicketServiceLabel = $"Service ({settings.CurrencyPricing.ServicePercent:0.##}%)";
 
+        OnPropertyChanged(nameof(TicketOrderId));
+        OnPropertyChanged(nameof(TicketStatus));
         IsTicketPreviewOpen = true;
     }
 

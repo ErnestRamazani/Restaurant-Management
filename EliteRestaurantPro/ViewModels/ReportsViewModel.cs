@@ -1,10 +1,10 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Threading.Tasks;
 using System.Windows.Input;
-using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Utils;
 using EliteRestaurant.Core.Models;
-using Microsoft.EntityFrameworkCore;
+using EliteRestaurantPro.ApiClients;
 using Microsoft.Win32;
 
 namespace EliteRestaurantPro.ViewModels;
@@ -47,6 +47,7 @@ public sealed class ReportDayGroupDto
 
 public sealed class ReportsViewModel : AdminBaseViewModel
 {
+    private readonly AdminDataApiClient _data = new();
     private ReportEntityItem? _selectedEmployee;
     private ReportEntityItem? _selectedTable;
     private ReportEntityItem? _selectedInventoryItem;
@@ -90,7 +91,7 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         {
             if (!SetField(ref _selectedEmployee, value))
                 return;
-            LoadEmployeeDetails(value?.Id);
+            _ = LoadEmployeeDetailsAsync(value?.Id);
         }
     }
 
@@ -101,7 +102,7 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         {
             if (!SetField(ref _selectedTable, value))
                 return;
-            LoadTableDetails(value?.Id);
+            _ = LoadTableDetailsAsync(value?.Id);
         }
     }
 
@@ -112,7 +113,7 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         {
             if (!SetField(ref _selectedInventoryItem, value))
                 return;
-            LoadInventoryDetails(value?.Id);
+            _ = LoadInventoryDetailsAsync(value?.Id);
         }
     }
 
@@ -123,7 +124,7 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         {
             if (!SetField(ref _selectedMenuItem, value))
                 return;
-            LoadMenuDetails(value?.Id);
+            _ = LoadMenuDetailsAsync(value?.Id);
         }
     }
 
@@ -200,8 +201,8 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         {
             if (!SetField(ref _reportStartDate, value))
                 return;
-            LoadDailyReport();
-            LoadOrdersReport();
+            _ = LoadDailyReportAsync();
+            _ = LoadOrdersReportAsync();
         }
     }
 
@@ -212,8 +213,8 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         {
             if (!SetField(ref _reportEndDate, value))
                 return;
-            LoadDailyReport();
-            LoadOrdersReport();
+            _ = LoadDailyReportAsync();
+            _ = LoadOrdersReportAsync();
         }
     }
 
@@ -229,18 +230,50 @@ public sealed class ReportsViewModel : AdminBaseViewModel
 
     public ReportsViewModel(Action<BaseViewModel> navigate) : base(navigate)
     {
-        RefreshCommand = new RelayCommand(_ => LoadReportLists());
-        ExportExcelCommand = new RelayCommand(_ => ExportExcel());
-        BulkExportExcelCommand = new RelayCommand(_ => ExportBulkExcel());
-        LoadReportLists();
+        RefreshCommand = new RelayCommand(_ => _ = LoadReportListsAsync());
+        ExportExcelCommand = new RelayCommand(_ => _ = ExportExcelAsync());
+        BulkExportExcelCommand = new RelayCommand(_ => _ = ExportBulkExcelAsync());
+        _ = LoadReportListsAsync();
     }
 
-    private void LoadReportLists()
-    {
-        using var db = new AppDbContext();
+    private async Task<Dictionary<int, Product>> LoadProductsByIdAsync() =>
+        (await _data.GetProductsAsync().ConfigureAwait(true)).ToDictionary(p => p.Id);
 
+    private static void HydrateOrderItems(IReadOnlyList<OrderRecord> orders, IReadOnlyDictionary<int, Product> productsById)
+    {
+        foreach (var o in orders)
+        {
+            foreach (var i in o.Items)
+            {
+                i.OrderRecord = o;
+                if (productsById.TryGetValue(i.ProductId, out var p))
+                    i.Product = p;
+            }
+        }
+    }
+
+    private async Task<List<OrderRecord>> LoadOrdersInRangeAsync(DateTime start, DateTime endExclusive)
+    {
+        var productsById = await LoadProductsByIdAsync().ConfigureAwait(true);
+        var orders = (await _data.GetOrdersAsync().ConfigureAwait(true))
+            .Where(o => o.CreatedAt >= start && o.CreatedAt < endExclusive)
+            .OrderBy(o => o.CreatedAt)
+            .ToList();
+        HydrateOrderItems(orders, productsById);
+        return orders;
+    }
+
+    private async Task LoadReportListsAsync()
+    {
+        var employeesTask = _data.GetEmployeesAsync();
+        var tablesTask = _data.GetTablesAsync();
+        var invTask = _data.GetInventoryItemsAsync();
+        var productsTask = _data.GetProductsAsync();
+        await Task.WhenAll(employeesTask, tablesTask, invTask, productsTask).ConfigureAwait(true);
+
+        var employees = (await employeesTask.ConfigureAwait(true)).OrderBy(e => e.Name).ToList();
         Employees.Clear();
-        foreach (var employee in db.Employees.AsNoTracking().OrderBy(e => e.Name))
+        foreach (var employee in employees)
         {
             Employees.Add(new ReportEntityItem
             {
@@ -251,8 +284,9 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             });
         }
 
+        var tables = (await tablesTask.ConfigureAwait(true)).OrderBy(t => t.TableNumber).ToList();
         Tables.Clear();
-        foreach (var table in db.Tables.AsNoTracking().OrderBy(t => t.TableNumber))
+        foreach (var table in tables)
         {
             Tables.Add(new ReportEntityItem
             {
@@ -263,8 +297,9 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             });
         }
 
+        var inv = (await invTask.ConfigureAwait(true)).OrderBy(i => i.Name).ToList();
         InventoryItems.Clear();
-        foreach (var item in db.InventoryItems.AsNoTracking().OrderBy(i => i.Name))
+        foreach (var item in inv)
         {
             InventoryItems.Add(new ReportEntityItem
             {
@@ -275,8 +310,9 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             });
         }
 
+        var products = (await productsTask.ConfigureAwait(true)).OrderBy(p => p.Name).ToList();
         MenuItems.Clear();
-        foreach (var product in db.Products.AsNoTracking().OrderBy(p => p.Name))
+        foreach (var product in products)
         {
             MenuItems.Add(new ReportEntityItem
             {
@@ -291,11 +327,11 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         SelectedTable = Tables.FirstOrDefault();
         SelectedInventoryItem = InventoryItems.FirstOrDefault();
         SelectedMenuItem = MenuItems.FirstOrDefault();
-        LoadDailyReport();
-        LoadOrdersReport();
+        await LoadDailyReportAsync().ConfigureAwait(true);
+        await LoadOrdersReportAsync().ConfigureAwait(true);
     }
 
-    private void LoadOrdersReport()
+    private async Task LoadOrdersReportAsync()
     {
         OrderTimelineDays.Clear();
         var start = ReportStartDate.Date;
@@ -306,15 +342,7 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             return;
         }
 
-        using var db = new AppDbContext();
-        var orders = db.Orders
-            .AsNoTracking()
-            .Include(o => o.Items)
-            .ThenInclude(i => i.Product)
-            .Where(o => o.CreatedAt >= start && o.CreatedAt < endExclusive)
-            .OrderBy(o => o.CreatedAt)
-            .ToList();
-
+        var orders = await LoadOrdersInRangeAsync(start, endExclusive).ConfigureAwait(true);
         var entries = new List<ReportTimeEntryDto>();
         foreach (var order in orders)
         {
@@ -348,7 +376,7 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             $"Range {start:yyyy-MM-dd} → {ReportEndDate:yyyy-MM-dd}. {orders.Count} order(s) over {dayCount} day(s), {entries.Sum(e => e.ItemCount)} items total.";
     }
 
-    private void LoadEmployeeDetails(int? employeeId)
+    private async Task LoadEmployeeDetailsAsync(int? employeeId)
     {
         EmployeeTimelineDays.Clear();
         EmployeeSummary = "Select an employee to view details.";
@@ -358,14 +386,13 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         if (employeeId is null)
             return;
 
-        using var db = new AppDbContext();
-        var employee = db.Employees.AsNoTracking().SingleOrDefault(e => e.Id == employeeId.Value);
+        var employee = (await _data.GetEmployeesAsync().ConfigureAwait(true)).SingleOrDefault(e => e.Id == employeeId.Value);
         if (employee is null)
             return;
 
         EmployeeNotes = string.IsNullOrWhiteSpace(employee.Notes) ? "-" : employee.Notes;
 
-        var payrollLines = db.PayrollPaymentRecords.AsNoTracking()
+        var payrollLines = (await _data.GetPayrollAsync().ConfigureAwait(true))
             .Where(p => p.EmployeeId == employee.Id)
             .OrderByDescending(p => p.Year)
             .ThenByDescending(p => p.Month)
@@ -385,8 +412,7 @@ public sealed class ReportsViewModel : AdminBaseViewModel
                 }));
         var entries = new List<ReportTimeEntryDto>();
 
-        var attendanceRows = db.EmployeeAttendances
-            .AsNoTracking()
+        var attendanceRows = (await _data.GetAttendanceAsync().ConfigureAwait(true))
             .Where(a => a.EmployeeId == employee.Id)
             .OrderByDescending(a => a.WorkDate)
             .Take(120)
@@ -408,14 +434,13 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             });
         }
 
-        var servedOrders = db.Orders
-            .AsNoTracking()
-            .Include(o => o.Items)
-            .ThenInclude(i => i.Product)
+        var productsById = await LoadProductsByIdAsync().ConfigureAwait(true);
+        var servedOrders = (await _data.GetOrdersAsync().ConfigureAwait(true))
             .Where(o => o.ServerId == employee.Id)
             .OrderByDescending(o => o.CreatedAt)
             .Take(180)
             .ToList();
+        HydrateOrderItems(servedOrders, productsById);
 
         foreach (var order in servedOrders)
         {
@@ -434,12 +459,11 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         }
 
         var empMarker = $"| EMP:{employee.Id}|";
-        var salaryMoneyRows = db.Transactions
-            .AsNoTracking()
+        var salaryMoneyRows = (await _data.GetMoneyTransactionsAsync().ConfigureAwait(true))
             .Where(t =>
                 t.Type == "Expense" &&
                 t.Category == "Salary" &&
-                t.Justification.Contains(empMarker))
+                t.Justification?.Contains(empMarker, StringComparison.Ordinal) == true)
             .OrderByDescending(t => t.Date)
             .Take(48)
             .ToList();
@@ -449,17 +473,16 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             entries.Add(new ReportTimeEntryDto
             {
                 EventTime = t.Date,
-                EventType = t.Justification.Contains("| ADVANCE:", StringComparison.Ordinal)
+                EventType = t.Justification?.Contains("| ADVANCE:", StringComparison.Ordinal) == true
                     ? "Salary advance (Money)"
                     : "Salary payment (Money)",
-                Summary = t.Justification,
+                Summary = t.Justification ?? string.Empty,
                 RelatedInfo = $"USD $ {t.AmountUsd:0.00}",
                 EntityContext = employee.Name
             });
         }
 
-        var advanceRows = db.SalaryAdvances
-            .AsNoTracking()
+        var advanceRows = (await _data.GetSalaryAdvancesAsync().ConfigureAwait(true))
             .Where(a => a.EmployeeId == employee.Id)
             .OrderByDescending(a => a.GivenAt)
             .Take(36)
@@ -489,7 +512,7 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             $"Name: {employee.Name}\nID: {employee.UniqueId}\nRole: {employee.Role}\nStatus: {employee.EmploymentStatus}\nPhone: {employee.PhoneNumber}\nAttendance Events: {attendanceRows.Count}\nOrders Served: {servedOrders.Count}\nItems Served: {servedOrders.Sum(o => o.Items.Sum(i => i.Quantity))}";
     }
 
-    private void LoadTableDetails(int? tableId)
+    private async Task LoadTableDetailsAsync(int? tableId)
     {
         TableTimelineDays.Clear();
         TableSummary = "Select a table to view details.";
@@ -498,23 +521,23 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         if (tableId is null)
             return;
 
-        using var db = new AppDbContext();
-        var table = db.Tables
-            .AsNoTracking()
-            .Include(t => t.AssignedServer)
-            .SingleOrDefault(t => t.Id == tableId.Value);
+        var table = (await _data.GetTablesAsync().ConfigureAwait(true)).SingleOrDefault(t => t.Id == tableId.Value);
         if (table is null)
             return;
 
+        var employeesById = (await _data.GetEmployeesAsync().ConfigureAwait(true)).ToDictionary(e => e.Id);
+        Employee? assignedServer = table.AssignedServer;
+        if (assignedServer is null && table.AssignedServerId is int sid && employeesById.TryGetValue(sid, out var linked))
+            assignedServer = linked;
+
         var entries = new List<ReportTimeEntryDto>();
-        var relatedOrders = db.Orders
-            .AsNoTracking()
-            .Include(o => o.Items)
-            .ThenInclude(i => i.Product)
+        var productsById = await LoadProductsByIdAsync().ConfigureAwait(true);
+        var relatedOrders = (await _data.GetOrdersAsync().ConfigureAwait(true))
             .Where(o => o.TableId == table.Id)
             .OrderByDescending(o => o.CreatedAt)
             .Take(220)
             .ToList();
+        HydrateOrderItems(relatedOrders, productsById);
 
         foreach (var order in relatedOrders)
         {
@@ -532,8 +555,7 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             });
         }
 
-        var relatedReservations = db.Reservations
-            .AsNoTracking()
+        var relatedReservations = (await _data.GetReservationsAsync().ConfigureAwait(true))
             .Where(r => r.TableId == table.Id)
             .OrderByDescending(r => r.UpdatedAt)
             .Take(180)
@@ -558,12 +580,12 @@ public sealed class ReportsViewModel : AdminBaseViewModel
 
         TableSummary =
             $"Table: {table.TableNumber} ({table.Name})\nID: {table.UniqueId}\nCapacity: {table.Capacity}\nStatus: {table.Status}\nOrders Logged: {relatedOrders.Count}\nItems Served: {relatedOrders.Sum(o => o.Items.Sum(i => i.Quantity))}";
-        TableCurrentServer = table.AssignedServer is null
+        TableCurrentServer = assignedServer is null
             ? "Unassigned"
-            : $"{table.AssignedServer.Name} ({table.AssignedServer.UniqueId})";
+            : $"{assignedServer.Name} ({assignedServer.UniqueId})";
     }
 
-    private void LoadInventoryDetails(int? inventoryId)
+    private async Task LoadInventoryDetailsAsync(int? inventoryId)
     {
         InventoryTimelineDays.Clear();
         InventorySummary = "Select an inventory item to view details.";
@@ -572,18 +594,21 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         if (inventoryId is null)
             return;
 
-        using var db = new AppDbContext();
-        var item = db.InventoryItems.AsNoTracking().SingleOrDefault(i => i.Id == inventoryId.Value);
+        var item = (await _data.GetInventoryItemsAsync().ConfigureAwait(true)).SingleOrDefault(i => i.Id == inventoryId.Value);
         if (item is null)
             return;
 
         InventoryNotes = string.IsNullOrWhiteSpace(item.Notes) ? "-" : item.Notes;
 
-        var ingredients = db.ProductIngredients
-            .AsNoTracking()
-            .Include(pi => pi.Product)
+        var productsById = await LoadProductsByIdAsync().ConfigureAwait(true);
+        var ingredients = (await _data.GetProductIngredientsAsync().ConfigureAwait(true))
             .Where(pi => pi.InventoryItemId == item.Id)
             .ToList();
+        foreach (var pi in ingredients)
+        {
+            if (productsById.TryGetValue(pi.ProductId, out var p))
+                pi.Product = p;
+        }
 
         var entries = new List<ReportTimeEntryDto>();
 
@@ -594,7 +619,7 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             $"Item: {item.Name}\nID: {item.UniqueId}\nQuantity: {item.StockQuantity:0.##} {item.Unit}\nExpiration: {item.ExpirationDate?.ToString("yyyy-MM-dd") ?? "Not set"}\nLinked Menu Items: {ingredients.Select(i => i.ProductId).Distinct().Count()}";
     }
 
-    private void LoadMenuDetails(int? productId)
+    private async Task LoadMenuDetailsAsync(int? productId)
     {
         MenuTimelineDays.Clear();
         MenuSummary = "Select a menu item to view details.";
@@ -603,57 +628,60 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         if (productId is null)
             return;
 
-        using var db = new AppDbContext();
-        var product = db.Products.AsNoTracking().SingleOrDefault(p => p.Id == productId.Value);
+        var product = (await _data.GetProductsAsync().ConfigureAwait(true)).SingleOrDefault(p => p.Id == productId.Value);
         if (product is null)
             return;
 
-        var ingredients = db.ProductIngredients
-            .AsNoTracking()
-            .Include(pi => pi.InventoryItem)
+        var invById = (await _data.GetInventoryItemsAsync().ConfigureAwait(true)).ToDictionary(i => i.Id);
+        var ingredients = (await _data.GetProductIngredientsAsync().ConfigureAwait(true))
             .Where(pi => pi.ProductId == product.Id)
             .ToList();
+        foreach (var pi in ingredients)
+        {
+            if (invById.TryGetValue(pi.InventoryItemId, out var inv))
+                pi.InventoryItem = inv;
+        }
 
         MenuIngredientsSummary = ingredients.Count == 0
             ? "No ingredients linked."
             : string.Join(", ", ingredients.Select(i => $"{i.InventoryItem?.Name ?? "Unknown"} ({i.Quantity:0.##} {i.InventoryItem?.Unit ?? "unit"})"));
 
         var entries = new List<ReportTimeEntryDto>();
-        var servedLines = db.OrderItems
-            .AsNoTracking()
-            .Include(oi => oi.OrderRecord!)
-            .ThenInclude(o => o.Table)
-            .Where(oi => oi.ProductId == product.Id)
-            .OrderByDescending(oi => oi.OrderRecord!.CreatedAt)
+        var productsById = await LoadProductsByIdAsync().ConfigureAwait(true);
+        var allOrders = (await _data.GetOrdersAsync().ConfigureAwait(true))
+            .OrderByDescending(o => o.CreatedAt)
+            .ToList();
+        HydrateOrderItems(allOrders, productsById);
+
+        var servedLines = allOrders
+            .SelectMany(o => o.Items.Where(i => i.ProductId == product.Id).Select(i => (Order: o, Item: i)))
+            .OrderByDescending(x => x.Order.CreatedAt)
             .Take(300)
             .ToList();
 
         foreach (var line in servedLines)
         {
-            var order = line.OrderRecord;
-            if (order is null)
-                continue;
-
+            var order = line.Order;
             entries.Add(new ReportTimeEntryDto
             {
                 EventTime = order.CreatedAt,
                 EventType = "Menu Ordered",
-                Summary = $"{product.Name} x{line.Quantity} in order {order.UniqueId}",
+                Summary = $"{product.Name} x{line.Item.Quantity} in order {order.UniqueId}",
                 RelatedInfo = $"{order.TableCode} ({order.TableName}) | Server: {DisplayOrFallback(order.ServerName, "Unassigned")} | Status: {order.Status}",
                 EntityContext = product.Name,
                 OrdersCount = 1,
-                ItemCount = line.Quantity
+                ItemCount = line.Item.Quantity
             });
         }
 
         ApplyDayGroups(MenuTimelineDays, entries);
 
-        var totalQty = servedLines.Sum(l => l.Quantity);
+        var totalQty = servedLines.Sum(l => l.Item.Quantity);
         MenuSummary =
             $"Menu Item: {product.Name}\nID: {product.UniqueId}\nCategory: {product.Category}\nSub Category: {product.SubCategory}\nPrice: $ {product.Price:0.00}\nTimes Ordered: {servedLines.Count}\nUnits Ordered: {totalQty}";
     }
 
-    private void LoadDailyReport()
+    private async Task LoadDailyReportAsync()
     {
         DailyTimelineDays.Clear();
         var start = ReportStartDate.Date;
@@ -667,18 +695,19 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         var rangeStartUtc = AttendanceCalendar.DayAnchorUtc(start);
         var rangeEndExclusiveUtc = AttendanceCalendar.DayAnchorUtc(endExclusive);
 
-        using var db = new AppDbContext();
         var entries = new List<ReportTimeEntryDto>();
+        var employeesById = (await _data.GetEmployeesAsync().ConfigureAwait(true)).ToDictionary(e => e.Id);
 
-        var attendanceRows = db.EmployeeAttendances
-            .AsNoTracking()
-            .Include(a => a.Employee)
+        var attendanceRows = (await _data.GetAttendanceAsync().ConfigureAwait(true))
             .Where(a => a.WorkDate >= rangeStartUtc && a.WorkDate < rangeEndExclusiveUtc)
             .OrderByDescending(a => a.WorkDate)
             .ToList();
 
         foreach (var row in attendanceRows)
         {
+            if (row.Employee is null && employeesById.TryGetValue(row.EmployeeId, out var emp))
+                row.Employee = emp;
+
             entries.Add(new ReportTimeEntryDto
             {
                 EventTime = row.ClockInTime ?? row.WorkDate.Date.AddHours(9),
@@ -689,13 +718,12 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             });
         }
 
-        var orders = db.Orders
-            .AsNoTracking()
-            .Include(o => o.Items)
-            .ThenInclude(i => i.Product)
+        var productsById = await LoadProductsByIdAsync().ConfigureAwait(true);
+        var orders = (await _data.GetOrdersAsync().ConfigureAwait(true))
             .Where(o => o.CreatedAt >= start && o.CreatedAt < endExclusive)
             .OrderByDescending(o => o.CreatedAt)
             .ToList();
+        HydrateOrderItems(orders, productsById);
 
         foreach (var order in orders)
         {
@@ -712,15 +740,17 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             });
         }
 
-        var reservations = db.Reservations
-            .AsNoTracking()
-            .Include(r => r.Table)
+        var tablesById = (await _data.GetTablesAsync().ConfigureAwait(true)).ToDictionary(t => t.Id);
+        var reservations = (await _data.GetReservationsAsync().ConfigureAwait(true))
             .Where(r => r.UpdatedAt >= start && r.UpdatedAt < endExclusive)
             .OrderByDescending(r => r.UpdatedAt)
             .ToList();
 
         foreach (var reservation in reservations)
         {
+            if (reservation.Table is null && reservation.TableId is int tid && tablesById.TryGetValue(tid, out var tbl))
+                reservation.Table = tbl;
+
             var displayName = string.IsNullOrWhiteSpace(reservation.ReservationName)
                 ? DisplayOrFallback(reservation.GuestName, reservation.UniqueId)
                 : reservation.ReservationName.Trim();
@@ -737,42 +767,30 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             });
         }
 
-        var menuLines = db.OrderItems
-            .AsNoTracking()
-            .Include(oi => oi.Product)
-            .Include(oi => oi.OrderRecord)
-            .Where(oi => oi.OrderRecord != null &&
-                         oi.OrderRecord.CreatedAt >= start &&
-                         oi.OrderRecord.CreatedAt < endExclusive)
-            .OrderByDescending(oi => oi.OrderRecord!.CreatedAt)
-            .ToList();
-
-        foreach (var line in menuLines)
+        foreach (var order in orders)
         {
-            if (line.OrderRecord is null)
-                continue;
-
-            entries.Add(new ReportTimeEntryDto
+            foreach (var line in order.Items)
             {
-                EventTime = line.OrderRecord.CreatedAt,
-                EventType = "Menu Activity",
-                Summary = $"{line.Product?.Name ?? "Unknown"} x{line.Quantity}",
-                RelatedInfo = $"Order {line.OrderRecord.UniqueId} | {line.OrderRecord.TableCode} ({line.OrderRecord.TableName})",
-                EntityContext = $"Menu: {line.Product?.Name ?? "Unknown"}",
-                OrdersCount = 1,
-                ItemCount = line.Quantity
-            });
+                entries.Add(new ReportTimeEntryDto
+                {
+                    EventTime = order.CreatedAt,
+                    EventType = "Menu Activity",
+                    Summary = $"{line.Product?.Name ?? "Unknown"} x{line.Quantity}",
+                    RelatedInfo = $"Order {order.UniqueId} | {order.TableCode} ({order.TableName})",
+                    EntityContext = $"Menu: {line.Product?.Name ?? "Unknown"}",
+                    OrdersCount = 1,
+                    ItemCount = line.Quantity
+                });
+            }
         }
 
-        var inventoryNoteRows = db.InventoryItems
-            .AsNoTracking()
+        var inventoryNoteRows = (await _data.GetInventoryItemsAsync().ConfigureAwait(true))
             .Where(i => !string.IsNullOrWhiteSpace(i.Notes))
-            .Select(i => new InventoryNotesSnapshot(i.UniqueId, i.Name, i.Notes))
+            .Select(i => new InventoryNotesSnapshot(i.UniqueId, i.Name, i.Notes!))
             .ToList();
         AppendInventoryActivityFromNotes(entries, start, endExclusive, inventoryNoteRows);
 
-        var salaryTx = db.Transactions
-            .AsNoTracking()
+        var salaryTx = (await _data.GetMoneyTransactionsAsync().ConfigureAwait(true))
             .Where(t =>
                 t.Type == "Expense" &&
                 t.Category == "Salary" &&
@@ -787,7 +805,7 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             {
                 EventTime = t.Date,
                 EventType = "Salary / Money",
-                Summary = t.Justification,
+                Summary = t.Justification ?? string.Empty,
                 RelatedInfo = $"USD $ {t.AmountUsd:0.00} (same as Money ledger)",
                 EntityContext = "Money"
             });
@@ -923,7 +941,7 @@ public sealed class ReportsViewModel : AdminBaseViewModel
     private static string DisplayOrFallback(string? value, string fallback)
         => string.IsNullOrWhiteSpace(value) ? fallback : value;
 
-    private void ExportExcel()
+    private async Task ExportExcelAsync()
     {
         var range = TryGetExportRange();
         if (range is null)
@@ -931,7 +949,7 @@ public sealed class ReportsViewModel : AdminBaseViewModel
 
         if (SelectedExportReportType == "All Reports")
         {
-            ExportBulkExcel();
+            await ExportBulkExcelAsync().ConfigureAwait(true);
             return;
         }
 
@@ -947,11 +965,11 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         if (saveDialog.ShowDialog() != true)
             return;
 
-        var data = BuildExportRows(SelectedExportReportType, range.Value.Start, range.Value.EndExclusive);
+        var data = await BuildExportRowsAsync(SelectedExportReportType, range.Value.Start, range.Value.EndExclusive).ConfigureAwait(true);
         ExcelExportService.ExportSingleSheet(saveDialog.FileName, SelectedExportReportType, data.Headers, data.Rows);
     }
 
-    private void ExportBulkExcel()
+    private async Task ExportBulkExcelAsync()
     {
         var range = TryGetExportRange();
         if (range is null)
@@ -969,12 +987,12 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         if (saveDialog.ShowDialog() != true)
             return;
 
-        var daily = BuildExportRows("Daily", range.Value.Start, range.Value.EndExclusive);
-        var orders = BuildExportRows("Orders", range.Value.Start, range.Value.EndExclusive);
-        var employees = BuildExportRows("Employees", range.Value.Start, range.Value.EndExclusive);
-        var tables = BuildExportRows("Tables", range.Value.Start, range.Value.EndExclusive);
-        var inventory = BuildExportRows("Inventory", range.Value.Start, range.Value.EndExclusive);
-        var menu = BuildExportRows("Menu", range.Value.Start, range.Value.EndExclusive);
+        var daily = await BuildExportRowsAsync("Daily", range.Value.Start, range.Value.EndExclusive).ConfigureAwait(true);
+        var orders = await BuildExportRowsAsync("Orders", range.Value.Start, range.Value.EndExclusive).ConfigureAwait(true);
+        var employees = await BuildExportRowsAsync("Employees", range.Value.Start, range.Value.EndExclusive).ConfigureAwait(true);
+        var tables = await BuildExportRowsAsync("Tables", range.Value.Start, range.Value.EndExclusive).ConfigureAwait(true);
+        var inventory = await BuildExportRowsAsync("Inventory", range.Value.Start, range.Value.EndExclusive).ConfigureAwait(true);
+        var menu = await BuildExportRowsAsync("Menu", range.Value.Start, range.Value.EndExclusive).ConfigureAwait(true);
 
         var sheets = new List<(string SheetName, IReadOnlyList<string> Headers, IReadOnlyList<IReadOnlyList<string>> Rows)>
         {
@@ -1002,19 +1020,13 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         return (start, end.AddDays(1));
     }
 
-    private (IReadOnlyList<string> Headers, IReadOnlyList<IReadOnlyList<string>> Rows) BuildExportRows(string reportType, DateTime start, DateTime endExclusive)
+    private async Task<(IReadOnlyList<string> Headers, IReadOnlyList<IReadOnlyList<string>> Rows)> BuildExportRowsAsync(string reportType, DateTime start, DateTime endExclusive)
     {
-        using var db = new AppDbContext();
-
         if (reportType == "Orders")
-            return BuildOrderExportRows(db, start, endExclusive);
+            return BuildOrderExportRows(await LoadOrdersInRangeAsync(start, endExclusive).ConfigureAwait(true));
 
-        var employeesById = db.Employees
-            .AsNoTracking()
-            .ToDictionary(e => e.Id, e => e);
-        var tablesById = db.Tables
-            .AsNoTracking()
-            .ToDictionary(t => t.Id, t => t);
+        var employeesById = (await _data.GetEmployeesAsync().ConfigureAwait(true)).ToDictionary(e => e.Id, e => e);
+        var tablesById = (await _data.GetTablesAsync().ConfigureAwait(true)).ToDictionary(t => t.Id, t => t);
 
         var rows = new List<IReadOnlyList<string>>();
 
@@ -1026,9 +1038,7 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         {
             var attendanceStartUtc = AttendanceCalendar.DayAnchorUtc(start.Date);
             var attendanceEndExclusiveUtc = AttendanceCalendar.DayAnchorUtc(endExclusive.Date);
-            var attendanceRows = db.EmployeeAttendances
-                .AsNoTracking()
-                .Include(a => a.Employee)
+            var attendanceRows = (await _data.GetAttendanceAsync().ConfigureAwait(true))
                 .Where(a => a.WorkDate >= attendanceStartUtc && a.WorkDate < attendanceEndExclusiveUtc)
                 .OrderBy(a => a.WorkDate)
                 .ThenBy(a => a.EmployeeId)
@@ -1036,6 +1046,9 @@ public sealed class ReportsViewModel : AdminBaseViewModel
 
             foreach (var row in attendanceRows)
             {
+                if (row.Employee is null && employeesById.TryGetValue(row.EmployeeId, out var empAttach))
+                    row.Employee = empAttach;
+
                 rows.Add(BuildAnalyticalRow(
                     eventTime: row.ClockInTime ?? row.WorkDate.Date,
                     eventType: "Attendance",
@@ -1048,8 +1061,7 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         var includeSalaryLedger = reportType is "Daily" or "Employees";
         if (includeSalaryLedger)
         {
-            var salaryTx = db.Transactions
-                .AsNoTracking()
+            var salaryTx = (await _data.GetMoneyTransactionsAsync().ConfigureAwait(true))
                 .Where(t =>
                     t.Type == "Expense" &&
                     t.Category == "Salary" &&
@@ -1061,15 +1073,15 @@ public sealed class ReportsViewModel : AdminBaseViewModel
 
             foreach (var t in salaryTx)
             {
-                _ = TryParseEmployeeIdFromSalaryJustification(t.Justification, out var eid);
+                _ = TryParseEmployeeIdFromSalaryJustification(t.Justification ?? string.Empty, out var eid);
                 employeesById.TryGetValue(eid, out var empRef);
-                var j = t.Justification;
+                var j = t.Justification ?? string.Empty;
                 if (j.Length > 120)
                     j = j[..120] + "…";
 
                 rows.Add(BuildAnalyticalRow(
                     eventTime: t.Date,
-                    eventType: t.Justification.Contains("| ADVANCE:", StringComparison.Ordinal)
+                    eventType: j.Contains("| ADVANCE:", StringComparison.Ordinal)
                         ? "Salary advance (Money)"
                         : "Salary payment (Money)",
                     employeeId: empRef?.UniqueId ?? string.Empty,
@@ -1079,18 +1091,19 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             }
         }
 
-        var orderItems = new List<OrderItem>();
+        List<OrderItem> orderItems = new();
         if (includeOrders)
         {
-            orderItems = db.OrderItems
-                .AsNoTracking()
-                .Include(oi => oi.OrderRecord)
-                .Include(oi => oi.Product)
-                .Where(oi => oi.OrderRecord != null &&
-                             oi.OrderRecord.CreatedAt >= start &&
-                             oi.OrderRecord.CreatedAt < endExclusive)
-                .OrderBy(oi => oi.OrderRecord!.CreatedAt)
-                .ThenBy(oi => oi.Id)
+            var productsById = await LoadProductsByIdAsync().ConfigureAwait(true);
+            var ordersForLines = (await _data.GetOrdersAsync().ConfigureAwait(true))
+                .Where(o => o.CreatedAt >= start && o.CreatedAt < endExclusive)
+                .OrderBy(o => o.CreatedAt)
+                .ToList();
+            HydrateOrderItems(ordersForLines, productsById);
+            orderItems = ordersForLines
+                .SelectMany(o => o.Items)
+                .OrderBy(i => i.OrderRecord?.CreatedAt)
+                .ThenBy(i => i.Id)
                 .ToList();
         }
 
@@ -1129,14 +1142,13 @@ public sealed class ReportsViewModel : AdminBaseViewModel
 
         if (reportType is "Daily" or "Inventory")
         {
-            var inventoryActivityItems = db.InventoryItems
-                .AsNoTracking()
+            var inventoryActivityItems = (await _data.GetInventoryItemsAsync().ConfigureAwait(true))
                 .Where(i => !string.IsNullOrWhiteSpace(i.Notes))
                 .ToList();
 
             foreach (var item in inventoryActivityItems)
             {
-                foreach (var rawLine in item.Notes.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                foreach (var rawLine in item.Notes!.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
                 {
                     var line = rawLine.Trim();
                     if (string.IsNullOrWhiteSpace(line))
@@ -1159,8 +1171,7 @@ public sealed class ReportsViewModel : AdminBaseViewModel
 
         if (includeReservations)
         {
-            var reservationRows = db.Reservations
-                .AsNoTracking()
+            var reservationRows = (await _data.GetReservationsAsync().ConfigureAwait(true))
                 .Where(r => r.UpdatedAt >= start && r.UpdatedAt < endExclusive)
                 .OrderBy(r => r.UpdatedAt)
                 .ThenBy(r => r.Id)
@@ -1196,18 +1207,8 @@ public sealed class ReportsViewModel : AdminBaseViewModel
     }
 
     private static (IReadOnlyList<string> Headers, IReadOnlyList<IReadOnlyList<string>> Rows) BuildOrderExportRows(
-        AppDbContext db,
-        DateTime start,
-        DateTime endExclusive)
+        IReadOnlyList<OrderRecord> orders)
     {
-        var orders = db.Orders
-            .AsNoTracking()
-            .Include(o => o.Items)
-            .ThenInclude(i => i.Product)
-            .Where(o => o.CreatedAt >= start && o.CreatedAt < endExclusive)
-            .OrderBy(o => o.CreatedAt)
-            .ToList();
-
         var rows = new List<IReadOnlyList<string>>();
         foreach (var order in orders)
         {

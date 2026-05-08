@@ -21,6 +21,190 @@ public static class MoneyExcelReportRowsBuilder
             _ => BuildTransactionRows(db, fromDate, toExclusive)
         };
 
+    /// <summary>HTTP/cloud clients: same output as <see cref="BuildReportRows"/> without EF.</summary>
+    public static (IReadOnlyList<string> Headers, IReadOnlyList<IReadOnlyList<string>> Rows) BuildReportRowsFromData(
+        string reportType,
+        DateTime fromDate,
+        DateTime toExclusive,
+        IReadOnlyList<MoneyTransaction> transactions,
+        IReadOnlyList<OrderRecord> orders,
+        IReadOnlyList<Product> products,
+        IReadOnlyList<ProductIngredient> ingredients,
+        IReadOnlyList<InventoryItem> inventoryItems,
+        IReadOnlyList<EmployeeAttendance> attendances,
+        IReadOnlyList<Employee> employees)
+    {
+        var employeesById = employees.ToDictionary(e => e.Id);
+        return reportType switch
+        {
+            "Transactions" => BuildTransactionRowsData(transactions, fromDate, toExclusive),
+            "Orders" => BuildOrderRowsData(orders, products, fromDate, toExclusive),
+            "Inventory" => BuildInventoryRowsData(orders, products, ingredients, inventoryItems, fromDate, toExclusive),
+            "Attendance" => BuildAttendanceRowsData(attendances, employeesById, fromDate, toExclusive),
+            _ => BuildTransactionRowsData(transactions, fromDate, toExclusive)
+        };
+    }
+
+    private static (IReadOnlyList<string> Headers, IReadOnlyList<IReadOnlyList<string>> Rows) BuildTransactionRowsData(
+        IReadOnlyList<MoneyTransaction> transactions,
+        DateTime fromDate,
+        DateTime toExclusive)
+    {
+        var records = transactions
+            .Where(t => t.Date >= fromDate && t.Date < toExclusive)
+            .OrderBy(t => t.Date)
+            .ThenBy(t => t.Id)
+            .ToList();
+
+        var rows = records
+            .Select(t => (IReadOnlyList<string>)
+            [
+                t.Id.ToString(),
+                t.Date.ToString("yyyy-MM-dd HH:mm"),
+                t.Type,
+                t.Category,
+                MoneyReportingHelpers.NormalizeCurrencyCode(t.CurrencyCode),
+                t.Amount.ToString("N2"),
+                t.IsFixed ? "Yes" : "No",
+                t.Justification
+            ])
+            .ToList();
+
+        return (["Id", "Date", "Type", "Category", "Currency", "Amount", "IsFixed", "Justification"], rows);
+    }
+
+    private static (IReadOnlyList<string> Headers, IReadOnlyList<IReadOnlyList<string>> Rows) BuildOrderRowsData(
+        IReadOnlyList<OrderRecord> allOrders,
+        IReadOnlyList<Product> products,
+        DateTime fromDate,
+        DateTime toExclusive)
+    {
+        var orders = allOrders
+            .Where(o => o.CreatedAt >= fromDate && o.CreatedAt < toExclusive)
+            .OrderBy(o => o.CreatedAt)
+            .ToList();
+
+        var orderItems = orders.SelectMany(o => o.Items).ToList();
+        var productPrices = products.ToDictionary(p => p.Id, p => p.Price);
+
+        var totalsByOrder = orderItems
+            .GroupBy(i => i.OrderRecordId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Sum(item => (productPrices.TryGetValue(item.ProductId, out var price) ? price : 0m) * item.Quantity));
+
+        var rows = orders
+            .Select(order => (IReadOnlyList<string>)
+            [
+                order.Id.ToString(),
+                string.IsNullOrWhiteSpace(order.UniqueId) ? $"ORD-{order.Id:000}" : order.UniqueId,
+                order.CreatedAt.ToString("yyyy-MM-dd HH:mm"),
+                string.Equals(order.OrderSource, "Reservation", StringComparison.OrdinalIgnoreCase)
+                    ? $"Reservation ({(string.IsNullOrWhiteSpace(order.ReservationCode) ? "-" : order.ReservationCode)})"
+                    : "WalkIn",
+                order.Status,
+                order.TableCode,
+                order.ServerName,
+                (totalsByOrder.TryGetValue(order.Id, out var total) ? total : 0m).ToString("N2")
+            ])
+            .ToList();
+
+        return (["Id", "OrderId", "Date", "Source", "Status", "Table", "Server", "Total"], rows);
+    }
+
+    private static (IReadOnlyList<string> Headers, IReadOnlyList<IReadOnlyList<string>> Rows) BuildInventoryRowsData(
+        IReadOnlyList<OrderRecord> allOrders,
+        IReadOnlyList<Product> products,
+        IReadOnlyList<ProductIngredient> ingredients,
+        IReadOnlyList<InventoryItem> inventoryItems,
+        DateTime fromDate,
+        DateTime toExclusive)
+    {
+        _ = products;
+        var orders = allOrders
+            .Where(o => o.CreatedAt >= fromDate && o.CreatedAt < toExclusive && o.Status != "Cancelled")
+            .Select(o => new { o.Id, o.UniqueId })
+            .ToList();
+        var orderIds = orders.Select(o => o.Id).ToHashSet();
+
+        var orderItems = allOrders.SelectMany(o => o.Items).Where(i => orderIds.Contains(i.OrderRecordId)).ToList();
+        var inventory = inventoryItems.ToDictionary(i => i.Id, i => i);
+
+        var ingredientsByProduct = ingredients
+            .GroupBy(i => i.ProductId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var usedByInventory = new Dictionary<int, decimal>();
+        var orderCountByInventory = new Dictionary<int, int>();
+
+        foreach (var line in orderItems)
+        {
+            if (!ingredientsByProduct.TryGetValue(line.ProductId, out var recipe))
+                continue;
+
+            foreach (var ingredient in recipe)
+            {
+                var consumed = ingredient.Quantity * line.Quantity;
+                if (!usedByInventory.TryAdd(ingredient.InventoryItemId, consumed))
+                    usedByInventory[ingredient.InventoryItemId] += consumed;
+
+                if (!orderCountByInventory.TryAdd(ingredient.InventoryItemId, 1))
+                    orderCountByInventory[ingredient.InventoryItemId]++;
+            }
+        }
+
+        var rows = usedByInventory
+            .OrderByDescending(kv => kv.Value)
+            .Select(kv =>
+            {
+                var item = inventory.TryGetValue(kv.Key, out var inv) ? inv : null;
+                var count = orderCountByInventory.TryGetValue(kv.Key, out var c) ? c : 0;
+                return (IReadOnlyList<string>)
+                [
+                    item?.UniqueId ?? "N/A",
+                    item?.Name ?? "Unknown",
+                    item?.Unit ?? string.Empty,
+                    kv.Value.ToString("0.##"),
+                    (item?.StockQuantity ?? 0m).ToString("0.##"),
+                    count.ToString()
+                ];
+            })
+            .ToList();
+
+        return (["ItemId", "Item", "Unit", "UsedQty", "CurrentStock", "LinkedOrders"], rows);
+    }
+
+    private static (IReadOnlyList<string> Headers, IReadOnlyList<IReadOnlyList<string>> Rows) BuildAttendanceRowsData(
+        IReadOnlyList<EmployeeAttendance> allAttendance,
+        IReadOnlyDictionary<int, Employee> employeesById,
+        DateTime fromDate,
+        DateTime toExclusive)
+    {
+        var fromUtc = AttendanceCalendar.DayAnchorUtc(fromDate.Date);
+        var toExclusiveUtc = AttendanceCalendar.DayAnchorUtc(toExclusive.Date);
+        var rows = allAttendance
+            .Where(a => a.WorkDate >= fromUtc && a.WorkDate < toExclusiveUtc)
+            .OrderBy(a => a.WorkDate)
+            .ThenBy(a => a.EmployeeId)
+            .Select(a =>
+            {
+                var emp = employeesById.TryGetValue(a.EmployeeId, out var e) ? e : null;
+                return (IReadOnlyList<string>)
+                [
+                    a.WorkDate.ToString("yyyy-MM-dd"),
+                    emp?.UniqueId ?? string.Empty,
+                    emp?.Name ?? "Unknown",
+                    a.ClockInTime?.ToString("HH:mm") ?? "-",
+                    a.ClockOutTime?.ToString("HH:mm") ?? "-",
+                    string.IsNullOrWhiteSpace(a.ClockInStatus) ? "Pending" : a.ClockInStatus,
+                    a.Justification
+                ];
+            })
+            .ToList();
+
+        return (["Date", "EmployeeId", "Employee", "ClockIn", "ClockOut", "Status", "Justification"], rows);
+    }
+
     private static (IReadOnlyList<string> Headers, IReadOnlyList<IReadOnlyList<string>> Rows) BuildTransactionRows(
         AppDbContext db,
         DateTime fromDate,

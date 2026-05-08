@@ -1,7 +1,9 @@
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using EliteRestaurant.Contracts.Admin;
 using EliteRestaurant.Core.Utils;
 
 namespace EliteRestaurantPro.ApiClients;
@@ -38,6 +40,41 @@ public sealed class EliteApiClient
         return await response.Content.ReadFromJsonAsync<T>(JsonOptions, cancellationToken);
     }
 
+    /// <summary>
+    /// Load-order bundle is absent on older API hosts; those may incorrectly return SPA HTML (200) for unknown routes.
+    /// Returns null when the route is missing or the body is not JSON — callers should fall back to legacy list calls.
+    /// </summary>
+    public async Task<AdminCreateOrderCatalogBundleResponse?> TryGetCreateOrderCatalogBundleAsync(
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await SendWithRetryAsync(
+            () => _http.GetAsync(
+                Normalize("api/admin/data/bundles/create-order"),
+                cancellationToken),
+            cancellationToken);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+            return null;
+
+        await EnsureSuccessAsync(response, cancellationToken);
+
+        var mediaType = response.Content.Headers.ContentType?.MediaType ?? string.Empty;
+        if (mediaType.Contains("html", StringComparison.OrdinalIgnoreCase)
+            || !mediaType.Contains("json", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        try
+        {
+            return await response.Content.ReadFromJsonAsync<AdminCreateOrderCatalogBundleResponse>(
+                JsonOptions,
+                cancellationToken);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
     public async Task<bool> CanReachApiAsync(CancellationToken cancellationToken = default)
     {
         try
@@ -58,6 +95,31 @@ public sealed class EliteApiClient
             cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<TResponse>(JsonOptions, cancellationToken);
+    }
+
+    /// <summary>
+    /// POST without <c>Authorization</c>. Required for <c>api/auth/login</c>: a stale Bearer from a prior admin session
+    /// can make JWT middleware reject the request before it reaches <c>[AllowAnonymous]</c>, so staff sign-in would fail while web works.
+    /// </summary>
+    public async Task<TResponse?> PostWithoutBearerAsync<TRequest, TResponse>(string path, TRequest payload, CancellationToken cancellationToken = default)
+    {
+        using var http = CreateUnauthenticatedClient();
+        using var response = await SendWithRetryAsync(
+            () => http.PostAsJsonAsync(Normalize(path), payload, JsonOptions, cancellationToken),
+            cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<TResponse>(JsonOptions, cancellationToken);
+    }
+
+    private static HttpClient CreateUnauthenticatedClient()
+    {
+        var settings = SettingsManager.Load().CloudApi;
+        var baseUrl = CloudEndpoints.NormalizeApiBaseUrl(settings.BaseUrl);
+        return new HttpClient
+        {
+            BaseAddress = new Uri(baseUrl + "/"),
+            Timeout = TimeSpan.FromSeconds(20)
+        };
     }
 
     private static string Normalize(string path) => path.TrimStart('/');

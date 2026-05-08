@@ -1,7 +1,6 @@
-using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Reporting;
 using EliteRestaurant.Core.Utils;
-using Microsoft.EntityFrameworkCore;
+using EliteRestaurantPro.ApiClients;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -15,13 +14,16 @@ public static class MoneyFinancialPdfExportService
 
     public static void ExportLedgerPdf(string filePath, DateTime fromDate, DateTime toDate, DateTime rangeEndExclusive)
     {
-        using var db = new AppDbContext();
-        var transactions = db.Transactions
-            .AsNoTracking()
-            .Where(t => t.Date >= fromDate && t.Date < rangeEndExclusive)
-            .OrderBy(t => t.Date)
-            .ThenBy(t => t.Id)
-            .ToList();
+        var transactions = Task.Run(async () =>
+        {
+            var data = new AdminDataApiClient();
+            var all = await data.GetMoneyTransactionsAsync().ConfigureAwait(false);
+            return all
+                .Where(t => t.Date >= fromDate && t.Date < rangeEndExclusive)
+                .OrderBy(t => t.Date)
+                .ThenBy(t => t.Id)
+                .ToList();
+        }).GetAwaiter().GetResult();
 
         var totalSales = transactions.Where(t => t.Type == RevenueType && t.Category == "Sale").ToList();
         var tipsCollected = transactions.Where(t => t.Type == RevenueType && t.Category == "Tip").ToList();

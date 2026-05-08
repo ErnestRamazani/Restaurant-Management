@@ -36,15 +36,25 @@ public sealed class PublicMenuController(
         var all = SettingsManager.Load();
         var business = all.BusinessProfile;
         var pricing = all.CurrencyPricing;
+        var cloudSettings = db.PublicMenuSettings.AsNoTracking().FirstOrDefault(s => s.Key == "default");
         var apiPricing = currencyPricingOptions.Value;
-        var tax = PricingResolver.ResolveTaxRate(apiPricing.TaxPercent, pricing.TaxPercent);
-        var service = PricingResolver.ResolveServicePercent(apiPricing.ServicePercent, pricing.ServicePercent);
-        var name = string.IsNullOrWhiteSpace(business.RestaurantName) ? "Elite Restaurant" : business.RestaurantName.Trim();
-        var mode = string.IsNullOrWhiteSpace(pricing.DefaultCurrencyDisplayMode) ? "Dual" : pricing.DefaultCurrencyDisplayMode.Trim();
-        var rate = pricing.UsdToFcRate > 0m ? pricing.UsdToFcRate : CurrencyHelper.DefaultFcPerUsd;
-        var tagline = string.IsNullOrWhiteSpace(business.CustomerMenuTagline)
+        var tax = PricingResolver.ResolveTaxRate(apiPricing.TaxPercent, cloudSettings?.TaxPercent ?? pricing.TaxPercent);
+        var service = PricingResolver.ResolveServicePercent(apiPricing.ServicePercent, cloudSettings?.ServicePercent ?? pricing.ServicePercent);
+        var name = string.IsNullOrWhiteSpace(cloudSettings?.RestaurantName)
+            ? (string.IsNullOrWhiteSpace(business.RestaurantName) ? "Elite Restaurant" : business.RestaurantName.Trim())
+            : cloudSettings!.RestaurantName.Trim();
+        var mode = string.IsNullOrWhiteSpace(cloudSettings?.DefaultCurrencyDisplayMode)
+            ? (string.IsNullOrWhiteSpace(pricing.DefaultCurrencyDisplayMode) ? "Dual" : pricing.DefaultCurrencyDisplayMode.Trim())
+            : cloudSettings!.DefaultCurrencyDisplayMode.Trim();
+        var rate = cloudSettings?.UsdToFcRate > 0m
+            ? cloudSettings.UsdToFcRate
+            : (pricing.UsdToFcRate > 0m ? pricing.UsdToFcRate : CurrencyHelper.DefaultFcPerUsd);
+        var taglineValue = cloudSettings?.CustomerMenuTagline ?? business.CustomerMenuTagline;
+        var tagline = string.IsNullOrWhiteSpace(taglineValue)
             ? null
-            : business.CustomerMenuTagline!.Trim();
+            : taglineValue.Trim();
+        var phone = cloudSettings?.Phone ?? business.Phone;
+        var address = cloudSettings?.Address ?? business.Address;
         return Ok(new PublicMenuConfigDto(
             name,
             "/api/public/menu/assets/logo",
@@ -53,8 +63,8 @@ public sealed class PublicMenuController(
             rate,
             tax,
             service,
-            string.IsNullOrWhiteSpace(business.Phone) ? null : business.Phone.Trim(),
-            string.IsNullOrWhiteSpace(business.Address) ? null : business.Address.Trim()));
+            string.IsNullOrWhiteSpace(phone) ? null : phone.Trim(),
+            string.IsNullOrWhiteSpace(address) ? null : address.Trim()));
     }
 
     [HttpPost("staff-login-code")]
@@ -80,7 +90,11 @@ public sealed class PublicMenuController(
 
     private ActionResult<StaffLoginCodeResponse> ValidateStaffLoginCodeValue(string? code)
     {
-        var configured = SettingsManager.Load().BusinessProfile.StaffLoginPasscode;
+        var configured = db.PublicMenuSettings.AsNoTracking()
+                             .Where(s => s.Key == "default")
+                             .Select(s => s.StaffLoginPasscode)
+                             .FirstOrDefault()
+                         ?? SettingsManager.Load().BusinessProfile.StaffLoginPasscode;
         var expected = string.IsNullOrWhiteSpace(configured) ? "er4124" : configured.Trim();
         var submitted = code?.Trim() ?? string.Empty;
         if (!string.Equals(submitted, expected, StringComparison.Ordinal))
@@ -114,6 +128,11 @@ public sealed class PublicMenuController(
             .ToList();
 
         var productIds = products.Select(p => p.Id).ToList();
+        var photoKeys = productIds.Select(ProductPhotoAssetKey).ToList();
+        var photoKeyPresent = db.PublicMenuAssets.AsNoTracking()
+            .Where(a => photoKeys.Contains(a.Key) && a.Content.Length > 0)
+            .Select(a => a.Key)
+            .ToHashSet();
         var ingredientStocks = db.ProductIngredients.AsNoTracking()
             .Where(pi => productIds.Contains(pi.ProductId))
             .Select(pi => new { pi.ProductId, pi.Quantity, Stock = pi.InventoryItem!.StockQuantity })
@@ -129,8 +148,9 @@ public sealed class PublicMenuController(
                 inStock = lines.All(x => x.Stock >= x.Quantity);
 
             var sub = string.IsNullOrWhiteSpace(p.SubCategory) ? "General" : p.SubCategory;
-            // Photo: reserved for a future column; not present yet
-            const string? photoUrl = null;
+            var photoUrl = photoKeyPresent.Contains(ProductPhotoAssetKey(p.Id))
+                ? $"/api/public/menu/assets/product/{p.Id}"
+                : null;
             rows.Add(new PublicProductDto
             {
                 Id = p.Id,
@@ -151,13 +171,37 @@ public sealed class PublicMenuController(
 
     [HttpGet("assets/logo")]
     [EnableRateLimiting("PublicMenuRead")]
-    public IActionResult GetLogo() =>
-        ServeImageFromPath(SettingsManager.Load().BusinessProfile.LogoPath?.Trim() ?? string.Empty);
+    public IActionResult GetLogo()
+    {
+        var asset = db.PublicMenuAssets.AsNoTracking().FirstOrDefault(a => a.Key == "logo");
+        if (asset is not null && asset.Content.Length > 0)
+        {
+            var contentType = string.IsNullOrWhiteSpace(asset.ContentType)
+                ? "image/png"
+                : asset.ContentType;
+            return File(asset.Content, contentType);
+        }
+
+        return ServeImageFromPath(SettingsManager.Load().BusinessProfile.LogoPath?.Trim() ?? string.Empty);
+    }
 
     [HttpGet("assets/product/{id:int}")]
     [EnableRateLimiting("PublicMenuRead")]
-    public IActionResult GetProductPhoto(int id) =>
-        NotFound();
+    public IActionResult GetProductPhoto(int id)
+    {
+        var asset = db.PublicMenuAssets.AsNoTracking()
+            .FirstOrDefault(a => a.Key == ProductPhotoAssetKey(id));
+        if (asset is not { Content.Length: > 0 })
+            return NotFound();
+
+        var contentType = string.IsNullOrWhiteSpace(asset.ContentType)
+            ? "image/jpeg"
+            : asset.ContentType;
+        return File(asset.Content, contentType);
+    }
+
+    /// <summary>Stored in <c>PublicMenuAssets</c> alongside the logo; upload via API/admin tooling using this key.</summary>
+    private static string ProductPhotoAssetKey(int productId) => $"product:{productId}";
 
     [HttpGet("tables")]
     [EnableRateLimiting("PublicMenuRead")]

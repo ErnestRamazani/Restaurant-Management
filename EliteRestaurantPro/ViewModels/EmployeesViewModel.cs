@@ -2,18 +2,20 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
-using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Utils;
-using Microsoft.EntityFrameworkCore;
+using EliteRestaurantPro.ApiClients;
+using EliteRestaurantPro.Services;
 using Microsoft.Win32;
 
 namespace EliteRestaurantPro.ViewModels;
 
 public class EmployeesViewModel : AdminBaseViewModel
 {
+    private readonly AdminDataApiClient _data = new();
     private const string PendingSalaryReferencePrefix = "Pending salary accrual:";
     private int? _editingEmployeeId;
     private bool _isDialogOpen;
@@ -223,74 +225,102 @@ public class EmployeesViewModel : AdminBaseViewModel
         OpenAddDialogCommand = new RelayCommand(_ => OpenAddDialog());
         EditEmployeeCommand = new RelayCommand(employee => OpenEditDialog(employee as Employee));
         DeleteEmployeeCommand = new RelayCommand(employee => DeleteEmployee(employee as Employee));
-        SaveEmployeeCommand = new RelayCommand(_ => SaveEmployee());
+        SaveEmployeeCommand = new RelayCommand(_ => _ = SaveEmployeeAsync());
         CancelDialogCommand = new RelayCommand(_ => CloseDialog());
         BrowseProfileImageCommand = new RelayCommand(_ => BrowseProfileImage());
-        ShowShiftHistoryCommand = new RelayCommand(employee => ShowShiftHistory(employee as Employee));
+        ShowShiftHistoryCommand = new RelayCommand(employee => _ = ShowShiftHistoryAsync(employee as Employee));
 
-        LoadEmployees();
+        _ = LoadEmployeesAsync();
     }
 
-    private void LoadEmployees()
+    private async Task LoadEmployeesAsync()
     {
+        await Task.Yield();
         Employees.Clear();
         _allEmployees.Clear();
 
-        using var db = new AppDbContext();
-        var today = DateTime.Today;
-        var (todayStartUtc, todayEndExclusiveUtc) = AttendanceCalendar.DayRangeUtc(today);
-        var todayAttendance = db.EmployeeAttendances
-            .AsNoTracking()
-            .Where(a => a.WorkDate >= todayStartUtc && a.WorkDate < todayEndExclusiveUtc)
-            .ToDictionary(a => a.EmployeeId, a => a);
-        var todayPendingSalariesByEmployeeId = db.Transactions
-            .AsNoTracking()
-            .Where(t =>
-                t.Type == "Expense" &&
-                t.Category == "Salary" &&
-                t.Date.Date == today &&
-                t.Justification.StartsWith(PendingSalaryReferencePrefix))
-            .ToList()
-            .GroupBy(t => ParseEmployeeIdFromPendingSalaryJustification(t.Justification))
-            .Where(g => g.Key.HasValue)
-            .ToDictionary(g => g.Key!.Value, g => g.Sum(x => x.Amount));
-        var orders = db.Orders
-            .AsNoTracking()
-            .Include(o => o.Items)
-            .ThenInclude(i => i.Product)
-            .ToList();
-
-        foreach (var employee in db.Employees.AsNoTracking().OrderBy(e => e.Name))
+        try
         {
-            employee.TotalOrdersServed = orders.Count(o => o.ServerId == employee.Id);
-            employee.TotalSalesGenerated = orders
-                .Where(o => o.ServerId == employee.Id && o.Status != "Cancelled")
-                .Sum(o => o.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity));
+            var today = DateTime.Today;
+            var (todayStartUtc, todayEndExclusiveUtc) = AttendanceCalendar.DayRangeUtc(today);
 
-            if (todayAttendance.TryGetValue(employee.Id, out var attendance))
+            var employeesTask = _data.GetEmployeesAsync();
+            var attendanceTask = _data.GetAttendanceAsync();
+            var moneyTask = _data.GetMoneyTransactionsAsync();
+            var ordersTask = _data.GetOrdersAsync();
+            var productsTask = _data.GetProductsAsync();
+            await Task.WhenAll(employeesTask, attendanceTask, moneyTask, ordersTask, productsTask).ConfigureAwait(true);
+
+            var employeeRows = (await employeesTask.ConfigureAwait(true)).OrderBy(e => e.Name).ToList();
+            var attendanceRows = await attendanceTask.ConfigureAwait(true);
+            var transactions = await moneyTask.ConfigureAwait(true);
+            var orders = (await ordersTask.ConfigureAwait(true)).ToList();
+            var priceByProductId = (await productsTask.ConfigureAwait(true)).ToDictionary(p => p.Id, p => p.Price);
+
+            foreach (var o in orders)
             {
-                var baseClockIn = attendance.ClockInTime?.ToString("HH:mm") ?? "Not clocked in";
-                employee.TodayClockInText = string.IsNullOrWhiteSpace(attendance.ClockInStatus)
-                    ? baseClockIn
-                    : $"{baseClockIn} ({attendance.ClockInStatus})";
-                employee.TodayClockOutText = attendance.ClockOutTime?.ToString("HH:mm") ?? "Not clocked out";
-                employee.CanClockIn = attendance.ClockInTime is null;
-                employee.CanClockOut = attendance.ClockInTime is not null && attendance.ClockOutTime is null;
+                foreach (var i in o.Items)
+                {
+                    if (i.Product is null && priceByProductId.TryGetValue(i.ProductId, out var price))
+                        i.Product = new Product { Id = i.ProductId, Price = price };
+                }
             }
-            else
+
+            var todayAttendance = attendanceRows
+                .Where(a => a.WorkDate >= todayStartUtc && a.WorkDate < todayEndExclusiveUtc)
+                .GroupBy(a => a.EmployeeId)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.Id).First());
+
+            var todayPendingSalariesByEmployeeId = transactions
+                .Where(t =>
+                    t.Type == "Expense" &&
+                    t.Category == "Salary" &&
+                    t.Date.Date == today &&
+                    t.Justification.StartsWith(PendingSalaryReferencePrefix))
+                .GroupBy(t => ParseEmployeeIdFromPendingSalaryJustification(t.Justification))
+                .Where(g => g.Key.HasValue)
+                .ToDictionary(g => g.Key!.Value, g => g.Sum(x => x.Amount));
+
+            foreach (var employee in employeeRows)
             {
-                employee.TodayClockInText = "Not clocked in";
-                employee.TodayClockOutText = "Not clocked out";
-                employee.CanClockIn = true;
-                employee.CanClockOut = false;
+                employee.TotalOrdersServed = orders.Count(o => o.ServerId == employee.Id);
+                employee.TotalSalesGenerated = orders
+                    .Where(o => o.ServerId == employee.Id && o.Status != "Cancelled")
+                    .Sum(o => o.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity));
+
+                if (todayAttendance.TryGetValue(employee.Id, out var attendance))
+                {
+                    var baseClockIn = attendance.ClockInTime?.ToString("HH:mm") ?? "Not clocked in";
+                    employee.TodayClockInText = string.IsNullOrWhiteSpace(attendance.ClockInStatus)
+                        ? baseClockIn
+                        : $"{baseClockIn} ({attendance.ClockInStatus})";
+                    employee.TodayClockOutText = attendance.ClockOutTime?.ToString("HH:mm") ?? "Not clocked out";
+                    employee.CanClockIn = attendance.ClockInTime is null;
+                    employee.CanClockOut = attendance.ClockInTime is not null && attendance.ClockOutTime is null;
+                }
+                else
+                {
+                    employee.TodayClockInText = "Not clocked in";
+                    employee.TodayClockOutText = "Not clocked out";
+                    employee.CanClockIn = true;
+                    employee.CanClockOut = false;
+                }
+
+                if (todayPendingSalariesByEmployeeId.TryGetValue(employee.Id, out var pendingSalary))
+                    employee.PendingSalaryToday = pendingSalary;
+                else
+                    employee.PendingSalaryToday = 0m;
+
+                _allEmployees.Add(employee);
             }
-
-            if (todayPendingSalariesByEmployeeId.TryGetValue(employee.Id, out var pendingSalary))
-                employee.PendingSalaryToday = pendingSalary;
-            else
-                employee.PendingSalaryToday = 0m;
-
-            _allEmployees.Add(employee);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                ex.GetBaseException().Message,
+                "Could not load employees",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
         }
 
         ApplyEmployeeFilter();
@@ -374,7 +404,7 @@ public class EmployeesViewModel : AdminBaseViewModel
         IsDialogOpen = true;
     }
 
-    private void SaveEmployee()
+    private async Task SaveEmployeeAsync()
     {
         var normalizedName = EmployeeName.Trim();
         var normalizedRole = SelectedRole.Trim();
@@ -465,14 +495,12 @@ public class EmployeesViewModel : AdminBaseViewModel
             return;
         }
 
-        using var db = new AppDbContext();
+        var allEmployees = await _data.GetEmployeesAsync().ConfigureAwait(true);
         if (!string.IsNullOrWhiteSpace(normalizedPin))
         {
-            var duplicatePinExists = db.Employees.AsNoTracking()
+            var duplicatePinExists = allEmployees
                 .Where(e => !_editingEmployeeId.HasValue || e.Id != _editingEmployeeId.Value)
-                .Select(e => e.PinCode)
-                .ToList()
-                .Any(stored => EmployeePinHasher.Verify(normalizedPin, stored));
+                .Any(stored => EmployeePinHasher.Verify(normalizedPin, stored.PinCode));
 
             if (duplicatePinExists)
             {
@@ -488,11 +516,9 @@ public class EmployeesViewModel : AdminBaseViewModel
         if (normalizedSignIn.Length > 0)
         {
             var signInLower = normalizedSignIn.ToLowerInvariant();
-            var othersQuery = db.Employees.AsNoTracking()
-                .Where(e => !_editingEmployeeId.HasValue || e.Id != _editingEmployeeId.Value);
+            var others = allEmployees.Where(e => !_editingEmployeeId.HasValue || e.Id != _editingEmployeeId.Value).ToList();
 
-            if (othersQuery.Any(e =>
-                    !string.IsNullOrWhiteSpace(e.SignInId) && e.SignInId.Trim().ToLower() == signInLower))
+            if (others.Any(e => !string.IsNullOrWhiteSpace(e.SignInId) && e.SignInId.Trim().ToLowerInvariant() == signInLower))
             {
                 MessageBox.Show(
                     "This Sign-in ID is already used by another employee.",
@@ -502,7 +528,7 @@ public class EmployeesViewModel : AdminBaseViewModel
                 return;
             }
 
-            if (othersQuery.Any(e => e.UniqueId.Trim().ToLower() == signInLower))
+            if (others.Any(e => e.UniqueId.Trim().ToLowerInvariant() == signInLower))
             {
                 MessageBox.Show(
                     "This Sign-in ID matches another employee's system Unique ID. Choose a different Sign-in ID.",
@@ -513,67 +539,89 @@ public class EmployeesViewModel : AdminBaseViewModel
             }
         }
 
-        if (_editingEmployeeId is int employeeId)
+        try
         {
-            var existing = db.Employees.Single(e => e.Id == employeeId);
-            existing.Name = normalizedName;
-            existing.Role = normalizedRole;
-            if (!string.IsNullOrWhiteSpace(normalizedPin))
-                existing.PinCode = EmployeePinHasher.HashForStorage(normalizedPin);
-            existing.SignInId = isStaffPortalRole ? normalizedSignIn : string.Empty;
-            existing.PhoneNumber = normalizedPhone;
-            existing.HourlyRate = hourlyRate;
-            existing.MonthlySalaryUSD = Math.Round(Math.Max(0m, monthlySalaryUsd), 2);
-            existing.JoinDate = joinDate.Date;
-            existing.EmploymentStatus = normalizedStatus;
-            existing.ProfileImagePath = normalizedImage;
-            existing.Notes = normalizedNotes;
-            existing.MondayShift = mondayShift;
-            existing.TuesdayShift = tuesdayShift;
-            existing.WednesdayShift = wednesdayShift;
-            existing.ThursdayShift = thursdayShift;
-            existing.FridayShift = fridayShift;
-            existing.SaturdayShift = saturdayShift;
-            existing.SundayShift = sundayShift;
-        }
-        else
-        {
-            var confirmAdd = MessageBox.Show(
-                "Add this employee?",
-                "Confirm Add Employee",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            if (confirmAdd != MessageBoxResult.Yes)
-                return;
-
-            db.Employees.Add(new Employee
+            if (_editingEmployeeId is int employeeId)
             {
-                UniqueId = UniqueIdGenerator.NewId("EMP"),
-                SignInId = isStaffPortalRole ? normalizedSignIn : string.Empty,
-                Name = normalizedName,
-                Role = normalizedRole,
-                PinCode = EmployeePinHasher.HashForStorage(normalizedPin),
-                PhoneNumber = normalizedPhone,
-                HourlyRate = hourlyRate,
-                MonthlySalaryUSD = Math.Round(Math.Max(0m, monthlySalaryUsd), 2),
-                JoinDate = joinDate.Date,
-                EmploymentStatus = normalizedStatus,
-                ProfileImagePath = normalizedImage,
-                Notes = normalizedNotes,
-                MondayShift = mondayShift,
-                TuesdayShift = tuesdayShift,
-                WednesdayShift = wednesdayShift,
-                ThursdayShift = thursdayShift,
-                FridayShift = fridayShift,
-                SaturdayShift = saturdayShift,
-                SundayShift = sundayShift
-            });
-        }
+                var shell = allEmployees.FirstOrDefault(e => e.Id == employeeId)
+                    ?? throw new InvalidOperationException("Employee not found. Refresh and try again.");
 
-        db.SaveChanges();
-        CloseDialog();
-        LoadEmployees();
+                var toSave = new Employee
+                {
+                    Id = employeeId,
+                    UniqueId = shell.UniqueId,
+                    Name = normalizedName,
+                    Role = normalizedRole,
+                    PinCode = !string.IsNullOrWhiteSpace(normalizedPin)
+                        ? EmployeePinHasher.HashForStorage(normalizedPin)
+                        : shell.PinCode,
+                    SignInId = isStaffPortalRole ? normalizedSignIn : string.Empty,
+                    PhoneNumber = normalizedPhone,
+                    HourlyRate = hourlyRate,
+                    MonthlySalaryUSD = Math.Round(Math.Max(0m, monthlySalaryUsd), 2),
+                    JoinDate = joinDate.Date,
+                    EmploymentStatus = normalizedStatus,
+                    ProfileImagePath = normalizedImage,
+                    Notes = normalizedNotes,
+                    MondayShift = mondayShift,
+                    TuesdayShift = tuesdayShift,
+                    WednesdayShift = wednesdayShift,
+                    ThursdayShift = thursdayShift,
+                    FridayShift = fridayShift,
+                    SaturdayShift = saturdayShift,
+                    SundayShift = sundayShift
+                };
+
+                DesktopCloudPersistence.PushUpsertBlocking(toSave);
+            }
+            else
+            {
+                var confirmAdd = MessageBox.Show(
+                    "Add this employee?",
+                    "Confirm Add Employee",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (confirmAdd != MessageBoxResult.Yes)
+                    return;
+
+                var newEmployee = new Employee
+                {
+                    UniqueId = UniqueIdGenerator.NewId("EMP"),
+                    SignInId = isStaffPortalRole ? normalizedSignIn : string.Empty,
+                    Name = normalizedName,
+                    Role = normalizedRole,
+                    PinCode = EmployeePinHasher.HashForStorage(normalizedPin),
+                    PhoneNumber = normalizedPhone,
+                    HourlyRate = hourlyRate,
+                    MonthlySalaryUSD = Math.Round(Math.Max(0m, monthlySalaryUsd), 2),
+                    JoinDate = joinDate.Date,
+                    EmploymentStatus = normalizedStatus,
+                    ProfileImagePath = normalizedImage,
+                    Notes = normalizedNotes,
+                    MondayShift = mondayShift,
+                    TuesdayShift = tuesdayShift,
+                    WednesdayShift = wednesdayShift,
+                    ThursdayShift = thursdayShift,
+                    FridayShift = fridayShift,
+                    SaturdayShift = saturdayShift,
+                    SundayShift = sundayShift
+                };
+
+                DesktopCloudPersistence.PushUpsertBlocking(newEmployee);
+            }
+
+            CloseDialog();
+            _ = LoadEmployeesAsync();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                ex.GetBaseException().Message,
+                "Save employee failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private void DeleteEmployee(Employee? employee)
@@ -589,13 +637,20 @@ public class EmployeesViewModel : AdminBaseViewModel
         if (confirmDelete != MessageBoxResult.Yes)
             return;
 
-        using var db = new AppDbContext();
-        var existing = db.Employees.SingleOrDefault(e => e.Id == employee.Id);
-        if (existing is null) return;
-
-        db.Employees.Remove(existing);
-        db.SaveChanges();
-        LoadEmployees();
+        try
+        {
+            var toDelete = new Employee { Id = employee.Id, UniqueId = employee.UniqueId };
+            DesktopCloudPersistence.PushDeleteBlocking(toDelete);
+            _ = LoadEmployeesAsync();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                ex.GetBaseException().Message,
+                "Delete employee failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private void CloseDialog()
@@ -619,40 +674,50 @@ public class EmployeesViewModel : AdminBaseViewModel
         }
     }
 
-    private void ShowShiftHistory(Employee? employee)
+    private async Task ShowShiftHistoryAsync(Employee? employee)
     {
         if (employee is null)
             return;
 
-        using var db = new AppDbContext();
-        var fromDate = DateTime.Today.AddDays(-6);
-        var historyStartUtc = AttendanceCalendar.DayAnchorUtc(fromDate);
-        var historyEndExclusiveUtc = AttendanceCalendar.DayAnchorUtc(DateTime.Today).AddDays(1);
-        var history = db.EmployeeAttendances
-            .AsNoTracking()
-            .Where(a => a.EmployeeId == employee.Id && a.WorkDate >= historyStartUtc && a.WorkDate < historyEndExclusiveUtc)
-            .OrderByDescending(a => a.WorkDate)
-            .ToList();
-
-        if (history.Count == 0)
+        try
         {
-            MessageBox.Show("No attendance records in the last 7 days.", "Shift History", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
+            var attendanceRows = await _data.GetAttendanceAsync().ConfigureAwait(true);
+            var fromDate = DateTime.Today.AddDays(-6);
+            var historyStartUtc = AttendanceCalendar.DayAnchorUtc(fromDate);
+            var historyEndExclusiveUtc = AttendanceCalendar.DayAnchorUtc(DateTime.Today).AddDays(1);
+            var history = attendanceRows
+                .Where(a => a.EmployeeId == employee.Id && a.WorkDate >= historyStartUtc && a.WorkDate < historyEndExclusiveUtc)
+                .OrderByDescending(a => a.WorkDate)
+                .ToList();
+
+            if (history.Count == 0)
+            {
+                MessageBox.Show("No attendance records in the last 7 days.", "Shift History", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var lines = history.Select(a =>
+            {
+                var inText = a.ClockInTime?.ToString("HH:mm") ?? "--:--";
+                var outText = a.ClockOutTime?.ToString("HH:mm") ?? "--:--";
+                var statusText = string.IsNullOrWhiteSpace(a.ClockInStatus) ? "Pending" : a.ClockInStatus;
+                return $"{a.WorkDate:ddd yyyy-MM-dd} | In {inText} | Out {outText} | {statusText}";
+            });
+
+            MessageBox.Show(
+                string.Join(Environment.NewLine, lines),
+                $"Shift History - {employee.Name}",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
         }
-
-        var lines = history.Select(a =>
+        catch (Exception ex)
         {
-            var inText = a.ClockInTime?.ToString("HH:mm") ?? "--:--";
-            var outText = a.ClockOutTime?.ToString("HH:mm") ?? "--:--";
-            var statusText = string.IsNullOrWhiteSpace(a.ClockInStatus) ? "Pending" : a.ClockInStatus;
-            return $"{a.WorkDate:ddd yyyy-MM-dd} | In {inText} | Out {outText} | {statusText}";
-        });
-
-        MessageBox.Show(
-            string.Join(Environment.NewLine, lines),
-            $"Shift History - {employee.Name}",
-            MessageBoxButton.OK,
-            MessageBoxImage.Information);
+            MessageBox.Show(
+                ex.GetBaseException().Message,
+                "Shift history failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private static int? ParseEmployeeIdFromPendingSalaryJustification(string justification)

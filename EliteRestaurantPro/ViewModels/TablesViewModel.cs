@@ -2,17 +2,23 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
+using System.Threading.Tasks;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Input;
-using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Sync;
 using EliteRestaurant.Core.Utils;
-using Microsoft.EntityFrameworkCore;
+using EliteRestaurantPro.ApiClients;
+using EliteRestaurantPro.Services;
 
 namespace EliteRestaurantPro.ViewModels;
 
 public class TablesViewModel : AdminBaseViewModel
 {
+    private static readonly JsonSerializerOptions SyncJson = new(JsonSerializerDefaults.Web);
+    private readonly AdminDataApiClient _data = new();
+
     private int? _editingTableId;
     private bool _isDialogOpen;
     private string _dialogTitle = "Add Table";
@@ -103,35 +109,44 @@ public class TablesViewModel : AdminBaseViewModel
     {
         OpenAddDialogCommand = new RelayCommand(_ => OpenAddDialog());
         EditTableCommand = new RelayCommand(table => OpenEditDialog(table as Table));
-        DeleteTableCommand = new RelayCommand(table => DeleteTable(table as Table));
-        SaveTableCommand = new RelayCommand(_ => SaveTable());
+        DeleteTableCommand = new RelayCommand(table => _ = DeleteTableAsync(table as Table));
+        SaveTableCommand = new RelayCommand(_ => _ = SaveTableAsync());
         CancelDialogCommand = new RelayCommand(_ => CloseDialog());
 
-        LoadTables();
+        _ = LoadTablesAsync();
     }
 
-    private void LoadTables()
+    private async Task LoadTablesAsync()
     {
-        Tables.Clear();
-        Servers.Clear();
-
-        using var db = new AppDbContext();
-        foreach (var server in db.Employees.AsNoTracking().Where(e => e.Role.ToLower() == "server").OrderBy(e => e.Name))
+        try
         {
-            Servers.Add(server);
-        }
+            var employees = await _data.GetEmployeesAsync().ConfigureAwait(true);
+            var tables = await _data.GetTablesAsync().ConfigureAwait(true);
+            var servers = employees
+                .Where(e => e.Role.Equals("server", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(e => e.Name)
+                .ToList();
+            var orderedTables = tables.OrderBy(t => t.TableNumber).ToList();
 
-        _allTables.Clear();
-        foreach (var table in db.Tables
-                     .AsNoTracking()
-                     .Include(t => t.AssignedServer)
-                     .OrderBy(t => t.TableNumber))
+            Servers.Clear();
+            foreach (var s in servers)
+                Servers.Add(s);
+
+            _allTables.Clear();
+            foreach (var t in orderedTables)
+                _allTables.Add(t);
+
+            ApplyTablesFilter();
+            RefreshReadyPickupBanner();
+        }
+        catch (Exception ex)
         {
-            _allTables.Add(table);
+            MessageBox.Show(
+                ex.GetBaseException().Message,
+                "Could not load tables",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
         }
-
-        ApplyTablesFilter();
-        RefreshReadyPickupBanner();
     }
 
     private void ApplyTablesFilter()
@@ -191,7 +206,14 @@ public class TablesViewModel : AdminBaseViewModel
         IsDialogOpen = true;
     }
 
-    private void SaveTable()
+    private static bool HasBlockingOrdersForTable(IReadOnlyList<OrderRecord> orders, int tableId) =>
+        orders.Any(o =>
+            o.TableId == tableId &&
+            (o.Status == "Waiting" || o.Status == "In Kitchen" || o.Status == "Ready" ||
+             o.Status == OrderWorkflow.Served ||
+             o.Status == OrderWorkflow.PendingCashier));
+
+    private async Task SaveTableAsync()
     {
         if (AppSession.IsStaffTablet) return;
 
@@ -202,7 +224,6 @@ public class TablesViewModel : AdminBaseViewModel
             return;
         }
 
-        using var db = new AppDbContext();
         var normalizedStatus = SelectedStatus.Trim();
 
         if (normalizedStatus == "Occupied")
@@ -215,57 +236,72 @@ public class TablesViewModel : AdminBaseViewModel
             return;
         }
 
-        if (normalizedStatus == "Maintenance" && _editingTableId is int maintenanceTableId)
-        {
-            var activeOrdersExist = db.Orders.Any(o => o.TableId == maintenanceTableId &&
-                (o.Status == "Waiting" || o.Status == "In Kitchen" || o.Status == "Ready" ||
-                 o.Status == OrderWorkflow.Served ||
-                 o.Status == OrderWorkflow.PendingCashier));
-            if (activeOrdersExist)
-            {
-                MessageBox.Show(
-                    "You cannot switch this table to Maintenance while active orders exist.",
-                    "Validation",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-                return;
-            }
-        }
-
-        if (normalizedStatus == "Available" && _editingTableId is int availableTableId)
-        {
-            var activeOrdersExist = db.Orders.Any(o => o.TableId == availableTableId &&
-                (o.Status == "Waiting" || o.Status == "In Kitchen" || o.Status == "Ready" ||
-                 o.Status == OrderWorkflow.Served ||
-                 o.Status == OrderWorkflow.PendingCashier));
-            if (activeOrdersExist)
-            {
-                MessageBox.Show(
-                    "This table has active orders and cannot be set to Available yet.",
-                    "Validation",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
-                return;
-            }
-        }
-
         try
         {
+            var orders = await _data.GetOrdersAsync().ConfigureAwait(true);
+
+            if (normalizedStatus == "Maintenance" && _editingTableId is int maintenanceTableId)
+            {
+                if (HasBlockingOrdersForTable(orders, maintenanceTableId))
+                {
+                    MessageBox.Show(
+                        "You cannot switch this table to Maintenance while active orders exist.",
+                        "Validation",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+            }
+
+            if (normalizedStatus == "Available" && _editingTableId is int availableTableId)
+            {
+                if (HasBlockingOrdersForTable(orders, availableTableId))
+                {
+                    MessageBox.Show(
+                        "This table has active orders and cannot be set to Available yet.",
+                        "Validation",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+            }
+
             if (_editingTableId is int tableId)
             {
                 if (!int.TryParse(TableNumberText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var editedTableNumber))
                     return;
 
-                var existing = db.Tables.Single(t => t.Id == tableId);
-                existing.TableNumber = editedTableNumber;
-                existing.Name = TableNameText.Trim();
-                existing.Capacity = capacity;
-                existing.Status = normalizedStatus;
-                existing.AssignedServerId = SelectedServerId;
+                var baseRow = _allTables.FirstOrDefault(t => t.Id == tableId)
+                    ?? throw new InvalidOperationException("Table not found in the current list. Refresh and try again.");
+
+                var toPush = new Table
+                {
+                    Id = tableId,
+                    UniqueId = baseRow.UniqueId,
+                    TableNumber = editedTableNumber,
+                    Name = TableNameText.Trim(),
+                    Capacity = capacity,
+                    Status = normalizedStatus,
+                    AssignedServerId = SelectedServerId
+                };
+
+                try
+                {
+                    DesktopCloudPersistence.PushUpsertBlocking(toPush);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(
+                        ex.GetBaseException().Message,
+                        "Save table failed",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
             }
             else
             {
-                var nextTableNumber = GetNextTableNumber(db);
+                var nextTableNumber = GetNextTableNumberFromNumbers(_allTables.Select(t => t.TableNumber));
                 var confirmAdd = MessageBox.Show(
                     $"Add this table as ID {nextTableNumber}?",
                     "Confirm Add Table",
@@ -275,7 +311,7 @@ public class TablesViewModel : AdminBaseViewModel
                 if (confirmAdd != MessageBoxResult.Yes)
                     return;
 
-                db.Tables.Add(new Table
+                var newTable = new Table
                 {
                     UniqueId = UniqueIdGenerator.NewId("TBL"),
                     TableNumber = nextTableNumber,
@@ -283,24 +319,37 @@ public class TablesViewModel : AdminBaseViewModel
                     Capacity = capacity,
                     Status = normalizedStatus,
                     AssignedServerId = SelectedServerId
-                });
+                };
+
+                try
+                {
+                    DesktopCloudPersistence.PushUpsertBlocking(newTable);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(
+                        ex.GetBaseException().Message,
+                        "Add table failed",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
             }
 
-            db.SaveChanges();
             CloseDialog();
-            LoadTables();
+            await LoadTablesAsync().ConfigureAwait(true);
         }
-        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+        catch (Exception ex)
         {
             MessageBox.Show(
-                "A table with this ID already exists. Table IDs must be unique.",
-                "Duplicate Table ID",
+                ex.GetBaseException().Message,
+                "Save table failed",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
     }
 
-    private void DeleteTable(Table? table)
+    private async Task DeleteTableAsync(Table? table)
     {
         if (table is null) return;
         if (AppSession.IsStaffTablet) return;
@@ -314,40 +363,109 @@ public class TablesViewModel : AdminBaseViewModel
         if (confirmDelete != MessageBoxResult.Yes)
             return;
 
-        using var db = new AppDbContext();
-        var existing = db.Tables.SingleOrDefault(t => t.Id == table.Id);
-        if (existing is null) return;
+        try
+        {
+            var orders = await _data.GetOrdersAsync().ConfigureAwait(true);
 
-        var activeOrdersExist = db.Orders.Any(o =>
-            o.TableId == existing.Id &&
-            (o.Status == "Waiting" || o.Status == "In Kitchen" || o.Status == "Ready" ||
-             o.Status == OrderWorkflow.Served ||
-             o.Status == OrderWorkflow.PendingCashier));
+            if (HasBlockingOrdersForTable(orders, table.Id))
+            {
+                MessageBox.Show(
+                    "This table has active orders and cannot be deleted.",
+                    "Delete Blocked",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
 
-        if (activeOrdersExist)
+            var pastOrders = orders.Where(o =>
+                o.TableId == table.Id &&
+                (o.Status == "Completed" || o.Status == "Cancelled")).ToList();
+
+            var tableCode = $"Table {table.TableNumber}";
+            var tableName = string.IsNullOrWhiteSpace(table.Name) ? tableCode : table.Name;
+
+            var ops = new List<CloudSyncOperation>();
+            foreach (var order in pastOrders)
+            {
+                StripOrderNav(order);
+                order.TableId = null;
+                order.TableCode = tableCode;
+                order.TableName = tableName;
+                ops.Add(MakeUpsertOp(order));
+            }
+
+            ops.Add(MakeDeleteOp(CloneTableForSync(table)));
+
+            try
+            {
+                DesktopCloudPersistence.PushBatchBlocking(ops);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    ex.GetBaseException().Message,
+                    "Delete table failed",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            await LoadTablesAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex)
         {
             MessageBox.Show(
-                "This table has active orders and cannot be deleted.",
-                "Delete Blocked",
+                ex.GetBaseException().Message,
+                "Delete table failed",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
-            return;
         }
+    }
 
-        var pastOrders = db.Orders.Where(o =>
-            o.TableId == existing.Id &&
-            (o.Status == "Completed" || o.Status == "Cancelled"));
+    private static CloudSyncOperation MakeUpsertOp(OrderRecord order)
+    {
+        var json = JsonSerializer.Serialize(order, SyncJson);
+        return new CloudSyncOperation(
+            Guid.NewGuid().ToString("N"),
+            nameof(OrderRecord),
+            "Upsert",
+            json,
+            DateTime.UtcNow);
+    }
 
-        foreach (var order in pastOrders)
+    private static CloudSyncOperation MakeDeleteOp(Table table)
+    {
+        var json = JsonSerializer.Serialize(table, SyncJson);
+        return new CloudSyncOperation(
+            Guid.NewGuid().ToString("N"),
+            nameof(Table),
+            "Delete",
+            json,
+            DateTime.UtcNow);
+    }
+
+    private static Table CloneTableForSync(Table t) =>
+        new()
         {
-            order.TableCode = $"Table {existing.TableNumber}";
-            order.TableName = string.IsNullOrWhiteSpace(existing.Name) ? $"Table {existing.TableNumber}" : existing.Name;
-            order.TableId = null;
-        }
+            Id = t.Id,
+            UniqueId = t.UniqueId,
+            TableNumber = t.TableNumber,
+            Name = t.Name,
+            Capacity = t.Capacity,
+            Status = t.Status,
+            AssignedServerId = t.AssignedServerId,
+            AssignedServer = null
+        };
 
-        db.Tables.Remove(existing);
-        db.SaveChanges();
-        LoadTables();
+    private static void StripOrderNav(OrderRecord o)
+    {
+        o.Table = null;
+        o.Server = null;
+        foreach (var i in o.Items)
+        {
+            i.OrderRecord = null;
+            i.Product = null;
+        }
     }
 
     private void CloseDialog()
@@ -357,19 +475,12 @@ public class TablesViewModel : AdminBaseViewModel
         IsTableNumberEditable = false;
     }
 
-    private static int GetNextTableNumber(AppDbContext db)
+    private static int GetNextTableNumberFromNumbers(IEnumerable<int> usedNumbers)
     {
-        var used = db.Tables.AsNoTracking().Select(t => t.TableNumber).ToHashSet();
+        var used = usedNumbers.ToHashSet();
         var next = 1;
         while (used.Contains(next))
             next++;
         return next;
-    }
-
-    private static bool IsUniqueConstraintViolation(DbUpdateException ex)
-    {
-        var message = ex.InnerException?.Message ?? ex.Message;
-        return message.Contains("unique", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("duplicate", StringComparison.OrdinalIgnoreCase);
     }
 }

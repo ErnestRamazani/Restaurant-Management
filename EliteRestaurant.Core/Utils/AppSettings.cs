@@ -13,11 +13,10 @@ public static class CloudEndpoints
         if (string.IsNullOrWhiteSpace(trimmed))
             return preferProduction ? ProductionApiBaseUrl : LocalApiBaseUrl;
 
-        if (trimmed.Contains("localhost:5223", StringComparison.OrdinalIgnoreCase) ||
-            trimmed.Contains("127.0.0.1:5223", StringComparison.OrdinalIgnoreCase))
-        {
-            return preferProduction ? ProductionApiBaseUrl : LocalApiBaseUrl;
-        }
+        // Older docs/tools used :5223; current API launch profile listens on :8080. Rewire localhost URLs so
+        // the desktop client hits the same host as the browser (avoid silently forcing production).
+        trimmed = trimmed.Replace("localhost:5223", "localhost:8080", StringComparison.OrdinalIgnoreCase);
+        trimmed = trimmed.Replace("127.0.0.1:5223", "127.0.0.1:8080", StringComparison.OrdinalIgnoreCase);
 
         return trimmed;
     }

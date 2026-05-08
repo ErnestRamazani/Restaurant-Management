@@ -7,26 +7,27 @@ namespace EliteRestaurant.Core.Orders;
 
 public sealed record AdminWalkInLine(int ProductId, int Quantity);
 
-public sealed class AdminOrderOperationsService
+public sealed class AdminOrderOperationsService(AppDbContext db)
 {
+    private readonly AppDbContext _db = db;
+
     public sealed record ReleasePendingResult(bool Ok, string? ErrorMessage, string? ReleasedOrderCode);
 
     public ReleasePendingResult TryReleasePendingToKitchen(int orderId)
     {
-        using var db = new AppDbContext();
-        var order = db.Orders
+        var order = _db.Orders
             .Include(o => o.Items)
             .ThenInclude(i => i.Product)
             .FirstOrDefault(o => o.Id == orderId && o.Status == OrderWorkflow.PendingCashier);
         if (order is null)
             return new ReleasePendingResult(false, "Order not found or already processed.", null);
 
-        return DatabaseResilientTransaction.Execute(db, () =>
+        return DatabaseResilientTransaction.Execute(_db, () =>
         {
-            using var tx = db.Database.BeginTransaction();
+            using var tx = _db.Database.BeginTransaction();
             try
             {
-                var err = OrderInventoryDeduction.TryApplyForPlacedOrder(db, order);
+                var err = OrderInventoryDeduction.TryApplyForPlacedOrder(_db, order);
                 if (err is not null)
                 {
                     tx.Rollback();
@@ -34,8 +35,8 @@ public sealed class AdminOrderOperationsService
                 }
 
                 order.Status = "Waiting";
-                DataReconciler.ReconcileTableStatusesWithOrders(db);
-                db.SaveChanges();
+                DataReconciler.ReconcileTableStatusesWithOrders(_db);
+                _db.SaveChanges();
                 tx.Commit();
                 var code = string.IsNullOrWhiteSpace(order.UniqueId) ? $"#{order.Id:000}" : order.UniqueId;
                 return new ReleasePendingResult(true, null, code);
@@ -50,19 +51,18 @@ public sealed class AdminOrderOperationsService
 
     public string? TryCancelPendingCashier(int orderId)
     {
-        using var db = new AppDbContext();
-        var order = db.Orders.FirstOrDefault(o => o.Id == orderId && o.Status == OrderWorkflow.PendingCashier);
+        var order = _db.Orders.FirstOrDefault(o => o.Id == orderId && o.Status == OrderWorkflow.PendingCashier);
         if (order is null)
             return "Order not found or already processed.";
 
-        return DatabaseResilientTransaction.Execute(db, () =>
+        return DatabaseResilientTransaction.Execute(_db, () =>
         {
-            using var tx = db.Database.BeginTransaction();
+            using var tx = _db.Database.BeginTransaction();
             try
             {
                 order.Status = "Cancelled";
-                DataReconciler.ReconcileTableStatusesWithOrders(db);
-                db.SaveChanges();
+                DataReconciler.ReconcileTableStatusesWithOrders(_db);
+                _db.SaveChanges();
                 tx.Commit();
                 return (string?)null;
             }
@@ -76,14 +76,13 @@ public sealed class AdminOrderOperationsService
 
     public string? TryCreateWalkInOrder(int tableId, string selectedOrderStatus, IReadOnlyList<AdminWalkInLine> lines)
     {
-        using var db = new AppDbContext();
-        var table = db.Tables.Include(t => t.AssignedServer).SingleOrDefault(t => t.Id == tableId);
+        var table = _db.Tables.Include(t => t.AssignedServer).SingleOrDefault(t => t.Id == tableId);
         if (table is null || table.AssignedServerId is null || table.AssignedServer is null)
             return null;
 
         var lineSum = lines.Sum(l =>
         {
-            var price = db.Products.AsNoTracking().Where(p => p.Id == l.ProductId).Select(p => p.Price).FirstOrDefault();
+            var price = _db.Products.AsNoTracking().Where(p => p.Id == l.ProductId).Select(p => p.Price).FirstOrDefault();
             return price * l.Quantity;
         });
         var totals = OrderTotalsHelper.ComputeTotals(lineSum, "None", 0m);
@@ -106,11 +105,11 @@ public sealed class AdminOrderOperationsService
             CreatedAt = DateTime.Now
         };
 
-        var activeStaff = db.Employees
+        var activeStaff = _db.Employees
             .AsNoTracking()
             .Where(e => e.EmploymentStatus == "Active")
             .ToList();
-        var productById = db.Products
+        var productById = _db.Products
             .AsNoTracking()
             .Where(p => lines.Select(s => s.ProductId).Contains(p.Id))
             .ToDictionary(p => p.Id, p => p);
@@ -128,22 +127,22 @@ public sealed class AdminOrderOperationsService
             });
         }
 
-        return DatabaseResilientTransaction.Execute(db, () =>
+        return DatabaseResilientTransaction.Execute(_db, () =>
         {
-            using var tx = db.Database.BeginTransaction();
+            using var tx = _db.Database.BeginTransaction();
             try
             {
-                var err = OrderInventoryDeduction.TryApplyForPlacedOrder(db, order);
+                var err = OrderInventoryDeduction.TryApplyForPlacedOrder(_db, order);
                 if (err is not null)
                 {
                     tx.Rollback();
                     return err;
                 }
 
-                db.Orders.Add(order);
+                _db.Orders.Add(order);
                 table.Status = "Occupied";
-                DataReconciler.ReconcileTableStatusesWithOrders(db);
-                db.SaveChanges();
+                DataReconciler.ReconcileTableStatusesWithOrders(_db);
+                _db.SaveChanges();
                 tx.Commit();
                 return (string?)null;
             }
@@ -161,17 +160,16 @@ public sealed class AdminOrderOperationsService
     /// </summary>
     public string? TryAdvanceOrder(int orderId)
     {
-        using var db = new AppDbContext();
-        var order = db.Orders.SingleOrDefault(o => o.Id == orderId);
+        var order = _db.Orders.SingleOrDefault(o => o.Id == orderId);
         if (order is null)
             return string.Empty;
 
         if (!OrderWorkflow.CanAdminAdvanceOrderStatus(order.Status))
             return "Advance is not available for this status.";
 
-        return DatabaseResilientTransaction.Execute(db, () =>
+        return DatabaseResilientTransaction.Execute(_db, () =>
         {
-            using var tx = db.Database.BeginTransaction();
+            using var tx = _db.Database.BeginTransaction();
             try
             {
                 order.Status = order.Status switch
@@ -182,8 +180,8 @@ public sealed class AdminOrderOperationsService
                     _ => order.Status
                 };
 
-                DataReconciler.ReconcileTableStatusesWithOrders(db);
-                db.SaveChanges();
+                DataReconciler.ReconcileTableStatusesWithOrders(_db);
+                _db.SaveChanges();
                 tx.Commit();
                 return (string?)null;
             }
@@ -204,8 +202,7 @@ public sealed class AdminOrderOperationsService
         decimal changeGivenUsd = 0m,
         decimal changeGivenFc = 0m)
     {
-        using var db = new AppDbContext();
-        var order = db.Orders
+        var order = _db.Orders
             .Include(o => o.Items)
             .ThenInclude(i => i.Product)
             .SingleOrDefault(o => o.Id == orderId);
@@ -249,17 +246,17 @@ public sealed class AdminOrderOperationsService
         }
 
         order.Status = status;
-        db.SaveChanges();
+        _db.SaveChanges();
 
         if (status == "Completed" && previousStatus != "Completed")
         {
-            FinancialTransactionService.RecordCompletedOrderRevenue(db, order.Id);
-            RecordChangeExpense(db, order);
-            db.SaveChanges();
+            FinancialTransactionService.RecordCompletedOrderRevenue(_db, order.Id);
+            RecordChangeExpense(_db, order);
+            _db.SaveChanges();
         }
 
-        RefreshTableStatus(db, order.TableId);
-        db.SaveChanges();
+        RefreshTableStatus(_db, order.TableId);
+        _db.SaveChanges();
     }
 
     private static (int? EmployeeId, string Role, string Name) ResolvePreparationAssignee(

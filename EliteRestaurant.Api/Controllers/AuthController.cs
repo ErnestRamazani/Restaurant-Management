@@ -18,6 +18,9 @@ public sealed class AuthController(TabletAuthService authService, JwtTokenServic
             return Unauthorized(new { message = "Invalid staff ID / PIN for selected portal." });
 
         var jwt = jwtTokenService.CreateToken(session, out var expiresAtUtc);
+        var responsePortal = string.Equals(session.Portal, "Admin", StringComparison.OrdinalIgnoreCase)
+            ? request.Portal
+            : session.Portal;
         return Ok(new CloudLoginResponse(
             AccessToken: jwt,
             ExpiresAtUtc: expiresAtUtc,
@@ -25,6 +28,7 @@ public sealed class AuthController(TabletAuthService authService, JwtTokenServic
             EmployeeUniqueId: session.EmployeeUniqueId,
             Name: session.Name,
             Role: session.Role,
-            SignInId: session.SignInId));
+            SignInId: session.SignInId,
+            Portal: responsePortal));
     }
 }

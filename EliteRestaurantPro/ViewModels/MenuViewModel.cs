@@ -1,11 +1,13 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
-using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Sync;
 using EliteRestaurant.Core.Utils;
-using Microsoft.EntityFrameworkCore;
+using EliteRestaurantPro.ApiClients;
+using EliteRestaurantPro.Services;
 
 namespace EliteRestaurantPro.ViewModels;
 
@@ -36,6 +38,10 @@ public class MenuViewModel : AdminBaseViewModel
         ["Main"] = new() { "Seafood", "Meat Meal", "Vegetarian", "Pasta", "Rice Dishes", "Grilled Meals", "Fast Food" },
         ["Dessert"] = new() { "Dessert" }
     };
+
+    private readonly AdminDataApiClient _data = new();
+
+    private Dictionary<int, string> _inventoryNameById = new();
 
     private int? _editingProductId;
     private List<Product> _allProducts = [];
@@ -167,56 +173,84 @@ public class MenuViewModel : AdminBaseViewModel
     public MenuViewModel(Action<BaseViewModel> navigate) : base(navigate)
     {
         OpenAddDialogCommand = new RelayCommand(_ => OpenAddDialog());
-        EditProductCommand = new RelayCommand(product => OpenEditDialog(product as Product));
-        DeleteProductCommand = new RelayCommand(product => DeleteProduct(product as Product));
-        SaveProductCommand = new RelayCommand(_ => SaveProduct());
+        EditProductCommand = new RelayCommand(product => _ = OpenEditDialogAsync(product as Product));
+        DeleteProductCommand = new RelayCommand(product => _ = DeleteProductAsync(product as Product));
+        SaveProductCommand = new RelayCommand(_ => _ = SaveProductAsync());
         CancelDialogCommand = new RelayCommand(_ => CloseDialog());
 
         UpdateSubCategories(SelectedCategory);
         InitializeViewCategories();
-        LoadProducts();
+        _ = LoadProductsAsync();
     }
 
-    private void LoadProducts()
+    private async Task LoadProductsAsync()
     {
         Products.Clear();
         GroupedProducts.Clear();
         InventorySelections.Clear();
 
-        using var db = new AppDbContext();
-        var products = db.Products
-                     .AsNoTracking()
-                     .Include(p => p.Ingredients)
-                     .ThenInclude(i => i.InventoryItem)
-                     .OrderBy(p => p.Category)
-                     .ThenBy(p => p.SubCategory)
-                     .ThenBy(p => p.Name)
-                     .ToList();
-
-        _allProducts = products;
-        foreach (var product in products)
+        try
         {
-            Products.Add(product);
-        }
+            var productsTask = _data.GetProductsAsync();
+            var pisTask = _data.GetProductIngredientsAsync();
+            var invTask = _data.GetInventoryItemsAsync();
+            await Task.WhenAll(productsTask, pisTask, invTask).ConfigureAwait(true);
 
-        InitializeViewCategories();
-        UpdateViewSubCategories();
-        RefreshGroupedProducts();
+            var products = (await productsTask.ConfigureAwait(true))
+                .OrderBy(p => p.Category)
+                .ThenBy(p => p.SubCategory)
+                .ThenBy(p => p.Name)
+                .ToList();
+            var pis = (await pisTask.ConfigureAwait(true)).ToList();
+            var invList = (await invTask.ConfigureAwait(true)).ToList();
+            var invById = invList.ToDictionary(i => i.Id);
+            _inventoryNameById = invList.ToDictionary(i => i.Id, i => i.Name ?? string.Empty);
 
-        foreach (var item in db.InventoryItems.AsNoTracking().OrderBy(i => i.Name))
-        {
-            InventorySelections.Add(new InventorySelectionItemViewModel
+            foreach (var pi in pis)
             {
-                InventoryItemId = item.Id,
-                UniqueId = item.UniqueId,
-                Name = item.Name,
-                Unit = item.Unit,
-                StockQuantity = item.StockQuantity,
-                Quantity = 1m
-            });
-        }
+                if (invById.TryGetValue(pi.InventoryItemId, out var inv))
+                    pi.InventoryItem = inv;
+            }
 
-        RefreshReadyPickupBanner();
+            var pisByProduct = pis.GroupBy(x => x.ProductId).ToDictionary(g => g.Key, g => (ICollection<ProductIngredient>)g.ToList());
+            foreach (var p in products)
+            {
+                p.Ingredients = pisByProduct.TryGetValue(p.Id, out var list)
+                    ? list
+                    : new List<ProductIngredient>();
+            }
+
+            _allProducts = products;
+            foreach (var product in products)
+                Products.Add(product);
+
+            InitializeViewCategories();
+            UpdateViewSubCategories();
+            RefreshGroupedProducts();
+
+            foreach (var item in invList.OrderBy(i => i.Name))
+            {
+                InventorySelections.Add(new InventorySelectionItemViewModel
+                {
+                    InventoryItemId = item.Id,
+                    UniqueId = item.UniqueId,
+                    Name = item.Name,
+                    Unit = item.Unit,
+                    StockQuantity = item.StockQuantity,
+                    Quantity = 1m
+                });
+            }
+
+            RefreshReadyPickupBanner();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Could not load menu from the cloud API.\n\n{ex.Message}",
+                "Menu",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private void BuildGroupedProducts(IEnumerable<Product> products)
@@ -240,9 +274,7 @@ public class MenuViewModel : AdminBaseViewModel
                 {
                     var subCategoryGroup = new MenuSubCategoryGroup { Name = subCategory.Key };
                     foreach (var product in subCategory)
-                    {
                         subCategoryGroup.Products.Add(product);
-                    }
 
                     categoryGroup.SubCategories.Add(subCategoryGroup);
                 }
@@ -347,7 +379,23 @@ public class MenuViewModel : AdminBaseViewModel
         IsDialogOpen = true;
     }
 
-    private void OpenEditDialog(Product? product)
+    private async Task<Dictionary<int, decimal>> GetIngredientQuantitiesForProductAsync(Product product)
+    {
+        if (product.Ingredients is { Count: > 0 })
+        {
+            return product.Ingredients
+                .GroupBy(pi => pi.InventoryItemId)
+                .ToDictionary(g => g.Key, g => g.First().Quantity);
+        }
+
+        var allPi = await _data.GetProductIngredientsAsync().ConfigureAwait(true);
+        return allPi
+            .Where(pi => pi.ProductId == product.Id)
+            .GroupBy(pi => pi.InventoryItemId)
+            .ToDictionary(g => g.Key, g => g.First().Quantity);
+    }
+
+    private async Task OpenEditDialogAsync(Product? product)
     {
         if (product is null) return;
         if (AppSession.IsStaffTablet) return;
@@ -370,24 +418,31 @@ public class MenuViewModel : AdminBaseViewModel
             ingredient.Quantity = 1m;
         }
 
-        using var db = new AppDbContext();
-        var ingredientMap = db.ProductIngredients
-            .AsNoTracking()
-            .Where(pi => pi.ProductId == product.Id)
-            .ToDictionary(pi => pi.InventoryItemId, pi => pi.Quantity);
-
-        foreach (var ingredient in InventorySelections)
+        try
         {
-            if (!ingredientMap.TryGetValue(ingredient.InventoryItemId, out var qty))
-                continue;
-            ingredient.IsSelected = true;
-            ingredient.Quantity = qty;
+            var ingredientMap = await GetIngredientQuantitiesForProductAsync(product).ConfigureAwait(true);
+            foreach (var ingredient in InventorySelections)
+            {
+                if (!ingredientMap.TryGetValue(ingredient.InventoryItemId, out var qty))
+                    continue;
+                ingredient.IsSelected = true;
+                ingredient.Quantity = qty;
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Could not load ingredients for this product.\n\n{ex.Message}",
+                "Menu",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
         }
 
         IsDialogOpen = true;
     }
 
-    private void SaveProduct()
+    private async Task SaveProductAsync()
     {
         if (AppSession.IsStaffTablet) return;
 
@@ -404,7 +459,6 @@ public class MenuViewModel : AdminBaseViewModel
             desc = desc[..350];
         var comp = (ProductComposition ?? string.Empty).Trim();
 
-        using var db = new AppDbContext();
         var selectedIngredients = InventorySelections.Where(i => i.IsSelected).ToList();
         if (!selectedIngredients.Any())
         {
@@ -416,70 +470,99 @@ public class MenuViewModel : AdminBaseViewModel
             return;
         }
 
-        if (_editingProductId is int productId)
+        try
         {
-            var existing = db.Products.Single(p => p.Id == productId);
-            existing.Name = ProductName.Trim();
-            existing.Category = SelectedCategory.Trim();
-            existing.SubCategory = SelectedSubCategory.Trim();
-            existing.Price = price;
-            existing.Description = string.IsNullOrWhiteSpace(desc) ? null : desc;
-            existing.Composition = string.IsNullOrWhiteSpace(comp) ? null : comp;
-
-            var existingIngredients = db.ProductIngredients.Where(pi => pi.ProductId == productId);
-            db.ProductIngredients.RemoveRange(existingIngredients);
-
-            foreach (var ingredient in selectedIngredients)
+            if (_editingProductId is int productId)
             {
-                db.ProductIngredients.Add(new ProductIngredient
+                var allPi = await _data.GetProductIngredientsAsync().ConfigureAwait(true);
+                var pis = allPi
+                    .Where(pi => pi.ProductId == productId)
+                    .ToList();
+                var ops = new List<CloudSyncOperation>();
+                foreach (var pi in pis)
+                    ops.Add(DesktopCloudPersistence.DeleteOperation(pi));
+
+                var existing = _allProducts.First(p => p.Id == productId);
+                existing.Name = ProductName.Trim();
+                existing.Category = SelectedCategory.Trim();
+                existing.SubCategory = SelectedSubCategory.Trim();
+                existing.Price = price;
+                existing.Description = string.IsNullOrWhiteSpace(desc) ? null : desc;
+                existing.Composition = string.IsNullOrWhiteSpace(comp) ? null : comp;
+                ops.Add(DesktopCloudPersistence.UpsertOperation(existing));
+                DesktopCloudPersistence.PushBatchBlocking(ops);
+
+                foreach (var ingredient in selectedIngredients)
                 {
-                    ProductId = productId,
-                    InventoryItemId = ingredient.InventoryItemId,
-                    Quantity = ingredient.Quantity
-                });
+                    DesktopCloudPersistence.PushUpsertBlocking(new ProductIngredient
+                    {
+                        ProductId = productId,
+                        InventoryItemId = ingredient.InventoryItemId,
+                        Quantity = ingredient.Quantity
+                    });
+                }
             }
+            else
+            {
+                var confirm = MessageBox.Show(
+                    "Add this menu item?",
+                    "Confirm Add Menu Item",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+                if (confirm != MessageBoxResult.Yes)
+                    return;
+
+                var uniqueId = UniqueIdGenerator.NewId("MEN");
+                var product = new Product
+                {
+                    UniqueId = uniqueId,
+                    Name = ProductName.Trim(),
+                    Category = SelectedCategory.Trim(),
+                    SubCategory = SelectedSubCategory.Trim(),
+                    Price = price,
+                    Description = string.IsNullOrWhiteSpace(desc) ? null : desc,
+                    Composition = string.IsNullOrWhiteSpace(comp) ? null : comp
+                };
+
+                DesktopCloudPersistence.PushUpsertBlocking(product);
+                await LoadProductsAsync().ConfigureAwait(true);
+
+                var created = _allProducts.FirstOrDefault(p => p.UniqueId == uniqueId);
+                if (created is null)
+                {
+                    MessageBox.Show(
+                        "The product was saved but could not be matched after refresh. Re-open the menu or try again.",
+                        "Menu",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    return;
+                }
+
+                foreach (var ingredient in selectedIngredients)
+                {
+                    DesktopCloudPersistence.PushUpsertBlocking(new ProductIngredient
+                    {
+                        ProductId = created.Id,
+                        InventoryItemId = ingredient.InventoryItemId,
+                        Quantity = ingredient.Quantity
+                    });
+                }
+            }
+
+            CloseDialog();
+            await LoadProductsAsync().ConfigureAwait(true);
         }
-        else
+        catch (Exception ex)
         {
-            var confirm = MessageBox.Show(
-                "Add this menu item?",
-                "Confirm Add Menu Item",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-            if (confirm != MessageBoxResult.Yes)
-                return;
-
-            var product = new Product
-            {
-                UniqueId = UniqueIdGenerator.NewId("MEN"),
-                Name = ProductName.Trim(),
-                Category = SelectedCategory.Trim(),
-                SubCategory = SelectedSubCategory.Trim(),
-                Price = price,
-                Description = string.IsNullOrWhiteSpace(desc) ? null : desc,
-                Composition = string.IsNullOrWhiteSpace(comp) ? null : comp
-            };
-
-            db.Products.Add(product);
-            db.SaveChanges();
-
-            foreach (var ingredient in selectedIngredients)
-            {
-                db.ProductIngredients.Add(new ProductIngredient
-                {
-                    ProductId = product.Id,
-                    InventoryItemId = ingredient.InventoryItemId,
-                    Quantity = ingredient.Quantity
-                });
-            }
+            MessageBox.Show(
+                $"Could not save menu item to the cloud.\n\n{ex.Message}",
+                "Menu",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
         }
-
-        db.SaveChanges();
-        CloseDialog();
-        LoadProducts();
     }
 
-    private void DeleteProduct(Product? product)
+    private async Task DeleteProductAsync(Product? product)
     {
         if (product is null) return;
         if (AppSession.IsStaffTablet) return;
@@ -492,28 +575,40 @@ public class MenuViewModel : AdminBaseViewModel
         if (confirmDelete != MessageBoxResult.Yes)
             return;
 
-        using var db = new AppDbContext();
-        var existing = db.Products.Include(p => p.Ingredients).SingleOrDefault(p => p.Id == product.Id);
-        if (existing is null) return;
-
-        db.ProductIngredients.RemoveRange(existing.Ingredients);
-        db.Products.Remove(existing);
-        db.SaveChanges();
-        LoadProducts();
+        try
+        {
+            var allPi = await _data.GetProductIngredientsAsync().ConfigureAwait(true);
+            var pis = allPi
+                .Where(pi => pi.ProductId == product.Id)
+                .ToList();
+            var ops = pis.Select(DesktopCloudPersistence.DeleteOperation).ToList();
+            ops.Add(DesktopCloudPersistence.DeleteOperation(product));
+            DesktopCloudPersistence.PushBatchBlocking(ops);
+            await LoadProductsAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"Could not delete menu item in the cloud.\n\n{ex.Message}",
+                "Menu",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     public string GetIngredientSummary(Product product)
     {
-        using var db = new AppDbContext();
-        var ingredients = db.ProductIngredients
-            .AsNoTracking()
-            .Include(i => i.InventoryItem)
-            .Where(i => i.ProductId == product.Id)
-            .Select(i => i.InventoryItem != null ? i.InventoryItem.Name : string.Empty)
+        var names = (product.Ingredients ?? [])
+            .Select(pi => pi.InventoryItem?.Name)
             .Where(n => !string.IsNullOrWhiteSpace(n))
+            .Cast<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        return ingredients.Count == 0 ? "No ingredients linked" : string.Join(", ", ingredients);
+        if (names.Count > 0)
+            return string.Join(", ", names);
+
+        return "No ingredients linked";
     }
 
     private void CloseDialog()

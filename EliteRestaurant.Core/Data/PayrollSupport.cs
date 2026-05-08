@@ -26,6 +26,19 @@ public static class PayrollSupport
         return Math.Round(sum, 2);
     }
 
+    public static decimal SumPendingAdvancesForPayrollMonth(
+        IReadOnlyList<SalaryAdvance> advances,
+        int employeeId,
+        int year,
+        int month)
+    {
+        var sum = advances
+            .Where(a => a.EmployeeId == employeeId && a.AppliedPayrollYear == null)
+            .Where(a => AdvanceAppliesToPayrollMonth(a, year, month))
+            .Sum(a => a.AmountUsd);
+        return Math.Round(sum, 2);
+    }
+
     /// <summary>Merchandise subtotal (USD) from line items for completed orders served by this employee in the range.</summary>
     public static decimal SumServerCompletedOrderMerchandiseUsd(
         AppDbContext db,
@@ -55,5 +68,32 @@ public static class PayrollSupport
             .ToList();
 
         return Math.Round(totals.Sum(), 2);
+    }
+
+    public static decimal SumServerCompletedOrderMerchandiseUsd(
+        IReadOnlyList<OrderRecord> orders,
+        IReadOnlyDictionary<int, decimal> productPriceById,
+        int serverEmployeeId,
+        DateTime rangeStartInclusive,
+        DateTime rangeEndExclusive)
+    {
+        decimal sum = 0;
+        foreach (var o in orders)
+        {
+            if (o.ServerId != serverEmployeeId || !string.Equals(o.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (o.CreatedAt < rangeStartInclusive || o.CreatedAt >= rangeEndExclusive)
+                continue;
+
+            foreach (var i in o.Items)
+            {
+                var price = productPriceById.TryGetValue(i.ProductId, out var p)
+                    ? p
+                    : (i.Product?.Price ?? 0m);
+                sum += price * i.Quantity;
+            }
+        }
+
+        return Math.Round(sum, 2);
     }
 }

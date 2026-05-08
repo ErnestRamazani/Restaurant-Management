@@ -1,12 +1,14 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
-using System.Linq;
-using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Sync;
 using EliteRestaurant.Core.Utils;
-using Microsoft.EntityFrameworkCore;
+using EliteRestaurantPro.ApiClients;
+using EliteRestaurantPro.Services;
 
 namespace EliteRestaurantPro.ViewModels;
 
@@ -119,6 +121,7 @@ public sealed class AttendanceDayGroupViewModel
 
 public class AttendanceViewModel : AdminBaseViewModel
 {
+    private readonly AdminDataApiClient _data = new();
     private const string PendingSalaryReferencePrefix = "Pending salary accrual:";
     private static readonly TimeSpan LateGraceWindow = TimeSpan.FromMinutes(30);
 
@@ -200,119 +203,153 @@ public class AttendanceViewModel : AdminBaseViewModel
     public AttendanceViewModel(Action<BaseViewModel> navigate) : base(navigate)
     {
         ClockInCommand = new RelayCommand(ClockIn);
-        ClockOutCommand = new RelayCommand(ClockOut);
-        SaveLateClockInCommand = new RelayCommand(_ => SaveLateClockIn());
+        ClockOutCommand = new RelayCommand(p => _ = ClockOutAsync(p));
+        SaveLateClockInCommand = new RelayCommand(_ => _ = SaveLateClockInAsync());
         CancelLateClockInCommand = new RelayCommand(_ => CloseLateDialog());
-        ValidateAttendanceCommand = new RelayCommand(ValidateAttendance);
+        ValidateAttendanceCommand = new RelayCommand(p => _ = ValidateAttendanceAsync(p));
         MarkAbsenceCommand = new RelayCommand(OpenMarkAbsenceDialog);
-        SaveMarkAbsenceCommand = new RelayCommand(_ => SaveMarkAbsence());
+        SaveMarkAbsenceCommand = new RelayCommand(_ => _ = SaveMarkAbsenceAsync());
         CancelMarkAbsenceCommand = new RelayCommand(_ => CloseMarkAbsenceDialog());
-        LoadAttendance();
+        _ = LoadAttendanceAsync();
     }
 
-    private void LoadAttendance()
+    private async Task LoadAttendanceAsync()
     {
         var today = DateTime.Today;
         var fromDate = today.AddDays(-13);
 
-        HashSet<DateTime> validatedDates;
-        using (var syncDb = new AppDbContext())
+        try
         {
+            var validationsTask = _data.GetAttendanceDayValidationsAsync();
+            var employeesTask = _data.GetEmployeesAsync();
+            var attendanceTask = _data.GetAttendanceAsync();
+            var moneyTask = _data.GetMoneyTransactionsAsync();
+            await Task.WhenAll(validationsTask, employeesTask, attendanceTask, moneyTask).ConfigureAwait(true);
+
+            var validations = await validationsTask.ConfigureAwait(true);
             var validationRangeStart = AttendanceCalendar.DayAnchorUtc(fromDate);
             var validationRangeEndExclusive = AttendanceCalendar.DayAnchorUtc(today).AddDays(1);
-            validatedDates = syncDb.AttendanceDayValidations.AsNoTracking()
+            var validatedDates = validations
                 .Where(v => v.WorkDate >= validationRangeStart && v.WorkDate < validationRangeEndExclusive)
-                .Select(v => v.WorkDate)
-                .ToList()
-                .Select(d => d.Date)
+                .Select(v => v.WorkDate.Date)
                 .ToHashSet();
-            AttendanceScheduleHelper.EnsureAutoAbsences(syncDb, fromDate, today, validatedDates);
-        }
 
-        using var db = new AppDbContext();
+            var employees = (await employeesTask.ConfigureAwait(true)).OrderBy(e => e.Name).ToList();
+            var attendanceList = (await attendanceTask.ConfigureAwait(true)).ToList();
 
-        var employees = db.Employees.AsNoTracking().OrderBy(e => e.Name).ToList();
-        var todayPendingSalariesByEmployeeId = db.Transactions
-            .AsNoTracking()
-            .Where(t =>
-                t.Type == "Expense" &&
-                t.Category == "Salary" &&
-                t.Date.Date == today &&
-                t.Justification.StartsWith(PendingSalaryReferencePrefix))
-            .ToList()
-            .GroupBy(t => ParseEmployeeIdFromPendingSalaryJustification(t.Justification))
-            .Where(g => g.Key.HasValue)
-            .ToDictionary(g => g.Key!.Value, g => g.Sum(x => x.Amount));
-        var historyStart = AttendanceCalendar.DayAnchorUtc(fromDate);
-        var historyEndExclusive = AttendanceCalendar.DayAnchorUtc(today).AddDays(1);
-        var todayStart = AttendanceCalendar.DayAnchorUtc(today);
-        var todayEndExclusive = todayStart.AddDays(1);
+            var historyStart = AttendanceCalendar.DayAnchorUtc(fromDate);
+            var historyEndExclusive = AttendanceCalendar.DayAnchorUtc(today).AddDays(1);
+            var attendanceInRange = attendanceList
+                .Where(a => a.WorkDate >= historyStart && a.WorkDate < historyEndExclusive)
+                .ToList();
 
-        var attendanceHistory = db.EmployeeAttendances
-            .AsNoTracking()
-            .Include(a => a.Employee)
-            .Where(a => a.WorkDate >= historyStart && a.WorkDate < historyEndExclusive)
-            .OrderByDescending(a => a.WorkDate)
-            .ThenBy(a => a.Employee!.Name)
-            .ToList();
+            var autoOps = AttendanceCloudHelper.BuildAutoAbsenceUpserts(
+                employees.Where(e => e.EmploymentStatus == "Active").ToList(),
+                attendanceInRange,
+                fromDate,
+                today,
+                validatedDates);
 
-        var todayAttendanceByEmployee = attendanceHistory
-            .Where(a => a.WorkDate >= todayStart && a.WorkDate < todayEndExclusive)
-            .GroupBy(a => a.EmployeeId)
-            .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.Id).First());
-
-        AttendanceDayGroups.Clear();
-
-        var todayValidated = validatedDates.Contains(today);
-        var todayGroup = new AttendanceDayGroupViewModel
-        {
-            WorkDate = today,
-            DayText = todayValidated
-                ? $"Today - {today:dddd, MMM dd yyyy} · Validated"
-                : $"Today - {today:dddd, MMM dd yyyy}",
-            IsExpanded = true,
-            IsDayValidated = todayValidated
-        };
-
-        foreach (var employee in employees)
-        {
-            todayAttendanceByEmployee.TryGetValue(employee.Id, out var attendance);
-            todayPendingSalariesByEmployeeId.TryGetValue(employee.Id, out var pendingSalaryToday);
-            todayGroup.Rows.Add(BuildAttendanceRow(employee, attendance, today, isCurrentDay: true, pendingSalaryToday, todayValidated));
-        }
-
-        AttendanceDayGroups.Add(todayGroup);
-
-        var historyGroups = attendanceHistory
-            .Where(a => a.WorkDate < todayStart)
-            .GroupBy(a => a.WorkDate.Date)
-            .OrderByDescending(g => g.Key);
-
-        foreach (var dayGroup in historyGroups)
-        {
-            var dayValidated = validatedDates.Contains(dayGroup.Key);
-            var vm = new AttendanceDayGroupViewModel
+            if (autoOps.Count > 0)
             {
-                WorkDate = dayGroup.Key,
-                DayText = dayValidated
-                    ? $"{dayGroup.Key:dddd, MMM dd yyyy} · Validated"
-                    : dayGroup.Key.ToString("dddd, MMM dd yyyy"),
-                IsExpanded = false,
-                IsDayValidated = dayValidated
-            };
-
-            foreach (var attendance in dayGroup.OrderBy(a => a.Employee?.Name))
-            {
-                if (attendance.Employee is null)
-                    continue;
-                vm.Rows.Add(BuildAttendanceRow(attendance.Employee, attendance, dayGroup.Key, isCurrentDay: false, pendingSalary: 0m, dayValidated));
+                DesktopCloudPersistence.PushBatchBlocking(autoOps);
+                attendanceList = (await _data.GetAttendanceAsync().ConfigureAwait(true)).ToList();
+                attendanceInRange = attendanceList
+                    .Where(a => a.WorkDate >= historyStart && a.WorkDate < historyEndExclusive)
+                    .ToList();
             }
 
-            AttendanceDayGroups.Add(vm);
-        }
+            var todayPendingSalariesByEmployeeId = (await moneyTask.ConfigureAwait(true))
+                .Where(t =>
+                    t.Type == "Expense" &&
+                    t.Category == "Salary" &&
+                    t.Date.Date == today &&
+                    t.Justification.StartsWith(PendingSalaryReferencePrefix))
+                .GroupBy(t => ParseEmployeeIdFromPendingSalaryJustification(t.Justification))
+                .Where(g => g.Key.HasValue)
+                .ToDictionary(g => g.Key!.Value, g => g.Sum(x => x.Amount));
 
-        SnapshotAttendanceSource();
-        ApplyAttendanceSearchFilter();
+            var employeeById = employees.ToDictionary(e => e.Id);
+            foreach (var a in attendanceInRange)
+            {
+                if (a.Employee is null && employeeById.TryGetValue(a.EmployeeId, out var emp))
+                    a.Employee = emp;
+            }
+
+            var todayStart = AttendanceCalendar.DayAnchorUtc(today);
+            var todayEndExclusive = todayStart.AddDays(1);
+
+            var attendanceHistory = attendanceInRange
+                .OrderByDescending(a => a.WorkDate)
+                .ThenBy(a => a.Employee?.Name)
+                .ToList();
+
+            var todayAttendanceByEmployee = attendanceHistory
+                .Where(a => a.WorkDate >= todayStart && a.WorkDate < todayEndExclusive)
+                .GroupBy(a => a.EmployeeId)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.Id).First());
+
+            AttendanceDayGroups.Clear();
+
+            var todayValidated = validatedDates.Contains(today);
+            var todayGroup = new AttendanceDayGroupViewModel
+            {
+                WorkDate = today,
+                DayText = todayValidated
+                    ? $"Today - {today:dddd, MMM dd yyyy} · Validated"
+                    : $"Today - {today:dddd, MMM dd yyyy}",
+                IsExpanded = true,
+                IsDayValidated = todayValidated
+            };
+
+            foreach (var employee in employees)
+            {
+                todayAttendanceByEmployee.TryGetValue(employee.Id, out var attendance);
+                todayPendingSalariesByEmployeeId.TryGetValue(employee.Id, out var pendingSalaryToday);
+                todayGroup.Rows.Add(BuildAttendanceRow(employee, attendance, today, isCurrentDay: true, pendingSalaryToday, todayValidated));
+            }
+
+            AttendanceDayGroups.Add(todayGroup);
+
+            var historyGroups = attendanceHistory
+                .Where(a => a.WorkDate < todayStart)
+                .GroupBy(a => a.WorkDate.Date)
+                .OrderByDescending(g => g.Key);
+
+            foreach (var dayGroup in historyGroups)
+            {
+                var dayValidated = validatedDates.Contains(dayGroup.Key);
+                var vm = new AttendanceDayGroupViewModel
+                {
+                    WorkDate = dayGroup.Key,
+                    DayText = dayValidated
+                        ? $"{dayGroup.Key:dddd, MMM dd yyyy} · Validated"
+                        : dayGroup.Key.ToString("dddd, MMM dd yyyy"),
+                    IsExpanded = false,
+                    IsDayValidated = dayValidated
+                };
+
+                foreach (var attendance in dayGroup.OrderBy(a => a.Employee?.Name))
+                {
+                    if (attendance.Employee is null)
+                        continue;
+                    vm.Rows.Add(BuildAttendanceRow(attendance.Employee, attendance, dayGroup.Key, isCurrentDay: false, pendingSalary: 0m, dayValidated));
+                }
+
+                AttendanceDayGroups.Add(vm);
+            }
+
+            SnapshotAttendanceSource();
+            ApplyAttendanceSearchFilter();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                ex.GetBaseException().Message,
+                "Attendance load failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private void SnapshotAttendanceSource()
@@ -373,7 +410,7 @@ public class AttendanceViewModel : AdminBaseViewModel
                || Hit(r.AbsenceJustification);
     }
 
-    private void ValidateAttendance(object? parameter)
+    private async Task ValidateAttendanceAsync(object? parameter)
     {
         if (parameter is not AttendanceDayGroupViewModel group)
             return;
@@ -397,33 +434,55 @@ public class AttendanceViewModel : AdminBaseViewModel
             return;
         }
 
-        using var db = new AppDbContext();
-        foreach (var row in group.Rows.Where(r => r.AttendanceId.HasValue))
+        try
         {
-            var att = db.EmployeeAttendances.FirstOrDefault(a => a.Id == row.AttendanceId!.Value);
-            if (att is null)
-                continue;
-            if (att.IsAbsence)
-                att.AbsenceJustification = row.AbsenceJustification.Trim();
-        }
+            var validations = (await _data.GetAttendanceDayValidationsAsync().ConfigureAwait(true)).ToList();
+            var attendanceRows = (await _data.GetAttendanceAsync().ConfigureAwait(true)).ToList();
+            var (dayStartUtc, dayEndExclusiveUtc) = AttendanceCalendar.DayRangeUtc(group.WorkDate);
 
-        var (dayStartUtc, dayEndExclusiveUtc) = AttendanceCalendar.DayRangeUtc(group.WorkDate);
-        if (!db.AttendanceDayValidations.Any(v => v.WorkDate >= dayStartUtc && v.WorkDate < dayEndExclusiveUtc))
-        {
-            db.AttendanceDayValidations.Add(new AttendanceDayValidation
+            var ops = new List<CloudSyncOperation>();
+            foreach (var row in group.Rows.Where(r => r.AttendanceId.HasValue))
             {
-                WorkDate = dayStartUtc,
-                ValidatedAtUtc = DateTime.UtcNow
-            });
-        }
+                var att = attendanceRows.FirstOrDefault(a => a.Id == row.AttendanceId!.Value);
+                if (att is null || !att.IsAbsence)
+                    continue;
 
-        db.SaveChanges();
-        MessageBox.Show(
-            $"Attendance for {group.DayText} validated and justifications saved.",
-            "Validate attendance",
-            MessageBoxButton.OK,
-            MessageBoxImage.Information);
-        LoadAttendance();
+                var saved = CopyAttendance(att);
+                saved.AbsenceJustification = row.AbsenceJustification.Trim();
+                ops.Add(AttendanceCloudHelper.ToUpsert(saved));
+            }
+
+            if (!validations.Any(v => v.WorkDate >= dayStartUtc && v.WorkDate < dayEndExclusiveUtc))
+            {
+                ops.Add(AttendanceCloudHelper.ToUpsert(new AttendanceDayValidation
+                {
+                    WorkDate = dayStartUtc,
+                    ValidatedAtUtc = DateTime.UtcNow
+                }));
+            }
+
+            if (ops.Count == 0)
+            {
+                MessageBox.Show("Nothing to validate for this day.", "Validate attendance", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            DesktopCloudPersistence.PushBatchBlocking(ops);
+            MessageBox.Show(
+                $"Attendance for {group.DayText} validated and justifications saved.",
+                "Validate attendance",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            await LoadAttendanceAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                ex.GetBaseException().Message,
+                "Validate attendance failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private void OpenMarkAbsenceDialog(object? parameter)
@@ -450,7 +509,7 @@ public class AttendanceViewModel : AdminBaseViewModel
         IsMarkAbsenceDialogOpen = true;
     }
 
-    private void SaveMarkAbsence()
+    private async Task SaveMarkAbsenceAsync()
     {
         if (string.IsNullOrWhiteSpace(MarkAbsenceJustification))
         {
@@ -458,31 +517,46 @@ public class AttendanceViewModel : AdminBaseViewModel
             return;
         }
 
-        using var db = new AppDbContext();
-        var workDate = _markAbsenceWorkDate.Date;
-        var (markDayStartUtc, markDayEndExclusiveUtc) = AttendanceCalendar.DayRangeUtc(workDate);
-        var att = db.EmployeeAttendances.FirstOrDefault(a =>
-            a.EmployeeId == _markAbsenceEmployeeId && a.WorkDate >= markDayStartUtc && a.WorkDate < markDayEndExclusiveUtc);
-        if (att is null)
+        try
         {
-            att = new EmployeeAttendance
+            var attendanceRows = (await _data.GetAttendanceAsync().ConfigureAwait(true)).ToList();
+            var workDate = _markAbsenceWorkDate.Date;
+            var (markDayStartUtc, markDayEndExclusiveUtc) = AttendanceCalendar.DayRangeUtc(workDate);
+            var att = attendanceRows.FirstOrDefault(a =>
+                a.EmployeeId == _markAbsenceEmployeeId && a.WorkDate >= markDayStartUtc && a.WorkDate < markDayEndExclusiveUtc);
+            if (att is null)
             {
-                EmployeeId = _markAbsenceEmployeeId,
-                WorkDate = markDayStartUtc
-            };
-            db.EmployeeAttendances.Add(att);
-        }
+                att = new EmployeeAttendance
+                {
+                    EmployeeId = _markAbsenceEmployeeId,
+                    WorkDate = markDayStartUtc
+                };
+            }
+            else
+            {
+                att = CopyAttendance(att);
+            }
 
-        att.ClockInTime = null;
-        att.ClockOutTime = null;
-        att.IsAbsence = true;
-        att.ClockInStatus = "Absent";
-        att.AbsenceJustification = MarkAbsenceJustification.Trim();
-        att.Justification = string.Empty;
-        db.SaveChanges();
-        CloseMarkAbsenceDialog();
-        MessageBox.Show("Absence saved.", "Attendance", MessageBoxButton.OK, MessageBoxImage.Information);
-        LoadAttendance();
+            att.ClockInTime = null;
+            att.ClockOutTime = null;
+            att.IsAbsence = true;
+            att.ClockInStatus = "Absent";
+            att.AbsenceJustification = MarkAbsenceJustification.Trim();
+            att.Justification = string.Empty;
+
+            DesktopCloudPersistence.PushUpsertBlocking(att);
+            CloseMarkAbsenceDialog();
+            MessageBox.Show("Absence saved.", "Attendance", MessageBoxButton.OK, MessageBoxImage.Information);
+            await LoadAttendanceAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                ex.GetBaseException().Message,
+                "Save absence failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
     private void CloseMarkAbsenceDialog()
@@ -521,10 +595,10 @@ public class AttendanceViewModel : AdminBaseViewModel
         }
 
         var status = now.TimeOfDay < row.ShiftStartTime ? "Early" : "On Time";
-        SaveClockIn(row.EmployeeId, status, string.Empty, now);
+        _ = SaveClockInAsync(row.EmployeeId, status, string.Empty, now);
     }
 
-    private void SaveLateClockIn()
+    private async Task SaveLateClockInAsync()
     {
         if (_pendingLateEmployeeId <= 0)
             return;
@@ -535,39 +609,55 @@ public class AttendanceViewModel : AdminBaseViewModel
             return;
         }
 
-        SaveClockIn(_pendingLateEmployeeId, "Late", LateJustification.Trim(), DateTime.Now);
+        await SaveClockInAsync(_pendingLateEmployeeId, "Late", LateJustification.Trim(), DateTime.Now).ConfigureAwait(true);
         CloseLateDialog();
     }
 
-    private void SaveClockIn(int employeeId, string status, string justification, DateTime timestamp)
+    private async Task SaveClockInAsync(int employeeId, string status, string justification, DateTime timestamp)
     {
-        using var db = new AppDbContext();
-        var today = DateTime.Today;
-        var (todayStartUtc, todayEndExclusiveUtc) = AttendanceCalendar.DayRangeUtc(today);
-        var attendance = db.EmployeeAttendances.FirstOrDefault(a =>
-            a.EmployeeId == employeeId && a.WorkDate >= todayStartUtc && a.WorkDate < todayEndExclusiveUtc);
-        if (attendance is null)
+        try
         {
-            attendance = new EmployeeAttendance
+            var today = DateTime.Today;
+            var (todayStartUtc, todayEndExclusiveUtc) = AttendanceCalendar.DayRangeUtc(today);
+            var attendanceRows = (await _data.GetAttendanceAsync().ConfigureAwait(true)).ToList();
+            var attendance = attendanceRows.FirstOrDefault(a =>
+                a.EmployeeId == employeeId && a.WorkDate >= todayStartUtc && a.WorkDate < todayEndExclusiveUtc);
+
+            if (attendance is null)
             {
-                EmployeeId = employeeId,
-                WorkDate = todayStartUtc
-            };
-            db.EmployeeAttendances.Add(attendance);
+                attendance = new EmployeeAttendance
+                {
+                    EmployeeId = employeeId,
+                    WorkDate = todayStartUtc
+                };
+            }
+            else
+            {
+                attendance = CopyAttendance(attendance);
+            }
+
+            attendance.ClockInTime = timestamp;
+            attendance.ClockInStatus = status;
+            attendance.Justification = justification;
+            attendance.IsAbsence = false;
+            attendance.AbsenceJustification = string.Empty;
+
+            DesktopCloudPersistence.PushUpsertBlocking(attendance);
+
+            MessageBox.Show($"{status} clock-in saved.", "Attendance", MessageBoxButton.OK, MessageBoxImage.Information);
+            await LoadAttendanceAsync().ConfigureAwait(true);
         }
-
-        attendance.ClockInTime = timestamp;
-        attendance.ClockInStatus = status;
-        attendance.Justification = justification;
-        attendance.IsAbsence = false;
-        attendance.AbsenceJustification = string.Empty;
-        db.SaveChanges();
-
-        MessageBox.Show($"{status} clock-in saved.", "Attendance", MessageBoxButton.OK, MessageBoxImage.Information);
-        LoadAttendance();
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                ex.GetBaseException().Message,
+                "Clock-in failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
-    private void ClockOut(object? parameter)
+    private async Task ClockOutAsync(object? parameter)
     {
         if (parameter is not AttendanceRowViewModel row)
             return;
@@ -584,91 +674,119 @@ public class AttendanceViewModel : AdminBaseViewModel
             return;
         }
 
-        using var db = new AppDbContext();
-        var today = DateTime.Today;
-        var (todayStartUtc, todayEndExclusiveUtc) = AttendanceCalendar.DayRangeUtc(today);
-        var attendance = db.EmployeeAttendances.FirstOrDefault(a =>
-            a.EmployeeId == row.EmployeeId && a.WorkDate >= todayStartUtc && a.WorkDate < todayEndExclusiveUtc);
-        if (attendance is null || attendance.ClockInTime is null)
+        try
         {
-            MessageBox.Show("Employee must clock in before clocking out.", "Attendance", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
+            var today = DateTime.Today;
+            var (todayStartUtc, todayEndExclusiveUtc) = AttendanceCalendar.DayRangeUtc(today);
+            var attendanceRows = (await _data.GetAttendanceAsync().ConfigureAwait(true)).ToList();
+            var attendance = attendanceRows.FirstOrDefault(a =>
+                a.EmployeeId == row.EmployeeId && a.WorkDate >= todayStartUtc && a.WorkDate < todayEndExclusiveUtc);
+            if (attendance is null || attendance.ClockInTime is null)
+            {
+                MessageBox.Show("Employee must clock in before clocking out.", "Attendance", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
 
-        if (attendance.ClockOutTime is not null)
-        {
-            MessageBox.Show("Employee is already clocked out for today.", "Attendance", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
+            if (attendance.ClockOutTime is not null)
+            {
+                MessageBox.Show("Employee is already clocked out for today.", "Attendance", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
 
-        if (DateTime.Now.TimeOfDay < row.ShiftStartTime)
+            if (DateTime.Now.TimeOfDay < row.ShiftStartTime)
+            {
+                MessageBox.Show(
+                    $"Clock-out is not allowed before the shift starts ({row.ShiftStartTime:hh\\:mm}).",
+                    "Attendance",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            if (DateTime.Now.TimeOfDay < row.ShiftEndTime)
+            {
+                var earlyClockOut = MessageBox.Show(
+                    $"Current time is before scheduled shift end ({row.ShiftEndTime:hh\\:mm}). Record an early clock-out anyway?",
+                    "Early Clock-Out",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (earlyClockOut != MessageBoxResult.Yes)
+                    return;
+            }
+
+            var toSave = CopyAttendance(attendance);
+            toSave.ClockOutTime = DateTime.Now;
+
+            var employees = await _data.GetEmployeesAsync().ConfigureAwait(true);
+            var employee = employees.FirstOrDefault(e => e.Id == row.EmployeeId);
+
+            var ops = new List<CloudSyncOperation> { AttendanceCloudHelper.ToUpsert(toSave) };
+
+            if (employee is not null && toSave.ClockInTime is not null && toSave.ClockOutTime is not null)
+            {
+                var workedDuration = toSave.ClockOutTime.Value - toSave.ClockInTime.Value;
+                var workedHours = Math.Max(0m, (decimal)workedDuration.TotalHours);
+                var pendingSalaryAmount = Math.Round(employee.HourlyRate * workedHours, 2);
+                var pendingSalaryReference = BuildPendingSalaryReference(employee, today);
+
+                var transactions = await _data.GetMoneyTransactionsAsync().ConfigureAwait(true);
+                var existingPendingSalaryEntry = transactions.FirstOrDefault(t =>
+                    t.Type == "Expense" &&
+                    t.Category == "Salary" &&
+                    t.Justification == pendingSalaryReference);
+
+                MoneyTransaction moneyRow;
+                if (existingPendingSalaryEntry is null)
+                {
+                    moneyRow = new MoneyTransaction
+                    {
+                        Amount = pendingSalaryAmount,
+                        AmountUsd = pendingSalaryAmount,
+                        AmountFc = CurrencyHelper.ConvertUsdToFc(pendingSalaryAmount),
+                        Date = DateTime.Now,
+                        Type = "Expense",
+                        Category = "Salary",
+                        CurrencyCode = CurrencyHelper.Usd,
+                        ExchangeRateUsed = CurrencyHelper.FcPerUsd,
+                        IsFixed = true,
+                        Justification = pendingSalaryReference
+                    };
+                }
+                else
+                {
+                    moneyRow = new MoneyTransaction
+                    {
+                        Id = existingPendingSalaryEntry.Id,
+                        Amount = pendingSalaryAmount,
+                        AmountUsd = pendingSalaryAmount,
+                        AmountFc = CurrencyHelper.ConvertUsdToFc(pendingSalaryAmount),
+                        Date = DateTime.Now,
+                        Type = "Expense",
+                        Category = "Salary",
+                        CurrencyCode = CurrencyHelper.Usd,
+                        ExchangeRateUsed = CurrencyHelper.FcPerUsd,
+                        IsFixed = true,
+                        Justification = pendingSalaryReference
+                    };
+                }
+
+                ops.Add(AttendanceCloudHelper.ToUpsert(moneyRow));
+            }
+
+            DesktopCloudPersistence.PushBatchBlocking(ops);
+
+            MessageBox.Show("Clock-out saved. Pending salary was updated in Money.", "Attendance", MessageBoxButton.OK, MessageBoxImage.Information);
+            await LoadAttendanceAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex)
         {
             MessageBox.Show(
-                $"Clock-out is not allowed before the shift starts ({row.ShiftStartTime:hh\\:mm}).",
-                "Attendance",
+                ex.GetBaseException().Message,
+                "Clock-out failed",
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
-            return;
         }
-
-        if (DateTime.Now.TimeOfDay < row.ShiftEndTime)
-        {
-            var earlyClockOut = MessageBox.Show(
-                $"Current time is before scheduled shift end ({row.ShiftEndTime:hh\\:mm}). Record an early clock-out anyway?",
-                "Early Clock-Out",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-
-            if (earlyClockOut != MessageBoxResult.Yes)
-                return;
-        }
-
-        attendance.ClockOutTime = DateTime.Now;
-
-        var employee = db.Employees.SingleOrDefault(e => e.Id == row.EmployeeId);
-        if (employee is not null && attendance.ClockInTime is not null && attendance.ClockOutTime is not null)
-        {
-            var workedDuration = attendance.ClockOutTime.Value - attendance.ClockInTime.Value;
-            var workedHours = Math.Max(0m, (decimal)workedDuration.TotalHours);
-            var pendingSalaryAmount = Math.Round(employee.HourlyRate * workedHours, 2);
-            var pendingSalaryReference = BuildPendingSalaryReference(employee, today);
-
-            var existingPendingSalaryEntry = db.Transactions.FirstOrDefault(t =>
-                t.Type == "Expense" &&
-                t.Category == "Salary" &&
-                t.Justification == pendingSalaryReference);
-
-            if (existingPendingSalaryEntry is null)
-            {
-                db.Transactions.Add(new MoneyTransaction
-                {
-                    Amount = pendingSalaryAmount,
-                    AmountUsd = pendingSalaryAmount,
-                    AmountFc = CurrencyHelper.ConvertUsdToFc(pendingSalaryAmount),
-                    Date = DateTime.Now,
-                    Type = "Expense",
-                    Category = "Salary",
-                    CurrencyCode = CurrencyHelper.Usd,
-                    ExchangeRateUsed = CurrencyHelper.FcPerUsd,
-                    IsFixed = true,
-                    Justification = pendingSalaryReference
-                });
-            }
-            else
-            {
-                existingPendingSalaryEntry.Amount = pendingSalaryAmount;
-                existingPendingSalaryEntry.AmountUsd = pendingSalaryAmount;
-                existingPendingSalaryEntry.AmountFc = CurrencyHelper.ConvertUsdToFc(pendingSalaryAmount);
-                existingPendingSalaryEntry.Date = DateTime.Now;
-                existingPendingSalaryEntry.CurrencyCode = CurrencyHelper.Usd;
-                existingPendingSalaryEntry.ExchangeRateUsed = CurrencyHelper.FcPerUsd;
-            }
-        }
-
-        db.SaveChanges();
-
-        MessageBox.Show("Clock-out saved. Pending salary was updated in Money.", "Attendance", MessageBoxButton.OK, MessageBoxImage.Information);
-        LoadAttendance();
     }
 
     private void CloseLateDialog()
@@ -725,6 +843,20 @@ public class AttendanceViewModel : AdminBaseViewModel
 
     private static string FormatLateJustification(string? justification)
         => string.IsNullOrWhiteSpace(justification) ? "No justification provided." : justification.Trim();
+
+    private static EmployeeAttendance CopyAttendance(EmployeeAttendance a) =>
+        new()
+        {
+            Id = a.Id,
+            EmployeeId = a.EmployeeId,
+            WorkDate = a.WorkDate,
+            ClockInTime = a.ClockInTime,
+            ClockOutTime = a.ClockOutTime,
+            ClockInStatus = a.ClockInStatus,
+            Justification = a.Justification,
+            IsAbsence = a.IsAbsence,
+            AbsenceJustification = a.AbsenceJustification
+        };
 
     private static int? ParseEmployeeIdFromPendingSalaryJustification(string justification)
     {

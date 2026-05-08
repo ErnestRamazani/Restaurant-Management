@@ -30,13 +30,20 @@ public sealed class AdminDataController(AppDbContext db) : ControllerBase
             "employees" or "employee" => await Snapshot(db.Employees.AsNoTracking().OrderBy(e => e.Name), cancellationToken),
             "tables" or "table" => await Snapshot(db.Tables.AsNoTracking().Include(t => t.AssignedServer).OrderBy(t => t.TableNumber), cancellationToken),
             "reservations" or "reservationbooking" => await Snapshot(db.Reservations.AsNoTracking().OrderByDescending(r => r.ReservedFor), cancellationToken),
+            "customerprofiles" or "customerprofile" => await Snapshot(db.CustomerProfiles.AsNoTracking().OrderBy(c => c.FullName), cancellationToken),
             "inventory" or "inventoryitems" or "inventoryitem" => await Snapshot(db.InventoryItems.AsNoTracking().OrderBy(i => i.Name), cancellationToken),
             "attendance" or "employeeattendances" or "employeeattendance" => await Snapshot(db.EmployeeAttendances.AsNoTracking().OrderByDescending(a => a.WorkDate), cancellationToken),
             "salaryadvances" or "salaryadvance" => await Snapshot(db.SalaryAdvances.AsNoTracking().OrderByDescending(a => a.GivenAt), cancellationToken),
             "payroll" or "payrollpaymentrecords" or "payrollpaymentrecord" => await Snapshot(db.PayrollPaymentRecords.AsNoTracking().OrderByDescending(p => p.PaidAtUtc), cancellationToken),
-            "orders" or "orderrecord" => await Snapshot(db.Orders.AsNoTracking().Include(o => o.Items).OrderByDescending(o => o.CreatedAt), cancellationToken),
+            "orders" or "orderrecord" => await Snapshot(
+                db.Orders.AsNoTracking()
+                    .Include(o => o.Items)
+                    .AsSplitQuery()
+                    .OrderByDescending(o => o.CreatedAt),
+                cancellationToken),
             "orderitems" or "orderitem" => await Snapshot(db.OrderItems.AsNoTracking(), cancellationToken),
             "money" or "transactions" or "moneytransaction" => await Snapshot(db.Transactions.AsNoTracking().OrderByDescending(t => t.Date), cancellationToken),
+            "attendancedayvalidations" or "attendancevalidations" or "attendancedayvalidation" => await Snapshot(db.AttendanceDayValidations.AsNoTracking().OrderByDescending(v => v.WorkDate), cancellationToken),
             "settings" => SnapshotSettings(),
             _ => null
         };
@@ -45,6 +52,77 @@ public sealed class AdminDataController(AppDbContext db) : ControllerBase
             return NotFound(new { message = $"Unsupported admin entity '{entityName}'." });
 
         return Ok(new AdminEntityListResponse(entityName, items, snapshotAt));
+    }
+
+    [HttpGet("bundles/create-order")]
+    public async Task<ActionResult<AdminCreateOrderCatalogBundleResponse>> CreateOrderCatalogBundle(CancellationToken cancellationToken)
+    {
+        var tablesTask = Snapshot(
+            db.Tables.AsNoTracking()
+                .Include(t => t.AssignedServer)
+                .AsSplitQuery()
+                .OrderBy(t => t.TableNumber),
+            cancellationToken);
+        var productsTask = Snapshot(
+            db.Products.AsNoTracking().OrderBy(p => p.Category).ThenBy(p => p.Name),
+            cancellationToken);
+        // Create-order UI only lists arrived guests; avoid scanning hundreds of irrelevant rows.
+        var reservationsTask = Snapshot(
+            db.Reservations.AsNoTracking()
+                .Where(r => r.Status == "Arrived")
+                .OrderByDescending(r => r.ReservedFor)
+                .Take(120),
+            cancellationToken);
+        // Heavy join if we load every historical order with all lines. Load delivery headers + active table tickets with lines only.
+        var ordersTask = CreateOrderBundleOrdersAsync(cancellationToken);
+
+        await Task.WhenAll(tablesTask, productsTask, reservationsTask, ordersTask);
+
+        var snapshotAt = DateTime.UtcNow;
+        return Ok(new AdminCreateOrderCatalogBundleResponse(
+            await tablesTask,
+            await productsTask,
+            await reservationsTask,
+            await ordersTask,
+            snapshotAt));
+    }
+
+    /// <summary>
+    /// Desktop needs (1) recent delivery order headers for reference autocomplete and (2) open / in-service table tickets with line items.
+    /// Merged by id so we do not hydrate thousands of historical <c>OrderItems</c> rows.
+    /// </summary>
+    private async Task<IReadOnlyList<JsonElement>> CreateOrderBundleOrdersAsync(CancellationToken cancellationToken)
+    {
+        var deliveryTask = db.Orders.AsNoTracking()
+            .Where(o => o.OrderSource == "Delivery")
+            .OrderByDescending(o => o.CreatedAt)
+            .Take(150)
+            .ToListAsync(cancellationToken);
+
+        var openTask = db.Orders.AsNoTracking()
+            .WhereOccupiesTable()
+            .OrderByDescending(o => o.CreatedAt)
+            .Take(400)
+            .Include(o => o.Items)
+            .AsSplitQuery()
+            .ToListAsync(cancellationToken);
+
+        await Task.WhenAll(deliveryTask, openTask);
+
+        var deliveryHeaders = await deliveryTask;
+        var openWithLines = await openTask;
+
+        var merged = new Dictionary<int, OrderRecord>();
+        foreach (var o in deliveryHeaders)
+            merged[o.Id] = o;
+        foreach (var o in openWithLines)
+            merged[o.Id] = o;
+
+        var ordered = merged.Values
+            .OrderByDescending(o => o.CreatedAt)
+            .ToList();
+
+        return ordered.Select(ToJsonElement).ToList();
     }
 
     private static async Task<IReadOnlyList<JsonElement>> Snapshot<T>(

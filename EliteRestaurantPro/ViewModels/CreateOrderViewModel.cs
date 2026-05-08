@@ -3,12 +3,11 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Input;
-using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Utils;
+using EliteRestaurantPro.ApiClients;
 using EliteRestaurantPro.Services;
 using EliteRestaurantPro.Views;
-using Microsoft.EntityFrameworkCore;
 using ModelTable = EliteRestaurant.Core.Models.Table;
 
 namespace EliteRestaurantPro.ViewModels;
@@ -20,6 +19,7 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
     private readonly TableLoadingService _tableLoading = new();
     private readonly DraftPersistenceService _draftPersistence = new();
     private readonly OrderSubmissionService _orderSubmission = new();
+    private readonly AdminDataApiClient _cloudData = new();
 
     public sealed class DraftEntry
     {
@@ -88,6 +88,10 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
     private bool _skipPersistedSubtotalInTotals;
     private ArrivedReservationOption? _selectedArrivedReservation;
     private string _selectedDeliveryReference = string.Empty;
+    /// <summary>Resolved via cloud API during load for admin draft ownership (never block UI synchronously).</summary>
+    private int? _resolvedDraftOwnerEmployeeId;
+    /// <summary>Subtotal for the open check's existing lines; refreshed with open-check banner.</summary>
+    private decimal _persistedOpenOrderLineSubtotal;
 
     public override string ActivePage => "CreateOrder";
     public string PageTitle => "Create Order";
@@ -397,8 +401,7 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         DeleteDraftCommand = new RelayCommand(_ => DeleteSelectedDraft());
         DeleteAllDraftsCommand = new RelayCommand(_ => DeleteAllDrafts());
 
-        RefreshSavedDrafts();
-        LoadData();
+        _ = LoadDataAsync();
     }
 
     private void OnAppSettingsChanged()
@@ -431,184 +434,276 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         OnPropertyChanged(nameof(CanSubmitCreateOrder));
     }
 
-    private void LoadData()
+    private async Task LoadDataAsync()
     {
-        if (IsLoading)
+        var shouldRun = await Application.Current.Dispatcher.InvokeAsync(() =>
+        {
+            if (IsLoading)
+                return false;
+            IsLoading = true;
+            return true;
+        });
+
+        if (!shouldRun)
             return;
 
-        IsLoading = true;
         try
         {
+            _resolvedDraftOwnerEmployeeId = null;
+            var catalogTask = _tableLoading.LoadCatalogAsync(_serverEmployeeId);
+            Task<IReadOnlyList<Employee>>? employeesTask = null;
+            string? draftOwnerCandidateName = null;
+            if (!_serverEmployeeId.HasValue && !AppSession.StaffEmployeeId.HasValue)
+            {
+                draftOwnerCandidateName = ResolveDraftOwnerName();
+                if (!string.IsNullOrWhiteSpace(draftOwnerCandidateName)
+                    && !string.Equals(draftOwnerCandidateName, "Server", StringComparison.OrdinalIgnoreCase))
+                    employeesTask = _cloudData.GetEmployeesAsync();
+            }
+
+            if (employeesTask is not null)
+                await Task.WhenAll(catalogTask, employeesTask).ConfigureAwait(false);
+            else
+                await catalogTask.ConfigureAwait(false);
+
+            if (employeesTask is not null)
+            {
+                try
+                {
+                    var employees = await employeesTask.ConfigureAwait(false);
+                    var candidateName = draftOwnerCandidateName!;
+                    _resolvedDraftOwnerEmployeeId = employees
+                        .Where(e => e.EmploymentStatus == "Active")
+                        .Where(e =>
+                            e.Name == candidateName
+                            || e.SignInId == candidateName
+                            || e.UniqueId == candidateName)
+                        .Select(e => (int?)e.Id)
+                        .FirstOrDefault();
+                }
+                catch
+                {
+                    _resolvedDraftOwnerEmployeeId = null;
+                }
+            }
+
             _skipPersistedSubtotalInTotals = false;
-            var catalog = _tableLoading.LoadCatalog(_serverEmployeeId);
+            var catalog = await catalogTask.ConfigureAwait(false);
 
-            AvailableTables.Clear();
-            foreach (var t in catalog.Tables)
+            await Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                AvailableTables.Add(new ModelTable
+                AvailableTables.Clear();
+                foreach (var t in catalog.Tables)
                 {
-                    Id = t.Id,
-                    UniqueId = t.UniqueId,
-                    TableNumber = t.TableNumber,
-                    Name = t.Name,
-                    Capacity = t.Capacity,
-                    Status = t.Status,
-                    AssignedServerId = t.AssignedServerId
-                });
-            }
+                    AvailableTables.Add(new ModelTable
+                    {
+                        Id = t.Id,
+                        UniqueId = t.UniqueId,
+                        TableNumber = t.TableNumber,
+                        Name = t.Name,
+                        Capacity = t.Capacity,
+                        Status = t.Status,
+                        AssignedServerId = t.AssignedServerId
+                    });
+                }
 
-            ProductSelections.Clear();
-            foreach (var p in catalog.Products)
-            {
-                var vm = new ProductSelectionItemViewModel
+                ProductSelections.Clear();
+                foreach (var p in catalog.Products)
                 {
-                    ProductId = p.ProductId,
-                    UniqueId = p.UniqueId,
-                    Name = p.Name,
-                    Category = p.Category,
-                    SubCategory = p.SubCategory,
-                    Price = p.Price,
-                    Quantity = 1
-                };
-                vm.PropertyChanged += OnSelectionChanged;
-                ProductSelections.Add(vm);
-            }
+                    var vm = new ProductSelectionItemViewModel
+                    {
+                        ProductId = p.ProductId,
+                        UniqueId = p.UniqueId,
+                        Name = p.Name,
+                        Category = p.Category,
+                        SubCategory = p.SubCategory,
+                        Price = p.Price,
+                        Quantity = 1
+                    };
+                    vm.PropertyChanged += OnSelectionChanged;
+                    ProductSelections.Add(vm);
+                }
 
-            ArrivedReservations.Clear();
-            ArrivedReservations.Add(NoneReservationOption);
-            foreach (var r in catalog.ArrivedReservations)
-            {
-                ArrivedReservations.Add(new ArrivedReservationOption
+                ArrivedReservations.Clear();
+                ArrivedReservations.Add(NoneReservationOption);
+                foreach (var r in catalog.ArrivedReservations)
                 {
-                    Id = r.Id,
-                    UniqueId = r.UniqueId,
-                    ReservationName = r.ReservationName,
-                    GuestName = r.GuestName,
-                    ReservedFor = r.ReservedFor,
-                    TableId = r.TableId,
-                    TableLabel = r.TableLabel
-                });
-            }
+                    ArrivedReservations.Add(new ArrivedReservationOption
+                    {
+                        Id = r.Id,
+                        UniqueId = r.UniqueId,
+                        ReservationName = r.ReservationName,
+                        GuestName = r.GuestName,
+                        ReservedFor = r.ReservedFor,
+                        TableId = r.TableId,
+                        TableLabel = r.TableLabel
+                    });
+                }
 
-            DeliveryReferences.Clear();
-            foreach (var d in catalog.DeliveryReferences)
-                DeliveryReferences.Add(d);
+                DeliveryReferences.Clear();
+                foreach (var d in catalog.DeliveryReferences)
+                    DeliveryReferences.Add(d);
 
-            _suppressOpenCheckRefresh = true;
-            try
-            {
-                SelectedTableId = AvailableTables.FirstOrDefault()?.Id ?? 0;
-            }
-            finally
-            {
-                _suppressOpenCheckRefresh = false;
-            }
-            SelectedArrivedReservation = ArrivedReservations.FirstOrDefault();
-            SelectedDeliveryReference = string.Empty;
-            SelectedOrderSource = "WalkIn";
+                _suppressOpenCheckRefresh = true;
+                try
+                {
+                    SelectedTableId = AvailableTables.FirstOrDefault()?.Id ?? 0;
+                }
+                finally
+                {
+                    _suppressOpenCheckRefresh = false;
+                }
 
-            if (IsTabletStaffOrderFlow)
-            {
-                OrderStatuses.Clear();
-                OrderStatuses.Add(OrderWorkflow.PendingCashier);
-                SelectedOrderStatus = OrderWorkflow.PendingCashier;
-            }
-            else if (!OrderStatuses.Contains(SelectedOrderStatus))
-            {
-                SelectedOrderStatus = OrderStatuses.First();
-            }
+                SelectedArrivedReservation = ArrivedReservations.FirstOrDefault();
+                SelectedDeliveryReference = string.Empty;
+                SelectedOrderSource = "WalkIn";
 
-            SelectedPaymentCurrency = CurrencyHelper.Usd;
+                if (IsTabletStaffOrderFlow)
+                {
+                    OrderStatuses.Clear();
+                    OrderStatuses.Add(OrderWorkflow.PendingCashier);
+                    SelectedOrderStatus = OrderWorkflow.PendingCashier;
+                }
+                else if (!OrderStatuses.Contains(SelectedOrderStatus))
+                {
+                    SelectedOrderStatus = OrderStatuses.First();
+                }
 
-            RebuildCategoryFilter();
-            RebuildSubCategoryFilter();
-            ApplyProductFilters();
-            RefreshOpenCheckBanner();
-            RefreshReadyPickupBanner();
-            OnPropertyChanged(nameof(CanEditOrderStatusPicker));
-            OnPropertyChanged(nameof(CanEditTablePicker));
-            OnPropertyChanged(nameof(CanEditTableForCurrentSource));
+                SelectedPaymentCurrency = CurrencyHelper.Usd;
+
+                RebuildCategoryFilter();
+                RebuildSubCategoryFilter();
+                ApplyProductFilters();
+                RefreshSavedDrafts();
+                var productPrices = ProductSelections.ToDictionary(p => p.ProductId, p => p.Price);
+                ApplyOpenCheckUi(SelectedTableId, catalog.OrdersSnapshot, productPrices);
+                RefreshReadyPickupBanner();
+                OnPropertyChanged(nameof(CanEditOrderStatusPicker));
+                OnPropertyChanged(nameof(CanEditTablePicker));
+                OnPropertyChanged(nameof(CanEditTableForCurrentSource));
+            });
         }
         catch (Exception ex)
         {
-            ShowDialog($"Create Order failed to load:\n\n{ex.Message}", "Create Order", MessageBoxButton.OK, MessageBoxImage.Error);
+            await Application.Current.Dispatcher.InvokeAsync(() =>
+                ShowDialog($"Create Order failed to load:\n\n{ex.Message}", "Create Order", MessageBoxButton.OK, MessageBoxImage.Error));
         }
         finally
         {
-            IsLoading = false;
+            await Application.Current.Dispatcher.InvokeAsync(() => { IsLoading = false; });
         }
     }
 
     private void RefreshOpenCheckBanner()
     {
-        if (SelectedTableId == 0)
+        _ = RefreshOpenCheckBannerAsync();
+    }
+
+    private static OrderRecord? FindOpenCheckForTable(IReadOnlyList<OrderRecord> orders, int tableId)
+    {
+        if (tableId == 0)
+            return null;
+        return orders
+            .Where(o => o.TableId == tableId && OrderWorkflow.IsOpenCheckStatus(o.Status))
+            .OrderByDescending(o => o.CreatedAt)
+            .FirstOrDefault();
+    }
+
+    private static decimal ComputePersistedOpenLineSubtotal(OrderRecord? open, IReadOnlyDictionary<int, decimal> productPrices)
+    {
+        var items = open?.Items?.ToList() ?? [];
+        if (items.Count == 0)
+            return 0m;
+        return items.Sum(i =>
+            (productPrices.TryGetValue(i.ProductId, out var price) ? price : 0m) * i.Quantity);
+    }
+
+    /// <summary>UI thread: applies open-check banner, discount fields from server order, and totals.</summary>
+    private void ApplyOpenCheckUi(int tableId, IReadOnlyList<OrderRecord> orders, IReadOnlyDictionary<int, decimal> productPrices)
+    {
+        if (tableId == 0)
         {
             _openCheckOrderId = null;
             _openCheckCode = string.Empty;
             _openCheckStatus = string.Empty;
+            _persistedOpenOrderLineSubtotal = 0m;
             OnPropertyChanged(nameof(HasOpenCheckForTable));
             OnPropertyChanged(nameof(OpenCheckBannerText));
-            HydrateDiscountFieldsFromOpenCheck();
+            ApplyDiscountFieldsFromOpen(null);
             RecalculateTotals();
             OnPropertyChanged(nameof(SubtotalCaption));
             return;
         }
 
-        using var db = new AppDbContext();
-        var open = db.Orders.AsNoTracking()
-            .WhereOpenCheckForTable(SelectedTableId)
-            .OrderByDescending(o => o.CreatedAt)
-            .FirstOrDefault();
-
+        var open = FindOpenCheckForTable(orders, tableId);
         _openCheckOrderId = open?.Id;
         _openCheckCode = open is null
             ? string.Empty
             : string.IsNullOrWhiteSpace(open.UniqueId) ? $"#{open.Id:000}" : open.UniqueId;
         _openCheckStatus = open?.Status ?? string.Empty;
+        _persistedOpenOrderLineSubtotal = ComputePersistedOpenLineSubtotal(open, productPrices);
 
         OnPropertyChanged(nameof(HasOpenCheckForTable));
         OnPropertyChanged(nameof(OpenCheckBannerText));
-        HydrateDiscountFieldsFromOpenCheck();
+        ApplyDiscountFieldsFromOpen(open);
         RecalculateTotals();
         OnPropertyChanged(nameof(SubtotalCaption));
     }
 
-    private void HydrateDiscountFieldsFromOpenCheck()
+    private async Task RefreshOpenCheckBannerAsync()
+    {
+        var (tableId, productPrices) = await Application.Current.Dispatcher.InvokeAsync(() =>
+        {
+            var prices = ProductSelections.ToDictionary(p => p.ProductId, p => p.Price);
+            return (SelectedTableId, (IReadOnlyDictionary<int, decimal>)prices);
+        });
+
+        if (tableId == 0)
+        {
+            await Application.Current.Dispatcher.InvokeAsync(() =>
+                ApplyOpenCheckUi(0, Array.Empty<OrderRecord>(), productPrices));
+            return;
+        }
+
+        try
+        {
+            var orders = await _cloudData.GetOrdersAsync().ConfigureAwait(false);
+            await Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                if (SelectedTableId != tableId)
+                    return;
+                ApplyOpenCheckUi(tableId, orders, productPrices);
+            });
+        }
+        catch
+        {
+            // Best-effort: leave prior open-check state if refresh fails.
+        }
+    }
+
+    private void ApplyDiscountFieldsFromOpen(OrderRecord? open)
     {
         string mode;
         string input;
-        if (_openCheckOrderId is not int orderId)
+        if (open is null || string.Equals(open.DiscountMode, "None", StringComparison.OrdinalIgnoreCase) || open.DiscountValue <= 0m)
         {
             mode = "None";
             input = string.Empty;
         }
+        else if (string.Equals(open.DiscountMode, "Percent", StringComparison.OrdinalIgnoreCase))
+        {
+            mode = "Percent";
+            input = open.DiscountValue.ToString("0.##", CultureInfo.InvariantCulture);
+        }
+        else if (string.Equals(open.DiscountMode, "Usd", StringComparison.OrdinalIgnoreCase))
+        {
+            mode = "Usd";
+            input = open.DiscountValue.ToString("0.##", CultureInfo.InvariantCulture);
+        }
         else
         {
-            using var db = new AppDbContext();
-            var row = db.Orders.AsNoTracking()
-                .Where(o => o.Id == orderId)
-                .Select(o => new { o.DiscountMode, o.DiscountValue })
-                .SingleOrDefault();
-            if (row is null || string.Equals(row.DiscountMode, "None", StringComparison.OrdinalIgnoreCase) || row.DiscountValue <= 0m)
-            {
-                mode = "None";
-                input = string.Empty;
-            }
-            else if (string.Equals(row.DiscountMode, "Percent", StringComparison.OrdinalIgnoreCase))
-            {
-                mode = "Percent";
-                input = row.DiscountValue.ToString("0.##", CultureInfo.InvariantCulture);
-            }
-            else if (string.Equals(row.DiscountMode, "Usd", StringComparison.OrdinalIgnoreCase))
-            {
-                mode = "Usd";
-                input = row.DiscountValue.ToString("0.##", CultureInfo.InvariantCulture);
-            }
-            else
-            {
-                mode = "None";
-                input = string.Empty;
-            }
+            mode = "None";
+            input = string.Empty;
         }
 
         if (string.Equals(_selectedDiscountMode, mode, StringComparison.OrdinalIgnoreCase) &&
@@ -623,17 +718,9 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
 
     private decimal GetPersistedOpenOrderLineSubtotal()
     {
-        if (_skipPersistedSubtotalInTotals || _openCheckOrderId is not int oid)
+        if (_skipPersistedSubtotalInTotals || _openCheckOrderId is null)
             return 0m;
-
-        using var db = new AppDbContext();
-        var items = db.OrderItems.AsNoTracking().Where(i => i.OrderRecordId == oid).ToList();
-        if (items.Count == 0)
-            return 0m;
-
-        var productIds = items.Select(i => i.ProductId).Distinct().ToList();
-        var prices = db.Products.AsNoTracking().Where(p => productIds.Contains(p.Id)).ToDictionary(p => p.Id, p => p.Price);
-        return items.Sum(i => (prices.TryGetValue(i.ProductId, out var price) ? price : 0m) * i.Quantity);
+        return _persistedOpenOrderLineSubtotal;
     }
 
     private void RebuildCategoryFilter()
@@ -850,6 +937,11 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
 
     private void CreateOrder()
     {
+        _ = CreateOrderAsync();
+    }
+
+    private async Task CreateOrderAsync()
+    {
         if (IsLoading || _isSubmitting)
             return;
 
@@ -879,7 +971,7 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         try
         {
             var snap = BuildSubmitSnapshot(selected);
-            var phase = _orderSubmission.LoadPhase1(snap);
+            var phase = await _orderSubmission.LoadPhase1Async(snap).ConfigureAwait(true);
             if (!phase.Ok)
             {
                 ShowDialog(phase.Message, phase.Caption, MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -1215,26 +1307,7 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         if (AppSession.StaffEmployeeId.HasValue)
             return AppSession.StaffEmployeeId;
 
-        var candidateName = ResolveDraftOwnerName();
-        if (string.IsNullOrWhiteSpace(candidateName) || string.Equals(candidateName, "Server", StringComparison.OrdinalIgnoreCase))
-            return null;
-
-        try
-        {
-            using var db = new AppDbContext();
-            var employeeId = db.Employees.AsNoTracking()
-                .Where(e => e.EmploymentStatus == "Active")
-                .Where(e => e.Name == candidateName
-                            || e.SignInId == candidateName
-                            || e.UniqueId == candidateName)
-                .Select(e => (int?)e.Id)
-                .FirstOrDefault();
-            return employeeId;
-        }
-        catch
-        {
-            return null;
-        }
+        return _resolvedDraftOwnerEmployeeId;
     }
 
     private string ResolveDraftOwnerName()

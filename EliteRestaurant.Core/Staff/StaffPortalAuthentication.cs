@@ -30,6 +30,23 @@ public static class StaffPortalAuthentication
         return "Server";
     }
 
+    /// <summary>Same portal rules as <see cref="CanonicalPortalForEmployee"/> for a role string (e.g. cloud login payload).</summary>
+    public static string CanonicalPortalForRole(string? role)
+    {
+        if (string.IsNullOrWhiteSpace(role))
+            return "Server";
+
+        var r = role.Trim();
+        if (r.Equals("Admin", StringComparison.OrdinalIgnoreCase)
+            || r.Equals("Manager", StringComparison.OrdinalIgnoreCase))
+            return "Admin";
+        if (r.Equals("Cashier", StringComparison.OrdinalIgnoreCase))
+            return "Cashier";
+        if (IsKitchenBarRole(r))
+            return "KitchenBar";
+        return "Server";
+    }
+
     /// <summary>
     /// Active employees whose Sign-in ID or UniqueId matches <paramref name="staffId"/> (trim + case-insensitive).
     /// Intended for DB execution; PIN is applied in-memory via <see cref="FilterPinMatches"/>.

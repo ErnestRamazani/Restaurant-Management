@@ -18,4 +18,16 @@ public sealed class OrderHub : Hub
             await Groups.AddToGroupAsync(Context.ConnectionId, "Server");
         }
     }
+
+    public async Task JoinKitchen()
+    {
+        var role = Context.User?.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
+        if (role.Equals("Chef", StringComparison.OrdinalIgnoreCase)
+            || role.Equals("Barman", StringComparison.OrdinalIgnoreCase)
+            || role.Equals("Bartender", StringComparison.OrdinalIgnoreCase)
+            || role.Equals("Sous Chef", StringComparison.OrdinalIgnoreCase))
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, "Kitchen");
+        }
+    }
 }

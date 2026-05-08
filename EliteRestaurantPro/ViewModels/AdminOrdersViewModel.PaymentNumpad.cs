@@ -5,13 +5,11 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Input;
-using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Orders;
 using EliteRestaurant.Core.Utils;
 using EliteRestaurantPro.Services;
 using Microsoft.Win32;
-using Microsoft.EntityFrameworkCore;
 using ModelTable = EliteRestaurant.Core.Models.Table;
 
 namespace EliteRestaurantPro.ViewModels;
@@ -185,9 +183,14 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
             return;
         }
 
+        _ = ConfirmChangeAndCompleteAsync(entry);
+    }
+
+    private async Task ConfirmChangeAndCompleteAsync(OrderEntry entry)
+    {
         var paymentCurrencyCode = "MIXED";
 
-        UpdateOrderStatus(
+        await UpdateOrderStatusAsync(
             entry,
             "Completed",
             paymentCurrencyCode,

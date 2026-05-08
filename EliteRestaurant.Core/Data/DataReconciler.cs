@@ -100,4 +100,23 @@ public static class DataReconciler
             table.Status = occupiedTableIds.Contains(table.Id) ? "Occupied" : "Available";
         }
     }
+
+    /// <summary>HTTP/sync clients: same occupancy rules as <see cref="ReconcileTableStatusesWithOrders(AppDbContext)"/> without EF.</summary>
+    public static void ReconcileTableStatusesWithOrders(IEnumerable<Table> tables, IReadOnlyList<OrderRecord> orders)
+    {
+        var occupiedTableIds = new HashSet<int>();
+        foreach (var o in orders)
+        {
+            if (o.TableId is int tid && OrderWorkflow.OccupiesTable(o.Status))
+                occupiedTableIds.Add(tid);
+        }
+
+        foreach (var table in tables)
+        {
+            if (string.Equals(table.Status, "Maintenance", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            table.Status = occupiedTableIds.Contains(table.Id) ? "Occupied" : "Available";
+        }
+    }
 }
