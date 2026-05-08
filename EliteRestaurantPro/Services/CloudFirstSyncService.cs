@@ -144,16 +144,25 @@ public static class CloudFirstSyncService
 
             using var db = new AppDbContext();
             var operations = new List<CloudSyncOperation>();
+
+            // Parent/reference tables first, then children/detail tables, so FK relationships can be restored.
             AddBootstrapOperations(operations, "Employee", db.Employees.AsNoTracking().OrderBy(e => e.Id).ToList(), e => e.UniqueId);
+            AddBootstrapOperations(operations, "CustomerProfile", db.CustomerProfiles.AsNoTracking().OrderBy(c => c.Id).ToList(), c => c.UniqueId);
             AddBootstrapOperations(operations, "InventoryItem", db.InventoryItems.AsNoTracking().OrderBy(i => i.Id).ToList(), i => i.UniqueId);
             AddBootstrapOperations(operations, "Product", db.Products.AsNoTracking().OrderBy(p => p.Id).ToList(), p => p.UniqueId);
+            AddBootstrapOperations(operations, "ProductIngredient", db.ProductIngredients.AsNoTracking().OrderBy(pi => pi.Id).ToList(), pi => pi.Id.ToString());
             AddBootstrapOperations(operations, "Table", db.Tables.AsNoTracking().OrderBy(t => t.Id).ToList(), t => t.UniqueId);
             AddBootstrapOperations(operations, "ReservationBooking", db.Reservations.AsNoTracking().OrderBy(r => r.Id).ToList(), r => r.UniqueId);
+            AddBootstrapOperations(operations, "WaitlistEntry", db.WaitlistEntries.AsNoTracking().OrderBy(w => w.Id).ToList(), w => w.UniqueId);
             AddBootstrapOperations(operations, "OrderRecord", db.Orders.AsNoTracking().OrderBy(o => o.Id).ToList(), o => o.UniqueId);
+            AddBootstrapOperations(operations, "OrderItem", db.OrderItems.AsNoTracking().OrderBy(oi => oi.Id).ToList(), oi => oi.Id.ToString());
             AddBootstrapOperations(operations, "MoneyTransaction", db.Transactions.AsNoTracking().OrderBy(t => t.Id).ToList(), t => t.Id.ToString());
             AddBootstrapOperations(operations, "EmployeeAttendance", db.EmployeeAttendances.AsNoTracking().OrderBy(a => a.Id).ToList(), a => $"{a.EmployeeId}-{a.WorkDate:yyyyMMdd}");
+            AddBootstrapOperations(operations, "AttendanceDayValidation", db.AttendanceDayValidations.AsNoTracking().OrderBy(v => v.Id).ToList(), v => v.WorkDate.ToString("yyyyMMdd"));
             AddBootstrapOperations(operations, "SalaryAdvance", db.SalaryAdvances.AsNoTracking().OrderBy(a => a.Id).ToList(), a => a.Id.ToString());
             AddBootstrapOperations(operations, "PayrollPaymentRecord", db.PayrollPaymentRecords.AsNoTracking().OrderBy(p => p.Id).ToList(), p => $"{p.EmployeeId}-{p.Year}-{p.Month}");
+            AddBootstrapOperations(operations, "SharedOrderDraft", db.SharedOrderDrafts.AsNoTracking().OrderBy(d => d.Id).ToList(), d => d.UniqueId);
+            AddBootstrapOperations(operations, "TabletSession", db.TabletSessions.AsNoTracking().OrderBy(s => s.CreatedAtUtc).ToList(), s => s.Token);
 
             foreach (var batch in operations.Chunk(50))
                 await SyncClient.PushAsync(batch, cancellationToken);

@@ -28,7 +28,12 @@ public sealed class AdminSyncController(AppDbContext db) : ControllerBase
         [nameof(PayrollPaymentRecord)] = typeof(PayrollPaymentRecord),
         [nameof(OrderRecord)] = typeof(OrderRecord),
         [nameof(OrderItem)] = typeof(OrderItem),
-        [nameof(MoneyTransaction)] = typeof(MoneyTransaction)
+        [nameof(MoneyTransaction)] = typeof(MoneyTransaction),
+        [nameof(CustomerProfile)] = typeof(CustomerProfile),
+        [nameof(WaitlistEntry)] = typeof(WaitlistEntry),
+        [nameof(SharedOrderDraft)] = typeof(SharedOrderDraft),
+        [nameof(TabletSession)] = typeof(TabletSession),
+        [nameof(AttendanceDayValidation)] = typeof(AttendanceDayValidation)
     };
 
     [HttpPost]

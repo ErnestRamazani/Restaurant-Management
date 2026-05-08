@@ -26,6 +26,10 @@ public sealed class HealthController(AppDbContext db) : ControllerBase
             var tableCount = db.Tables.Count();
             var productCount = db.Products.Count();
             var reservationCount = db.Reservations.Count();
+            var inventoryCount = db.InventoryItems.Count();
+            var orderCount = db.Orders.Count();
+            var orderItemCount = db.OrderItems.Count();
+            var customerCount = db.CustomerProfiles.Count();
             return Ok(new
             {
                 status = "ok",
@@ -34,6 +38,10 @@ public sealed class HealthController(AppDbContext db) : ControllerBase
                 tables = tableCount,
                 products = productCount,
                 reservations = reservationCount,
+                inventoryItems = inventoryCount,
+                orders = orderCount,
+                orderItems = orderItemCount,
+                customers = customerCount,
                 utc = DateTime.UtcNow
             });
         }
