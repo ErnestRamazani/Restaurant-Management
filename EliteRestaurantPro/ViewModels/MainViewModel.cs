@@ -4,6 +4,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using EliteRestaurant.Core.Utils;
+using EliteRestaurantPro.Services;
 
 namespace EliteRestaurantPro.ViewModels;
 
@@ -16,6 +17,8 @@ public class MainViewModel : BaseViewModel
     private double _menuBackgroundImageOpacity = 0.22;
     private string _cloudStatusText = "Cloud: Checking";
     private Brush _cloudStatusBrush = Brushes.Gray;
+    private string _syncStatusText = "Sync: 0 pending";
+    private Brush _syncStatusBrush = Brushes.Gray;
     private readonly DispatcherTimer _cloudStatusTimer;
 
     public BaseViewModel CurrentViewModel
@@ -61,14 +64,28 @@ public class MainViewModel : BaseViewModel
         private set => SetField(ref _cloudStatusBrush, value);
     }
 
+    public string SyncStatusText
+    {
+        get => _syncStatusText;
+        private set => SetField(ref _syncStatusText, value);
+    }
+
+    public Brush SyncStatusBrush
+    {
+        get => _syncStatusBrush;
+        private set => SetField(ref _syncStatusBrush, value);
+    }
+
     public MainViewModel()
     {
         SettingsManager.SettingsChanged += OnSettingsChanged;
+        CloudFirstSyncService.StatusChanged += OnSyncStatusChanged;
         Navigate(new RoleSelectionViewModel(Navigate));
         _cloudStatusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
         _cloudStatusTimer.Tick += async (_, _) => await RefreshCloudStatusAsync();
         _cloudStatusTimer.Start();
         _ = RefreshCloudStatusAsync();
+        OnSyncStatusChanged();
     }
 
     public void Navigate(BaseViewModel viewModel)
@@ -107,6 +124,20 @@ public class MainViewModel : BaseViewModel
             CloudStatusText = "Cloud: Offline";
             CloudStatusBrush = Brushes.IndianRed;
         }
+    }
+
+    private void OnSyncStatusChanged()
+    {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+        {
+            dispatcher.BeginInvoke(OnSyncStatusChanged);
+            return;
+        }
+
+        var pending = CloudFirstSyncService.PendingCount;
+        SyncStatusText = pending == 0 ? "Sync: Up to date" : $"Sync: {pending} pending";
+        SyncStatusBrush = pending == 0 ? Brushes.LimeGreen : Brushes.Goldenrod;
     }
 
     private void UpdateBackgroundForCurrentView()

@@ -2,6 +2,7 @@ using System.Windows;
 using System.IO;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Utils;
+using EliteRestaurantPro.Services;
 using EliteRestaurantPro.Utils;
 using EliteRestaurantPro.Views;
 using Npgsql;
@@ -51,6 +52,7 @@ public partial class App : Application
             return;
         }
 
+        CloudFirstSyncService.Start();
         ThemeManager.ApplySavedPalette();
         base.OnStartup(e);
     }

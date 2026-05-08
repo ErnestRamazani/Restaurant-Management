@@ -1,8 +1,10 @@
 using System;
 using System.Text.Json;
 using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Sync;
 using EliteRestaurant.Core.Utils;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql;
 
@@ -10,6 +12,8 @@ namespace EliteRestaurant.Core.Data;
 
 public class AppDbContext : DbContext
 {
+    private static readonly JsonSerializerOptions SyncJsonOptions = new(JsonSerializerDefaults.Web);
+
     public AppDbContext()
     {
     }
@@ -35,6 +39,10 @@ public class AppDbContext : DbContext
     public DbSet<WaitlistEntry> WaitlistEntries => Set<WaitlistEntry>();
     public DbSet<SharedOrderDraft> SharedOrderDrafts => Set<SharedOrderDraft>();
     public DbSet<TabletSession> TabletSessions => Set<TabletSession>();
+    public DbSet<SyncOutbox> SyncOutbox => Set<SyncOutbox>();
+
+    public static Func<IReadOnlyList<CloudSyncOperation>, CancellationToken, Task<IReadOnlyList<CloudSyncResult>>>?
+        CloudSyncDispatcher { get; set; }
 
     [Obsolete("Use DatabaseInitializer.Initialize() (EF Core migrations + optional sample seed).")]
     public static void Initialize() => DatabaseInitializer.Initialize();
@@ -65,6 +73,32 @@ public class AppDbContext : DbContext
             "Continuing without configuring a database provider.");
     }
 
+    public override int SaveChanges()
+    {
+        PrepareCloudSyncOperations(CancellationToken.None).GetAwaiter().GetResult();
+        return base.SaveChanges(acceptAllChangesOnSuccess: true);
+    }
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        PrepareCloudSyncOperations(CancellationToken.None).GetAwaiter().GetResult();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        await PrepareCloudSyncOperations(cancellationToken);
+        return await base.SaveChangesAsync(acceptAllChangesOnSuccess: true, cancellationToken);
+    }
+
+    public override async Task<int> SaveChangesAsync(
+        bool acceptAllChangesOnSuccess,
+        CancellationToken cancellationToken = default)
+    {
+        await PrepareCloudSyncOperations(cancellationToken);
+        return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Table>()
@@ -87,6 +121,7 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<WaitlistEntry>().ToTable("WaitlistEntries");
         modelBuilder.Entity<SharedOrderDraft>().ToTable("SharedOrderDrafts");
         modelBuilder.Entity<TabletSession>().ToTable("TabletSessions");
+        modelBuilder.Entity<SyncOutbox>().ToTable("SyncOutbox");
         modelBuilder.Entity<TabletSession>().HasKey(t => t.Token);
 
         modelBuilder.Entity<TabletSession>()
@@ -122,6 +157,8 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<WaitlistEntry>().HasIndex(w => w.Status);
         modelBuilder.Entity<SharedOrderDraft>().HasIndex(d => d.UniqueId).IsUnique();
         modelBuilder.Entity<SharedOrderDraft>().HasIndex(d => new { d.EmployeeId, d.Portal, d.UpdatedAtUtc });
+        modelBuilder.Entity<SyncOutbox>().HasIndex(o => o.IdempotencyKey).IsUnique();
+        modelBuilder.Entity<SyncOutbox>().HasIndex(o => new { o.Status, o.QueuedAtUtc });
         modelBuilder.Entity<EmployeeAttendance>()
             .HasIndex(a => new { a.EmployeeId, a.WorkDate })
             .IsUnique();
@@ -228,6 +265,103 @@ public class AppDbContext : DbContext
             DateTimeKind.Local => v.ToUniversalTime(),
             _ => DateTime.SpecifyKind(v, DateTimeKind.Utc)
         };
+
+    private async Task PrepareCloudSyncOperations(CancellationToken cancellationToken)
+    {
+        var dispatcher = CloudSyncDispatcher;
+        if (dispatcher is null)
+            return;
+
+        ChangeTracker.DetectChanges();
+        var operations = ChangeTracker.Entries()
+            .Where(IsSyncableEntry)
+            .Select(CreateSyncOperation)
+            .ToList();
+
+        if (operations.Count == 0)
+            return;
+
+        IReadOnlyList<CloudSyncResult> results;
+        try
+        {
+            results = await dispatcher(operations, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            QueueFailedOperations(operations, ex.GetBaseException().Message);
+            return;
+        }
+
+        var resultMap = results.ToDictionary(r => r.IdempotencyKey, StringComparer.OrdinalIgnoreCase);
+        foreach (var operation in operations)
+        {
+            if (resultMap.TryGetValue(operation.IdempotencyKey, out var result) && result.Success)
+                continue;
+
+            QueueFailedOperation(operation, resultMap.GetValueOrDefault(operation.IdempotencyKey)?.Message
+                                          ?? "Cloud rejected the operation.");
+        }
+    }
+
+    private static bool IsSyncableEntry(EntityEntry entry)
+    {
+        if (entry.Entity is SyncOutbox)
+            return false;
+
+        return entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted;
+    }
+
+    private static CloudSyncOperation CreateSyncOperation(EntityEntry entry)
+    {
+        var operation = entry.State switch
+        {
+            EntityState.Added => "Upsert",
+            EntityState.Modified => "Upsert",
+            EntityState.Deleted => "Delete",
+            _ => "Unknown"
+        };
+
+        return new CloudSyncOperation(
+            Guid.NewGuid().ToString("N"),
+            entry.Entity.GetType().Name,
+            operation,
+            SerializeEntry(entry),
+            DateTime.UtcNow);
+    }
+
+    private static string SerializeEntry(EntityEntry entry)
+    {
+        var values = entry.State == EntityState.Deleted
+            ? entry.OriginalValues
+            : entry.CurrentValues;
+
+        var payload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var property in values.Properties)
+            payload[property.Name] = values[property];
+
+        return JsonSerializer.Serialize(payload, SyncJsonOptions);
+    }
+
+    private void QueueFailedOperations(IEnumerable<CloudSyncOperation> operations, string error)
+    {
+        foreach (var operation in operations)
+            QueueFailedOperation(operation, error);
+    }
+
+    private void QueueFailedOperation(CloudSyncOperation operation, string error)
+    {
+        SyncOutbox.Add(new SyncOutbox
+        {
+            IdempotencyKey = operation.IdempotencyKey,
+            EntityName = operation.EntityName,
+            Operation = operation.Operation,
+            PayloadJson = operation.PayloadJson,
+            Status = "Pending",
+            Attempts = 0,
+            LastError = error,
+            QueuedAtUtc = operation.QueuedAtUtc
+        });
+    }
 
     public static bool TryGetPostgreSqlConnectionString(out string connectionString, string? defaultConnection = null)
     {
