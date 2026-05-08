@@ -1,16 +1,22 @@
 using System.IO;
+using System.Net.Http;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using EliteRestaurant.Core.Utils;
 
 namespace EliteRestaurantPro.ViewModels;
 
 public class MainViewModel : BaseViewModel
 {
+    private static readonly HttpClient CloudStatusHttp = new();
     private BaseViewModel _currentViewModel = null!;
     private ImageSource? _menuBackgroundImage;
     private double _menuBackgroundDimOpacity = 0.18;
     private double _menuBackgroundImageOpacity = 0.22;
+    private string _cloudStatusText = "Cloud: Checking";
+    private Brush _cloudStatusBrush = Brushes.Gray;
+    private readonly DispatcherTimer _cloudStatusTimer;
 
     public BaseViewModel CurrentViewModel
     {
@@ -43,10 +49,26 @@ public class MainViewModel : BaseViewModel
 
     public bool HasMenuBackgroundImage => MenuBackgroundImage is not null;
 
+    public string CloudStatusText
+    {
+        get => _cloudStatusText;
+        private set => SetField(ref _cloudStatusText, value);
+    }
+
+    public Brush CloudStatusBrush
+    {
+        get => _cloudStatusBrush;
+        private set => SetField(ref _cloudStatusBrush, value);
+    }
+
     public MainViewModel()
     {
         SettingsManager.SettingsChanged += OnSettingsChanged;
         Navigate(new RoleSelectionViewModel(Navigate));
+        _cloudStatusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+        _cloudStatusTimer.Tick += async (_, _) => await RefreshCloudStatusAsync();
+        _cloudStatusTimer.Start();
+        _ = RefreshCloudStatusAsync();
     }
 
     public void Navigate(BaseViewModel viewModel)
@@ -57,6 +79,34 @@ public class MainViewModel : BaseViewModel
     private void OnSettingsChanged()
     {
         UpdateBackgroundForCurrentView();
+        _ = RefreshCloudStatusAsync();
+    }
+
+    private async Task RefreshCloudStatusAsync()
+    {
+        var baseUrl = CloudEndpoints.NormalizeApiBaseUrl(SettingsManager.Load().CloudApi.BaseUrl);
+
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{baseUrl}/api/health");
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            using var response = await CloudStatusHttp.SendAsync(request, cts.Token);
+            if (response.IsSuccessStatusCode)
+            {
+                CloudStatusText = "Cloud: Online";
+                CloudStatusBrush = Brushes.LimeGreen;
+            }
+            else
+            {
+                CloudStatusText = "Cloud: Offline";
+                CloudStatusBrush = Brushes.IndianRed;
+            }
+        }
+        catch
+        {
+            CloudStatusText = "Cloud: Offline";
+            CloudStatusBrush = Brushes.IndianRed;
+        }
     }
 
     private void UpdateBackgroundForCurrentView()

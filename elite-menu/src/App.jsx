@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChefHat, CreditCard, MonitorCog, ShieldCheck, Utensils } from 'lucide-react'
+import { ChefHat, CreditCard, MonitorCog, Utensils } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { BrowserRouter, Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { useCart } from './hooks/useCart'
@@ -15,6 +15,7 @@ import { ConfirmDialog } from './components/ui/ConfirmDialog'
 import { ErrorScreen } from './components/ui/ErrorScreen'
 import { LoadingScreen } from './components/ui/LoadingScreen'
 import { validateStaffLoginCode } from './utils/api'
+import { pingApi } from './utils/apiClient'
 
 const spring = { type: 'spring', stiffness: 300, damping: 34 }
 /** @internal history.state key for in-app back (cart → menu → hero) */
@@ -28,17 +29,53 @@ function portalHref(path) {
   return path
 }
 
+function CloudStatus({ className = '' }) {
+  const [online, setOnline] = useState(/** @type {boolean | null} */ (null))
+
+  useEffect(() => {
+    let cancelled = false
+    const controller = new AbortController()
+
+    async function check() {
+      try {
+        await pingApi({ signal: controller.signal })
+        if (!cancelled) setOnline(true)
+      } catch {
+        if (!cancelled) setOnline(false)
+      }
+    }
+
+    check()
+    const id = window.setInterval(check, 30000)
+    return () => {
+      cancelled = true
+      controller.abort()
+      window.clearInterval(id)
+    }
+  }, [])
+
+  const isOnline = online === true
+  const label = online == null ? 'Checking cloud' : isOnline ? 'Cloud online' : 'Cloud offline'
+
+  return (
+    <div className={`inline-flex items-center gap-2 rounded-full border border-champagne/10 bg-black/20 px-3 py-1.5 font-body text-[0.68rem] font-bold uppercase tracking-[0.14em] text-champagne/60 ${className}`}>
+      <span className={`h-2.5 w-2.5 rounded-full ${isOnline ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)]' : 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.65)]'}`} />
+      {label}
+    </div>
+  )
+}
+
 function HubHome() {
   const cards = [
-    { to: '/', title: 'Consumer Menu', desc: 'Guests scan, browse, and send orders.', icon: Utensils },
-    { to: '/server/index.html', title: 'Server', desc: 'Take table orders and manage pickup.', icon: MonitorCog, external: true },
-    { to: '/cashier.html', title: 'Cashier', desc: 'Release, complete, and manage checks.', icon: CreditCard, external: true },
-    { title: 'Kitchen', desc: 'Kitchen web workspace is coming soon.', icon: ChefHat, disabled: true },
-    { title: 'Admin', desc: 'Cloud admin workspace placeholder.', icon: ShieldCheck, disabled: true },
+    { to: '/menu', title: 'Consumer Menu', desc: 'Guests scan, browse, and send orders.', icon: Utensils },
+    { to: '/server', title: 'Server', desc: 'Take table orders and manage pickup.', icon: MonitorCog },
+    { to: '/cashier', title: 'Cashier', desc: 'Release, complete, and manage checks.', icon: CreditCard },
+    { to: '/kitchen', title: 'Kitchen', desc: 'Kitchen web workspace is coming soon.', icon: ChefHat },
   ]
 
   return (
-    <main className="min-h-[100svh] bg-midnight px-5 py-8 text-champagne">
+    <main className="relative min-h-[100svh] bg-midnight px-5 py-8 text-champagne">
+      <CloudStatus className="absolute right-5 top-5" />
       <section className="mx-auto flex max-w-4xl flex-col gap-8">
         <div className="text-center">
           <p className="font-body text-xs font-bold uppercase tracking-[0.28em] text-gold/80">EliteRestaurant Cloud</p>
@@ -48,7 +85,7 @@ function HubHome() {
           </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          {cards.map(({ to, title, desc, icon: Icon, external, disabled }) => {
+          {cards.map(({ to, title, desc, icon: Icon }) => {
             const content = (
               <>
                 <Icon className="h-8 w-8 text-gold" />
@@ -56,17 +93,43 @@ function HubHome() {
                 <p className="mt-2 font-body text-sm leading-relaxed text-champagne/60">{desc}</p>
               </>
             )
-            const className = `rounded-3xl border border-champagne/10 bg-midnight-2 p-5 shadow-[0_10px_30px_rgba(0,0,0,0.28)] transition ${disabled ? 'cursor-not-allowed opacity-55' : 'hover:border-gold/50 hover:bg-midnight-3'}`
-            if (disabled) {
-              return <div key={title} className={className} aria-disabled="true">{content}</div>
-            }
-            return external ? (
-              <a key={to} href={portalHref(to)} className={className}>{content}</a>
-            ) : (
-              <Link key={to} to={to} className={className}>{content}</Link>
-            )
+            const className = 'rounded-3xl border border-champagne/10 bg-midnight-2 p-5 shadow-[0_10px_30px_rgba(0,0,0,0.28)] transition hover:border-gold/50 hover:bg-midnight-3'
+            return <Link key={to} to={to} className={className}>{content}</Link>
           })}
         </div>
+      </section>
+    </main>
+  )
+}
+
+function PortalRedirect({ path }) {
+  useEffect(() => {
+    window.location.replace(portalHref(path))
+  }, [path])
+
+  return (
+    <main className="flex min-h-[100svh] items-center justify-center bg-midnight px-5 text-center text-champagne">
+      <div>
+        <CloudStatus className="mb-5" />
+        <p className="font-body text-sm text-champagne/65">Opening staff portal...</p>
+      </div>
+    </main>
+  )
+}
+
+function KitchenPage() {
+  return (
+    <main className="relative flex min-h-[100svh] items-center justify-center bg-midnight px-5 text-center text-champagne">
+      <CloudStatus className="absolute right-5 top-5" />
+      <section className="max-w-md rounded-3xl border border-champagne/10 bg-midnight-2 p-6">
+        <ChefHat className="mx-auto h-10 w-10 text-gold" />
+        <h1 className="mt-4 font-display text-3xl italic">Kitchen</h1>
+        <p className="mt-3 font-body text-sm leading-relaxed text-champagne/60">
+          Kitchen web workspace is coming soon. The cloud API connection is monitored above.
+        </p>
+        <Link to="/" className="mt-5 inline-flex min-h-[44px] items-center font-body text-xs font-bold uppercase tracking-[0.18em] text-gold">
+          Back to hub
+        </Link>
       </section>
     </main>
   )
@@ -374,8 +437,12 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<CustomerMenuApp />} />
+        <Route path="/" element={<HubHome />} />
+        <Route path="/menu/*" element={<CustomerMenuApp />} />
         <Route path="/order/*" element={<CustomerMenuApp />} />
+        <Route path="/server" element={<PortalRedirect path="/server/index.html" />} />
+        <Route path="/cashier" element={<PortalRedirect path="/cashier.html" />} />
+        <Route path="/kitchen" element={<KitchenPage />} />
         <Route path="/reservation" element={<ReservationPage />} />
         <Route path="/login" element={<HubHome />} />
         <Route path="*" element={<Navigate to="/" replace />} />

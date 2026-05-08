@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using EliteRestaurant.Core.Utils;
 
 namespace EliteRestaurantPro.Utils;
 
@@ -8,7 +9,7 @@ namespace EliteRestaurantPro.Utils;
 public static class PublicMenuUrlHelper
 {
     /// <summary>Production API (and static menu from wwwroot) listen here.</summary>
-    public const int DefaultApiHttpPort = 5223;
+    public const int DefaultApiHttpPort = 8080;
 
     /// <summary>Vite dev server with <c>host: true</c> (LAN phones load SPA here; <c>/api</c> is proxied to the API).</summary>
     public const int ViteDevMenuPort = 5173;
@@ -144,10 +145,14 @@ public static class PublicMenuUrlHelper
     /// <param name="port">Usually <see cref="QrBasePort"/> (5173 in DEBUG, 5223 in release) for correct QR in dev vs production.</param>
     public static string? SuggestBaseUrlForPhones(int? port = null)
     {
+#if !DEBUG
+        return CloudEndpoints.ProductionApiBaseUrl;
+#else
         var p = port ?? QrBasePort;
         var ip = GetPreferredLanIPv4();
         if (string.IsNullOrEmpty(ip)) return null;
         return $"http://{ip}:{p}";
+#endif
     }
 
     /// <summary>

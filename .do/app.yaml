@@ -34,4 +34,4 @@ services:
         value: REPLACE_WITH_LONG_RANDOM_SECRET
       - key: Cors__AllowedOrigins__0
         scope: RUN_TIME
-        value: REPLACE_WITH_DIGITALOCEAN_APP_URL
+        value: https://starfish-app-owtoz.ondigitalocean.app

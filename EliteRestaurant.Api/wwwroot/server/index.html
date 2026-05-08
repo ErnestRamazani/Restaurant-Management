@@ -842,7 +842,7 @@
         <input id="pin" placeholder="PIN">
         <button type="button" id="btnLogin">Login as Server</button>
       </div>
-      <p id="loginFileWarning" class="danger hidden" style="margin-top:10px;">This page was opened as a local file. Login will not work until you open it from the API site (for example <span class="mono">http://localhost:5223/index.html</span>).</p>
+      <p id="loginFileWarning" class="danger hidden" style="margin-top:10px;">This page was opened as a local file. Login will not work until you open it from the API site (for example <span class="mono">https://starfish-app-owtoz.ondigitalocean.app/server/</span>).</p>
       <div id="loginMessage" class="muted" style="margin-top:10px;min-height:1.25em;white-space:pre-wrap;"></div>
       <p class="muted">After <span class="mono">SeedRunner</span> defaults: e.g. <strong class="mono">SRV01</strong> / PIN <strong class="mono">3101</strong>.</p>
       <p class="muted">This portal is server-only. No reservation flow in this phase.</p>
@@ -1864,7 +1864,7 @@
         res = await api("/api/auth/login", "POST", { staffId, pin, portal: "Server" }, false);
       } catch (e) {
         setLoginMessage(
-          "Could not reach the API. Use the hosted URL (for example http://localhost:5223/index.html), confirm the API is running, and check the browser console for details.\n\n"
+          "Could not reach the API. Use the hosted URL (for example https://starfish-app-owtoz.ondigitalocean.app/server/), confirm the API is running, and check the browser console for details.\n\n"
             + (e && e.message ? e.message : String(e)),
           "error"
         );

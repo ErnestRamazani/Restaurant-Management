@@ -484,7 +484,7 @@
         <input id="pin" placeholder="PIN">
         <button type="button" id="btnLogin">Login as Cashier</button>
       </div>
-      <p id="loginFileWarning" class="danger hidden" style="margin-top:10px;">This page was opened as a local file. Login will not work until you open it from the API site (for example <span class="mono">http://localhost:5223/cashier-order.html</span>).</p>
+      <p id="loginFileWarning" class="danger hidden" style="margin-top:10px;">This page was opened as a local file. Login will not work until you open it from the API site (for example <span class="mono">https://starfish-app-owtoz.ondigitalocean.app/cashier-order.html</span>).</p>
       <div id="loginMessage" class="muted" style="margin-top:10px;min-height:1.25em;white-space:pre-wrap;"></div>
       <p class="muted">Use cashier credentials. For payments and pending tickets, open the <a href="/cashier.html" style="color:#b45309;">full Cashier Portal</a>. Servers: <a href="/index.html" style="color:#b45309;">Server Portal</a>.</p>
     </div>
@@ -1036,7 +1036,7 @@
         res = await api("/api/auth/login", "POST", { staffId, pin, portal: "Cashier" }, false);
       } catch (e) {
         setLoginMessage(
-          "Could not reach the API. Open this page from the API host (for example http://localhost:5223/cashier-order.html).\n\n"
+          "Could not reach the API. Open this page from the API host (for example https://starfish-app-owtoz.ondigitalocean.app/cashier-order.html).\n\n"
             + (e && e.message ? e.message : String(e)),
           "error"
         );

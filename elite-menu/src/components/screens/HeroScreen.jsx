@@ -86,11 +86,13 @@ export function HeroScreen({ config, onEnterMenu, onReservation, onStaffLogin })
           transition={{ delay: 0.2, duration: 0.55 }}
         >
           {logoUrl ? (
-            <img
+            <motion.img
               src={logoSrc}
               alt=""
               className="mb-1 h-auto w-full max-w-[min(100%,32rem)] object-contain"
               style={{ maxHeight: 'min(300px, 55vw)', minHeight: 'min(150px, 28vw)' }}
+              animate={{ scale: [1, 1.018, 1] }}
+              transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
             />
           ) : null}
           <h1

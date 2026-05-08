@@ -13,9 +13,7 @@ public sealed class OrderHubClient : IAsyncDisposable
     public async Task ConnectAsync(CancellationToken cancellationToken = default)
     {
         var settings = SettingsManager.Load().CloudApi;
-        var baseUrl = (settings.BaseUrl ?? string.Empty).Trim().TrimEnd('/');
-        if (string.IsNullOrWhiteSpace(baseUrl))
-            throw new InvalidOperationException("Cloud API BaseUrl is not configured.");
+        var baseUrl = CloudEndpoints.NormalizeApiBaseUrl(settings.BaseUrl);
 
         _connection = new HubConnectionBuilder()
             .WithUrl($"{baseUrl}/hubs/order", options =>

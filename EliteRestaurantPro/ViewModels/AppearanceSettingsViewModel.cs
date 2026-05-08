@@ -61,7 +61,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     private string _databaseUsername = string.Empty;
     private string _pendingDatabasePassword = string.Empty;
     private bool _hasSavedDatabasePassword;
-    private string _publicMenuBaseUrl = "http://localhost:5223";
+    private string _publicMenuBaseUrl = CloudEndpoints.ProductionApiBaseUrl;
     private string _customerMenuTagline = string.Empty;
     private string _staffLoginPasscode = "er4124";
 
@@ -628,8 +628,8 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         TicketFooterText = business.TicketFooterText;
         TaxIdLegalInfo = business.TaxIdLegalInfo;
         PublicMenuBaseUrl = string.IsNullOrWhiteSpace(business.PublicMenuBaseUrl)
-            ? (PublicMenuUrlHelper.SuggestBaseUrlForPhones() ?? "http://localhost:5223")
-            : business.PublicMenuBaseUrl.Trim();
+            ? (PublicMenuUrlHelper.SuggestBaseUrlForPhones() ?? CloudEndpoints.ProductionApiBaseUrl)
+            : CloudEndpoints.NormalizeApiBaseUrl(business.PublicMenuBaseUrl);
         CustomerMenuTagline = business.CustomerMenuTagline ?? string.Empty;
         StaffLoginPasscode = string.IsNullOrWhiteSpace(business.StaffLoginPasscode)
             ? "er4124"
@@ -659,7 +659,8 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         _settings.BusinessProfile.TaxIdLegalInfo = TaxIdLegalInfo.Trim();
         _settings.BusinessProfile.PublicMenuBaseUrl = (PublicMenuBaseUrl ?? string.Empty).Trim();
         if (string.IsNullOrWhiteSpace(_settings.BusinessProfile.PublicMenuBaseUrl))
-            _settings.BusinessProfile.PublicMenuBaseUrl = "http://localhost:5223";
+            _settings.BusinessProfile.PublicMenuBaseUrl = CloudEndpoints.ProductionApiBaseUrl;
+        _settings.BusinessProfile.PublicMenuBaseUrl = CloudEndpoints.NormalizeApiBaseUrl(_settings.BusinessProfile.PublicMenuBaseUrl);
         _settings.BusinessProfile.CustomerMenuTagline = string.IsNullOrWhiteSpace(CustomerMenuTagline)
             ? null
             : CustomerMenuTagline.Trim();
@@ -671,7 +672,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         RefreshBusinessProfileBindings();
         var msg = "Business profile saved.";
         if (PublicMenuUrlHelper.LooksLikeLocalHostOnly(_settings.BusinessProfile.PublicMenuBaseUrl))
-            msg += " QR: localhost will not work on customers’ phones on Wi-Fi — set this PC’s LAN URL (e.g. “Use phone-friendly URL for QR”) and re-print QRs.";
+            msg += " QR: localhost will not work on customers’ phones on Wi-Fi — use the hosted cloud URL or this PC’s LAN URL and re-print QRs.";
         StatusMessage = msg;
     }
 
@@ -1088,7 +1089,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         {
             var baseUrl = PublicMenuUrlHelper.ResolveQrBaseUrl(PublicMenuBaseUrl);
             if (string.IsNullOrWhiteSpace(baseUrl))
-                baseUrl = PublicMenuUrlHelper.SuggestBaseUrlForPhones() ?? "http://localhost:5223";
+                baseUrl = PublicMenuUrlHelper.SuggestBaseUrlForPhones() ?? CloudEndpoints.ProductionApiBaseUrl;
 
             using var db = new AppDbContext();
             var tables = db.Tables.AsNoTracking().OrderBy(t => t.TableNumber).ToList();

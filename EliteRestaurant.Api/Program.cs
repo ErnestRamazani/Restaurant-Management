@@ -151,9 +151,8 @@ try
         return 8080;
     }
 
-    const string CorsPolicyRestrictToConfiguredOrigins = "RestrictToConfiguredOrigins";
-    var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-                      ?? Array.Empty<string>();
+    const string CorsPolicyAllowAll = "AllowAllOrigins";
+    const string ProductionOrigin = "https://starfish-app-owtoz.ondigitalocean.app";
 
     var httpPort = GetHttpPort();
 
@@ -164,21 +163,11 @@ try
 
     builder.Services.AddCors(options =>
     {
-        options.AddPolicy(CorsPolicyRestrictToConfiguredOrigins, policy =>
+        options.AddPolicy(CorsPolicyAllowAll, policy =>
         {
-            if (corsOrigins.Length > 0)
-            {
-                policy.WithOrigins(corsOrigins)
-                    .AllowAnyHeader()
-                    .AllowAnyMethod();
-            }
-            else
-            {
-                // Same-origin browser hosting does not require CORS. Empty origin list means no cross-origin access.
-                policy.SetIsOriginAllowed(_ => false)
-                    .AllowAnyHeader()
-                    .AllowAnyMethod();
-            }
+            policy.AllowAnyOrigin()
+                .AllowAnyHeader()
+                .AllowAnyMethod();
         });
     });
 
@@ -218,7 +207,7 @@ try
                 "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
                 "style-src 'self' 'unsafe-inline'; " +
                 "img-src 'self' blob: data:; " +
-                "connect-src 'self';";
+                $"connect-src 'self' {ProductionOrigin};";
         }
 
         await next();
@@ -234,7 +223,7 @@ try
         });
     }
 
-    app.UseCors(CorsPolicyRestrictToConfiguredOrigins);
+    app.UseCors(CorsPolicyAllowAll);
     app.UseRateLimiter();
     app.UseAuthentication();
     app.UseAuthorization();

@@ -62,7 +62,7 @@
         <input id="pin" placeholder="PIN">
         <button type="button" id="btnLogin">Login as Cashier</button>
       </div>
-      <p id="loginFileWarning" class="danger hidden" style="margin-top:10px;">This page was opened as a local file. Login will not work until you open it from the API site (for example <span class="mono">http://localhost:5223/cashier.html</span>).</p>
+      <p id="loginFileWarning" class="danger hidden" style="margin-top:10px;">This page was opened as a local file. Login will not work until you open it from the API site (for example <span class="mono">https://starfish-app-owtoz.ondigitalocean.app/cashier.html</span>).</p>
       <div id="loginMessage" class="muted" style="margin-top:10px;min-height:1.25em;white-space:pre-wrap;"></div>
       <p class="muted">After <span class="mono">SeedRunner</span> defaults: sign-in <strong class="mono">CSH01</strong> or <strong class="mono">CSH02</strong>, PIN <strong class="mono">4101</strong> / <strong class="mono">4102</strong>.</p>
       <p class="muted">Same flows as the desktop cashier: take order (→ pending validation), orders &amp; payment, reservations (arrived), menu.</p>
@@ -829,7 +829,7 @@
         res = await api("/api/auth/login", "POST", { staffId, pin, portal: "Cashier" }, false);
       } catch (e) {
         setLoginMessage(
-          "Could not reach the API. Use the hosted URL (for example http://localhost:5223/cashier.html), confirm the API is running, and check the browser console for details.\n\n"
+          "Could not reach the API. Use the hosted URL (for example https://starfish-app-owtoz.ondigitalocean.app/cashier.html), confirm the API is running, and check the browser console for details.\n\n"
             + (e && e.message ? e.message : String(e)),
           "error"
         );

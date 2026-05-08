@@ -22,9 +22,8 @@ public sealed class EliteApiClient
     public void ConfigureFromSettings()
     {
         var settings = SettingsManager.Load().CloudApi;
-        var baseUrl = (settings.BaseUrl ?? string.Empty).Trim();
-        if (!string.IsNullOrWhiteSpace(baseUrl))
-            _http.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
+        var baseUrl = CloudEndpoints.NormalizeApiBaseUrl(settings.BaseUrl);
+        _http.BaseAddress = new Uri(baseUrl + "/");
 
         _http.Timeout = TimeSpan.FromSeconds(20);
         _http.DefaultRequestHeaders.Authorization = string.IsNullOrWhiteSpace(settings.AccessToken)
@@ -37,6 +36,19 @@ public sealed class EliteApiClient
         using var response = await SendWithRetryAsync(() => _http.GetAsync(Normalize(path), cancellationToken), cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadFromJsonAsync<T>(JsonOptions, cancellationToken);
+    }
+
+    public async Task<bool> CanReachApiAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var response = await _http.GetAsync("api/health", cancellationToken);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     public async Task<TResponse?> PostAsync<TRequest, TResponse>(string path, TRequest payload, CancellationToken cancellationToken = default)

@@ -2,6 +2,27 @@ using System.Text.Json.Serialization;
 
 namespace EliteRestaurant.Core.Utils;
 
+public static class CloudEndpoints
+{
+    public const string ProductionApiBaseUrl = "https://starfish-app-owtoz.ondigitalocean.app";
+    public const string LocalApiBaseUrl = "http://localhost:8080";
+
+    public static string NormalizeApiBaseUrl(string? baseUrl, bool preferProduction = true)
+    {
+        var trimmed = (baseUrl ?? string.Empty).Trim().TrimEnd('/');
+        if (string.IsNullOrWhiteSpace(trimmed))
+            return preferProduction ? ProductionApiBaseUrl : LocalApiBaseUrl;
+
+        if (trimmed.Contains("localhost:5223", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.Contains("127.0.0.1:5223", StringComparison.OrdinalIgnoreCase))
+        {
+            return preferProduction ? ProductionApiBaseUrl : LocalApiBaseUrl;
+        }
+
+        return trimmed;
+    }
+}
+
 public sealed class AppSettings
 {
     public BusinessProfileSettings BusinessProfile { get; set; } = new();
@@ -31,7 +52,7 @@ public sealed class DatabaseSettings
 
 public sealed class CloudApiSettings
 {
-    public string BaseUrl { get; set; } = "http://localhost:5223";
+    public string BaseUrl { get; set; } = CloudEndpoints.ProductionApiBaseUrl;
     public string AccessToken { get; set; } = string.Empty;
     public DateTime? TokenExpiresAtUtc { get; set; }
 }
@@ -46,7 +67,7 @@ public sealed class BusinessProfileSettings
     public string LogoPath { get; set; } = string.Empty;
 
     /// <summary>Base URL for customer menu QR links (no trailing slash), e.g. http://192.168.1.50:5223</summary>
-    public string PublicMenuBaseUrl { get; set; } = "http://localhost:5223";
+    public string PublicMenuBaseUrl { get; set; } = CloudEndpoints.ProductionApiBaseUrl;
 
     /// <summary>Optional tagline for the public customer menu (e.g. Fine Dining · Est. 2024).</summary>
     public string? CustomerMenuTagline { get; set; }
