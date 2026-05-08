@@ -43,6 +43,7 @@ public class AppDbContext : DbContext
 
     public static Func<IReadOnlyList<CloudSyncOperation>, CancellationToken, Task<IReadOnlyList<CloudSyncResult>>>?
         CloudSyncDispatcher { get; set; }
+    public static Action? CloudSyncQueued { get; set; }
 
     [Obsolete("Use DatabaseInitializer.Initialize() (EF Core migrations + optional sample seed).")]
     public static void Initialize() => DatabaseInitializer.Initialize();
@@ -75,28 +76,36 @@ public class AppDbContext : DbContext
 
     public override int SaveChanges()
     {
-        PrepareCloudSyncOperations(CancellationToken.None).GetAwaiter().GetResult();
-        return base.SaveChanges(acceptAllChangesOnSuccess: true);
+        var queued = QueueCloudSyncOperations();
+        var result = base.SaveChanges(acceptAllChangesOnSuccess: true);
+        NotifyCloudSyncQueued(queued);
+        return result;
     }
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
-        PrepareCloudSyncOperations(CancellationToken.None).GetAwaiter().GetResult();
-        return base.SaveChanges(acceptAllChangesOnSuccess);
+        var queued = QueueCloudSyncOperations();
+        var result = base.SaveChanges(acceptAllChangesOnSuccess);
+        NotifyCloudSyncQueued(queued);
+        return result;
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        await PrepareCloudSyncOperations(cancellationToken);
-        return await base.SaveChangesAsync(acceptAllChangesOnSuccess: true, cancellationToken);
+        var queued = QueueCloudSyncOperations();
+        var result = await base.SaveChangesAsync(acceptAllChangesOnSuccess: true, cancellationToken);
+        NotifyCloudSyncQueued(queued);
+        return result;
     }
 
     public override async Task<int> SaveChangesAsync(
         bool acceptAllChangesOnSuccess,
         CancellationToken cancellationToken = default)
     {
-        await PrepareCloudSyncOperations(cancellationToken);
-        return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        var queued = QueueCloudSyncOperations();
+        var result = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        NotifyCloudSyncQueued(queued);
+        return result;
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -266,11 +275,10 @@ public class AppDbContext : DbContext
             _ => DateTime.SpecifyKind(v, DateTimeKind.Utc)
         };
 
-    private async Task PrepareCloudSyncOperations(CancellationToken cancellationToken)
+    private int QueueCloudSyncOperations()
     {
-        var dispatcher = CloudSyncDispatcher;
-        if (dispatcher is null)
-            return;
+        if (CloudSyncQueued is null && CloudSyncDispatcher is null)
+            return 0;
 
         ChangeTracker.DetectChanges();
         var operations = ChangeTracker.Entries()
@@ -279,27 +287,24 @@ public class AppDbContext : DbContext
             .ToList();
 
         if (operations.Count == 0)
+            return 0;
+
+        QueueFailedOperations(operations, "Queued for cloud sync.");
+        return operations.Count;
+    }
+
+    private static void NotifyCloudSyncQueued(int queuedCount)
+    {
+        if (queuedCount <= 0)
             return;
 
-        IReadOnlyList<CloudSyncResult> results;
         try
         {
-            results = await dispatcher(operations, cancellationToken);
+            CloudSyncQueued?.Invoke();
         }
-        catch (Exception ex)
+        catch
         {
-            QueueFailedOperations(operations, ex.GetBaseException().Message);
-            return;
-        }
-
-        var resultMap = results.ToDictionary(r => r.IdempotencyKey, StringComparer.OrdinalIgnoreCase);
-        foreach (var operation in operations)
-        {
-            if (resultMap.TryGetValue(operation.IdempotencyKey, out var result) && result.Success)
-                continue;
-
-            QueueFailedOperation(operation, resultMap.GetValueOrDefault(operation.IdempotencyKey)?.Message
-                                          ?? "Cloud rejected the operation.");
+            // Saving local data must never fail because the background sync notifier failed.
         }
     }
 

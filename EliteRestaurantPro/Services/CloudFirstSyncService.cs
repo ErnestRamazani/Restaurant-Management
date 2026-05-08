@@ -20,7 +20,7 @@ public static class CloudFirstSyncService
 
     public static void Start()
     {
-        AppDbContext.CloudSyncDispatcher = DispatchAsync;
+        AppDbContext.CloudSyncQueued = () => _ = RetryPendingAsync();
         _timer ??= new Timer(
             async _ => await RetryPendingAsync(),
             null,
@@ -34,7 +34,7 @@ public static class CloudFirstSyncService
     {
         _timer?.Dispose();
         _timer = null;
-        AppDbContext.CloudSyncDispatcher = null;
+        AppDbContext.CloudSyncQueued = null;
     }
 
     public static async Task<IReadOnlyList<CloudSyncResult>> DispatchAsync(
