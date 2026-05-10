@@ -366,13 +366,13 @@ export function CartScreen({
       </ConfirmDialog>
 
       <BottomSheet open={tablePickerOpen} onClose={() => setTablePickerOpen(false)}>
-        <div className="px-5 pt-0 pb-2">
+        <div className="px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-0">
           <h2 className="font-display text-2xl italic text-champagne">Select your table</h2>
           <GoldDivider className="my-3" />
           <p className="mb-3 font-body text-[0.8rem] text-[var(--text-muted)]">
             Tap a table so your server can match this order to your seat.
           </p>
-          <ul className="max-h-[50svh] space-y-1 overflow-y-auto pb-2" role="listbox">
+          <ul className="space-y-1 pb-2" role="listbox">
             {tables.map((t) => {
               const id = Number(t.id)
               const selected = manualTableId === id

@@ -1,7 +1,39 @@
 import { AnimatePresence, animate, motion, useMotionValue } from 'framer-motion'
 import { useCallback, useEffect, useRef } from 'react'
 
+/** Max squared movement (px²) to count as a tap on the backdrop (not a scroll/drag). */
+const BACKDROP_TAP_THRESHOLD_SQ = 24 * 24
+
+function TapBackdrop({ onClose }) {
+  const startRef = useRef(/** @type {{ x: number; y: number; pointerId: number } | null} */ (null))
+
+  return (
+    <div
+      role="presentation"
+      className="absolute inset-0 bg-black/70"
+      onPointerDown={(e) => {
+        if (e.target === e.currentTarget) {
+          startRef.current = { x: e.clientX, y: e.clientY, pointerId: e.pointerId }
+        }
+      }}
+      onPointerUp={(e) => {
+        if (e.target !== e.currentTarget) return
+        const start = startRef.current
+        startRef.current = null
+        if (!start || start.pointerId !== e.pointerId) return
+        const dx = e.clientX - start.x
+        const dy = e.clientY - start.y
+        if (dx * dx + dy * dy <= BACKDROP_TAP_THRESHOLD_SQ) onClose()
+      }}
+      onPointerCancel={() => {
+        startRef.current = null
+      }}
+    />
+  )
+}
+
 export function BottomSheet({ open, onClose, children }) {
+  /** The scrollable panel (same node that has translateY). Its scrollTop is authoritative for swipe logic. */
   const sheetRef = useRef(/** @type {HTMLDivElement | null} */ (null))
   const y = useMotionValue(0)
 
@@ -33,8 +65,8 @@ export function BottomSheet({ open, onClose, children }) {
     }
   }, [open, y])
 
-  // Non-passive touchmove on the scrollable sheet is required so preventDefault()
-  // can stop the overflow scroll on mobile (window/pointer path cannot).
+  // Swipe down to dismiss when this sheet’s *own* scroll position is at the top (scrollTop === 0).
+  // Listeners are on the scrolling motion node so scrollTop matches user scrolling (fixes nested-list issues).
   useEffect(() => {
     const el = sheetRef.current
     if (!el || !open) return
@@ -47,13 +79,6 @@ export function BottomSheet({ open, onClose, children }) {
     /** @param {TouchEvent} e */
     function onTouchStart(e) {
       if (e.touches.length !== 1) return
-      if (
-        e.target instanceof Element &&
-        e.target.closest('button, input, textarea, select, a, [role="button"], [data-no-drag]')
-      ) {
-        return
-      }
-
       startY = e.touches[0].clientY
       startScrollTop = el.scrollTop
       dragging = false
@@ -69,7 +94,6 @@ export function BottomSheet({ open, onClose, children }) {
       if (!decided) {
         if (Math.abs(dy) < 8) return
         decided = true
-
         if (dy > 0 && startScrollTop <= 0) {
           dragging = true
         } else {
@@ -96,20 +120,16 @@ export function BottomSheet({ open, onClose, children }) {
       }
     }
 
-    const touchStartOpts = { passive: true }
-    const touchMoveOpts = { passive: false }
-    const touchEndOpts = { passive: true }
-
-    el.addEventListener('touchstart', onTouchStart, touchStartOpts)
-    el.addEventListener('touchmove', onTouchMove, touchMoveOpts)
-    el.addEventListener('touchend', onTouchEnd, touchEndOpts)
-    el.addEventListener('touchcancel', onTouchEnd, touchEndOpts)
+    el.addEventListener('touchstart', onTouchStart, { passive: true })
+    el.addEventListener('touchmove', onTouchMove, { passive: false })
+    el.addEventListener('touchend', onTouchEnd)
+    el.addEventListener('touchcancel', onTouchEnd)
 
     return () => {
-      el.removeEventListener('touchstart', onTouchStart, touchStartOpts)
-      el.removeEventListener('touchmove', onTouchMove, touchMoveOpts)
-      el.removeEventListener('touchend', onTouchEnd, touchEndOpts)
-      el.removeEventListener('touchcancel', onTouchEnd, touchEndOpts)
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove', onTouchMove)
+      el.removeEventListener('touchend', onTouchEnd)
+      el.removeEventListener('touchcancel', onTouchEnd)
     }
   }, [open, dismiss, y])
 
@@ -122,25 +142,20 @@ export function BottomSheet({ open, onClose, children }) {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
-          <button
-            type="button"
-            aria-label="Close"
-            className="absolute inset-0 bg-black/70"
-            onClick={dismiss}
-          />
+          <TapBackdrop onClose={dismiss} />
 
           <motion.div
             ref={sheetRef}
             role="dialog"
             aria-modal="true"
-            className="relative z-10 max-h-[88svh] overflow-y-auto rounded-t-3xl bg-midnight-2 shadow-2xl"
+            className="relative z-10 flex max-h-[88svh] flex-col overflow-y-auto overflow-x-hidden overscroll-y-contain rounded-t-3xl bg-midnight-2 shadow-2xl [-webkit-overflow-scrolling:touch]"
             style={{ y }}
           >
-            <div className="flex justify-center pb-1 pt-3">
+            <div className="sticky top-0 z-10 flex shrink-0 flex-col items-center bg-midnight-2 px-4 pb-2 pt-3" aria-hidden>
               <div className="h-1 w-10 rounded-full bg-champagne/20" />
             </div>
 
-            {children}
+            <div className="flex flex-col">{children}</div>
           </motion.div>
         </motion.div>
       )}

@@ -1,14 +1,21 @@
 export const PRODUCTION_API_ORIGIN = 'https://starfish-app-owtoz.ondigitalocean.app'
+/** Use when you want the phone to talk to the API directly (see README / LAN testing). */
 export const DEVELOPMENT_API_ORIGIN = 'http://localhost:8080'
 
-const configuredBase = import.meta.env.VITE_API_BASE_URL
-const defaultBase = import.meta.env.DEV ? DEVELOPMENT_API_ORIGIN : PRODUCTION_API_ORIGIN
+const configuredBase = import.meta.env.VITE_API_BASE_URL?.trim()
 
-export const API_ORIGIN = (configuredBase && configuredBase.trim())
-  ? configuredBase.trim().replace(/\/$/, '')
-  : defaultBase
+/**
+ * In Vite `dev`, default to same-origin `/api` so the dev proxy works from any device on your LAN
+ * (e.g. http://192.168.x.x:5173 → proxy → API on the PC). Override with VITE_API_BASE_URL if needed.
+ */
+export const API_ORIGIN =
+  configuredBase && configuredBase.length > 0
+    ? configuredBase.replace(/\/$/, '')
+    : import.meta.env.DEV
+      ? ''
+      : PRODUCTION_API_ORIGIN
 
-export const API_BASE = `${API_ORIGIN}/api`
+export const API_BASE = API_ORIGIN ? `${API_ORIGIN}/api` : '/api'
 
 export async function pingApi(options = {}) {
   const response = await fetch(`${API_BASE}/health`, {

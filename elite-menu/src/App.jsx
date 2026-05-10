@@ -23,20 +23,25 @@ const H = 'elite'
 
 /** Staff HTML portals live on the API host (`wwwroot`). Never use a relative path when the menu PWA is on another origin. */
 function portalHref(path) {
-  if (window.location.port === '5173') {
-    return `http://${window.location.hostname}:8080${path}`
+  const p = path.startsWith('/') ? path : `/${path}`
+  // Vite dev: always open staff portals on the API port of the **same machine** you used to load the menu (LAN IP works).
+  if (import.meta.env.DEV && window.location.port === '5173') {
+    return `http://${window.location.hostname}:8080${p}`
   }
 
   try {
+    if (!API_ORIGIN) {
+      return p
+    }
     const apiOrigin = new URL(API_ORIGIN).origin
     if (apiOrigin !== window.location.origin) {
-      return `${apiOrigin}${path.startsWith('/') ? path : `/${path}`}`
+      return `${apiOrigin}${p}`
     }
   } catch {
     /* fall through */
   }
 
-  return path.startsWith('/') ? path : `/${path}`
+  return p
 }
 
 function CloudStatus({ className = '' }) {
