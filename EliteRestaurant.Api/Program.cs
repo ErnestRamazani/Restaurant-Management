@@ -2,8 +2,11 @@ using System.Net;
 using System.Threading.RateLimiting;
 using EliteRestaurant.Api;
 using EliteRestaurant.Api.Hubs;
+using EliteRestaurant.Api.Notifications;
 using EliteRestaurant.Api.Security;
+using EliteRestaurant.Api.Services;
 using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Reservations;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
@@ -99,7 +102,8 @@ try
                 {
                     var accessToken = context.Request.Query["access_token"].ToString();
                     if (!string.IsNullOrWhiteSpace(accessToken)
-                        && context.HttpContext.Request.Path.StartsWithSegments("/hubs/order"))
+                        && (context.HttpContext.Request.Path.StartsWithSegments("/hubs/order")
+                            || context.HttpContext.Request.Path.StartsWithSegments("/hubs/reservation-floor")))
                     {
                         context.Token = accessToken;
                     }
@@ -121,6 +125,20 @@ try
         options.AddPolicy("StaffAny", policy => policy.RequireAuthenticatedUser());
     });
     builder.Services.AddScoped<EliteRestaurant.Core.Reporting.AdminReportAggregationService>();
+    builder.Services.Configure<ReservationSchedulingOptions>(builder.Configuration.GetSection("ReservationScheduling"));
+    builder.Services.Configure<ReservationAutomationOptions>(builder.Configuration.GetSection("ReservationAutomation"));
+    builder.Services.AddScoped<PlacementUnitClusterResolver>();
+    builder.Services.AddScoped<ReservationSchedulingService>();
+    builder.Services.AddScoped<FloorSnapshotBuilder>();
+    builder.Services.AddSingleton<ReservationFloorRealtimePublisher>();
+    builder.Services.AddSingleton<INotificationPublisher, LogNotificationPublisher>();
+    if (!builder.Environment.IsEnvironment("Testing"))
+    {
+        builder.Services.AddHostedService<ReservationNoShowProcessor>();
+        builder.Services.AddHostedService<ReservationReminderProcessor>();
+        builder.Services.AddHostedService<ReservationLifecycleProcessor>();
+    }
+
     builder.Services.AddSignalR();
 
     builder.Services.AddRateLimiter(options =>
@@ -293,6 +311,7 @@ try
     });
     app.MapControllers();
     app.MapHub<OrderHub>("/hubs/order");
+    app.MapHub<ReservationFloorHub>("/hubs/reservation-floor");
     // Do not serve SPA index.html for /api/* — unknown API routes used to fall through and return HTML with 200,
     // which broke JSON clients (e.g. Create Order bundle on older deployments).
     app.MapFallback(async (HttpContext context) =>

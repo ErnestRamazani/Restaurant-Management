@@ -2,6 +2,7 @@ using System.Text.Json;
 using EliteRestaurant.Api.Branding;
 using EliteRestaurant.Api.Dtos;
 using EliteRestaurant.Api.Hubs;
+using EliteRestaurant.Api.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
@@ -23,7 +24,8 @@ public sealed class PublicMenuController(
     AppDbContext db,
     IWebHostEnvironment environment,
     IOptions<CurrencyPricingOptions> currencyPricingOptions,
-    IHubContext<OrderHub> hubContext) : ControllerBase
+    IHubContext<OrderHub> hubContext,
+    JwtTokenService jwtTokenService) : ControllerBase
 {
     private static readonly JsonSerializerOptions JsonStoreOptions = new()
     {
@@ -132,7 +134,17 @@ public sealed class PublicMenuController(
             return BadRequest(new StaffLoginCodeResponse(false, "Incorrect staff passcode."));
         }
 
-        return Ok(new StaffLoginCodeResponse(true));
+        var session = new AuthenticatedStaffSession(
+            Token: string.Empty,
+            EmployeeId: 0,
+            EmployeeUniqueId: "MENU-STAFF",
+            Name: "Menu Staff",
+            Role: "Server",
+            SignInId: "menu-staff",
+            Portal: "elite-menu",
+            ExpiresAtUtc: DateTime.UtcNow.AddHours(12));
+        var jwt = jwtTokenService.CreateToken(session, out var expiresAtUtc);
+        return Ok(new StaffLoginCodeResponse(true, null, jwt, expiresAtUtc));
     }
 
     [HttpGet("products")]

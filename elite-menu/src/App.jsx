@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChefHat, CreditCard, LayoutDashboard, MonitorCog, Utensils } from 'lucide-react'
+import { ChefHat, CreditCard, LayoutDashboard, Map, MonitorCog, Utensils } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { BrowserRouter, Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { useCart } from './hooks/useCart'
@@ -10,7 +10,7 @@ import { ConfirmScreen } from './components/screens/ConfirmScreen'
 import { HeroScreen } from './components/screens/HeroScreen'
 import { MenuScreen } from './components/screens/MenuScreen'
 import { ProductSheet } from './components/screens/ProductSheet'
-import { ReservationScreen } from './components/screens/ReservationScreen'
+import { ReservationFloorScreen } from './components/screens/ReservationFloorScreen'
 import { ConfirmDialog } from './components/ui/ConfirmDialog'
 import { ErrorScreen } from './components/ui/ErrorScreen'
 import { LoadingScreen } from './components/ui/LoadingScreen'
@@ -83,6 +83,7 @@ function CloudStatus({ className = '' }) {
 function HubHome() {
   const cards = [
     { to: '/', title: 'Consumer Menu', desc: 'Guests scan, browse, and send orders.', icon: Utensils },
+    { to: '/staff/floor', title: 'Reservation floor', desc: 'Live tables, check-in, and merge (staff token).', icon: Map },
     { to: '/staff/server', title: 'Server', desc: 'Take table orders and manage pickup.', icon: MonitorCog },
     { to: '/staff/cashier', title: 'Cashier', desc: 'Release, complete, and manage checks.', icon: CreditCard },
     { to: '/staff/kitchen', title: 'Kitchen', desc: 'Prep queue, receive tickets, mark ready — opens the kitchen portal.', icon: ChefHat },
@@ -442,6 +443,7 @@ export default function App() {
         <Route path="/staff/server" element={<PortalRedirect path="/server/index.html" />} />
         <Route path="/staff/cashier" element={<PortalRedirect path="/cashier/index.html" />} />
         <Route path="/staff/kitchen" element={<PortalRedirect path="/kitchen/index.html" />} />
+        <Route path="/staff/floor" element={<ReservationFloorScreen />} />
         <Route path="/staff/admin" element={<PortalRedirect path="/admin/index.html" />} />
         <Route path="/kitchen" element={<Navigate to="/staff/kitchen" replace />} />
         <Route path="/reservation" element={<ReservationPage />} />

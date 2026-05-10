@@ -19,7 +19,11 @@ public sealed record PublicMenuConfigDto(
 
 public sealed record StaffLoginCodeRequest(string? Code);
 
-public sealed record StaffLoginCodeResponse(bool Success, string? Message = null);
+public sealed record StaffLoginCodeResponse(
+    bool Success,
+    string? Message = null,
+    string? AccessToken = null,
+    DateTime? ExpiresAtUtc = null);
 
 public sealed class PublicProductDto
 {

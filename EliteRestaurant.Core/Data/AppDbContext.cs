@@ -36,6 +36,8 @@ public class AppDbContext : DbContext
     public DbSet<MoneyTransaction> Transactions => Set<MoneyTransaction>();
     public DbSet<CustomerProfile> CustomerProfiles => Set<CustomerProfile>();
     public DbSet<ReservationBooking> Reservations => Set<ReservationBooking>();
+    public DbSet<PlacementUnit> PlacementUnits => Set<PlacementUnit>();
+    public DbSet<ReservationEngagement> ReservationEngagements => Set<ReservationEngagement>();
     public DbSet<WaitlistEntry> WaitlistEntries => Set<WaitlistEntry>();
     public DbSet<SharedOrderDraft> SharedOrderDrafts => Set<SharedOrderDraft>();
     public DbSet<TabletSession> TabletSessions => Set<TabletSession>();
@@ -129,6 +131,8 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<MoneyTransaction>().ToTable("Transactions");
         modelBuilder.Entity<CustomerProfile>().ToTable("CustomerProfiles");
         modelBuilder.Entity<ReservationBooking>().ToTable("Reservations");
+        modelBuilder.Entity<PlacementUnit>().ToTable("PlacementUnits");
+        modelBuilder.Entity<ReservationEngagement>().ToTable("ReservationEngagements");
         modelBuilder.Entity<WaitlistEntry>().ToTable("WaitlistEntries");
         modelBuilder.Entity<SharedOrderDraft>().ToTable("SharedOrderDrafts");
         modelBuilder.Entity<TabletSession>().ToTable("TabletSessions");
@@ -165,6 +169,12 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<ReservationBooking>().HasIndex(r => r.UniqueId).IsUnique();
         modelBuilder.Entity<ReservationBooking>().HasIndex(r => r.ReservedFor);
         modelBuilder.Entity<ReservationBooking>().HasIndex(r => r.Status);
+        modelBuilder.Entity<PlacementUnit>().HasIndex(p => p.TableId).IsUnique();
+        modelBuilder.Entity<PlacementUnit>().HasIndex(p => p.MergeClusterKey);
+        modelBuilder.Entity<ReservationEngagement>().HasIndex(e => e.PlannedStartUtc);
+        modelBuilder.Entity<ReservationEngagement>().HasIndex(e => e.Status);
+        modelBuilder.Entity<ReservationEngagement>().HasIndex(e => e.PlacementUnitId);
+        modelBuilder.Entity<ReservationEngagement>().HasIndex(e => e.TableId);
         modelBuilder.Entity<WaitlistEntry>().HasIndex(w => w.UniqueId).IsUnique();
         modelBuilder.Entity<WaitlistEntry>().HasIndex(w => w.CreatedAt);
         modelBuilder.Entity<WaitlistEntry>().HasIndex(w => w.Status);
@@ -249,6 +259,30 @@ public class AppDbContext : DbContext
             .HasOne(r => r.Table)
             .WithMany()
             .HasForeignKey(r => r.TableId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<PlacementUnit>()
+            .HasOne(p => p.Table)
+            .WithMany()
+            .HasForeignKey(p => p.TableId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ReservationEngagement>()
+            .HasOne(e => e.PlacementUnit)
+            .WithMany()
+            .HasForeignKey(e => e.PlacementUnitId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ReservationEngagement>()
+            .HasOne(e => e.Table)
+            .WithMany()
+            .HasForeignKey(e => e.TableId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ReservationEngagement>()
+            .HasOne(e => e.ReservationBooking)
+            .WithMany()
+            .HasForeignKey(e => e.ReservationBookingId)
             .OnDelete(DeleteBehavior.SetNull);
 
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())

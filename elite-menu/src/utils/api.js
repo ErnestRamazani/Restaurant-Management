@@ -19,7 +19,14 @@ export async function fetchTables() {
 
 /** @param {string} code */
 export async function validateStaffLoginCode(code) {
-  return apiFetch(`${BASE}/staff-login-code/${encodeURIComponent(code)}`)
+  const data = await apiFetch(`${BASE}/staff-login-code/${encodeURIComponent(code)}`, {
+    method: 'POST',
+  })
+  const token = data?.accessToken != null ? String(data.accessToken) : ''
+  if (token && typeof window !== 'undefined') {
+    window.sessionStorage.setItem('elite_access_token', token)
+  }
+  return data
 }
 
 /**
