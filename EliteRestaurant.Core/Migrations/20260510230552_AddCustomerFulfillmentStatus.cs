@@ -23,14 +23,12 @@ namespace EliteRestaurant.Core.Migrations
                 type: "integer",
                 nullable: true);
 
-            migrationBuilder.AlterColumn<string>(
+            migrationBuilder.AddColumn<string>(
                 name: "OrderOrigin",
                 table: "Orders",
                 type: "text",
                 nullable: false,
-                oldClrType: typeof(string),
-                oldType: "text",
-                oldDefaultValue: "InStore");
+                defaultValue: "InStore");
 
             migrationBuilder.AddColumn<string>(
                 name: "CustomerFulfillmentStatus",
@@ -56,7 +54,7 @@ namespace EliteRestaurant.Core.Migrations
                 table: "Orders",
                 type: "text",
                 nullable: false,
-                defaultValue: "");
+                defaultValue: "Immediate");
         }
 
         /// <inheritdoc />
@@ -86,14 +84,9 @@ namespace EliteRestaurant.Core.Migrations
                 name: "PaymentTiming",
                 table: "Orders");
 
-            migrationBuilder.AlterColumn<string>(
+            migrationBuilder.DropColumn(
                 name: "OrderOrigin",
-                table: "Orders",
-                type: "text",
-                nullable: false,
-                defaultValue: "InStore",
-                oldClrType: typeof(string),
-                oldType: "text");
+                table: "Orders");
         }
     }
 }
