@@ -1,0 +1,2565 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Elite Admin — Read-only</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --navy: #0f172a;
+      --navy-deep: #0b1220;
+      --cream: #f7f5f0;
+      --amber: #f59e0b;
+      --amber-dim: #d97706;
+      --gold-line: #c4a035;
+      --text-dark: #1f2937;
+      --text-muted: #94a3b8;
+      --dash-text: #e8eef4;
+      --dash-muted: #94a3b8;
+      --dash-card: #151f32;
+      --dash-border: #2d3b50;
+      --radius: 14px;
+      --chart-blue: #3b82f6;
+      --accent-blue: #3b82f6;
+      --accent-gold: #e8b84a;
+      --accent-red: #f87171;
+      --accent-cyan: #22d3ee;
+      --accent-green: #4ade80;
+      --accent-purple: #a78bfa;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "Plus Jakarta Sans", system-ui, sans-serif; background: var(--navy-deep); color: var(--dash-text); }
+    .layout { display: grid; grid-template-columns: 220px 1fr; grid-template-rows: 1fr; min-height: 100vh; }
+    .sidebar { border-right: 1px solid var(--dash-border); padding: 14px; display: flex; flex-direction: column; gap: 6px; background: var(--navy); }
+    .brand { font-weight: 700; font-size: 15px; letter-spacing: 0.04em; color: var(--amber); }
+    .brand-sub { font-size: 11px; color: var(--text-muted); line-height: 1.4; margin-top: 6px; margin-bottom: 8px; }
+    .nav-btn {
+      width: 100%; text-align: left; padding: 10px 12px; min-height: 42px;
+      border: none; border-radius: var(--radius); border-left: 3px solid transparent;
+      background: transparent; color: #6b7280; cursor: pointer; font-family: inherit; font-size: 13px;
+    }
+    .nav-btn:hover { color: #d1d5db; background: rgba(255,255,255,0.04); }
+    .nav-btn.active { border-left-color: var(--amber); background: rgba(245,158,11,0.1); color: #fff; font-weight: 600; }
+    .who { margin-top: auto; border-top: 1px solid var(--dash-border); padding-top: 12px; font-size: 12px; color: var(--dash-muted); }
+    #app > .main-area {
+      padding: 20px;
+      background: linear-gradient(165deg, var(--navy-deep) 0%, #0f1628 100%);
+      color: var(--dash-text);
+      min-width: 0;
+      min-height: 0;
+      align-self: stretch;
+      display: flex;
+      flex-direction: column;
+      overflow: auto;
+    }
+    #app > .main-area.main--orders { overflow: hidden; }
+    #loginWrap.main-area { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--navy); }
+    .card { max-width: 420px; width: 100%; border: 1px solid var(--dash-border); border-radius: var(--radius); background: var(--dash-card); padding: 22px; color: var(--dash-text); }
+    #loginWrap h1 { margin: 0 0 8px; font-size: 1.3rem; }
+    .lead { color: var(--dash-muted); font-size: 14px; margin: 0 0 16px; }
+    label { display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.12em; color: #64748b; margin-bottom: 6px; }
+    input, select {
+      width: 100%; min-height: 42px; padding: 0 12px; border: 1px solid var(--dash-border); border-radius: var(--radius);
+      font-family: inherit; font-size: 15px; margin-bottom: 12px; background: #0f1928; color: var(--dash-text);
+    }
+    .btn { min-height: 42px; padding: 0 14px; border-radius: var(--radius); font-family: inherit; font-weight: 600; font-size: 14px; cursor: pointer; border: none; }
+    .btn-sm { min-height: 36px; padding: 0 12px; font-size: 13px; }
+    .btn-primary { background: var(--amber); color: #111827; }
+    .btn-ghost { background: rgba(255,255,255,0.06); color: var(--dash-text); border: 1px solid var(--dash-border); }
+    .btn-block { width: 100%; }
+    .hidden { display: none !important; }
+    .muted { color: var(--dash-muted); font-size: 12px; }
+    .danger { color: #fecaca; background: rgba(220,38,38,0.2); padding: 10px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
+    .api-err-detail { white-space: pre-wrap; font-size: 11px; margin: 10px 0 0; color: #fecaca; font-family: ui-monospace, monospace; max-height: 280px; overflow: auto; }
+    .panel {
+      background: var(--dash-card);
+      border: 1px solid var(--dash-border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+    .panel h2 { margin: 0 0 10px; font-size: 1.05rem; font-weight: 600; }
+    pre.raw { margin: 0; font-size: 11px; overflow: auto; max-height: 62vh; white-space: pre-wrap; word-break: break-word; color: var(--dash-muted); }
+    table.data { width: 100%; border-collapse: collapse; font-size: 13px; }
+    table.data th, table.data td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--dash-border); }
+    table.data th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dash-muted); }
+    table.data tr:hover td { background: rgba(255,255,255,0.03); }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; margin-bottom: 12px; }
+    .toolbar label { margin: 0; }
+    .toolbar input { margin: 0; max-width: 160px; }
+
+    /* General Reports */
+    #app > .main-area.main--reports { overflow: auto; }
+    .reports-hero {
+      display: flex; flex-wrap: wrap; justify-content: space-between; gap: 20px; margin-bottom: 8px;
+      align-items: flex-start;
+    }
+    .reports-hero-text h1 { margin: 0; font-size: 1.65rem; font-weight: 700; color: #fff; letter-spacing: -0.02em; }
+    .reports-hero-sub {
+      margin: 8px 0 0; color: var(--dash-muted); font-size: 13px; max-width: 560px; line-height: 1.5;
+    }
+    .reports-controls {
+      display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;
+      justify-content: flex-end;
+    }
+    .reports-controls .field { display: flex; flex-direction: column; gap: 4px; }
+    .reports-controls .field label {
+      margin: 0; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b;
+    }
+    .reports-controls input[type="date"],
+    .reports-controls select { width: 158px; margin: 0; min-height: 40px; }
+    .reports-btn-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .reports-btn-refresh {
+      background: var(--accent-gold) !important; color: #111827 !important; border: none !important;
+      font-weight: 700;
+    }
+    .reports-btn-refresh:hover { filter: brightness(1.05); }
+    .reports-tabs {
+      display: flex; flex-wrap: wrap; gap: 6px; margin: 18px 0 14px;
+    }
+    .reports-tab {
+      padding: 10px 16px;
+      border: 1px solid var(--dash-border);
+      border-radius: 10px;
+      background: #0f1928;
+      color: var(--dash-muted);
+      cursor: pointer;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .reports-tab:hover { color: var(--dash-text); border-color: #4b5f80; }
+    .reports-tab.active {
+      background: #f1f5f9;
+      color: #0f172a;
+      border-color: #f1f5f9;
+      font-weight: 700;
+    }
+    .reports-feed-title {
+      color: var(--accent-gold); font-size: 13px; font-weight: 600; margin: 0 0 8px;
+    }
+    .reports-feed-summary { font-size: 13px; color: var(--dash-muted); margin: 0 0 16px; line-height: 1.55; }
+    .reports-day-block {
+      border: 1px solid var(--dash-border); border-radius: var(--radius); margin-bottom: 16px;
+      overflow: hidden; background: var(--dash-card);
+    }
+    .reports-day-head {
+      padding: 12px 16px; background: rgba(0, 0, 0, 0.22); border-bottom: 1px solid var(--dash-border);
+      display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; align-items: baseline;
+    }
+    .reports-day-title { font-weight: 600; color: var(--dash-text); }
+    .reports-day-meta { font-size: 12px; color: var(--accent-gold); font-weight: 500; }
+    .reports-day-picker { margin: 0 0 16px; max-width: min(520px, 100%); }
+    .reports-day-picker label { margin-bottom: 6px; }
+    .reports-day-select { width: 100%; margin: 0; min-height: 42px; }
+    .reports-day-panel.reports-day-block { margin-bottom: 16px; }
+    .reports-day-inline-head {
+      padding: 12px 16px; background: rgba(0, 0, 0, 0.22); border-bottom: 1px solid var(--dash-border);
+      display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; align-items: baseline;
+    }
+    .reports-table-wrap { overflow: auto; max-height: min(62vh, 640px); }
+    .reports-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .reports-table th {
+      text-align: left; padding: 10px 12px; font-size: 10px; text-transform: uppercase;
+      letter-spacing: 0.07em; color: var(--dash-muted); border-bottom: 1px solid var(--dash-border);
+      background: rgba(15, 24, 40, 0.95); position: sticky; top: 0; z-index: 1;
+    }
+    .reports-table td { padding: 11px 12px; border-bottom: 1px solid var(--dash-border); vertical-align: top; }
+    .reports-table tbody tr:hover td { background: rgba(255, 255, 255, 0.035); }
+    .reports-cell-time { color: var(--accent-gold); font-weight: 600; white-space: nowrap; }
+    .reports-cell-detail { color: var(--dash-text); line-height: 1.45; max-width: min(460px, 36vw); }
+    .reports-cell-related { color: var(--dash-muted); font-size: 12px; max-width: min(300px, 28vw); line-height: 1.4; }
+    .reports-cell-sub { margin-top: 6px; font-size: 11px; opacity: 0.92; }
+    .reports-cell-metric { white-space: nowrap; color: var(--dash-text); }
+    .reports-entity-bar {
+      display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; margin: 0 0 14px;
+      padding: 14px; background: var(--dash-card); border: 1px solid var(--dash-border); border-radius: var(--radius);
+    }
+    .reports-entity-bar label { margin: 0; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
+    .reports-entity-bar select { min-width: 260px; margin: 0; }
+    .reports-entity-meta {
+      white-space: pre-wrap; font-size: 12px; color: var(--dash-muted); margin: 0 0 14px; padding: 14px;
+      border-radius: var(--radius); border: 1px solid var(--dash-border); background: rgba(0, 0, 0, 0.18);
+      max-height: 180px; overflow: auto; line-height: 1.45;
+    }
+    .reports-placeholder { color: var(--dash-muted); font-size: 14px; padding: 28px 8px; text-align: center; }
+
+    /* Dashboard */
+    .dash-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
+    .dash-header h1 { margin: 0; font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em; }
+    .dash-sub { margin: 6px 0 0; color: var(--dash-muted); font-size: 14px; max-width: 520px; line-height: 1.45; }
+    .dash-meta { text-align: right; font-size: 13px; color: var(--dash-muted); }
+    .dash-meta .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent-green); margin-right: 6px; vertical-align: middle; }
+    .dash-meta .clock { margin-top: 6px; font-weight: 500; color: var(--dash-text); }
+    .payroll-banner {
+      background: linear-gradient(90deg, rgba(220,38,38,0.25), rgba(180,20,20,0.15));
+      border: 1px solid rgba(248,113,113,0.35);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      margin-bottom: 18px;
+      cursor: pointer;
+      text-align: left;
+      width: 100%;
+      font: inherit;
+      color: inherit;
+      transition: transform 0.12s ease, background 0.12s;
+    }
+    .payroll-banner:hover { transform: scale(1.002); background: linear-gradient(90deg, rgba(220,38,38,0.32), rgba(180,20,20,0.22)); }
+    .payroll-banner strong { display: block; font-size: 15px; margin-bottom: 6px; color: #fecaca; }
+    .payroll-banner span { color: var(--dash-muted); font-size: 13px; line-height: 1.4; }
+
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 18px; }
+    .kpi-card {
+      background: var(--dash-card);
+      border: 1px solid var(--dash-border);
+      border-radius: var(--radius);
+      padding: 14px 14px 12px;
+      cursor: pointer;
+      text-align: left;
+      width: 100%;
+      font: inherit;
+      color: inherit;
+      transition: background 0.15s, border-color 0.15s, transform 0.12s;
+      position: relative;
+      overflow: hidden;
+    }
+    .kpi-card::before {
+      content: "";
+      position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: var(--kpi-accent, var(--accent-blue));
+    }
+    .kpi-card:hover { background: #1a273d; border-color: #3d4f6a; transform: translateY(-1px); }
+    .kpi-card.accent-blue { --kpi-accent: var(--accent-blue); }
+    .kpi-card.accent-gold { --kpi-accent: var(--accent-gold); }
+    .kpi-card.accent-red { --kpi-accent: var(--accent-red); }
+    .kpi-card.accent-cyan { --kpi-accent: var(--accent-cyan); }
+    .kpi-card.accent-green { --kpi-accent: var(--accent-green); }
+    .kpi-card.tables { --kpi-accent: var(--accent-cyan); }
+    .kpi-primary { font-size: 1.45rem; font-weight: 700; margin: 8px 0 6px; }
+    .kpi-sub { font-size: 12px; color: var(--dash-muted); line-height: 1.35; margin-bottom: 8px; }
+    .kpi-sub-em { color: var(--kpi-accent, var(--accent-blue)); font-weight: 500; }
+    .kpi-spark-wrap { margin-top: 6px; }
+    .kpi-spark-cap { font-size: 10px; color: var(--dash-muted); margin-top: 4px; }
+    .kpi-spark { height: 28px; width: 100%; opacity: 0.85; display: block; }
+    .kpi-progress { height: 8px; border-radius: 4px; background: #2d3b50; margin: 10px 0 4px; overflow: hidden; }
+    .kpi-progress > i { display: block; height: 100%; background: var(--kpi-accent, var(--accent-cyan)); border-radius: 4px; }
+
+    .dash-mid { display: grid; grid-template-columns: 1fr 1.2fr; gap: 14px; margin-bottom: 18px; }
+    @media (max-width: 960px) { .dash-mid { grid-template-columns: 1fr; } }
+    .panel-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .panel-title-row h2 { margin: 0; }
+    .pill-btn {
+      font-size: 11px; padding: 6px 12px; border-radius: 999px;
+      border: 1px solid var(--dash-border); background: rgba(255,255,255,0.05);
+      color: var(--dash-text); cursor: pointer; font-family: inherit;
+    }
+    .pill-btn:hover { background: rgba(255,255,255,0.1); }
+    .critical-label { color: var(--accent-red); font-size: 12px; font-weight: 600; margin-bottom: 10px; }
+    .inv-alert {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+      width: 100%;
+      text-align: left;
+      background: rgba(127,29,29,0.25);
+      border: 1px solid rgba(248,113,113,0.25);
+      border-radius: 10px;
+      padding: 10px 12px; margin-bottom: 8px;
+      cursor: pointer; font: inherit; color: inherit;
+      transition: background 0.12s;
+    }
+    .inv-alert.reorder {
+      background: rgba(180, 140, 40, 0.15);
+      border-color: rgba(232, 184, 74, 0.35);
+    }
+    .inv-alert.reorder:hover { background: rgba(180, 140, 40, 0.25); }
+    .inv-alert.info {
+      background: rgba(59, 130, 246, 0.1);
+      border-color: rgba(59, 130, 246, 0.25);
+    }
+    .inv-alert.info:hover { background: rgba(59, 130, 246, 0.18); }
+    .inv-alert .t { font-weight: 600; display: block; line-height: 1.35; }
+    .inv-alert .d { font-size: 12px; color: var(--dash-muted); display: block; line-height: 1.45; margin-top: 0; }
+
+    .chart-caption { font-size: 12px; color: var(--dash-muted); margin-bottom: 8px; }
+    .chart-wrap-hourly { width: 100%; margin: 8px 0 4px; }
+    .chart-svg-hourly { width: 100%; height: 220px; display: block; }
+    .chart-axis-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--dash-muted); margin-top: 4px; padding: 0 4px; }
+    .chart-svg { width: 100%; height: auto; display: block; }
+    .chart-hit {
+      fill: transparent; cursor: pointer;
+    }
+    .chart-hit:hover { fill: rgba(59,130,246,0.08); }
+
+    .top-dish {
+      display: flex;
+      align-items: stretch;
+      gap: 12px;
+      margin-bottom: 10px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(45, 59, 80, 0.85);
+      background: rgba(15, 25, 40, 0.65);
+    }
+    .top-dish:hover { background: rgba(21, 31, 50, 0.92); border-color: #4b5f80; }
+    .top-dish-photo-wrap {
+      width: 56px; height: 56px; flex-shrink: 0; border-radius: 10px; overflow: hidden;
+      background: #1a273d; display: flex; align-items: center; justify-content: center;
+    }
+    .top-dish-photo {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+    }
+    .top-dish-photo-ph { font-size: 10px; text-align: center; padding: 4px; color: var(--dash-muted); line-height: 1.25; }
+    .top-dish-text { flex: 1; min-width: 0; }
+    .top-dish .row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; gap: 8px; }
+    .top-dish .bar { height: 6px; border-radius: 3px; background: #2d3b50; overflow: hidden; }
+    .top-dish .bar > i { display: block; height: 100%; background: var(--accent-blue); border-radius: 3px; }
+
+    .roster-section { margin-bottom: 18px; }
+    .roster-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+    .roster-head h2 { margin: 0; font-size: 1.1rem; }
+    .roster-badge { font-size: 12px; padding: 4px 10px; border-radius: 8px; background: rgba(232,184,74,0.15); color: var(--accent-gold); border: 1px solid rgba(232,184,74,0.35); }
+    .roster-sub { font-size: 13px; color: var(--dash-muted); margin-bottom: 12px; }
+    .roster-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+    .staff-card {
+      display: flex; align-items: center; gap: 10px;
+      min-width: 160px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--dash-border);
+      background: var(--dash-card);
+      cursor: pointer;
+      font: inherit; color: inherit;
+      text-align: left;
+      transition: background 0.12s, transform 0.12s;
+    }
+    .staff-card:hover { background: #1a273d; transform: translateY(-1px); }
+    .staff-av { width: 36px; height: 36px; border-radius: 50%; background: #2d3b50; flex-shrink: 0; }
+    .staff-name { font-weight: 600; font-size: 13px; }
+    .staff-role { font-size: 11px; color: var(--dash-muted); }
+    .staff-st { font-size: 11px; color: var(--dash-muted); margin-top: 2px; }
+    .dot-off { background: #64748b; }
+    .dot-on { background: var(--accent-green); }
+
+    .dash-bottom { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 14px; align-items: start; }
+    @media (max-width: 960px) { .dash-bottom { grid-template-columns: 1fr; } }
+
+    .act-list { display: flex; flex-direction: column; gap: 0; max-height: 70vh; overflow: auto; }
+    .act-card {
+      border: none;
+      border-top: 1px solid rgba(196,160,53,0.35);
+      background: transparent;
+      padding: 12px 4px;
+      cursor: pointer;
+      text-align: left;
+      font: inherit;
+      color: inherit;
+      width: 100%;
+      transition: background 0.12s;
+    }
+    .act-card:first-child { border-top: none; }
+    .act-card:hover { background: rgba(255,255,255,0.04); }
+    .act-kind { font-size: 10px; letter-spacing: 0.1em; color: var(--accent-gold); font-weight: 600; margin-bottom: 4px; }
+    .act-title { font-weight: 600; font-size: 14px; }
+    .act-detail { font-size: 12px; color: var(--dash-muted); margin-top: 6px; white-space: pre-wrap; line-height: 1.4; }
+
+    /* Orders (read-only, two columns) */
+    .orders-view-root { flex: 1; display: flex; flex-direction: column; min-height: 0; gap: 14px; }
+    .orders-toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 12px; flex-shrink: 0; }
+    .orders-toolbar h1 { margin: 0; font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em; }
+    .orders-updated { font-size: 13px; color: var(--dash-muted); }
+    .orders-hint { margin: 0; font-size: 13px; color: var(--dash-muted); flex-shrink: 0; }
+    .orders-columns {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      min-height: 0;
+      align-items: stretch;
+    }
+    @media (max-width: 960px) { .orders-columns { grid-template-columns: 1fr; } }
+    .orders-col {
+      background: var(--dash-card);
+      border: 1px solid var(--dash-border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .orders-col h2 { margin: 0 0 10px; font-size: 1rem; font-weight: 600; }
+    .orders-col .orders-search {
+      width: 100%;
+      margin-bottom: 10px;
+      min-height: 42px;
+      padding: 0 12px;
+      border: 1px solid var(--dash-border);
+      border-radius: var(--radius);
+      font-family: inherit;
+      font-size: 14px;
+      background: #0f1928;
+      color: var(--dash-text);
+    }
+    .orders-day-label {
+      display: block;
+      font-size: 11px;
+      color: var(--dash-muted);
+      margin: 0 0 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .orders-day-select {
+      width: 100%;
+      margin-bottom: 10px;
+      min-height: 42px;
+      padding: 0 12px;
+      border: 1px solid var(--dash-border);
+      border-radius: var(--radius);
+      font-family: inherit;
+      font-size: 14px;
+      background: #0f1928;
+      color: var(--dash-text);
+    }
+    .orders-col-list { flex: 1; overflow-y: auto; min-height: 0; padding-right: 4px; }
+    button.admin-order-active {
+      border: 1px solid var(--dash-border);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 10px;
+      background: rgba(15, 25, 40, 0.65);
+      display: block;
+      width: 100%;
+      text-align: left;
+      font: inherit;
+      color: inherit;
+      cursor: pointer;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    button.admin-order-active:hover { background: rgba(25, 38, 58, 0.85); border-color: #3d4f6a; }
+    button.admin-order-active:last-child { margin-bottom: 0; }
+    button.admin-order-active .row-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: baseline; margin-bottom: 8px; }
+    button.admin-order-active .oid { font-family: ui-monospace, Consolas, monospace; font-weight: 700; font-size: 14px; }
+    button.admin-order-active .st { font-size: 13px; color: #cbd5e1; }
+    button.admin-order-active .line { font-size: 13px; color: var(--dash-muted); margin-bottom: 6px; line-height: 1.45; }
+    button.admin-order-active .items { font-size: 13px; color: var(--dash-text); margin-bottom: 10px; white-space: pre-wrap; }
+    button.admin-order-active .tot { font-size: 1.2rem; font-weight: 700; }
+    .admin-order-past {
+      border: none;
+      border-bottom: 1px solid var(--dash-border);
+      background: transparent;
+      width: 100%;
+      text-align: left;
+      font: inherit;
+      color: inherit;
+      cursor: pointer;
+      padding: 12px 4px 14px;
+      border-radius: 8px;
+      margin-bottom: 2px;
+    }
+    .admin-order-past:hover { background: rgba(255,255,255,0.04); }
+    .admin-order-past .hint { font-size: 11px; color: var(--dash-muted); margin-bottom: 4px; }
+    .admin-order-past .line1 { font-size: 13px; margin-bottom: 4px; }
+    .admin-order-past .line2 { font-size: 12px; color: var(--dash-muted); }
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(8, 14, 24, 0.55);
+      display: flex; align-items: center; justify-content: center;
+      padding: 16px; z-index: 200;
+    }
+    .modal-backdrop.hidden { display: none !important; }
+    .modal-card-admin {
+      background: var(--dash-card); color: var(--dash-text);
+      border: 1px solid var(--dash-border); border-radius: var(--radius);
+      max-width: 520px; width: 100%;
+      padding: 20px 22px; box-shadow: 0 28px 70px rgba(0,0,0,0.55);
+      max-height: 90vh; overflow-y: auto;
+    }
+    .modal-card-admin h3 { margin: 0 0 12px; font-size: 1.1rem; }
+    .modal-card-admin pre {
+      white-space: pre-wrap; font-size: 12px; background: #0f1928;
+      border: 1px solid var(--dash-border); border-radius: 10px;
+      padding: 12px; margin: 0 0 14px; max-height: 340px; overflow: auto;
+    }
+
+    /* Inventory / menu catalog (Admin Web) */
+    .catalog-page { max-width: 1100px; margin: 0 auto; }
+    .catalog-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 16px; }
+    .catalog-header h1 { margin: 0; font-size: 1.65rem; font-weight: 700; letter-spacing: -0.02em; }
+    .catalog-sub { margin: 8px 0 0; color: var(--dash-muted); font-size: 14px; max-width: 560px; line-height: 1.45; }
+    .catalog-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .read-only-pill {
+      font-size: 11px; padding: 6px 12px; border-radius: 999px;
+      border: 1px solid var(--dash-border); color: var(--dash-muted); background: rgba(255,255,255,0.04);
+    }
+    .catalog-search {
+      width: 100%; margin-bottom: 16px; min-height: 42px; padding: 0 14px;
+      border: 1px solid var(--dash-border); border-radius: var(--radius);
+      background: #0f1928; color: var(--dash-text); font: inherit; font-size: 15px;
+      box-sizing: border-box;
+    }
+    .catalog-list { display: flex; flex-direction: column; gap: 12px; padding-bottom: 24px; }
+    .inv-card {
+      background: var(--dash-card); border: 1px solid var(--dash-border); border-radius: var(--radius);
+      padding: 16px 18px;
+    }
+    .inv-card-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 14px; align-items: flex-start; }
+    .inv-name { font-size: 1.12rem; font-weight: 700; margin: 0 0 4px; }
+    .inv-id { font-size: 12px; color: var(--dash-muted); font-family: ui-monospace, Consolas, monospace; }
+    .inv-stock { color: var(--accent-blue); font-weight: 600; margin-top: 8px; font-size: 14px; }
+    .inv-exp-line { font-size: 13px; color: var(--dash-muted); margin-top: 4px; }
+    .inv-status-row { display: flex; align-items: center; gap: 10px; margin: 14px 0 6px; flex-wrap: wrap; }
+    .inv-bar-wrap { flex: 1; min-width: 140px; height: 4px; background: #2d3b50; border-radius: 4px; overflow: hidden; }
+    .inv-bar { height: 100%; border-radius: 4px; transition: width 0.2s; }
+    .inv-bar.ok { background: var(--accent-blue); }
+    .inv-bar.bad { background: var(--accent-red); }
+    .inv-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .inv-log {
+      margin-top: 10px; background: #0b1220; border: 1px solid var(--dash-border); border-radius: 10px;
+      padding: 10px 12px; font-size: 12px; color: var(--dash-muted); max-height: 100px; overflow-y: auto;
+      white-space: pre-wrap; line-height: 1.45;
+    }
+    .mono { font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+    .menu-page-h1 { margin: 0 0 8px; font-size: 1.85rem; font-weight: 700; letter-spacing: -0.02em; }
+    .menu-page-h1 .part-gold { color: var(--accent-gold); }
+    .menu-filter-panel {
+      background: var(--dash-card);
+      border: 1px solid var(--dash-border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      margin-bottom: 20px;
+    }
+    .menu-filter-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 12px; }
+    @media (max-width: 720px) { .menu-filter-row { grid-template-columns: 1fr; } }
+    .menu-lbl {
+      display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--dash-muted); margin-bottom: 6px; font-weight: 600;
+    }
+    .menu-filter-panel select.menu-filter-select {
+      width: 100%; min-height: 42px; padding: 0 12px; border: 1px solid var(--dash-border);
+      border-radius: var(--radius); background: #0f1928; color: var(--dash-text);
+      font: inherit; font-size: 15px; box-sizing: border-box;
+    }
+    .menu-filter-panel .catalog-search { margin-bottom: 0; }
+    .menu-cat-title {
+      color: var(--accent-gold); font-size: 1.35rem; margin: 28px 0 14px; font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .menu-cat-title:first-of-type { margin-top: 6px; }
+    .menu-sub-title {
+      color: #38bdf8; font-size: 1.02rem; margin: 18px 0 12px; font-weight: 600;
+    }
+    .menu-prod-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+      gap: 14px;
+    }
+    .menu-prod-card {
+      background: var(--dash-card);
+      border: 1px solid var(--dash-border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
+    }
+    .menu-prod-thumb {
+      height: 148px;
+      position: relative;
+      background: linear-gradient(160deg, #1a2538, #0f172a);
+      overflow: hidden;
+    }
+    .menu-prod-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; position: relative; z-index: 1; }
+    .menu-prod-thumb-ph {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      opacity: 0.3;
+    }
+    .menu-prod-body { padding: 14px 16px 16px; flex: 1; display: flex; flex-direction: column; }
+    .menu-prod-name { font-size: 1.08rem; font-weight: 700; margin: 0 0 4px; }
+    .menu-prod-id { font-size: 12px; color: var(--dash-muted); margin-bottom: 10px; }
+    .menu-prod-price { font-size: 1.32rem; font-weight: 700; color: var(--accent-blue); margin-bottom: 10px; }
+    .menu-prod-ing { font-size: 12px; color: var(--dash-muted); line-height: 1.55; margin: 0; padding-left: 16px; }
+    .menu-prod-ing li { margin-bottom: 3px; }
+
+    /* Table management cards */
+    .table-page-h1 { margin: 0 0 8px; font-size: 1.85rem; font-weight: 700; letter-spacing: -0.02em; }
+    .table-page-h1 .part-gold { color: var(--accent-gold); }
+    .table-card {
+      background: var(--dash-card);
+      border: 1px solid var(--dash-border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      margin-bottom: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+    }
+    .table-card-main { flex: 1; min-width: 200px; }
+    .table-card-title { font-size: 1.08rem; font-weight: 700; margin: 0 0 12px; }
+    .table-card-pills { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .tbl-pill { font-size: 12px; padding: 5px 12px; border-radius: 999px; font-weight: 600; }
+    .tbl-pill-cap { background: rgba(59,130,246,0.2); color: #38bdf8; border: 1px solid rgba(59,130,246,0.35); }
+    .tbl-pill-ok { background: rgba(74,222,128,0.15); color: #4ade80; border: 1px solid rgba(74,222,128,0.35); }
+    .tbl-pill-busy { background: rgba(248,113,113,0.12); color: #f87171; border: 1px solid rgba(248,113,113,0.35); }
+    .tbl-pill-srv { background: rgba(232,184,74,0.15); color: var(--accent-gold); border: 1px solid rgba(232,184,74,0.4); }
+
+    /* Employee accordion (read-only web admin) */
+    .emp-page-h1 { margin: 0 0 8px; font-size: 1.85rem; font-weight: 700; letter-spacing: -0.02em; }
+    .emp-page-h1 .part-gold { color: var(--accent-gold); }
+    .emp-acc-list { display: flex; flex-direction: column; gap: 12px; padding-bottom: 24px; }
+    .emp-acc-item {
+      background: var(--dash-card);
+      border: 1px solid var(--dash-border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .emp-acc-hdr {
+      width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 14px 16px; margin: 0; border: none; cursor: pointer; font: inherit; text-align: left;
+      background: #121c2c; color: var(--dash-text);
+    }
+    .emp-acc-hdr:hover { background: #172236; }
+    .emp-acc-title { font-size: 1.12rem; font-weight: 700; margin: 0 0 8px; flex: 1; min-width: 0; }
+    .emp-acc-hdr-pills { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .emp-pill {
+      font-size: 11px; padding: 4px 10px; border-radius: 999px; font-weight: 600;
+      background: rgba(59,130,246,0.15); color: #38bdf8; border: 1px solid rgba(59,130,246,0.3);
+    }
+    .emp-pill-role { background: rgba(232,184,74,0.12); color: var(--accent-gold); border-color: rgba(232,184,74,0.35); }
+    .emp-pill-status { background: rgba(74,222,128,0.12); color: #4ade80; border-color: rgba(74,222,128,0.3); }
+    .emp-pill-status.inactive { background: rgba(148,163,184,0.12); color: #94a3b8; border-color: rgba(148,163,184,0.3); }
+    .emp-acc-chev {
+      font-size: 0.65rem; color: var(--accent-gold); flex-shrink: 0; transition: transform 0.2s;
+    }
+    .emp-acc-item.open .emp-acc-chev { transform: rotate(-180deg); }
+    .emp-acc-body { padding: 0 16px 18px 16px; }
+    .emp-acc-inner { display: grid; grid-template-columns: 140px 1fr; gap: 18px; margin-top: 4px; }
+    @media (max-width: 640px) { .emp-acc-inner { grid-template-columns: 1fr; } }
+    .emp-photo-box {
+      position: relative; width: 120px; height: 120px; border-radius: 12px; overflow: hidden;
+      background: linear-gradient(160deg, #1a2538, #0f172a);
+      border: 1px solid var(--dash-border);
+    }
+    .emp-photo-initials {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      font-size: 2rem; font-weight: 700; color: var(--accent-gold); letter-spacing: 0.04em;
+    }
+    .emp-photo-img {
+      position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; display: none;
+    }
+    .emp-photo-img.is-visible { display: block; }
+    .emp-photo-box:has(.emp-photo-img.is-visible) .emp-photo-initials { display: none; }
+    .emp-notes-lbl {
+      display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--dash-muted); margin: 14px 0 6px; font-weight: 600;
+    }
+    .emp-notes-box {
+      min-height: 72px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--dash-border);
+      background: #0b1220; color: var(--dash-muted); font-size: 13px; line-height: 1.5; white-space: pre-wrap;
+    }
+    .emp-detail-sec { margin-bottom: 16px; }
+    .emp-detail-sec h4 {
+      margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--dash-muted); font-weight: 600;
+    }
+    .emp-tag-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .emp-tag {
+      font-size: 12px; padding: 5px 12px; border-radius: 999px; font-weight: 600;
+      background: rgba(59,130,246,0.12); color: #7dd3fc; border: 1px solid rgba(59,130,246,0.28);
+    }
+    .emp-tag-muted { background: rgba(148,163,184,0.1); color: #cbd5e1; border-color: rgba(148,163,184,0.25); }
+    .emp-schedule-bar {
+      padding: 12px 14px; border-radius: 10px; background: #151e2e; border: 1px solid var(--dash-border);
+      font-size: 13px; color: #cbd5e1; line-height: 1.55;
+    }
+
+    /* Money dashboard (read-only web) */
+    .money-dash { max-width: 1400px; margin: 0 auto; }
+    .money-dash-head h1 {
+      margin: 0; font-size: 1.85rem; font-weight: 700; letter-spacing: -0.02em; color: #fff;
+    }
+    .money-dash-head .part-gold { color: var(--accent-gold); }
+    .money-dash-sub {
+      margin: 8px 0 0; font-size: 14px; color: var(--accent-gold); font-weight: 500;
+      max-width: 560px; line-height: 1.45;
+    }
+    .money-dash-kpis {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 22px 0 18px;
+    }
+    @media (max-width: 900px) { .money-dash-kpis { grid-template-columns: 1fr; } }
+    .money-kpi {
+      background: var(--dash-card); border: 1px solid var(--dash-border); border-radius: var(--radius);
+      padding: 18px 16px; text-align: center;
+    }
+    .money-kpi-lbl {
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--dash-muted);
+      font-weight: 600; margin-bottom: 10px;
+    }
+    .money-kpi-val { font-size: 1.35rem; font-weight: 700; line-height: 1.35; }
+    .money-kpi-val.rev { color: var(--accent-green); }
+    .money-kpi-val.exp { color: var(--accent-red); }
+    .money-toolbar {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px;
+      margin-bottom: 16px; padding: 12px 0; border-bottom: 1px solid var(--dash-border);
+    }
+    .money-toolbar-showing { font-size: 14px; color: var(--dash-muted); }
+    .money-toolbar-showing strong { color: var(--dash-text); font-weight: 600; }
+    .money-preset-group { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; justify-content: center; }
+    .money-preset-btn {
+      min-height: 36px; padding: 0 14px; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 600;
+      border: 1px solid var(--dash-border); background: rgba(255,255,255,0.04); color: var(--dash-muted);
+      cursor: pointer;
+    }
+    .money-preset-btn:hover { background: rgba(255,255,255,0.08); color: var(--dash-text); }
+    .money-preset-btn.active {
+      background: rgba(59,130,246,0.22); border-color: rgba(59,130,246,0.45); color: #93c5fd;
+    }
+    .money-dash-main {
+      display: grid; grid-template-columns: 1fr minmax(260px, 300px); gap: 18px; align-items: start;
+    }
+    @media (max-width: 1024px) { .money-dash-main { grid-template-columns: 1fr; } }
+    .money-ledger-panel {
+      background: var(--dash-card); border: 1px solid var(--dash-border); border-radius: var(--radius);
+      overflow: hidden; min-width: 0;
+    }
+    .money-ledger-panel h2 {
+      margin: 0; padding: 14px 16px; font-size: 15px; font-weight: 700;
+      border-bottom: 1px solid var(--dash-border); color: var(--dash-text);
+    }
+    .money-ledger-scroll {
+      max-height: min(68vh, 720px); overflow: auto;
+    }
+    .money-ledger { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .money-ledger th, .money-ledger td {
+      text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--dash-border);
+      vertical-align: top;
+    }
+    .money-ledger th {
+      position: sticky; top: 0; background: #121c2c; z-index: 1;
+      font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dash-muted); font-weight: 600;
+    }
+    .money-ledger tbody tr:hover td { background: rgba(255,255,255,0.03); }
+    .money-ledger .cell-amt { text-align: right; font-weight: 650; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .money-sidebar { display: flex; flex-direction: column; gap: 12px; }
+    .money-side-card {
+      background: var(--dash-card); border: 1px solid var(--dash-border); border-radius: var(--radius);
+      padding: 16px; text-align: center;
+    }
+    .money-side-card .lbl {
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dash-muted); font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .money-side-card .fig { font-size: 1.15rem; font-weight: 700; line-height: 1.35; }
+    .money-side-card .fig.rev { color: var(--accent-green); }
+    .money-side-card .fig.exp { color: var(--accent-red); }
+    .money-summary-list {
+      background: var(--dash-card); border: 1px solid var(--dash-border); border-radius: var(--radius);
+      padding: 14px 16px; font-size: 13px;
+    }
+    .money-summary-list h3 {
+      margin: 0 0 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--dash-muted); font-weight: 600;
+    }
+    .money-summary-list dl { margin: 0; }
+    .money-summary-list dt {
+      color: var(--dash-muted); font-size: 12px; margin-top: 10px;
+    }
+    .money-summary-list dt:first-child { margin-top: 0; }
+    .money-summary-list dd { margin: 4px 0 0; font-weight: 600; color: var(--dash-text); }
+    .money-report-btn {
+      width: 100%; min-height: 44px; border-radius: var(--radius); font: inherit; font-weight: 600; font-size: 14px;
+      cursor: pointer; border: 1px solid var(--dash-border);
+      background: #1a2332; color: var(--dash-text);
+    }
+    .money-report-btn:hover { background: #243044; }
+    .money-report-note { font-size: 11px; color: var(--dash-muted); text-align: center; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <div id="loginWrap" class="main-area">
+    <div class="card">
+      <h1>Admin (read-only)</h1>
+      <p class="lead">Owner / manager web view. Sign in with your <strong>AdminWeb</strong> staff ID and PIN.</p>
+      <div id="loginErr" class="danger hidden"></div>
+      <label for="staffId">Sign-in ID</label>
+      <input id="staffId" type="text" autocomplete="username" placeholder="er4124">
+      <label for="pin">PIN</label>
+      <input id="pin" type="password" autocomplete="current-password">
+      <button type="button" class="btn btn-primary btn-block" id="btnLogin">Sign in</button>
+      <p class="muted" style="margin-top:14px;">Uses same API host. JWT is stored in session storage for this tab only.</p>
+    </div>
+  </div>
+
+  <div id="app" class="layout hidden">
+    <aside class="sidebar">
+      <div>
+        <div class="brand">ELITE ADMIN</div>
+        <div class="brand-sub">Read-only mirrors: dashboard, operations snapshot, reports.</div>
+      </div>
+      <button type="button" class="nav-btn active" data-view="dashboard">Dashboard</button>
+      <button type="button" class="nav-btn" data-view="orders">Orders</button>
+      <button type="button" class="nav-btn" data-view="inventory">Inventory</button>
+      <button type="button" class="nav-btn" data-view="menu">Menu</button>
+      <button type="button" class="nav-btn" data-view="tables">Tables</button>
+      <button type="button" class="nav-btn" data-view="employees">Employees</button>
+      <button type="button" class="nav-btn" data-view="money">Money</button>
+      <button type="button" class="nav-btn" data-view="reports">Reports</button>
+      <div class="who">
+        <div id="sessionLabel"></div>
+        <button type="button" class="btn btn-ghost btn-block" id="btnLogout" style="margin-top:10px;">Sign out</button>
+      </div>
+    </aside>
+    <main class="main-area" id="main"></main>
+  </div>
+
+  <script>
+    const TOKEN_KEY = "eliteAdminWebJwt";
+    const NAV_FILTER_KEY = "eliteAdminNavFilter";
+    let token = sessionStorage.getItem(TOKEN_KEY) || "";
+    let dashClockTimer = null;
+
+    function $(id) { return document.getElementById(id); }
+
+    async function api(path, method, body, useAuth) {
+      const headers = {};
+      if (body) headers["Content-Type"] = "application/json";
+      if (useAuth !== false && token) headers["Authorization"] = "Bearer " + token;
+      const res = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+      const txt = await res.text();
+      let json;
+      try { json = JSON.parse(txt); } catch (_) { json = { raw: txt }; }
+      return { ok: res.ok, status: res.status, body: json };
+    }
+
+    function fmtMoney(n) {
+      const x = Number(n);
+      if (!Number.isFinite(x)) return "—";
+      return "$" + x.toFixed(2);
+    }
+
+    function fmtFc(n) {
+      const x = Number(n);
+      if (!Number.isFinite(x)) return "—";
+      return "FC " + Math.round(x).toLocaleString();
+    }
+
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]));
+    }
+
+    function formatApiError(status, body) {
+      if (!body || typeof body !== "object") return "";
+      const d = body.detail || body.Detail;
+      const m = body.message || body.Message;
+      const t = body.title || body.Title;
+      const line = d || m || t;
+      return line ? String(line) : "";
+    }
+
+    function localDayKeyFromTs(ts) {
+      if (ts == null || ts === "") return "";
+      const d = new Date(ts);
+      if (Number.isNaN(d.getTime())) return "";
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return y + "-" + m + "-" + day;
+    }
+
+    function pastDayLabelForKey(key) {
+      if (!key) return "";
+      const parts = key.split("-").map(Number);
+      if (parts.length !== 3 || parts.some(n => Number.isNaN(n))) return key;
+      const dt = new Date(parts[0], parts[1] - 1, parts[2]);
+      return dt.toLocaleDateString(undefined, { weekday: "short", year: "numeric", month: "short", day: "numeric" });
+    }
+
+    function collectSortedPastDayKeys(rows, getTs) {
+      const set = new Set();
+      for (const r of rows) {
+        const k = localDayKeyFromTs(getTs(r));
+        if (k) set.add(k);
+      }
+      return [...set].sort().reverse();
+    }
+
+    function fmtMenuMoney(n) {
+      const x = Number(n);
+      if (!Number.isFinite(x)) return "$ 0.00";
+      return "$ " + x.toFixed(2);
+    }
+
+    function absPublicUrl(u) {
+      const t = String(u ?? "").trim();
+      if (!t) return "";
+      if (t.startsWith("http://") || t.startsWith("https://")) return t;
+      if (t.startsWith("/")) return location.origin + t;
+      return t;
+    }
+
+    function normInvRowAdmin(raw) {
+      if (!raw || typeof raw !== "object") return null;
+      return {
+        id: raw.id ?? raw.Id,
+        name: String(raw.name ?? raw.Name ?? ""),
+        unit: String(raw.unit ?? raw.Unit ?? "")
+      };
+    }
+
+    /** Unwraps admin entity list payloads (handles string-encoded rows from some JSON pipelines). */
+    function normalizeAdminEntityItemRows(rows) {
+      const out = [];
+      if (!Array.isArray(rows)) return out;
+      for (const row of rows) {
+        if (row == null) continue;
+        if (typeof row === "string") {
+          try {
+            const o = JSON.parse(row);
+            if (o && typeof o === "object") out.push(o);
+          } catch (_) { /* skip */ }
+          continue;
+        }
+        if (typeof row === "object") out.push(row);
+      }
+      return out;
+    }
+
+    function normalizeAdminEntityItems(body) {
+      if (!body || typeof body !== "object") return [];
+      const rawList = body.items ?? body.Items;
+      if (rawList == null) return [];
+      if (!Array.isArray(rawList)) {
+        if (typeof rawList === "string") {
+          try {
+            const p = JSON.parse(rawList);
+            return normalizeAdminEntityItemRows(Array.isArray(p) ? p : []);
+          } catch (_) {
+            return [];
+          }
+        }
+        return [];
+      }
+      return normalizeAdminEntityItemRows(rawList);
+    }
+
+    function setNavFilter(view, text) {
+      if (!text) {
+        sessionStorage.removeItem(NAV_FILTER_KEY + ":" + view);
+        return;
+      }
+      sessionStorage.setItem(NAV_FILTER_KEY + ":" + view, text);
+    }
+
+    function getNavFilter(view) {
+      return sessionStorage.getItem(NAV_FILTER_KEY + ":" + view) || "";
+    }
+
+    function clearDashClock() {
+      if (dashClockTimer) {
+        clearInterval(dashClockTimer);
+        dashClockTimer = null;
+      }
+    }
+
+    function pick(obj, camel, pascal) {
+      if (!obj) return undefined;
+      if (obj[camel] !== undefined && obj[camel] !== null) return obj[camel];
+      if (pascal !== undefined && obj[pascal] !== undefined && obj[pascal] !== null) return obj[pascal];
+      return undefined;
+    }
+
+    function renderHourlyChartBlock(d) {
+      const hourlyRaw = pick(d, "hourlyRevenueToday", "HourlyRevenueToday");
+      let hourly = Array.isArray(hourlyRaw) ? hourlyRaw.map(x => Math.max(0, Number(x) || 0)) : [];
+      if (hourly.length !== 24)
+        hourly = Array(24).fill(0);
+      const maxReported = Number(pick(d, "hourlyRevenueChartMax", "HourlyRevenueChartMax")) || 0;
+      const max = Math.max(maxReported, ...hourly, 1);
+      const w = 640, h = 200, padL = 40, padR = 14, padT = 14, padB = 30;
+      const innerW = w - padL - padR;
+      const innerH = h - padT - padB;
+      const gx = i => padL + (i / 23) * innerW;
+      const gy = v => padT + innerH * (1 - v / max);
+      let grid = "";
+      for (let g = 0; g <= 4; g++) {
+        const y = padT + (g / 4) * innerH;
+        grid += "<line x1=\"" + padL + "\" y1=\"" + y.toFixed(1) + "\" x2=\"" + (w - padR) + "\" y2=\"" + y.toFixed(1) + "\" stroke=\"#2d3b50\" stroke-dasharray=\"5 6\" />";
+      }
+      const pts = hourly.map((v, i) => gx(i).toFixed(1) + "," + gy(v).toFixed(1)).join(" ");
+      const xLast = gx(23).toFixed(1);
+      const xFirst = gx(0).toFixed(1);
+      const yBase = (h - padB).toFixed(1);
+      const areaPts = pts + " " + xLast + "," + yBase + " " + xFirst + "," + yBase;
+      let hits = "";
+      for (let hour = 0; hour < 24; hour++) {
+        hits += "<rect class=\"chart-hit\" x=\"" + (gx(hour) - 13) + "\" y=\"" + padT + "\" width=\"26\" height=\"" + innerH + "\" data-hour=\"" + hour + "\" />";
+      }
+      const labs = [0, 4, 8, 12, 16, 20, 24].map(hr => {
+        const x = hr >= 24 ? padL + innerW : gx(hr);
+        return "<text x=\"" + x.toFixed(1) + "\" y=\"" + (h - 10) + "\" text-anchor=\"middle\" fill=\"#94a3b8\" font-size=\"11\" font-family=\"system-ui,sans-serif\">" + hr + "h</text>";
+      }).join("");
+      return (
+        "<div class=\"chart-wrap-hourly\">" +
+        "<svg class=\"chart-svg-hourly\" viewBox=\"0 0 " + w + " " + h + "\" xmlns=\"http://www.w3.org/2000/svg\">" +
+        "<defs><linearGradient id=\"ghourly\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\">" +
+        "<stop offset=\"0%\" stop-color=\"#3b82f6\" stop-opacity=\"0.4\"/><stop offset=\"100%\" stop-color=\"#3b82f6\" stop-opacity=\"0\"/></linearGradient></defs>" +
+        grid +
+        "<polygon fill=\"url(#ghourly)\" points=\"" + areaPts + "\" />" +
+        "<polyline fill=\"none\" stroke=\"#3b82f6\" stroke-width=\"2.5\" stroke-linejoin=\"round\" points=\"" + pts + "\" />" +
+        hits + labs +
+        "</svg></div>" +
+        "<div class=\"chart-axis-labels\"><span>0h</span><span>6h</span><span>12h</span><span>18h</span><span>24h</span></div>"
+      );
+    }
+
+    function sparklineSvg(values) {
+      if (!values || !values.length) return "";
+      const w = 120, h = 28, pad = 2;
+      const v = values.map(x => Math.max(0, Number(x) || 0));
+      const max = Math.max(...v, 1);
+      const pts = v.map((val, i) => {
+        const x = pad + (v.length <= 1 ? 0 : (i / (v.length - 1)) * (w - 2 * pad));
+        const y = pad + (h - 2 * pad) * (1 - val / max);
+        return x.toFixed(1) + "," + y.toFixed(1);
+      });
+      return "<svg class=\"kpi-spark\" viewBox=\"0 0 " + w + " " + h + "\" preserveAspectRatio=\"none\"><polyline fill=\"none\" stroke=\"#3b82f6\" stroke-width=\"1.5\" points=\"" + pts.join(" ") + "\" /></svg>";
+    }
+
+    function bindDashboardClicks(root, d) {
+      root.querySelectorAll(".js-nav").forEach(el => {
+        el.addEventListener("click", () => {
+          const view = el.getAttribute("data-nav");
+          const flt = el.getAttribute("data-filter");
+          if (view) navTo(view, { filter: flt || null });
+        });
+      });
+      root.querySelectorAll("svg .chart-hit[data-hour]").forEach(el => {
+        el.addEventListener("click", () => navTo("orders", { filter: null }));
+      });
+    }
+
+    function showLogin() {
+      clearDashClock();
+      $("app").classList.add("hidden");
+      $("loginWrap").classList.remove("hidden");
+      token = "";
+      sessionStorage.removeItem(TOKEN_KEY);
+    }
+
+    function showApp() {
+      $("loginWrap").classList.add("hidden");
+      $("app").classList.remove("hidden");
+    }
+
+    async function doLogin() {
+      $("loginErr").classList.add("hidden");
+      const staffId = ($("staffId").value || "").trim();
+      const pin = ($("pin").value || "").trim();
+      const r = await api("/api/auth/login", "POST", { staffId, pin, portal: "AdminWeb" }, false);
+      if (!r.ok || !r.body || !r.body.accessToken) {
+        $("loginErr").textContent = (r.body && r.body.message) || "Sign-in failed.";
+        $("loginErr").classList.remove("hidden");
+        return;
+      }
+      token = r.body.accessToken;
+      sessionStorage.setItem(TOKEN_KEY, token);
+      $("sessionLabel").innerHTML = "<strong>" + esc(r.body.name) + "</strong><br><span class=\"muted\">" + esc(r.body.role) + "</span>";
+      showApp();
+      navTo("dashboard");
+    }
+
+    const views = {
+      dashboard: async (el) => {
+        const r = await api("/api/admin/dashboard", "GET", null, true);
+        if (!r.ok) {
+          const hint = formatApiError(r.status, r.body);
+          el.innerHTML =
+            "<div class='danger'>HTTP " +
+            r.status +
+            (hint
+              ? "<pre class=\"api-err-detail\">" + esc(hint) + "</pre>"
+              : "") +
+            "</div>";
+          return;
+        }
+        const d = r.body;
+        const s = d.summary || d.Summary || {};
+        const roster = d.staffRoster || d.StaffRoster || [];
+        const clk = pick(s, "clockedInEmployees", "ClockedInEmployees");
+        const tact = pick(s, "totalActiveEmployees", "TotalActiveEmployees");
+        const clocked = clk != null && tact != null ? clk + "/" + tact : "—";
+        const notYet = (tact != null && clk != null) ? Math.max(0, tact - clk) + " not yet in" : "";
+
+        let kpiList = d.kpiCards || d.KpiCards;
+        if (!kpiList || !kpiList.length) {
+          const tr = pick(s, "todayRevenueUsd", "TodayRevenueUsd");
+          const trFc = pick(s, "todayRevenueFc", "TodayRevenueFc");
+          const tExp = pick(s, "todayExpensesUsd", "TodayExpensesUsd");
+          const ao = pick(s, "activeOrders", "ActiveOrders");
+          const oc = pick(s, "occupiedTables", "OccupiedTables");
+          const tt = pick(s, "totalTables", "TotalTables");
+          const av = pick(s, "availableTables", "AvailableTables");
+          const completed = pick(s, "ordersCompletedToday", "OrdersCompletedToday");
+          const inKitchen = pick(s, "inKitchenNow", "InKitchenNow");
+          const tTot = tt != null ? Number(tt) : (Number(oc || 0) + Number(av || 0));
+          kpiList = [
+            { key: "todayUsd", label: "Today's revenue (USD)", primaryText: fmtMoney(Number(tr) || 0), subtitle: "Money — entries in USD only", accentClass: "accent-blue", navView: "money", navFilter: null, sparklineUsdRevenue7d: null },
+            { key: "todayFc", label: "Today's revenue (FC)", primaryText: fmtFc(Number(trFc) || 0), subtitle: "Money — entries in FC only (not converted from USD)", accentClass: "accent-gold", navView: "money", navFilter: null, sparklineUsdRevenue7d: null },
+            { key: "todayExp", label: "Today's expenses", primaryText: fmtMoney(Number(tExp) || 0), subtitle: "All expenses in USD (FC rows use stored USD equivalent)", accentClass: "accent-red", navView: "money", navFilter: null, sparklineUsdRevenue7d: null },
+            { key: "tables", label: "Tables occupied", primaryText: (oc || 0) + "/" + (tTot || 0) + " occupied", subtitle: (ao || 0) + " active orders", accentClass: "accent-cyan", navView: "tables", navFilter: null, sparklineUsdRevenue7d: null },
+            { key: "activeOrders", label: "Active orders", primaryText: String(ao ?? "0"), subtitle: (inKitchen ?? 0) + " in kitchen now", accentClass: "accent-green", navView: "orders", navFilter: null, sparklineUsdRevenue7d: null },
+            { key: "completedToday", label: "Orders completed today", primaryText: String(completed ?? "0"), subtitle: "From orders (not Money ledger)", accentClass: "accent-purple", navView: "orders", navFilter: null, sparklineUsdRevenue7d: null }
+          ];
+        }
+
+        const kpis = kpiList.map(k => {
+          const key = k.key || k.Key || "";
+          const accent = k.accentClass || k.AccentClass || "";
+          const navView = k.navView || k.NavView || "dashboard";
+          const navFilter = k.navFilter || k.NavFilter || "";
+          const label = k.label || k.Label || key;
+          const primary = k.primaryText || k.PrimaryText || "";
+          const subtitle = k.subtitle || k.Subtitle || "";
+          const sparkRaw = k.sparklineUsdRevenue7d || k.SparklineUsdRevenue7d;
+          const spark = sparkRaw && sparkRaw.length ? "<div class=\"kpi-spark-wrap\">" + sparklineSvg(sparkRaw) + (key === "todayUsd" ? "<div class=\"kpi-spark-cap\">Sparkline: 7-day USD revenue (Money)</div>" : "") + "</div>" : "";
+          let extra = "";
+          if (key === "tables") {
+            const occ = Number(pick(s, "occupiedTables", "OccupiedTables")) || 0;
+            const tot = Number(pick(s, "totalTables", "TotalTables")) || 0;
+            const avail = Number(pick(s, "availableTables", "AvailableTables")) || 0;
+            const denom = tot > 0 ? tot : occ + avail || 1;
+            const pct = Math.min(100, Math.round(100 * occ / denom));
+            extra = "<div class=\"kpi-progress\"><i style=\"width:" + pct + "%\"></i></div>";
+          }
+          const cardClass = ("kpi-card js-nav " + accent + (key === "tables" ? " tables" : "")).trim();
+          return "<button type=\"button\" class=\"" + cardClass + "\" data-nav=\"" + esc(navView) + "\" data-filter=\"" + esc(navFilter || "") + "\">" +
+            "<div class=\"kpi-sub\">" + esc(label) + "</div>" +
+            "<div class=\"kpi-primary\">" + esc(primary) + "</div>" +
+            "<div class=\"kpi-sub\">" + esc(subtitle) + "</div>" + extra + spark +
+            "</button>";
+        }).join("");
+
+        const invRows = d.inventoryAlerts || d.InventoryAlerts || d.criticalInventoryAlerts || d.CriticalInventoryAlerts || [];
+        const inv = invRows.map(a => {
+          const name = a.name || a.Name || "";
+          const detail = a.detail || a.Detail || "";
+          const tier = (a.alertLevel || a.AlertLevel || "critical").toLowerCase();
+          const cls = tier === "reorder" ? "inv-alert reorder js-nav" : tier === "info" ? "inv-alert info js-nav" : "inv-alert js-nav";
+          return "<button type=\"button\" class=\"" + cls + "\" data-nav=\"inventory\" data-filter=\"" + esc(name) + "\"><span class=\"t\">" + esc(name) + "</span><span class=\"d\">" + esc(detail) + "</span></button>";
+        }).join("") || "<p class=\"muted\">No inventory on file.</p>";
+
+        const dishes = d.topDishesToday || d.TopDishesToday || [];
+        const topDishes = dishes.map(t => {
+          const name = t.name || t.Name || "";
+          const qty = t.quantity != null ? t.quantity : t.Quantity;
+          const pct = Number(t.barPercent != null ? t.barPercent : t.BarPercent) || 0;
+          const photoRaw = (t.photoUrl ?? t.PhotoUrl ?? "").trim();
+          const photo = photoRaw ? absPublicUrl(photoRaw) : "";
+          const img = photo
+            ? "<div class=\"top-dish-photo-wrap\"><img class=\"top-dish-photo\" src=\"" + esc(photo) + "\" alt=\"\" loading=\"lazy\"/></div>"
+            : "<div class=\"top-dish-photo-wrap top-dish-photo-ph\" aria-hidden=\"true\">No photo</div>";
+          return "<div class=\"top-dish js-nav\" style=\"cursor:pointer\" data-nav=\"menu\" data-filter=\"" + esc(name) + "\">" +
+            img +
+            "<div class=\"top-dish-text\">" +
+            "<div class=\"row\"><span>" + esc(name) + "</span><span>" + esc(String(qty ?? "")) + "</span></div>" +
+            "<div class=\"bar\"><i style=\"width:" + pct + "%\"></i></div></div></div>";
+        }).join("") || "<p class=\"muted\">No dishes yet today.</p>";
+
+        const hourlyChart = renderHourlyChartBlock(d);
+
+        const staffCards = roster.map(st => {
+          const on = st.isClockedIn != null ? st.isClockedIn : st.IsClockedIn;
+          const stl = st.statusLabel || st.StatusLabel || "";
+          return "<button type=\"button\" class=\"staff-card js-nav\" data-nav=\"employees\" data-filter=\"" + esc(st.name || st.Name || "") + "\">" +
+            "<span class=\"staff-av " + (on ? "dot-on" : "dot-off") + "\"></span>" +
+            "<div><div class=\"staff-name\">" + esc(st.name || st.Name || "") + "</div><div class=\"staff-role\">" + esc(st.role || st.Role || "") + "</div><div class=\"staff-st\">" + esc(stl) + "</div></div></button>";
+        }).join("");
+
+        const actList = d.recentActivity || d.RecentActivity || [];
+        const acts = actList.map(a =>
+          "<button type=\"button\" class=\"act-card js-nav\" data-nav=\"" + esc(a.navView || a.NavView || "") + "\" data-filter=\"" + esc(a.navFilter || a.NavFilter || "") + "\">" +
+          "<div class=\"act-kind\">" + esc(a.kindLabel || a.KindLabel || "") + "</div>" +
+          "<div class=\"act-title\">" + esc(a.title || a.Title || "") + "</div>" +
+          "<div class=\"act-detail\">" + esc(a.detailBlock || a.DetailBlock || "") + "</div></button>"
+        ).join("");
+
+        const welcomeName = d.welcomeName || d.WelcomeName || "Owner";
+        const headerSub = d.headerSubtitle || d.HeaderSubtitle || "";
+        const apiStatus = d.apiStatusText || d.ApiStatusText || "";
+
+        el.innerHTML =
+          "<div class=\"dash-wrap\">" +
+          "<header class=\"dash-header\">" +
+          "<div><h1>Welcome, " + esc(welcomeName) + "</h1>" +
+          "<p class=\"dash-sub\">" + esc(headerSub) + "</p></div>" +
+          "<div class=\"dash-meta\"><div><span class=\"status-dot\"></span>" + esc(apiStatus) + "</div>" +
+          "<div class=\"clock\" id=\"dashClock\"></div></div></header>" +
+          "<div class=\"kpi-grid\" id=\"dash-kpis\">" + kpis + "</div>" +
+          "<div class=\"dash-mid\">" +
+          "<div class=\"panel\">" +
+          "<div class=\"panel-title-row\"><h2>Inventory alerts</h2><button type=\"button\" class=\"pill-btn js-nav\" data-nav=\"inventory\">Inventory</button></div>" +
+          "<p class=\"muted\" style=\"margin:0 0 10px;\">Ten lowest on-hand quantities (by stock). Status reflects quantity rules only.</p>" + inv + "</div>" +
+          "<div class=\"panel\">" +
+          "<div class=\"panel-title-row\"><h2>Today's sales rhythm</h2></div>" +
+          "<p class=\"chart-caption\">Revenue by hour (completed &amp; open orders created today).</p>" +
+          hourlyChart +
+          "<p class=\"chart-caption\">Tap the chart to open orders · Scale max ≈ " + fmtMoney(Number(pick(d, "hourlyRevenueChartMax", "HourlyRevenueChartMax")) || 0) + "</p>" +
+          "<h3 style=\"margin:14px 0 8px;font-size:1rem;\">Top dishes today</h3>" + topDishes +
+          "</div></div>" +
+          "<section class=\"roster-section\">" +
+          "<div class=\"roster-head\"><h2>Team on roster</h2><span class=\"roster-badge\">" + esc(clocked) + " Attendance</span></div>" +
+          "<p class=\"roster-sub\">" + esc(notYet) + "</p><div class=\"roster-grid\">" + staffCards + "</div></section>" +
+          "<div class=\"dash-bottom\" style=\"grid-template-columns:1fr;\">" +
+          "<div class=\"panel\"><h2>Recent activity</h2>" +
+          "<p class=\"muted\" style=\"margin-top:0;\">Last " + actList.length + " events · tap a card to open orders, team, or inventory.</p>" +
+          "<div class=\"act-list\">" + acts + "</div></div></div></div>";
+
+        const clockEl = $("dashClock");
+        function tick() {
+          const now = new Date();
+          clockEl.textContent = now.toLocaleString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" });
+        }
+        tick();
+        clearDashClock();
+        dashClockTimer = setInterval(tick, 30 * 1000);
+
+        bindDashboardClicks(el, d);
+
+        el.querySelectorAll(".top-dish.js-nav").forEach(row => {
+          row.addEventListener("click", () => navTo("menu", { filter: row.getAttribute("data-filter") }));
+        });
+      },
+
+      orders: async (el) => {
+        const r = await api("/api/admin/data/order-summaries", "GET", null, true);
+        if (!r.ok) {
+          el.innerHTML = "<div class='danger'>HTTP " + r.status + "</div>";
+          return;
+        }
+        const hint = getNavFilter("orders");
+        if (hint) sessionStorage.removeItem(NAV_FILTER_KEY + ":orders");
+
+        function normRow(row) {
+          return {
+            id: pick(row, "id", "Id"),
+            orderId: String(pick(row, "orderId", "OrderId") ?? ""),
+            createdAt: pick(row, "createdAt", "CreatedAt"),
+            tableLabel: String(pick(row, "tableLabel", "TableLabel") ?? ""),
+            serverName: String(pick(row, "serverName", "ServerName") ?? ""),
+            grandTotal: Number(pick(row, "grandTotal", "GrandTotal") ?? 0),
+            itemsPreview: String(pick(row, "itemsPreview", "ItemsPreview") ?? ""),
+            status: String(pick(row, "status", "Status") ?? "")
+          };
+        }
+        function isPastSt(st) {
+          const s = String(st || "").toLowerCase();
+          return s === "completed" || s === "cancelled";
+        }
+        function usdSp(n) {
+          const x = Number(n);
+          if (!Number.isFinite(x)) return "$ 0.00";
+          return "$ " + x.toFixed(2);
+        }
+
+        let items = normalizeAdminEntityItems(r.body).map(normRow);
+        if (hint) {
+          const q = hint.toLowerCase();
+          items = items.filter(row => JSON.stringify(row).toLowerCase().includes(q));
+        }
+        const activeRows = items.filter(row => !isPastSt(row.status));
+        const pastRows = items.filter(row => isPastSt(row.status));
+
+        const updatedAt = new Date().toLocaleTimeString();
+
+        el.innerHTML =
+          "<div class=\"orders-view-root\">" +
+          "<div class=\"orders-toolbar\"><h1>Orders</h1><span class=\"orders-updated\" id=\"admOrdUpdated\">Updated " + esc(updatedAt) + "</span></div>" +
+          (hint ? "<p class=\"orders-hint\">Filtered from dashboard: \"" + esc(hint) + "\" · " + items.length + " row(s).</p>" : "") +
+          "<div class=\"orders-columns\">" +
+          "<div class=\"orders-col\">" +
+          "<h2>Active</h2>" +
+          "<input type=\"search\" class=\"orders-search\" id=\"admSearchActive\" placeholder=\"Search active…\" autocomplete=\"off\">" +
+          "<div class=\"orders-col-list\" id=\"admListActive\"></div></div>" +
+          "<div class=\"orders-col\">" +
+          "<h2>Past</h2>" +
+          "<label class=\"orders-day-label\" for=\"admPastDay\">Day</label>" +
+          "<select class=\"orders-day-select\" id=\"admPastDay\"></select>" +
+          "<input type=\"search\" class=\"orders-search\" id=\"admSearchPast\" placeholder=\"Search past…\" autocomplete=\"off\">" +
+          "<div class=\"orders-col-list\" id=\"admListPast\"></div></div></div></div>" +
+          "<div id=\"admOrdModal\" class=\"modal-backdrop hidden\">" +
+          "<div class=\"modal-card-admin\">" +
+          "<h3 id=\"admOrdTitle\">Order</h3>" +
+          "<pre id=\"admOrdBody\"></pre>" +
+          "<button type=\"button\" class=\"btn btn-ghost\" id=\"admOrdClose\">Close</button>" +
+          "</div></div>";
+
+        function filterByNeedle(rows, needle) {
+          if (!needle || !needle.trim()) return rows;
+          const n = needle.trim().toLowerCase();
+          return rows.filter(x => JSON.stringify(x).toLowerCase().includes(n));
+        }
+
+        function openModal(row) {
+          const ts = row.createdAt ? new Date(row.createdAt).toLocaleString() : "";
+          $("admOrdTitle").textContent = row.orderId + " · " + row.status;
+          $("admOrdBody").textContent =
+            "Placed: " + ts + "\n" +
+            "Table: " + row.tableLabel + "\n" +
+            "Server: " + row.serverName + "\n\n" +
+            "Items:\n" + (row.itemsPreview || "—") + "\n\n" +
+            "Total: " + usdSp(row.grandTotal);
+          $("admOrdModal").classList.remove("hidden");
+        }
+        function closeModal() {
+          $("admOrdModal").classList.add("hidden");
+        }
+
+        function paint() {
+          const aNeed = ($("admSearchActive").value || "");
+          const pNeed = ($("admSearchPast").value || "");
+          const al = $("admListActive");
+          const pl = $("admListPast");
+          const selPast = $("admPastDay");
+          const af = filterByNeedle(activeRows, aNeed);
+
+          const getPastTs = row => row.createdAt;
+          const pastDayKeys = collectSortedPastDayKeys(pastRows, getPastTs);
+          let pastForDay;
+          if (!pastRows.length) {
+            selPast.innerHTML = "";
+            pastForDay = [];
+          } else if (!pastDayKeys.length) {
+            selPast.innerHTML = "<option value=\"\">All past orders</option>";
+            selPast.disabled = true;
+            pastForDay = pastRows;
+          } else {
+            selPast.disabled = false;
+            const counts = {};
+            for (const row of pastRows) {
+              const k = localDayKeyFromTs(getPastTs(row));
+              if (k) counts[k] = (counts[k] || 0) + 1;
+            }
+            const prevDay = selPast.value;
+            selPast.innerHTML = pastDayKeys.map(k =>
+              "<option value=\"" + esc(k) + "\">" + esc(pastDayLabelForKey(k)) + " (" + (counts[k] || 0) + ")</option>"
+            ).join("");
+            selPast.value = pastDayKeys.includes(prevDay) ? prevDay : pastDayKeys[0];
+            const selectedDay = selPast.value;
+            pastForDay = pastRows.filter(row => localDayKeyFromTs(getPastTs(row)) === selectedDay);
+          }
+          const pf = filterByNeedle(pastForDay, pNeed);
+
+          al.innerHTML = af.length
+            ? af.map(row =>
+              "<button type=\"button\" class=\"admin-order-active\" data-adm-oid=\"" + esc(String(row.id)) + "\">" +
+              "<div class=\"row-top\"><span class=\"oid\">" + esc(row.orderId) + "</span><span class=\"st\">" + esc(row.status) + "</span></div>" +
+              "<div class=\"line\">" + esc(row.tableLabel) + "</div>" +
+              "<div class=\"line\">Server: " + esc(row.serverName) + "</div>" +
+              "<div class=\"items\">" + esc(row.itemsPreview) + "</div>" +
+              "<div class=\"tot\">" + esc(usdSp(row.grandTotal)) + "</div>" +
+              "</button>").join("")
+            : "<p class=\"muted\" style=\"padding:12px 4px;margin:0;\">No active orders.</p>";
+
+          pl.innerHTML = pf.length
+            ? pf.map(row => {
+              const ts = row.createdAt ? new Date(row.createdAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : "";
+              return (
+                "<button type=\"button\" class=\"admin-order-past\" data-adm-oid=\"" + esc(String(row.id)) + "\">" +
+                "<div class=\"hint\">Tap for details</div>" +
+                "<div class=\"line1\"><strong>" + esc(row.orderId) + "</strong> <span class=\"muted\">" + esc(row.status) + "</span> · " + esc(ts) + "</div>" +
+                "<div class=\"line2\">" + esc(row.tableLabel) + " · " + esc(usdSp(row.grandTotal)) + "</div>" +
+                "</button>");
+            }).join("")
+            : (pastRows.length
+              ? "<p class=\"muted\" style=\"padding:12px 4px;margin:0;\">No past orders for this selection" + (pNeed.trim() ? " matching search" : "") + ".</p>"
+              : "<p class=\"muted\" style=\"padding:12px 4px;margin:0;\">No past orders.</p>");
+
+          const byId = new Map(items.map(x => [String(x.id), x]));
+          al.querySelectorAll("[data-adm-oid]").forEach(b => {
+            b.addEventListener("click", () => {
+              const row = byId.get(b.getAttribute("data-adm-oid"));
+              if (row) openModal(row);
+            });
+          });
+          pl.querySelectorAll("[data-adm-oid]").forEach(b => {
+            b.addEventListener("click", () => {
+              const row = byId.get(b.getAttribute("data-adm-oid"));
+              if (row) openModal(row);
+            });
+          });
+        }
+
+        $("admSearchActive").addEventListener("input", paint);
+        $("admSearchPast").addEventListener("input", paint);
+        $("admPastDay").addEventListener("change", paint);
+        $("admOrdClose").addEventListener("click", closeModal);
+        $("admOrdModal").addEventListener("click", e => { if (e.target.id === "admOrdModal") closeModal(); });
+
+        paint();
+      },
+
+      inventory: async (el) => {
+        const r = await api("/api/admin/data/inventory", "GET", null, true);
+        if (!r.ok) {
+          el.innerHTML = "<div class='danger'>HTTP " + r.status + "</div>";
+          return;
+        }
+        const hint = getNavFilter("inventory");
+        if (hint) sessionStorage.removeItem(NAV_FILTER_KEY + ":inventory");
+
+        let raw = normalizeAdminEntityItems(r.body).map(row => ({
+          id: pick(row, "id", "Id"),
+          name: String(pick(row, "name", "Name") ?? ""),
+          uniqueId: String(pick(row, "uniqueId", "UniqueId") ?? ""),
+          stockQuantity: Number(pick(row, "stockQuantity", "StockQuantity") ?? 0),
+          unit: String(pick(row, "unit", "Unit") ?? ""),
+          expirationDate: pick(row, "expirationDate", "ExpirationDate"),
+          notes: String(pick(row, "notes", "Notes") ?? "")
+        }));
+
+        if (hint) {
+          const q = hint.toLowerCase();
+          raw = raw.filter(x =>
+            (x.name + "\n" + x.uniqueId).toLowerCase().includes(q));
+        }
+
+        let sortInv = "exp";
+
+        function expMeta(iso) {
+          if (iso == null || iso === "") return { sortKey: 999999, label: "No expiry", pct: 15, ok: true };
+          const d = new Date(iso);
+          if (Number.isNaN(d.getTime())) return { sortKey: 999998, label: "—", pct: 20, ok: true };
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const exp = new Date(d);
+          exp.setHours(0, 0, 0, 0);
+          const days = Math.round((exp - today) / 864e5);
+          let label, ok, pct;
+          if (days <= 0) { label = "Expired · " + days + " day(s)"; ok = false; pct = 100; }
+          else if (days <= 7) { label = "Critical · " + days + " day(s)"; ok = false; pct = 88; }
+          else if (days <= 14) { label = "Bad · " + days + " day(s)"; ok = false; pct = 60; }
+          else { label = "Good · " + days + " day(s)"; ok = true; pct = Math.min(96, 28 + Math.min(days, 200) / 8); }
+          return { sortKey: days, label, days, pct, ok };
+        }
+
+        function qtyLabel(qty) {
+          if (qty <= 0) return "Out";
+          if (qty <= 3) return "Critical";
+          if (qty <= 10) return "Low";
+          return "Healthy";
+        }
+
+        el.innerHTML =
+          "<div class=\"catalog-page\">" +
+          "<header class=\"catalog-header\">" +
+          "<div><h1>Inventory items</h1>" +
+          "<p class=\"catalog-sub\">Single food/ingredient records with unique IDs.</p>" +
+         (hint ? "<p class=\"muted\" style=\"margin:8px 0 0;\">Filtered from dashboard: \"" + esc(hint) + "\" · " + raw.length + " row(s).</p>" : "") +
+          "</div>" +
+          "<div class=\"catalog-actions\">" +
+          "<button type=\"button\" class=\"pill-btn\" id=\"invSortExp\">By expiration</button>" +
+          "<button type=\"button\" class=\"pill-btn\" id=\"invSortQty\">By quantity</button>" +
+          "<span class=\"read-only-pill\">Read-only web</span></div></header>" +
+          "<input type=\"search\" class=\"catalog-search\" id=\"invSearch\" placeholder=\"Search inventory…\" autocomplete=\"off\">" +
+          "<div class=\"catalog-list\" id=\"invCatalogList\"></div></div>" +
+          "<div id=\"invDetailModal\" class=\"modal-backdrop hidden\">" +
+          "<div class=\"modal-card-admin\">" +
+          "<h3 id=\"invDetailTitle\">Item</h3>" +
+          "<pre id=\"invDetailBody\"></pre>" +
+          "<button type=\"button\" class=\"btn btn-ghost\" id=\"invDetailClose\">Close</button>" +
+          "</div></div>";
+
+        function paintInv() {
+          const needle = ($("invSearch").value || "").trim().toLowerCase();
+          let rows = !needle
+            ? raw.slice()
+            : raw.filter(x =>
+              (x.name + "\n" + x.uniqueId + "\n" + x.unit + "\n" + x.notes).toLowerCase().includes(needle));
+          if (sortInv === "exp") {
+            rows.sort((a, b) => expMeta(a.expirationDate).sortKey - expMeta(b.expirationDate).sortKey);
+          } else {
+            rows.sort((a, b) => a.stockQuantity - b.stockQuantity || a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+          }
+          const list = $("invCatalogList");
+          if (!rows.length) {
+            list.innerHTML = "<p class=\"muted\">No inventory rows match.</p>";
+            return;
+          }
+          list.innerHTML = rows.map(it => {
+            const em = expMeta(it.expirationDate);
+            let expDateStr = "—";
+            if (it.expirationDate) {
+              const rawD = it.expirationDate;
+              expDateStr = typeof rawD === "string" ? rawD.slice(0, 10) : new Date(rawD).toISOString().slice(0, 10);
+            }
+            const qLab = qtyLabel(it.stockQuantity);
+            return (
+              "<article class=\"inv-card\" data-inv-id=\"" + it.id + "\">" +
+              "<div class=\"inv-card-top\">" +
+              "<div>" +
+              "<h2 class=\"inv-name\">" + esc(it.name) + "</h2>" +
+              "<div class=\"inv-id\">" + esc(it.uniqueId) + "</div>" +
+              "<div class=\"inv-stock\">Stock: " + esc(String(it.stockQuantity)) + " " + esc(it.unit) +
+              " · <span class=\"muted\">" + esc(qLab) + "</span></div>" +
+              "<div class=\"inv-exp-line\">Expires: " + esc(expDateStr) + "</div>" +
+              "</div>" +
+              "<div class=\"inv-actions\">" +
+              "<button type=\"button\" class=\"btn btn-ghost btn-sm js-inv-detail\">Details</button>" +
+              "</div></div>" +
+              "<div class=\"inv-status-row\">" +
+              "<span class=\"muted\" style=\"font-size:14px;\" aria-hidden=\"true\">⏳</span>" +
+              "<div class=\"inv-bar-wrap\"><div class=\"inv-bar " + (em.ok ? "ok" : "bad") + "\" style=\"width:" + em.pct.toFixed(1) + "%\"></div></div>" +
+              "<span class=\"muted\" style=\"font-size:13px;\">" + esc(em.label) + "</span>" +
+              "</div>" +
+              "<div class=\"inv-log\">" + esc(it.notes || "No notes on file. Full stock activity history is in Elite Pro.") + "</div>" +
+              "</article>");
+          }).join("");
+
+          list.querySelectorAll(".js-inv-detail").forEach(btn => {
+            btn.addEventListener("click", e => {
+              e.stopPropagation();
+              const card = btn.closest(".inv-card");
+              const id = Number(card.getAttribute("data-inv-id"));
+              const it = raw.find(x => x.id === id);
+              if (!it) return;
+              const em = expMeta(it.expirationDate);
+              $("invDetailTitle").textContent = it.name;
+              $("invDetailBody").textContent =
+                "ID: " + it.uniqueId + "\nStock: " + it.stockQuantity + " " + it.unit + " (" + qtyLabel(it.stockQuantity) + ")\n" +
+                "Expiration: " + (it.expirationDate || "—") + "\nShelf status: " + em.label + "\n\nNotes:\n" + (it.notes || "—");
+              $("invDetailModal").classList.remove("hidden");
+            });
+          });
+        }
+
+        $("invSortExp").addEventListener("click", () => { sortInv = "exp"; paintInv(); });
+        $("invSortQty").addEventListener("click", () => { sortInv = "qty"; paintInv(); });
+        $("invSearch").addEventListener("input", paintInv);
+        $("invDetailClose").addEventListener("click", () => $("invDetailModal").classList.add("hidden"));
+        $("invDetailModal").addEventListener("click", e => {
+          if (e.target.id === "invDetailModal") $("invDetailModal").classList.add("hidden");
+        });
+
+        paintInv();
+      },
+
+      menu: async (el) => {
+        const [r, rPub, rPi, rInv] = await Promise.all([
+          api("/api/admin/data/products", "GET", null, true),
+          api("/api/public/menu/products", "GET", null, false),
+          api("/api/admin/data/productingredients", "GET", null, true),
+          api("/api/admin/data/inventory", "GET", null, true)
+        ]);
+        if (!r.ok) {
+          el.innerHTML = "<div class='danger'>HTTP " + r.status + "</div>";
+          return;
+        }
+        const hint = getNavFilter("menu");
+        if (hint) sessionStorage.removeItem(NAV_FILTER_KEY + ":menu");
+
+        const photoById = {};
+        if (rPub.ok && Array.isArray(rPub.body)) {
+          for (const x of rPub.body) {
+            const id = x.id ?? x.Id;
+            const u = x.photoUrl ?? x.PhotoUrl;
+            if (id != null && u != null && String(u).trim())
+              photoById[id] = absPublicUrl(String(u).trim());
+          }
+        }
+
+        const invById = {};
+        const invList = rInv.ok ? normalizeAdminEntityItems(rInv.body) : [];
+        for (const rawI of invList) {
+          const n = normInvRowAdmin(rawI);
+          if (n) invById[n.id] = n;
+        }
+        const byProd = {};
+        const piList = rPi.ok ? normalizeAdminEntityItems(rPi.body) : [];
+        for (const row of piList) {
+          const pid = row.productId ?? row.ProductId;
+          const iid = row.inventoryItemId ?? row.InventoryItemId;
+          const qn = Number(row.quantity ?? row.Quantity ?? 0);
+          if (!byProd[pid]) byProd[pid] = [];
+          const inv = invById[iid];
+          const nm = inv ? inv.name : ("#" + iid);
+          const un = inv ? inv.unit : "";
+          byProd[pid].push({ name: nm, qty: qn, unit: un });
+        }
+
+        function normMenuCat(s) {
+          const t = String(s ?? "").trim();
+          return t || "Uncategorized";
+        }
+        function normMenuSub(s) {
+          const t = String(s ?? "").trim();
+          return t || "General";
+        }
+
+        let raw = normalizeAdminEntityItems(r.body).map(row => {
+          const id = pick(row, "id", "Id");
+          return {
+            id: id,
+            name: String(pick(row, "name", "Name") ?? ""),
+            category: normMenuCat(pick(row, "category", "Category")),
+            subCategory: normMenuSub(pick(row, "subCategory", "SubCategory")),
+            price: Number(pick(row, "price", "Price") ?? 0),
+            uniqueId: String(pick(row, "uniqueId", "UniqueId") ?? ""),
+            description: String(pick(row, "description", "Description") ?? ""),
+            composition: String(pick(row, "composition", "Composition") ?? ""),
+            photoUrl: photoById[id] || ""
+          };
+        });
+
+        if (hint) {
+          const q = hint.toLowerCase();
+          raw = raw.filter(x =>
+            (x.name + "\n" + x.uniqueId + "\n" + x.category + "\n" + x.subCategory + "\n" + x.description + "\n" + x.composition).toLowerCase().includes(q));
+        }
+
+        function ingHtmlForProduct(p) {
+          const lines = [];
+          const parts = byProd[p.id] || [];
+          for (const x of parts) {
+            const q = x.qty ? String(x.qty) : "";
+            const u = x.unit ? " " + x.unit : "";
+            lines.push("<li>" + esc(x.name) + (q ? " " + q + u : "") + "</li>");
+          }
+          if (!lines.length && p.composition) {
+            const bits = String(p.composition).split(/[,;]/).map(s => s.trim()).filter(Boolean);
+            for (const b of bits) lines.push("<li>" + esc(b) + "</li>");
+          }
+          if (!lines.length)
+            return "<ul class=\"menu-prod-ing\"><li>No ingredient breakdown</li></ul>";
+          return "<ul class=\"menu-prod-ing\">" + lines.join("") + "</ul>";
+        }
+
+        let sortMenu = "name";
+
+        el.innerHTML =
+          "<div class=\"catalog-page\">" +
+          "<header class=\"catalog-header\">" +
+          "<div>" +
+          "<h1 class=\"menu-page-h1\">Menu <span class=\"part-gold\">Products</span></h1>" +
+          "<p class=\"catalog-sub\">Curate the premium product catalog for service and POS. Filters follow your <strong>Menu type</strong> and <strong>Submenu type</strong> labels (e.g. Drink, Starters, Desserts, Burger, Fish).</p>" +
+          (hint ? "<p class=\"muted\" style=\"margin:10px 0 0;\">Filtered from dashboard: \"" + esc(hint) + "\" · " + raw.length + " row(s).</p>" : "") +
+          "</div>" +
+          "<div class=\"catalog-actions\">" +
+          "<button type=\"button\" class=\"pill-btn\" id=\"menuSortName\">By name</button>" +
+          "<button type=\"button\" class=\"pill-btn\" id=\"menuSortPriceHi\">Price · high</button>" +
+          "<button type=\"button\" class=\"pill-btn\" id=\"menuSortPriceLo\">Price · low</button>" +
+          "<span class=\"read-only-pill\">Read-only web</span></div></header>" +
+          "<div class=\"menu-filter-panel\">" +
+          "<div class=\"menu-filter-row\">" +
+          "<div><label class=\"menu-lbl\" for=\"menuCatSel\">Menu type</label>" +
+          "<select class=\"menu-filter-select\" id=\"menuCatSel\"></select></div>" +
+          "<div><label class=\"menu-lbl\" for=\"menuSubSel\">Submenu type</label>" +
+          "<select class=\"menu-filter-select\" id=\"menuSubSel\"></select></div></div>" +
+          "<label class=\"menu-lbl\" for=\"menuAdminSearch\">Search by name</label>" +
+          "<input type=\"search\" class=\"catalog-search\" id=\"menuAdminSearch\" placeholder=\"Search products…\" autocomplete=\"off\">" +
+          "</div>" +
+          "<div id=\"menuAdminList\"></div></div>";
+
+        function allCategories() {
+          return [...new Set(raw.map(p => p.category))].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+        }
+        function subsForCat(catVal) {
+          const set = new Set();
+          for (const p of raw) {
+            if (catVal === "__all__" || p.category === catVal) set.add(p.subCategory);
+          }
+          return [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+        }
+
+        function syncSelectors() {
+          const catSel = $("menuCatSel");
+          const subSel = $("menuSubSel");
+          const cats = allCategories();
+          const prevC = catSel.value;
+          catSel.innerHTML = "<option value=\"__all__\">All</option>" +
+            cats.map(c => "<option value=\"" + esc(c) + "\">" + esc(c) + "</option>").join("");
+          catSel.value = (prevC && (prevC === "__all__" || cats.includes(prevC))) ? prevC : "__all__";
+          const c = catSel.value;
+          const subs = subsForCat(c);
+          const prevS = subSel.value;
+          subSel.innerHTML = "<option value=\"__all__\">All</option>" +
+            subs.map(s => "<option value=\"" + esc(s) + "\">" + esc(s) + "</option>").join("");
+          subSel.value = (prevS && (prevS === "__all__" || subs.includes(prevS))) ? prevS : "__all__";
+        }
+
+        function applySort(rows) {
+          const out = rows.slice();
+          if (sortMenu === "name") {
+            out.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+          } else if (sortMenu === "priceHi") {
+            out.sort((a, b) => b.price - a.price || a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+          } else if (sortMenu === "priceLo") {
+            out.sort((a, b) => a.price - b.price || a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+          }
+          return out;
+        }
+
+        function paintMenu() {
+          const needle = ($("menuAdminSearch").value || "").trim().toLowerCase();
+          const catF = $("menuCatSel").value;
+          const subF = $("menuSubSel").value;
+          let rows = raw.filter(p => {
+            if (catF !== "__all__" && p.category !== catF) return false;
+            if (subF !== "__all__" && p.subCategory !== subF) return false;
+            if (!needle) return true;
+            return (p.name + "\n" + p.uniqueId + "\n" + p.description + "\n" + p.composition).toLowerCase().includes(needle);
+          });
+          rows = applySort(rows);
+          const list = $("menuAdminList");
+          if (!rows.length) {
+            list.innerHTML = "<p class=\"muted\">No dishes match these filters.</p>";
+            return;
+          }
+          const byCat = {};
+          for (const p of rows) {
+            if (!byCat[p.category]) byCat[p.category] = {};
+            if (!byCat[p.category][p.subCategory]) byCat[p.category][p.subCategory] = [];
+            byCat[p.category][p.subCategory].push(p);
+          }
+          const catKeys = Object.keys(byCat).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+          let html = "";
+          for (const c of catKeys) {
+            html += "<h2 class=\"menu-cat-title\">" + esc(c) + "</h2>";
+            const subs = Object.keys(byCat[c]).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+            for (const s of subs) {
+              const showSubHeading = subs.length > 1 || s !== "General";
+              if (showSubHeading) html += "<h3 class=\"menu-sub-title\">" + esc(s) + "</h3>";
+              html += "<div class=\"menu-prod-grid\">";
+              for (const p of byCat[c][s]) {
+                const imgUrl = p.photoUrl || "";
+                const thumb = imgUrl
+                  ? ("<img src=\"" + esc(imgUrl) + "\" alt=\"\" loading=\"lazy\" " +
+                     "onerror=\"this.remove();var ph=this.parentNode.querySelector('.menu-prod-thumb-ph');if(ph){ph.style.display='flex';}\">" +
+                     "<div class=\"menu-prod-thumb-ph\" style=\"display:none\" aria-hidden=\"true\">🍽</div>")
+                  : "<div class=\"menu-prod-thumb-ph\" aria-hidden=\"true\">🍽</div>";
+                html +=
+                  "<article class=\"menu-prod-card\">" +
+                  "<div class=\"menu-prod-thumb\">" + thumb + "</div>" +
+                  "<div class=\"menu-prod-body\">" +
+                  "<div class=\"menu-prod-name\">" + esc(p.name) + "</div>" +
+                  "<div class=\"menu-prod-id mono\">" + esc(p.uniqueId) + "</div>" +
+                  "<div class=\"menu-prod-price\">" + esc(fmtMenuMoney(p.price)) + "</div>" +
+                  ingHtmlForProduct(p) +
+                  "</div></article>";
+              }
+              html += "</div>";
+            }
+          }
+          list.innerHTML = html;
+        }
+
+        syncSelectors();
+        $("menuCatSel").addEventListener("change", () => { syncSelectors(); paintMenu(); });
+        $("menuSubSel").addEventListener("change", paintMenu);
+        $("menuSortName").addEventListener("click", () => { sortMenu = "name"; paintMenu(); });
+        $("menuSortPriceHi").addEventListener("click", () => { sortMenu = "priceHi"; paintMenu(); });
+        $("menuSortPriceLo").addEventListener("click", () => { sortMenu = "priceLo"; paintMenu(); });
+        $("menuAdminSearch").addEventListener("input", paintMenu);
+        paintMenu();
+      },
+
+      tables: async (el) => {
+        const r = await api("/api/admin/data/tables", "GET", null, true);
+        if (!r.ok) {
+          el.innerHTML = "<div class='danger'>HTTP " + r.status + "</div>";
+          return;
+        }
+
+        function serverLine(t) {
+          const s = t.assignedServer ?? t.AssignedServer;
+          if (!s || typeof s !== "object") return "";
+          return String(s.name ?? s.Name ?? "").trim();
+        }
+
+        let raw = normalizeAdminEntityItems(r.body).map(t => ({
+          id: pick(t, "id", "Id"),
+          tableNumber: pick(t, "tableNumber", "TableNumber"),
+          name: String(pick(t, "name", "Name") ?? ""),
+          status: String(pick(t, "status", "Status") ?? ""),
+          capacity: Number(pick(t, "capacity", "Capacity") ?? 0),
+          uniqueId: String(pick(t, "uniqueId", "UniqueId") ?? ""),
+          serverName: serverLine(t)
+        }));
+
+        el.innerHTML =
+          "<div class=\"catalog-page\">" +
+          "<header class=\"catalog-header\">" +
+          "<div>" +
+          "<h1 class=\"table-page-h1\">Table <span class=\"part-gold\">Management</span></h1>" +
+          "<p class=\"catalog-sub\">Dining capacity and live table status. Editing is available in Elite Pro — web admin is read-only.</p>" +
+          "</div>" +
+          "<span class=\"read-only-pill\">Read-only web</span></header>" +
+          "<input type=\"search\" class=\"catalog-search\" id=\"tableAdminSearch\" placeholder=\"Search tables…\" autocomplete=\"off\">" +
+          "<div id=\"tableAdminList\"></div></div>";
+
+        function statusPill(st) {
+          const s = String(st || "").toLowerCase();
+          if (s.includes("avail")) return "<span class=\"tbl-pill tbl-pill-ok\">" + esc(st) + "</span>";
+          if (s.includes("occup")) return "<span class=\"tbl-pill tbl-pill-busy\">" + esc(st) + "</span>";
+          return "<span class=\"tbl-pill tbl-pill-busy\">" + esc(st) + "</span>";
+        }
+
+        function paintTables() {
+          const needle = ($("tableAdminSearch").value || "").trim().toLowerCase();
+          let rows = !needle ? raw.slice() : raw.filter(t =>
+            (String(t.tableNumber) + "\n" + t.name + "\n" + t.uniqueId + "\n" + t.status + "\n" + t.serverName).toLowerCase().includes(needle));
+          rows.sort((a, b) => (Number(a.tableNumber) || 0) - (Number(b.tableNumber) || 0));
+          const list = $("tableAdminList");
+          if (!rows.length) {
+            list.innerHTML = "<p class=\"muted\">No tables match.</p>";
+            return;
+          }
+          list.innerHTML = rows.map(t => {
+            const srv = t.serverName
+              ? ("<span class=\"tbl-pill tbl-pill-srv\">Server: " + esc(t.serverName) + "</span>")
+              : "<span class=\"tbl-pill tbl-pill-srv\">Server: —</span>";
+            return (
+              "<div class=\"table-card\">" +
+              "<div class=\"table-card-main\">" +
+              "<div class=\"table-card-title\">Table ID " + esc(String(t.tableNumber)) + " · " + esc(t.name) + "</div>" +
+              "<div class=\"table-card-pills\">" +
+              "<span class=\"tbl-pill tbl-pill-cap\">Capacity " + esc(String(t.capacity)) + "</span>" +
+              statusPill(t.status) +
+              srv +
+              "</div></div></div>");
+          }).join("");
+        }
+
+        $("tableAdminSearch").addEventListener("input", paintTables);
+        paintTables();
+      },
+
+      employees: async (el) => {
+        const r = await api("/api/admin/data/employees-web", "GET", null, true);
+        if (!r.ok) {
+          el.innerHTML = "<div class='danger'>HTTP " + r.status + "</div>";
+          return;
+        }
+        const hint = getNavFilter("employees");
+        if (hint) sessionStorage.removeItem(NAV_FILTER_KEY + ":employees");
+
+        function initialsFromName(name) {
+          const t = String(name || "").trim();
+          if (!t) return "?";
+          const parts = t.split(/\s+/).filter(Boolean);
+          if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+          return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+        }
+
+        async function ensureEmpPhoto(imgEl, pathOrUrl) {
+          if (!imgEl || !pathOrUrl || imgEl.dataset.loaded === "1") return;
+          imgEl.dataset.loaded = "1";
+          try {
+            const res = await fetch(pathOrUrl, { headers: { "Authorization": "Bearer " + token } });
+            if (!res.ok) return;
+            const blob = await res.blob();
+            imgEl.src = URL.createObjectURL(blob);
+            imgEl.classList.add("is-visible");
+          } catch (_) { /* keep initials */ }
+        }
+
+        function workScheduleFromShifts(e) {
+          const days = [
+            ["Monday", pick(e, "mondayShift", "MondayShift")],
+            ["Tuesday", pick(e, "tuesdayShift", "TuesdayShift")],
+            ["Wednesday", pick(e, "wednesdayShift", "WednesdayShift")],
+            ["Thursday", pick(e, "thursdayShift", "ThursdayShift")],
+            ["Friday", pick(e, "fridayShift", "FridayShift")],
+            ["Saturday", pick(e, "saturdayShift", "SaturdayShift")],
+            ["Sunday", pick(e, "sundayShift", "SundayShift")]
+          ];
+          const parts = [];
+          for (const [label, sh] of days) {
+            const s = String(sh ?? "").trim();
+            if (s && !/^off$/i.test(s)) parts.push(label + " (" + s + ")");
+          }
+          return parts.length ? parts.join(", ") : "";
+        }
+
+        let raw = normalizeAdminEntityItems(r.body).map(e0 => {
+          let e = e0;
+          if (typeof e === "string") {
+            try { e = JSON.parse(e); } catch (_) { return null; }
+          }
+          if (!e || typeof e !== "object") return null;
+          let workScheduleSummary = String(pick(e, "workScheduleSummary", "WorkScheduleSummary") ?? "").trim();
+          if (!workScheduleSummary) {
+            const built = workScheduleFromShifts(e);
+            workScheduleSummary = built || "No schedule assigned.";
+          }
+          let profilePhotoUrl = String(pick(e, "profilePhotoUrl", "ProfilePhotoUrl") ?? "").trim();
+          if (!profilePhotoUrl) {
+            const legacyPath = String(pick(e, "profileImagePath", "ProfileImagePath") ?? "").trim();
+            const id = pick(e, "id", "Id");
+            if (legacyPath && id != null)
+              profilePhotoUrl = "/api/admin/data/employees-web/" + id + "/photo";
+          }
+          let todayClockInText = String(pick(e, "todayClockInText", "TodayClockInText") ?? "").trim();
+          if (!todayClockInText) todayClockInText = "Not clocked in";
+          let todayClockOutText = String(pick(e, "todayClockOutText", "TodayClockOutText") ?? "").trim();
+          if (!todayClockOutText) todayClockOutText = "Not clocked out";
+          let attendanceStatus = String(pick(e, "attendanceStatus", "AttendanceStatus") ?? "").trim();
+          if (!attendanceStatus) attendanceStatus = "Not active";
+          let joinDate = String(pick(e, "joinDate", "JoinDate") ?? "").trim();
+          return {
+            id: pick(e, "id", "Id"),
+            uniqueId: String(pick(e, "uniqueId", "UniqueId") ?? ""),
+            name: String(pick(e, "name", "Name") ?? ""),
+            role: String(pick(e, "role", "Role") ?? ""),
+            notes: String(pick(e, "notes", "Notes") ?? ""),
+            employmentStatus: String(pick(e, "employmentStatus", "EmploymentStatus") ?? ""),
+            profilePhotoUrl: profilePhotoUrl,
+            phoneNumber: String(pick(e, "phoneNumber", "PhoneNumber") ?? ""),
+            joinDate: joinDate,
+            workScheduleSummary: workScheduleSummary,
+            todayClockInText: todayClockInText,
+            todayClockOutText: todayClockOutText,
+            attendanceStatus: attendanceStatus
+          };
+        }).filter(Boolean);
+
+        if (hint) {
+          const fl = hint.toLowerCase();
+          raw = raw.filter(row => {
+            const blob = [
+              row.name, row.role, row.uniqueId, row.employmentStatus, row.notes, row.phoneNumber
+            ].join("\n").toLowerCase();
+            return blob.includes(fl);
+          });
+        }
+
+        el.innerHTML =
+          "<div class=\"catalog-page\">" +
+          "<header class=\"catalog-header\">" +
+          "<div>" +
+          "<h1 class=\"emp-page-h1\">Employee <span class=\"part-gold\">Management</span></h1>" +
+          "<p class=\"catalog-sub\">Active staff overview. Profile photos load when you expand a row (authenticated fetch).</p>" +
+          "</div>" +
+          "<span class=\"read-only-pill\">Read-only web</span></header>" +
+          (hint ? "<p class=\"muted\">Filtered: \"" + esc(hint) + "\" · " + raw.length + " staff.</p>" : "") +
+          "<input type=\"search\" class=\"catalog-search\" id=\"empAdminSearch\" placeholder=\"Search staff…\" autocomplete=\"off\">" +
+          "<div id=\"empAccList\" class=\"emp-acc-list\"></div>" +
+          "</div>";
+
+        function statusPillClass(st) {
+          const s = String(st || "").toLowerCase();
+          if (s === "active") return "emp-pill-status";
+          return "emp-pill-status inactive";
+        }
+
+        function paintEmp() {
+          const needle = ($("empAdminSearch").value || "").trim().toLowerCase();
+          let rows = !needle ? raw.slice() : raw.filter(row =>
+            (row.name + "\n" + row.role + "\n" + row.uniqueId + "\n" + row.phoneNumber + "\n" + row.notes + "\n" + row.employmentStatus)
+              .toLowerCase().includes(needle));
+          rows.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+          const list = $("empAccList");
+          if (!rows.length) {
+            list.innerHTML = "<p class=\"muted\">No staff match.</p>";
+            return;
+          }
+          list.innerHTML = rows.map(row => {
+            const ini = initialsFromName(row.name);
+            const ph = row.phoneNumber.trim()
+              ? ("<span class=\"emp-tag\">Phone " + esc(row.phoneNumber) + "</span>")
+              : "<span class=\"emp-tag emp-tag-muted\">Phone —</span>";
+            const joined = row.joinDate
+              ? ("<span class=\"emp-tag\">Joined " + esc(row.joinDate) + "</span>")
+              : "<span class=\"emp-tag emp-tag-muted\">Joined —</span>";
+            const notesText = row.notes.trim() ? esc(row.notes) : "—";
+            const photoUrl = row.profilePhotoUrl.trim();
+            const imgTag = photoUrl
+              ? ("<img class=\"emp-photo-img\" alt=\"\" data-src=\"" + esc(photoUrl) + "\" />")
+              : "";
+            return (
+              "<section class=\"emp-acc-item\" data-emp-id=\"" + esc(String(row.id)) + "\">" +
+              "<button type=\"button\" class=\"emp-acc-hdr\" aria-expanded=\"false\">" +
+              "<span style=\"display:flex;flex-direction:column;align-items:flex-start;gap:6px;flex:1;min-width:0\">" +
+              "<span class=\"emp-acc-title\">" + esc(row.name) + "</span>" +
+              "<span class=\"emp-acc-hdr-pills\">" +
+              "<span class=\"emp-pill emp-pill-role\">" + esc(row.role || "—") + "</span>" +
+              "<span class=\"emp-pill " + statusPillClass(row.employmentStatus) + "\">" + esc(row.employmentStatus || "—") + "</span>" +
+              "</span></span>" +
+              "<span class=\"emp-acc-chev\" aria-hidden=\"true\">▼</span>" +
+              "</button>" +
+              "<div class=\"emp-acc-body\" hidden>" +
+              "<div class=\"emp-acc-inner\">" +
+              "<div>" +
+              "<div class=\"emp-photo-box\">" +
+              (imgTag || "") +
+              "<div class=\"emp-photo-initials\">" + esc(ini) + "</div>" +
+              "</div>" +
+              "<label class=\"emp-notes-lbl\">Notes</label>" +
+              "<div class=\"emp-notes-box\">" + notesText + "</div>" +
+              "</div>" +
+              "<div>" +
+              "<div class=\"emp-detail-sec\">" +
+              "<h4>Contact</h4>" +
+              "<div class=\"emp-tag-row\">" + ph + joined + "</div></div>" +
+              "<div class=\"emp-detail-sec\">" +
+              "<h4>Attendance (today)</h4>" +
+              "<div class=\"emp-tag-row\">" +
+              "<span class=\"emp-tag emp-tag-muted\">Clock in: " + esc(row.todayClockInText) + "</span>" +
+              "<span class=\"emp-tag emp-tag-muted\">Clock out: " + esc(row.todayClockOutText) + "</span>" +
+              "<span class=\"emp-tag\">Status: " + esc(row.attendanceStatus) + "</span>" +
+              "</div></div>" +
+              "<div class=\"emp-detail-sec\">" +
+              "<h4>Work schedule</h4>" +
+              "<div class=\"emp-schedule-bar\">" + esc(row.workScheduleSummary) + "</div>" +
+              "</div></div></div></div></section>");
+          }).join("");
+
+          list.querySelectorAll(".emp-acc-hdr").forEach(btn => {
+            btn.addEventListener("click", () => {
+              const item = btn.closest(".emp-acc-item");
+              const body = item.querySelector(".emp-acc-body");
+              const open = !item.classList.contains("open");
+              item.classList.toggle("open", open);
+              btn.setAttribute("aria-expanded", open ? "true" : "false");
+              body.hidden = !open;
+              if (open) {
+                const img = body.querySelector(".emp-photo-img");
+                const rel = img && img.getAttribute("data-src");
+                if (img && rel) ensureEmpPhoto(img, rel);
+              }
+            });
+          });
+        }
+
+        $("empAdminSearch").addEventListener("input", paintEmp);
+        paintEmp();
+      },
+
+      money: async (el) => {
+        const hint = getNavFilter("money");
+        if (hint) sessionStorage.removeItem(NAV_FILTER_KEY + ":money");
+
+        let period = "Week";
+        let lastSnap = null;
+
+        function isoLocalDateFromApi(d) {
+          const x = d == null ? null : new Date(d);
+          if (!x || Number.isNaN(x.getTime())) return "";
+          const y = x.getFullYear();
+          const m = String(x.getMonth() + 1).padStart(2, "0");
+          const day = String(x.getDate()).padStart(2, "0");
+          return y + "-" + m + "-" + day;
+        }
+
+        function fmtMoneyLedgerWhen(iso) {
+          const d = new Date(iso);
+          if (Number.isNaN(d.getTime())) return "—";
+          const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+          const day = String(d.getDate()).padStart(2, "0");
+          const mon = months[d.getMonth()];
+          const hh = String(d.getHours()).padStart(2, "0");
+          const mm = String(d.getMinutes()).padStart(2, "0");
+          return day + " " + mon + " " + hh + ":" + mm;
+        }
+
+        function escAttr(s) {
+          return String(s ?? "").replace(/[&<>"']/g, c => (
+            { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]
+          ));
+        }
+
+        function renderShell() {
+          el.innerHTML =
+            "<div class=\"money-dash\" id=\"moneyDashRoot\">" +
+            "<header class=\"money-dash-head\">" +
+            "<h1>Money <span class=\"part-gold\">Dashboard</span></h1>" +
+            "<p class=\"money-dash-sub\">Daily revenue and expenses in real-time.</p>" +
+            "</header>" +
+            "<div class=\"money-dash-kpis\">" +
+            "<div class=\"money-kpi\"><div class=\"money-kpi-lbl\">Today revenue</div><div class=\"money-kpi-val rev\" id=\"moneyKpiRev\">—</div></div>" +
+            "<div class=\"money-kpi\"><div class=\"money-kpi-lbl\">Today expenses</div><div class=\"money-kpi-val exp\" id=\"moneyKpiExp\">—</div></div>" +
+            "<div class=\"money-kpi\"><div class=\"money-kpi-lbl\">Today net</div><div class=\"money-kpi-val\" id=\"moneyKpiNet\">—</div></div>" +
+            "</div>" +
+            "<div class=\"money-toolbar\">" +
+            "<div class=\"money-toolbar-showing\">Showing: <strong id=\"moneyPeriodLabel\">—</strong></div>" +
+            "<div class=\"money-preset-group\" id=\"moneyPresetGroup\">" +
+            "<button type=\"button\" class=\"money-preset-btn\" data-money-preset=\"Today\">Today</button>" +
+            "<button type=\"button\" class=\"money-preset-btn\" data-money-preset=\"Week\">Week</button>" +
+            "<button type=\"button\" class=\"money-preset-btn\" data-money-preset=\"Month\">Month</button>" +
+            ("<button type=\"button\" class=\"money-preset-btn\" data-money-preset=\"Year\">Year</button>" +
+            "<button type=\"button\" class=\"money-preset-btn\" data-money-preset=\"All\">All</button>") +
+            "</div>" +
+            "<button type=\"button\" class=\"btn btn-sm\" style=\"background:var(--accent-blue);color:#0b1220;border:none;font-weight:700\" id=\"moneyBtnRefresh\">Refresh</button>" +
+            "</div>" +
+            "<div class=\"money-dash-main\">" +
+            "<div class=\"money-ledger-panel\">" +
+            "<h2>Ledger — latest 200 entries</h2>" +
+            "<div class=\"money-ledger-scroll\"><table class=\"money-ledger\">" +
+            "<thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Justification</th><th class=\"cell-amt\">Amount</th></tr></thead>" +
+            "<tbody id=\"moneyLedgerBody\"><tr><td colspan=\"5\" class=\"muted\">Loading…</td></tr></tbody>" +
+            "</table></div></div>" +
+            "<aside class=\"money-sidebar\">" +
+            "<div class=\"money-side-card\"><div class=\"lbl\">Period revenue</div><div class=\"fig rev\" id=\"moneySideRev\">—</div></div>" +
+            "<div class=\"money-side-card\"><div class=\"lbl\">Period expenses</div><div class=\"fig exp\" id=\"moneySideExp\">—</div></div>" +
+            "<div class=\"money-side-card\"><div class=\"lbl\">Period net</div><div class=\"fig\" id=\"moneySideNet\">—</div></div>" +
+            "<div class=\"money-summary-list\">" +
+            "<h3>Summary</h3><dl>" +
+            "<dt>Sales</dt><dd id=\"moneySumSales\">—</dd>" +
+            "<dt>Tips</dt><dd id=\"moneySumTips\">—</dd>" +
+            "<dt>Payroll</dt><dd id=\"moneySumPayroll\">—</dd>" +
+            "</dl></div>" +
+            "<div><button type=\"button\" class=\"money-report-btn\" id=\"moneyBtnReport\">Generate Report (PDF)</button>" +
+            "<p class=\"money-report-note\">Backend export is Excel (Daily timeline) for the dates in this view.</p></div>" +
+            "</aside></div></div>";
+
+          el.querySelector("#moneyBtnRefresh").addEventListener("click", () => load());
+          el.querySelector("#moneyPresetGroup").addEventListener("click", (ev) => {
+            const btn = ev.target.closest("[data-money-preset]");
+            if (!btn) return;
+            period = btn.getAttribute("data-money-preset") || "Week";
+            load();
+          });
+          el.querySelector("#moneyBtnReport").addEventListener("click", exportPeriodExcel);
+        }
+
+        function applySnapshot(snap) {
+          lastSnap = snap;
+          const rev = snap.todayRevenueText ?? snap.TodayRevenueText ?? "";
+          const exp = snap.todayExpensesText ?? snap.TodayExpensesText ?? "";
+          const net = snap.todayNetProfitText ?? snap.TodayNetProfitText ?? "";
+          const netCol = snap.todayNetProfitColor ?? snap.TodayNetProfitColor ?? "#4ade80";
+          const lbl = snap.selectedPeriodLabel ?? snap.SelectedPeriodLabel ?? "";
+
+          el.querySelector("#moneyKpiRev").textContent = rev || "—";
+          el.querySelector("#moneyKpiExp").textContent = exp || "—";
+          const netEl = el.querySelector("#moneyKpiNet");
+          netEl.textContent = net || "—";
+          netEl.style.color = netCol;
+
+          el.querySelector("#moneyPeriodLabel").textContent = lbl || "—";
+
+          el.querySelector("#moneySideRev").textContent = snap.totalRevenueText ?? snap.TotalRevenueText ?? "—";
+          el.querySelector("#moneySideExp").textContent = snap.totalExpensesText ?? snap.TotalExpensesText ?? "—";
+          const sideNet = el.querySelector("#moneySideNet");
+          sideNet.textContent = snap.netProfitText ?? snap.NetProfitText ?? "—";
+          sideNet.style.color = snap.netProfitColor ?? snap.NetProfitColor ?? "#e8eef4";
+
+          el.querySelector("#moneySumSales").textContent = snap.salesSummaryText ?? snap.SalesSummaryText ?? "—";
+          el.querySelector("#moneySumTips").textContent = snap.tipsSummaryText ?? snap.TipsSummaryText ?? "—";
+          el.querySelector("#moneySumPayroll").textContent = snap.payrollSummaryText ?? snap.PayrollSummaryText ?? "—";
+
+          const items = snap.ledgerItems ?? snap.LedgerItems ?? [];
+          const tb = el.querySelector("#moneyLedgerBody");
+          if (!items.length) {
+            tb.innerHTML = "<tr><td colspan=\"5\" class=\"muted\">No ledger rows for this period.</td></tr>";
+          } else {
+            tb.innerHTML = items.map(row => {
+              const dt = row.date ?? row.Date;
+              const typ = String(row.type ?? row.Type ?? "");
+              const cat = String(row.category ?? row.Category ?? "");
+              const jus = String(row.justification ?? row.Justification ?? "");
+              const amt = String(row.amountText ?? row.AmountText ?? "");
+              const col = String(row.amountColor ?? row.AmountColor ?? "#e8eef4");
+              return "<tr><td>" + esc(fmtMoneyLedgerWhen(dt)) + "</td><td>" + esc(typ) + "</td><td>" + esc(cat) + "</td><td>" + esc(jus) + "</td><td class=\"cell-amt\" style=\"color:" + escAttr(col) + "\">" + esc(amt) + "</td></tr>";
+            }).join("");
+          }
+
+          el.querySelectorAll("[data-money-preset]").forEach(b => {
+            b.classList.toggle("active", (b.getAttribute("data-money-preset") || "") === period);
+          });
+        }
+
+        async function load() {
+          const r = await api("/api/admin/data/money-web/snapshot?period=" + encodeURIComponent(period), "GET", null, true);
+          if (!r.ok) {
+            if (!el.querySelector("#moneyDashRoot")) {
+              el.innerHTML = "<div class='danger'>Money dashboard failed (HTTP " + r.status + ").</div>";
+            } else {
+              el.querySelector("#moneyLedgerBody").innerHTML =
+                "<tr><td colspan=\"5\" class=\"danger\">Could not load snapshot (HTTP " + r.status + ").</td></tr>";
+            }
+            return;
+          }
+          if (!el.querySelector("#moneyDashRoot")) renderShell();
+          applySnapshot(r.body);
+        }
+
+        async function exportPeriodExcel() {
+          if (!lastSnap) return;
+          const start = isoLocalDateFromApi(lastSnap.reportStartDate ?? lastSnap.ReportStartDate);
+          const end = isoLocalDateFromApi(lastSnap.reportEndDate ?? lastSnap.ReportEndDate);
+          if (!start || !end) {
+            alert("Could not determine export range.");
+            return;
+          }
+          const qs = "type=Daily&start=" + encodeURIComponent(start) + "&end=" + encodeURIComponent(end);
+          const res = await fetch("/api/admin/reports/export?" + qs, { headers: { "Authorization": "Bearer " + token } });
+          if (!res.ok) {
+            alert("Export failed: " + res.status);
+            return;
+          }
+          const blob = await res.blob();
+          const u = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = u;
+          a.download = "daily-report-" + start + "-to-" + end + ".xlsx";
+          a.click();
+          URL.revokeObjectURL(u);
+        }
+
+        renderShell();
+        await load();
+      },
+
+      reports: async (el) => {
+        const today = new Date();
+        const start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7);
+        const iso = d => d.toISOString().slice(0, 10);
+
+        el.innerHTML =
+          "<div class=\"reports-page\">" +
+          "<div class=\"reports-hero\">" +
+          "<div class=\"reports-hero-text\">" +
+          "<h1>General Reports</h1>" +
+          "<p class=\"reports-hero-sub\">Day-grouped <strong>Daily</strong> and <strong>Orders</strong> reports for the date range below. For staff, tables, stock, and menu items, use the sidebar views. Excel exports still include all report types.</p>" +
+          "</div>" +
+          "<div class=\"reports-controls\">" +
+          "<div class=\"field\"><label for=\"repStart\">Start date</label><input type=\"date\" id=\"repStart\" value=\"" + iso(start) + "\"></div>" +
+          "<div class=\"field\"><label for=\"repEnd\">End date</label><input type=\"date\" id=\"repEnd\" value=\"" + iso(today) + "\"></div>" +
+          "<div class=\"field\"><label for=\"repScopeSelect\">Report type</label>" +
+          "<select id=\"repScopeSelect\">" +
+          "<option value=\"daily\">Daily</option>" +
+          "<option value=\"orders\">Orders</option>" +
+          "</select></div>" +
+          "<div class=\"reports-btn-row\">" +
+          "<button type=\"button\" class=\"btn btn-ghost btn-sm\" id=\"btnReportsExport\">Export Excel</button>" +
+          "<button type=\"button\" class=\"btn btn-ghost btn-sm\" id=\"btnReportsBulk\">Bulk Excel</button>" +
+          "<button type=\"button\" class=\"btn btn-primary btn-sm reports-btn-refresh\" id=\"btnReportsRefresh\">Refresh</button>" +
+          "</div></div></div>" +
+          "<div class=\"reports-tabs\" id=\"reportsTabs\">" +
+          "<button type=\"button\" class=\"reports-tab active\" data-rep-tab=\"daily\">Daily Report</button>" +
+          "<button type=\"button\" class=\"reports-tab\" data-rep-tab=\"orders\">Orders</button>" +
+          "</div>" +
+          "<div class=\"reports-feed-title\" id=\"reportsFeedSectionTitle\">Chronological daily feed across all entities</div>" +
+          "<div id=\"reportsContent\"><p class=\"muted\">Loading…</p></div>" +
+          "</div>";
+
+        let activeRepTab = "daily";
+
+        const tabTitles = {
+          daily: "Chronological daily feed across all entities",
+          orders: "Order activity in range"
+        };
+
+        const exportTypeMap = {
+          daily: "Daily",
+          orders: "Orders"
+        };
+
+        function syncScopeSelect() {
+          const sel = $("repScopeSelect");
+          if (sel) sel.value = activeRepTab;
+        }
+
+        function setActiveTabButtons() {
+          document.querySelectorAll("[data-rep-tab]").forEach(b => {
+            b.classList.toggle("active", b.getAttribute("data-rep-tab") === activeRepTab);
+          });
+          const title = $("reportsFeedSectionTitle");
+          if (title) title.textContent = tabTitles[activeRepTab] || tabTitles.daily;
+        }
+
+        function formatEntryMetric(ent) {
+          const oc = Number(ent.ordersCount ?? ent.OrdersCount ?? 0) || 0;
+          const ic = Number(ent.itemCount ?? ent.ItemCount ?? 0) || 0;
+          const uu = Number(ent.unitUsage ?? ent.UnitUsage ?? 0) || 0;
+          if (oc > 0) return oc + " order" + (oc === 1 ? "" : "s");
+          if (ic > 0) return ic + " item" + (ic === 1 ? "" : "s");
+          if (uu > 0) return uu + " units";
+          return "—";
+        }
+
+        function escDetailLines(s) {
+          return String(s ?? "")
+            .split("\n")
+            .map(line => esc(line))
+            .join("<br>");
+        }
+
+        function renderReportDayTableRows(day) {
+          const entries = day.entries ?? day.Entries ?? [];
+          let rows = "";
+          for (const ent of entries) {
+            const rawT = ent.eventTime ?? ent.EventTime;
+            const d = rawT ? new Date(rawT) : null;
+            const timeStr =
+              d && !Number.isNaN(d.getTime())
+                ? d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })
+                : "—";
+            const typ = ent.eventType ?? ent.EventType ?? "";
+            const sum = ent.summary ?? ent.Summary ?? "";
+            const rel = ent.relatedInfo ?? ent.RelatedInfo ?? "";
+            const ctx = ent.entityContext ?? ent.EntityContext ?? "";
+            rows += "<tr>";
+            rows += "<td class=\"reports-cell-time\">" + esc(timeStr) + "</td>";
+            rows += "<td>" + esc(typ) + "</td>";
+            rows += "<td class=\"reports-cell-detail\">" + escDetailLines(sum) + "</td>";
+            rows += "<td class=\"reports-cell-related\">" + esc(rel);
+            if (ctx)
+              rows += "<div class=\"reports-cell-sub\">" + esc(ctx) + "</div>";
+            rows += "</td>";
+            rows += "<td class=\"reports-cell-metric\">" + esc(formatEntryMetric(ent)) + "</td>";
+            rows += "</tr>";
+          }
+          return rows;
+        }
+
+        function renderReportTimeline(data, opts) {
+          opts = opts || {};
+          const useDayDropdown = opts.useDayDropdown === true;
+          const summary = data.summaryText ?? data.SummaryText ?? "";
+          const days = data.days ?? data.Days ?? [];
+          if (!days.length)
+            return "<p class=\"reports-placeholder\">No events in this range.</p>";
+
+          let html = "";
+          if (summary)
+            html += "<p class=\"reports-feed-summary\">" + esc(summary) + "</p>";
+
+          if (useDayDropdown) {
+            html += "<div class=\"reports-day-picker field\"><label for=\"repDayPicker\">Day</label>";
+            html += "<select id=\"repDayPicker\" class=\"reports-day-select\">";
+            days.forEach((day, idx) => {
+              const dayText = day.dayText ?? day.DayText ?? ("Day " + (idx + 1));
+              const totals = day.totalsText ?? day.TotalsText ?? "";
+              html += "<option value=\"" + idx + "\">" + esc(dayText + " — " + totals) + "</option>";
+            });
+            html += "</select></div>";
+
+            days.forEach((day, idx) => {
+              const dayText = day.dayText ?? day.DayText ?? "";
+              const totals = day.totalsText ?? day.TotalsText ?? "";
+              const hiddenAttr = idx === 0 ? "" : " hidden";
+              html += "<div class=\"reports-day-panel reports-day-block\"" + hiddenAttr + " data-day-index=\"" + idx + "\">";
+              html += "<div class=\"reports-day-inline-head\">";
+              html += "<span class=\"reports-day-title\">" + esc(dayText) + "</span>";
+              html += "<span class=\"reports-day-meta\">" + esc(totals) + "</span></div>";
+              html += "<div class=\"reports-table-wrap\"><table class=\"reports-table\">";
+              html += "<thead><tr><th>Time</th><th>Category</th><th>Details</th><th>Related</th><th>Summary</th></tr></thead><tbody>";
+              html += renderReportDayTableRows(day);
+              html += "</tbody></table></div></div>";
+            });
+            return html;
+          }
+
+          for (const day of days) {
+            const dayText = day.dayText ?? day.DayText ?? "";
+            const totals = day.totalsText ?? day.TotalsText ?? "";
+            html += "<div class=\"reports-day-block\">";
+            html += "<div class=\"reports-day-head\"><span class=\"reports-day-title\">" + esc(dayText) + "</span>";
+            html += "<span class=\"reports-day-meta\">" + esc(totals) + "</span></div>";
+            html += "<div class=\"reports-table-wrap\"><table class=\"reports-table\">";
+            html += "<thead><tr><th>Time</th><th>Category</th><th>Details</th><th>Related</th><th>Summary</th></tr></thead><tbody>";
+            html += renderReportDayTableRows(day);
+            html += "</tbody></table></div></div>";
+          }
+          return html;
+        }
+
+        function wireReportDayPicker(host) {
+          if (!host) return;
+          const sel = host.querySelector("#repDayPicker");
+          const panels = host.querySelectorAll(".reports-day-panel");
+          if (!sel || !panels.length) return;
+          function show(idx) {
+            const n = Math.max(0, Math.min(panels.length - 1, Number(idx) || 0));
+            panels.forEach((p, j) => {
+              if (j === n) p.removeAttribute("hidden");
+              else p.setAttribute("hidden", "");
+            });
+            sel.value = String(n);
+          }
+          sel.addEventListener("change", () => show(sel.value));
+          show(sel.value || 0);
+        }
+
+        async function refreshContent() {
+          const content = $("reportsContent");
+          const qs = buildReportQueryString();
+
+          if (!content) return;
+          content.innerHTML = "<p class=\"muted\">Loading…</p>";
+
+          if (activeRepTab === "daily") {
+            const r = await api("/api/admin/reports/daily?" + qs, "GET", null, true);
+            if (!r.ok) {
+              content.innerHTML = "<div class='danger'>HTTP " + r.status + "</div>";
+              return;
+            }
+            content.innerHTML = renderReportTimeline(r.body, { useDayDropdown: true });
+            wireReportDayPicker(content);
+            return;
+          }
+
+          if (activeRepTab === "orders") {
+            const r = await api("/api/admin/reports/orders?" + qs, "GET", null, true);
+            if (!r.ok) {
+              content.innerHTML = "<div class='danger'>HTTP " + r.status + "</div>";
+              return;
+            }
+            content.innerHTML = renderReportTimeline(r.body, { useDayDropdown: true });
+            wireReportDayPicker(content);
+            return;
+          }
+
+          activeRepTab = "daily";
+          syncScopeSelect();
+          setActiveTabButtons();
+          content.innerHTML = "<p class=\"reports-placeholder\">Choose Daily or Orders above.</p>";
+        }
+
+        function onTabClick(tab) {
+          activeRepTab = tab === "orders" ? "orders" : "daily";
+          syncScopeSelect();
+          setActiveTabButtons();
+          refreshContent();
+        }
+
+        document.querySelectorAll("[data-rep-tab]").forEach(btn => {
+          btn.addEventListener("click", () => onTabClick(btn.getAttribute("data-rep-tab") || "daily"));
+        });
+
+        $("repScopeSelect").addEventListener("change", () => {
+          const v = $("repScopeSelect").value || "daily";
+          activeRepTab = v === "orders" ? "orders" : "daily";
+          setActiveTabButtons();
+          refreshContent();
+        });
+
+        $("repStart").addEventListener("change", () => refreshContent());
+        $("repEnd").addEventListener("change", () => refreshContent());
+
+        $("btnReportsRefresh").addEventListener("click", () => {
+          refreshContent();
+        });
+
+        $("btnReportsExport").addEventListener("click", async () => {
+          const qs = buildReportQueryString();
+          const type = exportTypeMap[activeRepTab] || "Daily";
+          const res = await fetch(
+            "/api/admin/reports/export?type=" + encodeURIComponent(type) + "&" + qs,
+            { headers: { Authorization: "Bearer " + token } }
+          );
+          if (!res.ok) {
+            alert("Export failed: " + res.status);
+            return;
+          }
+          const blob = await res.blob();
+          const u = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = u;
+          a.download = type.toLowerCase().replace(/\s+/g, "-") + "-report.xlsx";
+          a.click();
+          URL.revokeObjectURL(u);
+        });
+
+        $("btnReportsBulk").addEventListener("click", async () => {
+          const qs = buildReportQueryString();
+          const res = await fetch(
+            "/api/admin/reports/export?type=" + encodeURIComponent("All Reports") + "&" + qs,
+            { headers: { Authorization: "Bearer " + token } }
+          );
+          if (!res.ok) {
+            alert("Bulk export failed: " + res.status);
+            return;
+          }
+          const blob = await res.blob();
+          const u = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = u;
+          a.download = "reports-bulk.xlsx";
+          a.click();
+          URL.revokeObjectURL(u);
+        });
+
+        syncScopeSelect();
+        setActiveTabButtons();
+        await refreshContent();
+      }
+    };
+
+    function renderJsonTable(el, title, res, cols, filterHint) {
+      if (!res.ok) {
+        el.innerHTML = "<div class='danger'>HTTP " + res.status + "</div>";
+        return;
+      }
+      let items = normalizeAdminEntityItems(res.body);
+      if (filterHint) {
+        const fl = filterHint.toLowerCase();
+        items = items.filter(row => cols.some(c => {
+          let v = row[c] ?? row[c.charAt(0).toUpperCase() + c.slice(1)];
+          return v != null && String(v).toLowerCase().includes(fl);
+        }));
+      }
+      el.innerHTML = "<div class=\"panel\"><h2>" + esc(title) + "</h2>" +
+        (filterHint ? "<p class=\"muted\">Filtered: \"" + esc(filterHint) + "\" · " + items.length + " row(s).</p>" : "") +
+        "<table class=\"data\"><thead><tr>" +
+        cols.map(c => "<th>" + esc(c) + "</th>").join("") + "</tr></thead><tbody>" +
+        items.map(row => "<tr>" + cols.map(c => {
+          let v = row[c] ?? row[c.charAt(0).toUpperCase() + c.slice(1)];
+          if (v && typeof v === "object") v = JSON.stringify(v);
+          return "<td>" + esc(v) + "</td>";
+        }).join("") + "</tr>").join("") + "</tbody></table></div>";
+    }
+
+    function buildReportQueryString() {
+      const sEl = document.getElementById("repStart");
+      const eEl = document.getElementById("repEnd");
+      const s = (sEl && sEl.value) || "";
+      const e = (eEl && eEl.value) || "";
+      return "start=" + encodeURIComponent(s) + "&end=" + encodeURIComponent(e);
+    }
+
+    async function navTo(name, opts) {
+      opts = opts || {};
+      if (opts.filter && name) setNavFilter(name, opts.filter);
+      document.querySelectorAll(".nav-btn").forEach(b => b.classList.toggle("active", b.getAttribute("data-view") === name));
+      const el = $("main");
+      let mainExtras = "";
+      if (name === "orders") mainExtras += " main--orders";
+      if (name === "money") mainExtras += " main--money";
+      if (name === "reports") mainExtras += " main--reports";
+      el.className = "main-area" + mainExtras;
+      el.innerHTML = "<p class=\"muted\">Loading…</p>";
+      clearDashClock();
+      const fn = views[name];
+      if (fn) await fn(el);
+    }
+
+    document.querySelectorAll(".nav-btn").forEach(btn => {
+      btn.addEventListener("click", () => navTo(btn.getAttribute("data-view")));
+    });
+
+    $("btnLogin").addEventListener("click", doLogin);
+    $("btnLogout").addEventListener("click", showLogin);
+
+    if (token) {
+      showApp();
+      api("/api/admin/dashboard", "GET", null, true).then(r => {
+        if (r.ok) {
+          $("sessionLabel").innerHTML = "<span class=\"muted\">Signed in</span>";
+          navTo("dashboard");
+        } else showLogin();
+      });
+    }
+  </script>
+</body>
+</html>

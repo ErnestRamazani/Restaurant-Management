@@ -9,13 +9,23 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --navy: #0f1923;
+      --navy: #0b0e14;
+      --navy-elev: #121722;
+      --surface: #161c28;
+      --surface-hover: #1c2433;
       --cream: #f7f5f0;
-      --amber: #f59e0b;
-      --amber-dim: #d97706;
-      --text-dark: #1f2937;
-      --text-muted: #64748b;
-      --radius: 12px;
+      --amber: #e8a838;
+      --amber-dim: #c98f2a;
+      --text-dark: #e8eaef;
+      --text-muted: #8b93a7;
+      --border: rgba(255, 255, 255, 0.08);
+      --accent-blue: #38bdf8;
+      --accent-rose: #fb7185;
+      --accent-violet: #a78bfa;
+      --accent-teal: #2dd4bf;
+      --accent-lime: #a3e635;
+      --radius: 14px;
+      --radius-sm: 10px;
     }
     * { box-sizing: border-box; }
     body {
@@ -24,7 +34,7 @@
       background: var(--navy);
       color: #e8eef4;
     }
-    .layout { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+    .layout { display: grid; grid-template-columns: 220px 1fr; grid-template-rows: 1fr; min-height: 100vh; }
     .sidebar {
       border-right: 1px solid #1e293b;
       background: var(--navy);
@@ -54,14 +64,15 @@
       text-transform: uppercase; letter-spacing: 0.06em; display: inline-block; margin-top: 6px;
     }
     #app .main-area {
-      padding: 12px 16px 20px;
-      min-height: 100vh;
-      background: var(--cream);
+      padding: 16px 18px 24px;
+      min-height: 0;
+      align-self: stretch;
+      background: linear-gradient(165deg, var(--navy) 0%, #0d1219 45%, #0a0d12 100%);
       color: var(--text-dark);
       min-width: 0;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 14px;
     }
     #loginWrap.main-area {
       min-height: 100vh;
@@ -73,48 +84,49 @@
     }
     #loginWrap .card {
       max-width: 420px; width: 100%;
-      border: 1px solid #e5e7eb; border-radius: var(--radius); background: #fff;
+      border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface);
       padding: 22px; color: var(--text-dark);
-      box-shadow: 0 12px 40px rgba(0,0,0,0.08);
+      box-shadow: 0 24px 60px rgba(0,0,0,0.45);
     }
-    #loginWrap h1 { margin: 0 0 8px; font-size: 1.35rem; }
+    #loginWrap h1 { margin: 0 0 8px; font-size: 1.35rem; color: var(--text-dark); }
     #loginWrap .lead { color: var(--text-muted); font-size: 14px; margin: 0 0 18px; line-height: 1.5; }
-    label.lbl { display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.12em; color: #64748b; margin-bottom: 6px; }
+    label.lbl { display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 6px; }
     input.inp, select.sel, textarea.txa {
-      width: 100%; min-height: 44px; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: var(--radius);
-      font-family: inherit; font-size: 15px; background: #fff; color: var(--text-dark);
+      width: 100%; min-height: 44px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      font-family: inherit; font-size: 15px; background: var(--navy-elev); color: var(--text-dark);
     }
     textarea.txa { min-height: 72px; resize: vertical; }
     .btn {
       min-height: 44px; padding: 0 16px; border-radius: var(--radius); font-family: inherit; font-weight: 600;
       font-size: 14px; cursor: pointer; border: none;
     }
-    .btn-primary { background: var(--amber); color: #111827; }
+    .btn-primary { background: linear-gradient(135deg, var(--amber), var(--amber-dim)); color: #0a0c10; box-shadow: 0 4px 14px rgba(232, 168, 56, 0.25); }
     .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-    .btn-ghost { background: #f1f5f9; color: var(--text-dark); border: 1px solid #e2e8f0; }
+    .btn-ghost { background: var(--surface); color: var(--text-dark); border: 1px solid var(--border); }
     .btn-sm { min-height: 36px; padding: 0 12px; font-size: 13px; }
-    .btn-danger { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+    .btn-danger { background: rgba(127, 29, 29, 0.35); color: #fecaca; border: 1px solid rgba(248, 113, 113, 0.4); }
     .btn-block { width: 100%; }
     .hidden { display: none !important; }
     .muted { color: var(--text-muted); font-size: 12px; }
-    .danger { color: #dc2626; background: #fef2f2; border: 1px solid #fecaca; padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
-    .muted.ok { color: #059669; }
+    .danger { color: #fecaca; background: rgba(127, 29, 29, 0.35); border: 1px solid rgba(248, 113, 113, 0.35); padding: 10px 12px; border-radius: var(--radius-sm); font-size: 13px; margin-bottom: 12px; }
+    .muted.ok { color: #6ee7b7; }
     .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
     .toolbar-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-end; flex: 1; min-width: 200px; }
-    .toolbar h2 { margin: 0; font-size: 1.15rem; }
+    .toolbar h2 { margin: 0; font-size: 1.2rem; font-weight: 700; letter-spacing: -0.02em; }
     .hub-pill {
       font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em;
       padding: 4px 10px; border-radius: 999px; font-weight: 600;
     }
-    .hub-pill.ok { background: #d1fae5; color: #065f46; }
-    .hub-pill.warn { background: #fef3c7; color: #92400e; }
-    .hub-pill.off { background: #e5e7eb; color: #4b5563; }
-    .view-panel { flex: 1; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+    .hub-pill.ok { background: rgba(45, 212, 191, 0.2); color: #5eead4; border: 1px solid rgba(45, 212, 191, 0.35); }
+    .hub-pill.warn { background: rgba(232, 168, 56, 0.18); color: #fbbf24; border: 1px solid rgba(232, 168, 56, 0.35); }
+    .hub-pill.off { background: var(--surface); color: var(--text-muted); border: 1px solid var(--border); }
+    .view-panel { flex: 1; display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow: hidden; }
     .nav-stack { display: flex; flex-direction: column; gap: 6px; }
     .card-panel {
-      background: #fff; border: 1px solid #e5e7eb; border-radius: var(--radius); padding: 16px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.2);
     }
-    .card-panel h3 { margin: 0 0 10px; font-size: 1rem; }
+    .card-panel h3 { margin: 0 0 10px; font-size: 0.95rem; font-weight: 600; color: #cbd5e1; }
     .row-flex { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
     .grow { flex: 1; min-width: 140px; }
     .take-split {
@@ -127,42 +139,113 @@
       .who { width: 100%; }
     }
     .list-scroll {
-      flex: 1; overflow-y: auto; min-height: 200px; max-height: min(52vh, 520px);
-      border: 1px solid #e5e7eb; border-radius: var(--radius); background: #fafafa;
+      flex: 1; overflow-y: auto; min-height: 0;
+      border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--navy-elev);
     }
+    .take-split .list-scroll { min-height: 200px; }
+    .orders-split {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      align-items: stretch;
+    }
+    .orders-split .card-panel {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      flex: 1;
+    }
+    .orders-split .list-scroll { min-height: 0; }
     .product-row, .cart-row {
       display: flex; justify-content: space-between; align-items: center; gap: 8px;
-      padding: 10px 14px; border-bottom: 1px solid #f1f5f9; font-size: 13px;
+      padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 13px;
     }
-    .order-row { padding: 12px 14px; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
-    .table-menu-row {
-      display: flex; justify-content: space-between; align-items: flex-start;
-      gap: 12px; flex-wrap: wrap; padding: 12px 14px; border-bottom: 1px solid #f1f5f9; font-size: 13px;
+    button.product-row {
+      width: 100%; text-align: left; font-family: inherit; font-size: inherit;
+      background: transparent; border: none; color: inherit; cursor: pointer;
+      border-radius: var(--radius-sm); margin: 2px 0;
+      display: flex; justify-content: space-between; align-items: center; gap: 8px;
     }
+    button.product-row:hover { background: var(--surface-hover); }
+    button.product-row:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+    .product-row--disabled { opacity: 0.45; cursor: not-allowed; }
+    .order-card {
+      border-bottom: 1px solid var(--border); font-size: 13px; background: transparent;
+    }
+    button.order-card__hit {
+      width: 100%; display: block; text-align: left; padding: 12px 14px 4px;
+      border: none; background: transparent; color: inherit; cursor: pointer; font-family: inherit; font-size: inherit;
+    }
+    button.order-card__hit:hover { background: var(--surface-hover); }
+    button.order-card__hit:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: -2px; }
+    .order-card__actions {
+      display: flex; flex-wrap: wrap; gap: 8px; padding: 0 14px 12px;
+    }
+    .order-row { padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 13px; }
+    .table-menu-card { border-bottom: 1px solid var(--border); }
+    button.table-menu-card__hit {
+      width: 100%; text-align: left; padding: 12px 14px; border: none; background: transparent;
+      color: inherit; cursor: pointer; font-family: inherit; font-size: 13px;
+    }
+    button.table-menu-card__hit:hover { background: var(--surface-hover); }
+    .table-menu-card__actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 14px 12px; }
     .kpi-grid {
-      display: grid; grid-template-columns: repeat(2, minmax(110px, 1fr)); gap: 8px; margin-top: 10px;
+      display: grid; grid-template-columns: repeat(2, minmax(110px, 1fr)); gap: 10px; margin-top: 12px;
     }
-    .kpi-grid .box { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; background: #f8fafc; font-size: 13px; }
+    .kpi-tile {
+      position: relative; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 12px 12px;
+      background: var(--navy-elev); font-size: 13px; text-align: left; cursor: pointer; font-family: inherit; color: inherit;
+      transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+    }
+    .kpi-tile::before {
+      content: ""; position: absolute; top: 0; left: 12px; right: 12px; height: 3px; border-radius: 0 0 4px 4px;
+      background: var(--kpi-accent, var(--amber));
+    }
+    .kpi-tile:hover { transform: translateY(-2px); background: var(--surface-hover); box-shadow: 0 8px 28px rgba(0,0,0,0.25); }
+    .kpi-tile:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+    .kpi-tile .k { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-top: 0; }
+    .kpi-tile .v { font-size: 1.2rem; font-weight: 700; margin-top: 6px; }
+    .kpi-tile--blue { --kpi-accent: var(--accent-blue); }
+    .kpi-tile--amber { --kpi-accent: var(--amber); }
+    .kpi-tile--rose { --kpi-accent: var(--accent-rose); }
+    .kpi-tile--teal { --kpi-accent: var(--accent-teal); }
+    .kpi-tile--violet { --kpi-accent: var(--accent-violet); }
+    .kpi-tile--lime { --kpi-accent: var(--accent-lime); }
     fieldset.ticket-field {
-      border: 1px solid #e5e7eb; border-radius: var(--radius); padding: 12px 14px; margin: 0;
+      border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; margin: 0;
     }
     fieldset.ticket-field legend { font-size: 12px; color: var(--text-muted); padding: 0 6px; }
     .search-field {
       flex: 1; min-width: 160px; max-width: 360px; min-height: 44px; padding: 0 14px;
-      border: 1px solid #d1d5db; border-radius: var(--radius); font-family: inherit; font-size: 15px;
-      background: #fff; color: var(--text-dark);
+      border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: inherit; font-size: 15px;
+      background: var(--navy-elev); color: var(--text-dark);
     }
-    .orders-split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    #viewOrders .search-field {
+      flex: 0 0 auto;
+      flex-grow: 0;
+      width: 100%;
+      max-width: none;
+      min-height: 38px;
+      height: 38px;
+      box-sizing: border-box;
+    }
     @media (max-width: 900px) { .orders-split { grid-template-columns: 1fr; } }
     .mono { font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
     .menu-section { margin-bottom: 18px; }
-    .menu-section h3 { margin: 0 0 10px; font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; }
+    .menu-section h3 { margin: 0 0 10px; font-size: 0.85rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em; }
+    .menu-section h4 { margin: 12px 0 8px; font-size: 0.8rem; color: var(--text-muted); }
     .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
-    .menu-card {
-      background: #fff; border: 1px solid #e5e7eb; border-radius: var(--radius); padding: 12px 14px;
+    button.menu-card {
+      background: var(--navy-elev); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px;
       font-size: 13px; line-height: 1.4;
       display: grid; grid-template-columns: 76px 1fr; gap: 12px; align-items: start;
+      text-align: left; cursor: pointer; font-family: inherit; color: inherit;
+      transition: border-color 0.15s, transform 0.12s, box-shadow 0.12s;
     }
+    button.menu-card:hover { border-color: rgba(232, 168, 56, 0.45); transform: translateY(-2px); box-shadow: 0 10px 28px rgba(0,0,0,0.22); }
+    button.menu-card:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
     .menu-card-text { min-width: 0; }
     .menu-thumb {
       width: 76px; height: 76px; border-radius: 10px; overflow: hidden;
@@ -184,13 +267,13 @@
     }
     .modal-backdrop.hidden { display: none !important; }
     .modal-card {
-      background: #fff; color: var(--text-dark); border-radius: var(--radius); max-width: 560px; width: 100%;
-      padding: 20px 22px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto;
+      background: var(--surface); color: var(--text-dark); border: 1px solid var(--border); border-radius: var(--radius); max-width: 560px; width: 100%;
+      padding: 20px 22px; box-shadow: 0 28px 70px rgba(0,0,0,0.55); max-height: 90vh; overflow-y: auto;
     }
     .modal-card h3 { margin: 0 0 12px; }
     .modal-card pre.detail-pre {
-      white-space: pre-wrap; font-size: 12px; background: #f8fafc; border: 1px solid #e5e7eb;
-      border-radius: 8px; padding: 12px; max-height: 320px; overflow: auto; margin: 0 0 12px;
+      white-space: pre-wrap; font-size: 12px; background: var(--navy-elev); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 12px; max-height: 320px; overflow: auto; margin: 0 0 12px;
     }
   </style>
 </head>
@@ -290,11 +373,11 @@
           <div id="draftStatus" class="muted" style="margin-top:8px;">Drafts sync with the server.</div>
         </div>
         <div class="take-split">
-          <div class="card-panel" style="display:flex; flex-direction:column; min-height:280px;">
+          <div class="card-panel" style="display:flex; flex-direction:column; min-height:0;">
             <h3>Products</h3>
             <div id="products" class="list-scroll"></div>
           </div>
-          <div class="card-panel" style="display:flex; flex-direction:column; min-height:280px;">
+          <div id="takeOrderCartPanel" class="card-panel" style="display:flex; flex-direction:column; min-height:0;">
             <h3>Cart &amp; totals</h3>
             <div class="row-flex" style="margin-bottom:8px;">
               <textarea class="txa grow" id="customerNotes" placeholder="Customer notes" style="min-height:56px;"></textarea>
@@ -310,14 +393,14 @@
               </select>
               <input class="inp" id="discountValue" type="number" step="0.01" min="0" placeholder="Value" style="max-width:140px;">
             </div>
-            <div id="cartItems" class="list-scroll" style="max-height:min(28vh,240px);"></div>
-            <div class="kpi-grid">
-              <div class="box"><div class="muted">Items</div><div id="itemCount">0</div></div>
-              <div class="box"><div class="muted">Subtotal</div><div id="subtotalUsd">$ 0.00</div></div>
-              <div class="box"><div class="muted">Tax</div><div id="taxAmount">$ 0.00</div></div>
-              <div class="box"><div class="muted">Service</div><div id="serviceAmount">$ 0.00</div></div>
-              <div class="box"><div class="muted">Discount</div><div id="discountAmount">$ 0.00</div></div>
-              <div class="box"><div class="muted">Grand total</div><div id="grandTotal">$ 0.00</div></div>
+            <div id="cartItems" class="list-scroll"></div>
+            <div class="kpi-grid" aria-label="Order totals — tap to focus cart or send">
+              <button type="button" class="kpi-tile kpi-tile--blue" data-kpi="cart" title="Scroll to line items"><span class="k">Items</span><span class="v" id="itemCount">0</span></button>
+              <button type="button" class="kpi-tile kpi-tile--amber" data-kpi="cart"><span class="k">Subtotal</span><span class="v" id="subtotalUsd">$ 0.00</span></button>
+              <button type="button" class="kpi-tile kpi-tile--teal" data-kpi="cart"><span class="k">Tax</span><span class="v" id="taxAmount">$ 0.00</span></button>
+              <button type="button" class="kpi-tile kpi-tile--violet" data-kpi="cart"><span class="k">Service</span><span class="v" id="serviceAmount">$ 0.00</span></button>
+              <button type="button" class="kpi-tile kpi-tile--rose" data-kpi="cart"><span class="k">Discount</span><span class="v" id="discountAmount">$ 0.00</span></button>
+              <button type="button" class="kpi-tile kpi-tile--lime" data-kpi="submit" title="Focus send to kitchen"><span class="k">Grand total</span><span class="v" id="grandTotal">$ 0.00</span></button>
             </div>
             <div class="row-flex" style="margin-top:12px;">
               <button type="button" class="btn btn-ghost" id="btnClearOrder">Clear</button>
@@ -334,22 +417,24 @@
         </div>
         <div class="card-panel">
           <p class="muted" style="margin:0 0 8px;">Pending tickets need release to kitchen or cancel. <strong>Complete payment</strong> only when status is <strong>Served</strong>.</p>
-          <div id="cashierAlerts" class="mono" style="white-space:pre-wrap; font-size:12px; color:#b45309;"></div>
+          <div id="cashierAlerts" class="mono" style="white-space:pre-wrap; font-size:12px; color:#fbbf24;"></div>
         </div>
         <div class="card-panel">
           <h3>Awaiting validation</h3>
-          <div id="pendingOrders" class="list-scroll" style="max-height:min(40vh,380px);"></div>
+          <div id="pendingOrders" class="list-scroll" style="min-height:120px; max-height:min(36vh,340px);"></div>
         </div>
         <div class="orders-split">
           <div class="card-panel">
             <h3>Active</h3>
             <input class="search-field" id="activeSearch" type="search" placeholder="Search active…" style="width:100%; max-width:none; margin-bottom:8px;">
-            <div id="activeOrders" class="list-scroll" style="max-height:min(44vh,420px);"></div>
+            <div id="activeOrders" class="list-scroll"></div>
           </div>
           <div class="card-panel">
             <h3>Past</h3>
+            <label class="lbl" for="pastDaySelect">Day</label>
+            <select class="sel" id="pastDaySelect" style="width:100%; max-width:none; margin-bottom:8px;"></select>
             <input class="search-field" id="pastSearch" type="search" placeholder="Search past…" style="width:100%; max-width:none; margin-bottom:8px;">
-            <div id="pastOrders" class="list-scroll" style="max-height:min(44vh,420px);"></div>
+            <div id="pastOrders" class="list-scroll"></div>
           </div>
         </div>
       </div>
@@ -361,7 +446,7 @@
         </div>
         <div class="card-panel">
           <p class="muted" style="margin:0 0 8px;">Open the <strong>guest</strong> ordering screen (same as the QR / table link) for any table. Uses this site’s address — if your public menu is hosted elsewhere, open that site with <span class="mono">?table=</span> and the table id.</p>
-          <div id="tableMenuList" class="list-scroll" style="max-height:min(70vh,560px); background:#fff;"></div>
+          <div id="tableMenuList" class="list-scroll" style="max-height:min(70vh,560px);"></div>
         </div>
       </div>
 
@@ -383,7 +468,7 @@
           <button type="button" class="btn btn-ghost" id="btnRefreshRes">Refresh</button>
         </div>
         <div class="card-panel">
-          <div id="reservationsList" class="list-scroll" style="max-height:min(70vh,560px); background:#fff;"></div>
+          <div id="reservationsList" class="list-scroll" style="max-height:min(70vh,560px);"></div>
         </div>
       </div>
     </main>

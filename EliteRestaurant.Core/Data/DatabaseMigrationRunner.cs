@@ -14,9 +14,27 @@ public static class DatabaseMigrationRunner
     private const int AdvisoryLockKey1 = 0x454C_5445; // 'ELTE' (Elite)
     private const int AdvisoryLockKey2 = 0x4442_4D47; // 'DBMG' (DB migration)
 
-    public static void ApplyPendingMigrations()
+    /// <summary>
+    /// Optional host configuration connection string (e.g. <c>IConfiguration.GetConnectionString("DefaultConnection")</c>).
+    /// When set, uses the same <see cref="AppDbContext.TryGetPostgreSqlConnectionString"/> resolution as API startup
+    /// (including this value as the configured default connection) so migrations run against the same database as the API.
+    /// </summary>
+    /// <param name="configurationDefaultConnection">Pass null for desktop/tools that rely only on env vars and on-disk appsettings.</param>
+    public static void ApplyPendingMigrations(string? configurationDefaultConnection = null)
     {
-        using var db = new AppDbContext();
+        if (!AppDbContext.TryGetPostgreSqlConnectionString(out var cs, configurationDefaultConnection)
+            && !AppDbContext.TryGetDatabaseUrlLastResort(out cs))
+        {
+            Console.WriteLine(
+                "[EliteRestaurant] Skipping EF migrations: no PostgreSQL connection string " +
+                "(same condition as API when the database provider is not configured).");
+            return;
+        }
+
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql(cs, npgsql => npgsql.EnableRetryOnFailure(5))
+            .Options;
+        using var db = new AppDbContext(options);
         var database = db.Database;
         var connection = database.GetDbConnection();
         var wasOpen = connection.State == ConnectionState.Open;

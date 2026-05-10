@@ -13,22 +13,24 @@ public sealed class AuthController(TabletAuthService authService, JwtTokenServic
     [HttpPost("login")]
     public ActionResult<CloudLoginResponse> Login([FromBody] CloudLoginRequest request)
     {
-        var session = authService.Login(request.StaffId, request.Pin, request.Portal);
-        if (session is null)
-            return Unauthorized(new { message = "Invalid staff ID / PIN for selected portal." });
+        var outcome = authService.Login(request.StaffId, request.Pin, request.Portal);
+        if (outcome.Session is null)
+            return Unauthorized(new { message = outcome.ErrorMessage ?? "Sign-in failed." });
 
-        var jwt = jwtTokenService.CreateToken(session, out var expiresAtUtc);
-        var responsePortal = string.Equals(session.Portal, "Admin", StringComparison.OrdinalIgnoreCase)
-            ? request.Portal
-            : session.Portal;
+        var jwt = jwtTokenService.CreateToken(outcome.Session, out var expiresAtUtc);
+        var responsePortal =
+            string.Equals(outcome.Session.Portal, "Admin", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(outcome.Session.Portal, "AdminWeb", StringComparison.OrdinalIgnoreCase)
+                ? request.Portal
+                : outcome.Session.Portal;
         return Ok(new CloudLoginResponse(
             AccessToken: jwt,
             ExpiresAtUtc: expiresAtUtc,
-            EmployeeId: session.EmployeeId,
-            EmployeeUniqueId: session.EmployeeUniqueId,
-            Name: session.Name,
-            Role: session.Role,
-            SignInId: session.SignInId,
+            EmployeeId: outcome.Session.EmployeeId,
+            EmployeeUniqueId: outcome.Session.EmployeeUniqueId,
+            Name: outcome.Session.Name,
+            Role: outcome.Session.Role,
+            SignInId: outcome.Session.SignInId,
             Portal: responsePortal));
     }
 }

@@ -123,7 +123,7 @@
       const subNames = Object.keys(subs).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
       for (const sc of subNames) {
         if (subNames.length > 1 || sc !== "General")
-          html += '<h4 style="margin:12px 0 8px;font-size:0.8rem;color:#64748b;">' + escapeHtml(sc) + '</h4>';
+          html += '<h4 class="menu-sub">' + escapeHtml(sc) + '</h4>';
         html += '<div class="menu-grid">';
         const list = subs[sc].slice().sort((a, b) => a.p.name.localeCompare(b.p.name, undefined, { sensitivity: "base" }));
         for (const row of list) {
@@ -137,19 +137,29 @@
               'onerror="this.classList.add(\'hidden\');var n=this.nextElementSibling;if(n)n.classList.remove(\'hidden\');">' +
               '<div class="menu-thumb-ph hidden" aria-hidden="true">🍽</div></div>';
           }
-          html += '<div class="menu-card">' + thumb + '<div class="menu-card-text">';
+          html += '<button type="button" class="menu-card" data-menu-search="' + escapeHtml(p.name) + '">' + thumb + '<div class="menu-card-text">';
           html += '<div class="title">' + escapeHtml(p.name) + '</div>';
           html += '<div class="price">$ ' + p.price.toFixed(2) + '</div>';
           if (p.description)
             html += '<div class="muted" style="margin-bottom:8px;font-size:12px;">' + escapeHtml(p.description) + '</div>';
           html += '<div class="ing"><strong>Ingredients</strong> · ' + escapeHtml(row.ingText) + '</div>';
-          html += '</div></div>';
+          html += '<div class="muted" style="margin-top:8px;font-size:11px;">Tap to jump to Take order with this search</div>';
+          html += '</div></button>';
         }
         html += '</div>';
       }
       html += '</div>';
     }
     $("menuBody").innerHTML = html;
+    $("menuBody").querySelectorAll(".menu-card").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const q = btn.getAttribute("data-menu-search") || "";
+        setView("take");
+        $("prodSearch").value = q;
+        renderProducts();
+        $("takeOrderCartPanel")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      });
+    });
   }
 
   async function loadMenu() {
@@ -281,15 +291,20 @@
     const rows = currentFilteredProducts();
     if (!rows.length) { el.innerHTML = "<div class='product-row'>No products found.</div>"; return; }
     el.innerHTML = rows.map(p => {
-      const stock = p.inStock !== false ? "" : " <span class='muted'>(out)</span>";
+      const disabled = p.inStock === false;
+      const stock = !disabled ? "" : " <span class='muted'>(out)</span>";
+      const cls = "product-row" + (disabled ? " product-row--disabled" : "");
+      const disAttr = disabled ? " disabled" : "";
       return (
-        "<div class='product-row'>" +
+        "<button type='button' class='" + cls + "' data-add='" + p.id + "'" + disAttr + ">" +
         "<div><strong>" + escapeHtml(p.name) + "</strong>" + stock + "<br><span class='muted'>" +
         escapeHtml(p.category) + " / " + escapeHtml(p.subCategory) + " · " + escapeHtml(p.uniqueId) + "</span></div>" +
-        "<div class='row-flex' style='align-items:center;'>" + fmtUsd(p.price) +
-        "<button type='button' class='btn btn-ghost btn-sm' data-add='" + p.id + "'>Add</button></div></div>");
+        "<div class='row-flex' style='align-items:center;'><span class='muted'>" + fmtUsd(p.price) + "</span>" +
+        (disabled ? "" : "<span class='muted' style='font-size:11px;text-transform:uppercase;'>Tap row to add</span>") +
+        "</div></button>");
     }).join("");
     el.querySelectorAll("[data-add]").forEach(b => b.onclick = () => {
+      if (b.disabled) return;
       const id = Number(b.getAttribute("data-add"));
       const p = products.find(x => x.id === id);
       if (p && p.inStock === false) return;
@@ -543,8 +558,36 @@
     return rows.filter(o => JSON.stringify(o).toLowerCase().includes(n));
   }
 
+  function localDayKeyFromTs(ts) {
+    if (ts == null || ts === "") return "";
+    const d = new Date(ts);
+    if (Number.isNaN(d.getTime())) return "";
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + day;
+  }
+
+  function pastDayLabelForKey(key) {
+    if (!key) return "";
+    const parts = key.split("-").map(Number);
+    if (parts.length !== 3 || parts.some(n => Number.isNaN(n))) return key;
+    const dt = new Date(parts[0], parts[1] - 1, parts[2]);
+    return dt.toLocaleDateString(undefined, { weekday: "short", year: "numeric", month: "short", day: "numeric" });
+  }
+
+  function collectSortedPastDayKeys(rows, getTs) {
+    const set = new Set();
+    for (const r of rows) {
+      const k = localDayKeyFromTs(getTs(r));
+      if (k) set.add(k);
+    }
+    return [...set].sort().reverse();
+  }
+
   function renderCashierAlerts(lines) {
     const el = $("cashierAlerts");
+    if (!el) return;
     if (!lines || !lines.length) { el.textContent = ""; return; }
     el.textContent = lines.join("\n");
   }
@@ -573,6 +616,7 @@
 
   function renderPendingOrders() {
     const el = $("pendingOrders");
+    if (!el) return;
     if (!pendingRows.length) { el.innerHTML = "<div class='muted' style='padding:16px;'>No tickets awaiting validation.</div>"; return; }
     el.innerHTML = pendingRows.map(o => {
       const id = o.id ?? o.Id;
@@ -583,16 +627,17 @@
       const gt = o.grandTotalText ?? o.GrandTotalText ?? "";
       const cat = o.createdAtText ?? o.CreatedAtText ?? "";
       return (
-        "<div class='order-row'>" +
+        "<div class='order-card'>" +
+        "<button type='button' class='order-card__hit' data-open-p='" + id + "'>" +
         "<div><strong>" + escapeHtml(code) + "</strong> · " + escapeHtml(tbl) + "</div>" +
         "<div class='muted'>Server: " + escapeHtml(srv) + " · " + escapeHtml(cat) + "</div>" +
         "<div class='muted'>" + escapeHtml(lines) + "</div><div>" + escapeHtml(gt) + "</div>" +
-        "<div class='row-flex' style='margin-top:8px;'>" +
-        "<button type='button' class='btn btn-ghost btn-sm' data-view-p='" + id + "'>View</button>" +
+        "</button>" +
+        "<div class='order-card__actions'>" +
         "<button type='button' class='btn btn-primary btn-sm' data-release='" + id + "'>Release to kitchen</button>" +
         "<button type='button' class='btn btn-danger btn-sm' data-cancel-p='" + id + "'>Cancel</button></div></div>");
     }).join("");
-    el.querySelectorAll("[data-view-p]").forEach(b => b.onclick = () => openOrderDetail(Number(b.getAttribute("data-view-p"))));
+    el.querySelectorAll("[data-open-p]").forEach(b => b.onclick = () => openOrderDetail(Number(b.getAttribute("data-open-p"))));
     el.querySelectorAll("[data-release]").forEach(b => b.onclick = async () => {
       const id = Number(b.getAttribute("data-release"));
       if (!confirm("Release to kitchen? Inventory will be deducted.")) return;
@@ -619,18 +664,19 @@
       const st = o.status ?? o.Status ?? "";
       const complete = o.showCompleteInOrders ?? o.ShowCompleteInOrders;
       return (
-        "<div class='order-row'>" +
+        "<div class='order-card'>" +
+        "<button type='button' class='order-card__hit' data-open='" + id + "'>" +
         "<div><strong>" + escapeHtml(oid) + "</strong> <span class='muted'>" + escapeHtml(st) + "</span></div>" +
         "<div class='muted'>" + escapeHtml(o.tableNumber ?? o.TableNumber ?? "") + "</div>" +
         "<div class='muted'>Server: " + escapeHtml(o.serverName ?? o.ServerName ?? "") + "</div>" +
         "<div class='muted'>" + escapeHtml(o.items ?? o.Items ?? "") + "</div>" +
-        "<div>" + fmtUsd(o.total ?? o.Total) + "</div>" +
-        "<div class='row-flex' style='margin-top:8px;'>" +
-        "<button type='button' class='btn btn-ghost btn-sm' data-view='" + id + "'>View</button>" +
-        (complete ? "<button type='button' class='btn btn-primary btn-sm' data-complete='" + id + "'>Complete</button>" : "") +
+        "<div style=\"font-size:1.05rem;font-weight:700;margin-top:6px;\">" + fmtUsd(o.total ?? o.Total) + "</div>" +
+        "</button>" +
+        "<div class='order-card__actions'>" +
+        (complete ? "<button type='button' class='btn btn-primary btn-sm' data-complete='" + id + "'>Complete payment</button>" : "") +
         "<button type='button' class='btn btn-danger btn-sm' data-cancel-o='" + id + "'>Cancel</button></div></div>");
     }).join("");
-    el.querySelectorAll("[data-view]").forEach(b => b.onclick = () => openOrderDetail(Number(b.getAttribute("data-view"))));
+    el.querySelectorAll("[data-open]").forEach(b => b.onclick = () => openOrderDetail(Number(b.getAttribute("data-open"))));
     el.querySelectorAll("[data-complete]").forEach(b => b.onclick = () => openPaymentModal(Number(b.getAttribute("data-complete"))));
     el.querySelectorAll("[data-cancel-o]").forEach(b => b.onclick = async () => {
       if (!confirm("Cancel this order?")) return;
@@ -641,21 +687,64 @@
 
   function renderPastOrders() {
     const el = $("pastOrders");
-    const needle = ($("pastSearch") && $("pastSearch").value) || "";
-    const rows = filterRows(pastOrderRows, needle);
-    if (!rows.length) { el.innerHTML = "<div class='muted' style='padding:16px;'>No past orders.</div>"; return; }
+    const sel = $("pastDaySelect");
+    if (!el || !sel) return;
+    const getTs = o => o.createdAt ?? o.CreatedAt;
+    const dayKeys = collectSortedPastDayKeys(pastOrderRows, getTs);
+    if (!pastOrderRows.length) {
+      sel.innerHTML = "";
+      el.innerHTML = "<div class='muted' style='padding:16px;'>No past orders.</div>";
+      return;
+    }
+    let rows;
+    if (!dayKeys.length) {
+      sel.innerHTML = "<option value=\"\">All past orders</option>";
+      sel.disabled = true;
+      sel.value = "";
+      const needle = ($("pastSearch") && $("pastSearch").value) || "";
+      rows = filterRows(pastOrderRows, needle);
+    } else {
+      sel.disabled = false;
+      const counts = {};
+      for (const o of pastOrderRows) {
+        const k = localDayKeyFromTs(getTs(o));
+        if (k) counts[k] = (counts[k] || 0) + 1;
+      }
+      const prevDay = sel.value;
+      sel.innerHTML = dayKeys.map(k =>
+        "<option value=\"" + escapeHtml(k) + "\">" + escapeHtml(pastDayLabelForKey(k)) + " (" + (counts[k] || 0) + ")</option>"
+      ).join("");
+      sel.value = dayKeys.includes(prevDay) ? prevDay : dayKeys[0];
+      const day = sel.value;
+      const needle = ($("pastSearch") && $("pastSearch").value) || "";
+      rows = filterRows(
+        pastOrderRows.filter(o => localDayKeyFromTs(getTs(o)) === day),
+        needle
+      );
+    }
+    if (!rows.length) {
+      const searched = Boolean(($("pastSearch") && $("pastSearch").value || "").trim());
+      const msg = searched
+        ? "No past orders match your search."
+        : (!dayKeys.length ? "No past orders to show." : "No past orders for this day.");
+      el.innerHTML = "<div class='muted' style='padding:16px;'>" + msg + "</div>";
+      return;
+    }
     el.innerHTML = rows.map(o => {
       const id = o.id ?? o.Id;
       const oid = o.orderId ?? o.OrderId ?? "";
       const st = o.status ?? o.Status ?? "";
       const time = o.time ?? o.Time ?? "";
+      const tbl = escapeHtml(o.tableNumber ?? o.TableNumber ?? "");
       return (
-        "<div class='order-row'>" +
+        "<div class='order-card'>" +
+        "<button type='button' class='order-card__hit' data-open-pt='" + id + "'>" +
+        "<div class='muted' style='font-size:11px;margin-bottom:4px;'>Tap for details</div>" +
         "<div><strong>" + escapeHtml(oid) + "</strong> <span class='muted'>" + escapeHtml(st) + "</span> · " + escapeHtml(time) + "</div>" +
-        "<div class='muted'>" + escapeHtml(o.tableNumber ?? o.TableNumber ?? "") + " · " + fmtUsd(o.total ?? o.Total) + "</div>" +
-        "<button type='button' class='btn btn-ghost btn-sm' data-view-pt='" + id + "'>View</button></div>");
+        "<div class='muted'>" + tbl + " · " + fmtUsd(o.total ?? o.Total) + "</div>" +
+        "</button></div>");
     }).join("");
-    el.querySelectorAll("[data-view-pt]").forEach(b => b.onclick = () => openOrderDetail(Number(b.getAttribute("data-view-pt"))));
+    el.querySelectorAll("[data-open-pt]").forEach(b => b.onclick = () => openOrderDetail(Number(b.getAttribute("data-open-pt"))));
   }
 
   async function openOrderDetail(orderId) {
@@ -767,22 +856,25 @@
       const srv = t.assignedServerName ? escapeHtml(t.assignedServerName) : "";
       const sid = String(id);
       return (
-        "<div class='table-menu-row'>" +
+        "<div class='table-menu-card'>" +
+        "<button type='button' class='table-menu-card__hit' data-use-tm='" + sid + "' title='Select this table in Take order'>" +
         "<div><strong>Table " + num + "</strong> — " + name +
         "<br><span class='muted'>" + st + (srv ? " · Server: " + srv : "") + "</span></div>" +
-        "<div class='row-flex' style='flex-shrink:0;'>" +
-        "<button type='button' class='btn btn-ghost btn-sm' data-use-tm='" + sid + "'>Use in Take order</button>" +
+        "<div class='muted' style='font-size:11px;margin-top:6px;'>Tap row to use table · buttons for guest link</div>" +
+        "</button>" +
+        "<div class='table-menu-card__actions'>" +
         "<button type='button' class='btn btn-primary btn-sm' data-open-guest='" + sid + "'>Open guest menu</button>" +
         "<button type='button' class='btn btn-ghost btn-sm' data-copy-tm='" + sid + "'>Copy link</button>" +
         "</div></div>");
     }).join("");
-    el.querySelectorAll("[data-use-tm]").forEach(b => {
+    el.querySelectorAll(".table-menu-card__hit").forEach(b => {
       b.onclick = () => {
         const id = Number(b.getAttribute("data-use-tm"));
         $("tableSelect").value = String(id);
         void checkOpenCheck();
         void loadDrafts();
         setView("take");
+        $("takeOrderCartPanel")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
       };
     });
     el.querySelectorAll("[data-open-guest]").forEach(b => {
@@ -1003,6 +1095,7 @@
 
   $("activeSearch").addEventListener("input", renderActiveOrders);
   $("pastSearch").addEventListener("input", renderPastOrders);
+  $("pastDaySelect").addEventListener("change", renderPastOrders);
 
   $("btnSaveDraft").onclick = async () => {
     const snapshot = snapshotState();
@@ -1080,6 +1173,18 @@
     await loadPortalData();
     await loadOrdersTab();
   };
+
+  document.querySelectorAll("[data-kpi]").forEach(tile => {
+    tile.addEventListener("click", () => {
+      const k = tile.getAttribute("data-kpi");
+      if (k === "submit") {
+        $("btnSubmit")?.focus();
+        $("takeOrderCartPanel")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      } else {
+        $("cartItems")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    });
+  });
 
   if (window.location.protocol === "file:") {
     $("loginErr").textContent = "Open this page from the API site (e.g. http://localhost:8080/cashier/) so login works.";

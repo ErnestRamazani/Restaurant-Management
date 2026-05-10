@@ -1,0 +1,1115 @@
+using System.Globalization;
+using EliteRestaurant.Contracts.Admin;
+using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Utils;
+using Microsoft.EntityFrameworkCore;
+
+namespace EliteRestaurant.Core.Reporting;
+
+/// <summary>Server-side report aggregation aligned with <c>ReportsViewModel</c> (desktop).</summary>
+public sealed class AdminReportAggregationService(AppDbContext db)
+{
+    public async Task<AdminReportListsResponse> GetListsAsync(CancellationToken cancellationToken = default)
+    {
+        // Same DbContext cannot run multiple queries concurrently — parallel ToListAsync causes HTTP 500.
+        var employeesRows = await db.Employees.AsNoTracking().OrderBy(e => e.Name).ToListAsync(cancellationToken);
+        var tablesRows = await db.Tables.AsNoTracking().OrderBy(t => t.TableNumber).ToListAsync(cancellationToken);
+        var invRows = await db.InventoryItems.AsNoTracking().OrderBy(i => i.Name).ToListAsync(cancellationToken);
+        var productsRows = await db.Products.AsNoTracking().OrderBy(p => p.Name).ToListAsync(cancellationToken);
+
+        var employees = employeesRows
+            .Select(e => new AdminReportEntityRefDto(
+                e.Id,
+                e.UniqueId ?? string.Empty,
+                e.Name ?? string.Empty,
+                e.Role ?? string.Empty))
+            .ToList();
+        var tables = tablesRows
+            .Select(t => new AdminReportEntityRefDto(
+                t.Id,
+                t.UniqueId ?? string.Empty,
+                $"Table {t.TableNumber} - {t.Name ?? string.Empty}",
+                t.Status ?? string.Empty))
+            .ToList();
+        var inv = invRows
+            .Select(i => new AdminReportEntityRefDto(
+                i.Id,
+                i.UniqueId ?? string.Empty,
+                i.Name ?? string.Empty,
+                $"{i.StockQuantity:0.##} {i.Unit ?? string.Empty}"))
+            .ToList();
+        var products = productsRows
+            .Select(p => new AdminReportEntityRefDto(
+                p.Id,
+                p.UniqueId ?? string.Empty,
+                p.Name ?? string.Empty,
+                $"{p.Category ?? string.Empty} | $ {p.Price:0.00}"))
+            .ToList();
+
+        return new AdminReportListsResponse(employees, tables, inv, products);
+    }
+
+    public async Task<AdminReportRangeSummaryResponse> GetDailyAsync(DateTime start, DateTime endInclusive, CancellationToken cancellationToken = default)
+    {
+        var startDay = start.Date;
+        var endDay = endInclusive.Date;
+        if (endDay < startDay)
+            return new AdminReportRangeSummaryResponse("Set a valid date range (end on or after start).", []);
+
+        var endExclusive = endDay.AddDays(1);
+        var entries = await BuildDailyEntriesAsync(startDay, endExclusive, cancellationToken);
+        var days = PadDaysDescending(
+            ApplyDayGroups(entries),
+            startDay,
+            endDay,
+            "0 events | 0 orders | 0 items | 0 units");
+        var summary =
+            $"Daily timeline {startDay:yyyy-MM-dd} → {endDay:yyyy-MM-dd}: {entries.Count} events (attendance, orders, reservations, menu, inventory activity, salary/Money).";
+        return new AdminReportRangeSummaryResponse(summary, days);
+    }
+
+    public async Task<AdminReportRangeSummaryResponse> GetOrdersAsync(DateTime start, DateTime endInclusive, CancellationToken cancellationToken = default)
+    {
+        var startDay = start.Date;
+        var endDay = endInclusive.Date;
+        if (endDay < startDay)
+            return new AdminReportRangeSummaryResponse("Set a valid date range (end on or after start).", []);
+
+        var endExclusive = endDay.AddDays(1);
+        var productsById = await LoadProductsByIdAsync(cancellationToken);
+        var orders = await db.Orders.AsNoTracking()
+            .Where(o => o.CreatedAt >= startDay && o.CreatedAt < endExclusive)
+            .Include(o => o.Items)
+            .ThenInclude(i => i.Product)
+            .OrderBy(o => o.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        HydrateOrderItems(orders, productsById);
+
+        var entries = new List<AdminReportTimeEntryDto>();
+        foreach (var order in orders)
+        {
+            var totalQty = order.Items.Sum(i => i.Quantity);
+            var menu = string.Join(", ",
+                order.Items.Select(i => $"{i.Product?.Name ?? "Unknown"} ×{i.Quantity}"));
+            var subtotal = order.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
+            var totals = OrderTotalsHelper.ComputeTotals(subtotal, "None", 0m);
+            var grandUsd = totals.GrandTotal;
+            var payUsd = order.PaymentAmountUsd > 0m ? order.PaymentAmountUsd : grandUsd;
+            var payFc = order.PaymentAmountFc > 0m ? order.PaymentAmountFc : CurrencyHelper.ConvertUsdToFc(payUsd);
+            var paymentText = CurrencyHelper.FormatDualCurrency(payUsd, payFc);
+
+            entries.Add(new AdminReportTimeEntryDto(
+                order.CreatedAt,
+                string.IsNullOrWhiteSpace(order.Status) ? "Order" : order.Status,
+                $"Order {DisplayOrFallback(order.UniqueId, $"#{order.Id}")} · {totalQty} item(s)",
+                $"Server: {DisplayOrFallback(order.ServerName, "Unassigned")} | Table: {DisplayOrFallback(order.TableCode, "?")} · {DisplayOrFallback(order.TableName, "-")} | {DisplayOrFallback(menu, "No line items")}",
+                paymentText,
+                1,
+                totalQty,
+                0m));
+        }
+
+        var days = PadDaysDescending(
+            ApplyOrderDayGroups(entries),
+            startDay,
+            endDay,
+            "0 order(s) | 0 items");
+        var summary =
+            $"Range {startDay:yyyy-MM-dd} → {endDay:yyyy-MM-dd}. {orders.Count} order(s), {entries.Sum(e => e.ItemCount)} items total.";
+        return new AdminReportRangeSummaryResponse(summary, days);
+    }
+
+    public async Task<AdminReportEmployeeDetailResponse> GetEmployeeDetailAsync(int employeeId, CancellationToken cancellationToken = default)
+    {
+        var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(e => e.Id == employeeId, cancellationToken);
+        if (employee is null)
+            return new AdminReportEmployeeDetailResponse("Employee not found.", "-", "-", []);
+
+        var notes = string.IsNullOrWhiteSpace(employee.Notes) ? "-" : employee.Notes;
+
+        var payrollLines = await db.PayrollPaymentRecords.AsNoTracking()
+            .Where(p => p.EmployeeId == employee.Id)
+            .OrderByDescending(p => p.Year)
+            .ThenByDescending(p => p.Month)
+            .Take(18)
+            .ToListAsync(cancellationToken);
+
+        var payrollHistory =
+            payrollLines.Count == 0
+                ? "No saved payroll yet. Confirm monthly payment on the Salary screen to record pay here."
+                : string.Join(
+                    "\n",
+                    payrollLines.Select(p =>
+                    {
+                        var paidLine = p.PaidToDateUsd >= p.NetPayUsd - 0.005m
+                            ? $"Paid in full ${p.NetPayUsd:N2} USD"
+                            : $"Partial: ${p.PaidToDateUsd:N2} of ${p.NetPayUsd:N2} USD net";
+                        return
+                            $"{PayrollCalculator.FormatPayrollMonthLabel(p.Year, p.Month)}: {paidLine} (base gross ${p.MonthlySalaryUsd:N2}, sales ${p.MoneyGeneratedUsd:N2}, 5% bonus ${p.BonusFivePercentUsd:N2}, advances -${p.AdvancesDeductedUsd:N2}) — last posting {p.PaidAtUtc.ToLocalTime():yyyy-MM-dd}";
+                    }));
+
+        var entries = new List<AdminReportTimeEntryDto>();
+
+        var attendanceRows = await db.EmployeeAttendances.AsNoTracking()
+            .Where(a => a.EmployeeId == employee.Id)
+            .OrderByDescending(a => a.WorkDate)
+            .Take(120)
+            .ToListAsync(cancellationToken);
+
+        foreach (var row in attendanceRows)
+        {
+            var clockIn = row.ClockInTime?.ToString("HH:mm") ?? "Not clocked in";
+            var clockOut = row.ClockOutTime?.ToString("HH:mm") ?? "Not clocked out";
+            var statusText = string.IsNullOrWhiteSpace(row.ClockInStatus) ? "Pending" : row.ClockInStatus;
+            var noteText = string.IsNullOrWhiteSpace(row.Justification) ? "-" : row.Justification;
+            entries.Add(new AdminReportTimeEntryDto(
+                row.ClockInTime ?? row.WorkDate.Date.AddHours(9),
+                "Attendance",
+                $"Clock In: {clockIn} ({statusText}) | Clock Out: {clockOut}",
+                $"Justification: {noteText}",
+                employee.Name,
+                0,
+                0,
+                0m));
+        }
+
+        var productsById = await LoadProductsByIdAsync(cancellationToken);
+        var servedOrders = await db.Orders.AsNoTracking()
+            .Where(o => o.ServerId == employee.Id)
+            .Include(o => o.Items)
+            .ThenInclude(i => i.Product)
+            .OrderByDescending(o => o.CreatedAt)
+            .Take(180)
+            .ToListAsync(cancellationToken);
+        HydrateOrderItems(servedOrders, productsById);
+
+        foreach (var order in servedOrders)
+        {
+            var totalItems = order.Items.Sum(i => i.Quantity);
+            var items = string.Join(", ", order.Items.Select(i => $"{i.Product?.Name ?? "Unknown"} x{i.Quantity}"));
+            entries.Add(new AdminReportTimeEntryDto(
+                order.CreatedAt,
+                "Served Order",
+                $"Order {order.UniqueId} ({order.Status})",
+                $"{order.TableCode} ({order.TableName}) | {DisplayOrFallback(items, "No order items.")}",
+                employee.Name,
+                1,
+                totalItems,
+                0m));
+        }
+
+        var empMarker = $"| EMP:{employee.Id}|";
+        var salaryMoneyRows = await db.Transactions.AsNoTracking()
+            .Where(t =>
+                t.Type == "Expense" &&
+                t.Category == "Salary" &&
+                t.Justification != null &&
+                t.Justification.Contains(empMarker, StringComparison.Ordinal))
+            .OrderByDescending(t => t.Date)
+            .Take(48)
+            .ToListAsync(cancellationToken);
+
+        foreach (var t in salaryMoneyRows)
+        {
+            entries.Add(new AdminReportTimeEntryDto(
+                t.Date,
+                t.Justification?.Contains("| ADVANCE:", StringComparison.Ordinal) == true
+                    ? "Salary advance (Money)"
+                    : "Salary payment (Money)",
+                t.Justification ?? string.Empty,
+                $"USD $ {t.AmountUsd:0.00}",
+                employee.Name,
+                0,
+                0,
+                0m));
+        }
+
+        var advanceRows = await db.SalaryAdvances.AsNoTracking()
+            .Where(a => a.EmployeeId == employee.Id)
+            .OrderByDescending(a => a.GivenAt)
+            .Take(36)
+            .ToListAsync(cancellationToken);
+
+        foreach (var adv in advanceRows)
+        {
+            var period = adv.ForPayrollYear.HasValue && adv.ForPayrollMonth.HasValue
+                ? PayrollCalculator.FormatPayrollMonthLabel(adv.ForPayrollYear.Value, adv.ForPayrollMonth.Value)
+                : "(by date)";
+            var applied = adv.AppliedPayrollYear.HasValue && adv.AppliedPayrollMonth.HasValue
+                ? $"Applied to {PayrollCalculator.FormatPayrollMonthLabel(adv.AppliedPayrollYear.Value, adv.AppliedPayrollMonth.Value)}"
+                : "Pending deduction on payroll confirm";
+            entries.Add(new AdminReportTimeEntryDto(
+                adv.GivenAt,
+                "Salary advance (record)",
+                $"${adv.AmountUsd:0.00} for payroll {period} — {applied}",
+                DisplayOrFallback(adv.Note, "—"),
+                employee.Name,
+                0,
+                0,
+                0m));
+        }
+
+        var days = ApplyDayGroups(entries);
+        var summary =
+            $"Name: {employee.Name}\nID: {employee.UniqueId}\nRole: {employee.Role}\nStatus: {employee.EmploymentStatus}\nPhone: {employee.PhoneNumber}\nAttendance Events: {attendanceRows.Count}\nOrders Served: {servedOrders.Count}\nItems Served: {servedOrders.Sum(o => o.Items.Sum(i => i.Quantity))}";
+
+        return new AdminReportEmployeeDetailResponse(summary, notes, payrollHistory, days);
+    }
+
+    public async Task<AdminReportTableDetailResponse> GetTableDetailAsync(int tableId, CancellationToken cancellationToken = default)
+    {
+        var table = await db.Tables.AsNoTracking()
+            .Include(t => t.AssignedServer)
+            .SingleOrDefaultAsync(t => t.Id == tableId, cancellationToken);
+        if (table is null)
+            return new AdminReportTableDetailResponse("Table not found.", "-", []);
+
+        var employees = await db.Employees.AsNoTracking().ToListAsync(cancellationToken);
+        var employeesById = employees.GroupBy(e => e.Id).ToDictionary(g => g.Key, g => g.First());
+        Employee? assignedServer = table.AssignedServer;
+        if (assignedServer is null && table.AssignedServerId is int sid && employeesById.TryGetValue(sid, out var linked))
+            assignedServer = linked;
+
+        var entries = new List<AdminReportTimeEntryDto>();
+        var productsById = await LoadProductsByIdAsync(cancellationToken);
+        var relatedOrders = await db.Orders.AsNoTracking()
+            .Where(o => o.TableId == table.Id)
+            .Include(o => o.Items)
+            .ThenInclude(i => i.Product)
+            .OrderByDescending(o => o.CreatedAt)
+            .Take(220)
+            .ToListAsync(cancellationToken);
+        HydrateOrderItems(relatedOrders, productsById);
+
+        foreach (var order in relatedOrders)
+        {
+            var totalItems = order.Items.Sum(i => i.Quantity);
+            var items = string.Join(", ", order.Items.Select(i => $"{i.Product?.Name ?? "Unknown"} x{i.Quantity}"));
+            entries.Add(new AdminReportTimeEntryDto(
+                order.CreatedAt,
+                "Table Order",
+                $"Order {order.UniqueId} ({order.Status})",
+                $"Server: {DisplayOrFallback(order.ServerName, "Unassigned")} | {DisplayOrFallback(items, "No order items.")}",
+                $"Table {table.TableNumber}",
+                1,
+                totalItems,
+                0m));
+        }
+
+        var relatedReservations = await db.Reservations.AsNoTracking()
+            .Where(r => r.TableId == table.Id)
+            .Include(r => r.Table)
+            .OrderByDescending(r => r.UpdatedAt)
+            .Take(180)
+            .ToListAsync(cancellationToken);
+
+        foreach (var reservation in relatedReservations)
+        {
+            var name = string.IsNullOrWhiteSpace(reservation.ReservationName)
+                ? DisplayOrFallback(reservation.GuestName, reservation.UniqueId)
+                : reservation.ReservationName.Trim();
+            entries.Add(new AdminReportTimeEntryDto(
+                reservation.UpdatedAt,
+                "Reservation",
+                $"{name} ({reservation.Status})",
+                $"Reservation {reservation.UniqueId} | Guest: {DisplayOrFallback(reservation.GuestName, "-")} | Party: {reservation.PartySize}",
+                $"Table {table.TableNumber}",
+                0,
+                0,
+                0m));
+        }
+
+        var days = ApplyDayGroups(entries);
+        var summary =
+            $"Table: {table.TableNumber} ({table.Name})\nID: {table.UniqueId}\nCapacity: {table.Capacity}\nStatus: {table.Status}\nOrders Logged: {relatedOrders.Count}\nItems Served: {relatedOrders.Sum(o => o.Items.Sum(i => i.Quantity))}";
+        var serverLine = assignedServer is null
+            ? "Unassigned"
+            : $"{assignedServer.Name} ({assignedServer.UniqueId})";
+
+        return new AdminReportTableDetailResponse(summary, serverLine, days);
+    }
+
+    public async Task<AdminReportInventoryDetailResponse> GetInventoryDetailAsync(int inventoryId, CancellationToken cancellationToken = default)
+    {
+        var item = await db.InventoryItems.AsNoTracking().SingleOrDefaultAsync(i => i.Id == inventoryId, cancellationToken);
+        if (item is null)
+            return new AdminReportInventoryDetailResponse("Inventory item not found.", "-", []);
+
+        var notes = string.IsNullOrWhiteSpace(item.Notes) ? "-" : item.Notes;
+        var productsById = await LoadProductsByIdAsync(cancellationToken);
+        var ingredients = await db.ProductIngredients.AsNoTracking()
+            .Where(pi => pi.InventoryItemId == item.Id)
+            .ToListAsync(cancellationToken);
+        foreach (var pi in ingredients)
+        {
+            if (productsById.TryGetValue(pi.ProductId, out var p))
+                pi.Product = p;
+        }
+
+        var entries = new List<AdminReportTimeEntryDto>();
+        AppendInventoryNotesTimeline(item.Notes, entries, item.Name);
+        var days = ApplyDayGroups(entries);
+        var summary =
+            $"Item: {item.Name}\nID: {item.UniqueId}\nQuantity: {item.StockQuantity:0.##} {item.Unit}\nExpiration: {item.ExpirationDate?.ToString("yyyy-MM-dd") ?? "Not set"}\nLinked Menu Items: {ingredients.Select(i => i.ProductId).Distinct().Count()}";
+
+        return new AdminReportInventoryDetailResponse(summary, notes, days);
+    }
+
+    public async Task<AdminReportMenuDetailResponse> GetMenuDetailAsync(int productId, CancellationToken cancellationToken = default)
+    {
+        var product = await db.Products.AsNoTracking().SingleOrDefaultAsync(p => p.Id == productId, cancellationToken);
+        if (product is null)
+            return new AdminReportMenuDetailResponse("Menu item not found.", "-", []);
+
+        var invRows = await db.InventoryItems.AsNoTracking().ToListAsync(cancellationToken);
+        var invById = invRows.GroupBy(i => i.Id).ToDictionary(g => g.Key, g => g.First());
+        var ingredients = await db.ProductIngredients.AsNoTracking()
+            .Where(pi => pi.ProductId == product.Id)
+            .ToListAsync(cancellationToken);
+        foreach (var pi in ingredients)
+        {
+            if (invById.TryGetValue(pi.InventoryItemId, out var inv))
+                pi.InventoryItem = inv;
+        }
+
+        var ingSummary = ingredients.Count == 0
+            ? "No ingredients linked."
+            : string.Join(", ", ingredients.Select(i => $"{i.InventoryItem?.Name ?? "Unknown"} ({i.Quantity:0.##} {i.InventoryItem?.Unit ?? "unit"})"));
+
+        var productsById = await LoadProductsByIdAsync(cancellationToken);
+        var allOrders = await db.Orders.AsNoTracking()
+            .Include(o => o.Items)
+            .ThenInclude(i => i.Product)
+            .OrderByDescending(o => o.CreatedAt)
+            .Take(800)
+            .ToListAsync(cancellationToken);
+        HydrateOrderItems(allOrders, productsById);
+
+        var servedLines = allOrders
+            .SelectMany(o => o.Items.Where(i => i.ProductId == product.Id).Select(i => (Order: o, Item: i)))
+            .OrderByDescending(x => x.Order.CreatedAt)
+            .Take(300)
+            .ToList();
+
+        var entries = new List<AdminReportTimeEntryDto>();
+        foreach (var line in servedLines)
+        {
+            var order = line.Order;
+            entries.Add(new AdminReportTimeEntryDto(
+                order.CreatedAt,
+                "Menu Ordered",
+                $"{product.Name} x{line.Item.Quantity} in order {order.UniqueId}",
+                $"{order.TableCode} ({order.TableName}) | Server: {DisplayOrFallback(order.ServerName, "Unassigned")} | Status: {order.Status}",
+                product.Name,
+                1,
+                line.Item.Quantity,
+                0m));
+        }
+
+        var days = ApplyDayGroups(entries);
+        var totalQty = servedLines.Sum(l => l.Item.Quantity);
+        var summary =
+            $"Menu Item: {product.Name}\nID: {product.UniqueId}\nCategory: {product.Category}\nSub Category: {product.SubCategory}\nPrice: $ {product.Price:0.00}\nTimes Ordered: {servedLines.Count}\nUnits Ordered: {totalQty}";
+
+        return new AdminReportMenuDetailResponse(summary, ingSummary, days);
+    }
+
+    public async Task<(byte[] Content, string FileName, string ContentType)> ExportAsync(
+        string reportType,
+        DateTime start,
+        DateTime endInclusive,
+        CancellationToken cancellationToken = default)
+    {
+        var startDay = start.Date;
+        var endDay = endInclusive.Date;
+        if (endDay < startDay)
+            throw new ArgumentException("Invalid range.");
+
+        var endExclusive = endDay.AddDays(1);
+
+        if (string.Equals(reportType, "All Reports", StringComparison.OrdinalIgnoreCase))
+        {
+            var daily = await BuildExportRowsAsync("Daily", startDay, endExclusive, cancellationToken);
+            var orders = await BuildExportRowsAsync("Orders", startDay, endExclusive, cancellationToken);
+            var employees = await BuildExportRowsAsync("Employees", startDay, endExclusive, cancellationToken);
+            var tables = await BuildExportRowsAsync("Tables", startDay, endExclusive, cancellationToken);
+            var inventory = await BuildExportRowsAsync("Inventory", startDay, endExclusive, cancellationToken);
+            var menu = await BuildExportRowsAsync("Menu", startDay, endExclusive, cancellationToken);
+            var bytes = ExcelExportService.ExportWorkbookToByteArray(
+            [
+                ("Daily", daily.Headers, daily.Rows),
+                ("Orders", orders.Headers, orders.Rows),
+                ("Employees", employees.Headers, employees.Rows),
+                ("Tables", tables.Headers, tables.Rows),
+                ("Inventory", inventory.Headers, inventory.Rows),
+                ("Menu", menu.Headers, menu.Rows)
+            ]);
+            return (bytes, $"reports-bulk-{startDay:yyyyMMdd}-{endDay:yyyyMMdd}.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        }
+
+        var single = await BuildExportRowsAsync(reportType, startDay, endExclusive, cancellationToken);
+        var oneBytes = ExcelExportService.ExportWorkbookToByteArray(
+            [(reportType, single.Headers, single.Rows)]);
+        return (oneBytes, $"{reportType.ToLowerInvariant()}-report-{startDay:yyyyMMdd}-{endDay:yyyyMMdd}.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    }
+
+    private async Task<List<AdminReportTimeEntryDto>> BuildDailyEntriesAsync(
+        DateTime start,
+        DateTime endExclusive,
+        CancellationToken cancellationToken)
+    {
+        var entries = new List<AdminReportTimeEntryDto>();
+        var employeeRows = await db.Employees.AsNoTracking().ToListAsync(cancellationToken);
+        var employeesById = employeeRows.GroupBy(e => e.Id).ToDictionary(g => g.Key, g => g.First());
+
+        var rangeStartUtc = AttendanceCalendar.DayAnchorUtc(start);
+        var rangeEndExclusiveUtc = AttendanceCalendar.DayAnchorUtc(endExclusive);
+
+        var attendanceRows = await db.EmployeeAttendances.AsNoTracking()
+            .Where(a => a.WorkDate >= rangeStartUtc && a.WorkDate < rangeEndExclusiveUtc)
+            .OrderByDescending(a => a.WorkDate)
+            .ToListAsync(cancellationToken);
+
+        foreach (var row in attendanceRows)
+        {
+            employeesById.TryGetValue(row.EmployeeId, out var emp);
+            var name = emp?.Name ?? "Unknown";
+            entries.Add(new AdminReportTimeEntryDto(
+                row.ClockInTime ?? row.WorkDate.Date.AddHours(9),
+                "Attendance",
+                $"{name} clocked {(row.ClockInTime.HasValue ? "in" : "scheduled")} ({DisplayOrFallback(row.ClockInStatus, "Pending")})",
+                $"Clock Out: {row.ClockOutTime?.ToString("HH:mm") ?? "Not clocked out"} | Justification: {DisplayOrFallback(row.Justification, "-")}",
+                $"Employee: {name}",
+                0,
+                0,
+                0m));
+        }
+
+        var productsById = await LoadProductsByIdAsync(cancellationToken);
+        var orders = await db.Orders.AsNoTracking()
+            .Where(o => o.CreatedAt >= start && o.CreatedAt < endExclusive)
+            .Include(o => o.Items)
+            .ThenInclude(i => i.Product)
+            .OrderByDescending(o => o.CreatedAt)
+            .ToListAsync(cancellationToken);
+        HydrateOrderItems(orders, productsById);
+
+        foreach (var order in orders)
+        {
+            var itemQty = order.Items.Sum(i => i.Quantity);
+            entries.Add(new AdminReportTimeEntryDto(
+                order.CreatedAt,
+                "Table Service",
+                $"Order {order.UniqueId} ({order.Status})",
+                $"{order.TableCode} ({order.TableName}) | Server: {DisplayOrFallback(order.ServerName, "Unassigned")} | Items: {itemQty}",
+                $"Table: {order.TableCode}",
+                1,
+                itemQty,
+                0m));
+        }
+
+        var tableRows = await db.Tables.AsNoTracking().ToListAsync(cancellationToken);
+        var tablesById = tableRows.GroupBy(t => t.Id).ToDictionary(g => g.Key, g => g.First());
+
+        var reservations = await db.Reservations.AsNoTracking()
+            .Where(r => r.UpdatedAt >= start && r.UpdatedAt < endExclusive)
+            .OrderByDescending(r => r.UpdatedAt)
+            .ToListAsync(cancellationToken);
+
+        foreach (var reservation in reservations)
+        {
+            Table? tbl = null;
+            if (reservation.TableId is int tid && tablesById.TryGetValue(tid, out var t))
+                tbl = t;
+
+            var displayName = string.IsNullOrWhiteSpace(reservation.ReservationName)
+                ? DisplayOrFallback(reservation.GuestName, reservation.UniqueId)
+                : reservation.ReservationName.Trim();
+            var tableLabel = tbl is not null
+                ? $"{tbl.TableNumber} ({DisplayOrFallback(tbl.Name, "-")})"
+                : "-";
+            entries.Add(new AdminReportTimeEntryDto(
+                reservation.UpdatedAt,
+                "Reservation",
+                $"Reservation {reservation.UniqueId} · {displayName} · {reservation.Status}",
+                $"Reserved for {reservation.ReservedFor:yyyy-MM-dd HH:mm} | Party: {reservation.PartySize} | Table: {tableLabel}",
+                "Reservations",
+                0,
+                0,
+                0m));
+        }
+
+        foreach (var order in orders)
+        {
+            foreach (var line in order.Items)
+            {
+                entries.Add(new AdminReportTimeEntryDto(
+                    order.CreatedAt,
+                    "Menu Activity",
+                    $"{line.Product?.Name ?? "Unknown"} x{line.Quantity}",
+                    $"Order {order.UniqueId} | {order.TableCode} ({order.TableName})",
+                    $"Menu: {line.Product?.Name ?? "Unknown"}",
+                    1,
+                    line.Quantity,
+                    0m));
+            }
+        }
+
+        var inventoryNoteRows = await db.InventoryItems.AsNoTracking()
+            .Where(i => !string.IsNullOrWhiteSpace(i.Notes))
+            .Select(i => new InventoryNotesSnapshot(i.UniqueId, i.Name, i.Notes!))
+            .ToListAsync(cancellationToken);
+        AppendInventoryActivityFromNotes(entries, start, endExclusive, inventoryNoteRows);
+
+        var salaryTx = await db.Transactions.AsNoTracking()
+            .Where(t =>
+                t.Type == "Expense" &&
+                t.Category == "Salary" &&
+                t.Date >= start &&
+                t.Date < endExclusive)
+            .OrderByDescending(t => t.Date)
+            .ToListAsync(cancellationToken);
+
+        foreach (var t in salaryTx)
+        {
+            entries.Add(new AdminReportTimeEntryDto(
+                t.Date,
+                "Salary / Money",
+                t.Justification ?? string.Empty,
+                $"USD $ {t.AmountUsd:0.00} (same as Money ledger)",
+                "Money",
+                0,
+                0,
+                0m));
+        }
+
+        return entries;
+    }
+
+    private async Task<Dictionary<int, Product>> LoadProductsByIdAsync(CancellationToken cancellationToken)
+    {
+        var rows = await db.Products.AsNoTracking().ToListAsync(cancellationToken);
+        return rows.GroupBy(p => p.Id).ToDictionary(g => g.Key, g => g.First());
+    }
+
+    private static void HydrateOrderItems(IReadOnlyList<OrderRecord> orders, IReadOnlyDictionary<int, Product> productsById)
+    {
+        foreach (var o in orders)
+        {
+            foreach (var i in o.Items)
+            {
+                i.OrderRecord = o;
+                if (productsById.TryGetValue(i.ProductId, out var p))
+                    i.Product = p;
+            }
+        }
+    }
+
+    private static DateTime LocalCalendarDay(DateTime t) =>
+        t.Kind switch
+        {
+            DateTimeKind.Utc => t.ToLocalTime().Date,
+            DateTimeKind.Local => t.Date,
+            _ => t.Date,
+        };
+
+    private static List<AdminReportDayGroupDto> PadDaysDescending(
+        IReadOnlyList<AdminReportDayGroupDto> filled,
+        DateTime rangeStartInclusive,
+        DateTime rangeEndInclusive,
+        string emptyTotalsText)
+    {
+        var start = rangeStartInclusive.Date;
+        var end = rangeEndInclusive.Date;
+        var map = filled.GroupBy(g => g.Day.Date).ToDictionary(g => g.Key, g => g.First());
+        var list = new List<AdminReportDayGroupDto>();
+        for (var d = start; d <= end; d = d.AddDays(1))
+        {
+            if (map.TryGetValue(d, out var existing))
+                list.Add(existing);
+            else
+            {
+                list.Add(new AdminReportDayGroupDto(
+                    d,
+                    d.ToString("dddd, MMM dd yyyy", CultureInfo.InvariantCulture),
+                    emptyTotalsText,
+                    Array.Empty<AdminReportTimeEntryDto>()));
+            }
+        }
+
+        list.Sort((a, b) => b.Day.CompareTo(a.Day));
+        return list;
+    }
+
+    private static List<AdminReportDayGroupDto> ApplyDayGroups(IReadOnlyList<AdminReportTimeEntryDto> entries)
+    {
+        var normalized = entries
+            .OrderByDescending(e => e.EventTime)
+            .ThenBy(e => e.EventType)
+            .ToList();
+
+        var list = new List<AdminReportDayGroupDto>();
+        foreach (var dayGroup in normalized.GroupBy(e => LocalCalendarDay(e.EventTime)))
+        {
+            var rows = dayGroup.ToList();
+            var key = dayGroup.Key;
+            list.Add(new AdminReportDayGroupDto(
+                key,
+                key.ToString("dddd, MMM dd yyyy", CultureInfo.InvariantCulture),
+                $"{rows.Count} events | {rows.Sum(r => r.OrdersCount)} orders | {rows.Sum(r => r.ItemCount)} items | {rows.Sum(r => r.UnitUsage):0.##} units",
+                rows));
+        }
+
+        return list;
+    }
+
+    private static List<AdminReportDayGroupDto> ApplyOrderDayGroups(List<AdminReportTimeEntryDto> entries)
+    {
+        var list = new List<AdminReportDayGroupDto>();
+        foreach (var dayGroup in entries.GroupBy(e => LocalCalendarDay(e.EventTime)).OrderByDescending(g => g.Key))
+        {
+            var rows = dayGroup.OrderBy(e => e.EventTime).ThenBy(e => e.Summary).ToList();
+            var orderCount = rows.Sum(r => r.OrdersCount);
+            list.Add(new AdminReportDayGroupDto(
+                dayGroup.Key,
+                dayGroup.Key.ToString("dddd, MMM dd yyyy", CultureInfo.InvariantCulture),
+                $"{orderCount} order(s) | {rows.Sum(r => r.ItemCount)} items",
+                rows));
+        }
+
+        return list;
+    }
+
+    private sealed record InventoryNotesSnapshot(string UniqueId, string Name, string Notes);
+
+    private static void AppendInventoryActivityFromNotes(
+        List<AdminReportTimeEntryDto> entries,
+        DateTime start,
+        DateTime endExclusive,
+        IReadOnlyList<InventoryNotesSnapshot> inventoryNoteRows)
+    {
+        foreach (var row in inventoryNoteRows)
+        {
+            foreach (var rawLine in row.Notes.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                var line = rawLine.Trim();
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
+
+                var ts = TryParseLeadingTimestamp(line);
+                if (ts is null || ts.Value < start || ts.Value >= endExclusive)
+                    continue;
+
+                entries.Add(new AdminReportTimeEntryDto(
+                    ts.Value,
+                    "Inventory Activity",
+                    line,
+                    $"Item: {row.Name} ({row.UniqueId})",
+                    $"Inventory: {row.Name}",
+                    0,
+                    0,
+                    0m));
+            }
+        }
+    }
+
+    private static void AppendInventoryNotesTimeline(string? notes, ICollection<AdminReportTimeEntryDto> entries, string itemName)
+    {
+        if (string.IsNullOrWhiteSpace(notes))
+            return;
+
+        var lines = notes
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(l => !string.IsNullOrWhiteSpace(l))
+            .ToList();
+
+        foreach (var line in lines)
+        {
+            var timestamp = TryParseLeadingTimestamp(line);
+            entries.Add(new AdminReportTimeEntryDto(
+                timestamp ?? DateTime.Today.AddHours(12),
+                "Inventory Note",
+                line,
+                "Text-based inventory history entry",
+                itemName,
+                0,
+                0,
+                0m));
+        }
+    }
+
+    private static DateTime? TryParseLeadingTimestamp(string line)
+    {
+        if (line.Length < 16)
+            return null;
+
+        var maybeDate = line[..16];
+        if (DateTime.TryParseExact(
+                maybeDate,
+                "yyyy-MM-dd HH:mm",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var parsed))
+            return parsed;
+
+        return null;
+    }
+
+    private static string DisplayOrFallback(string? value, string fallback) =>
+        string.IsNullOrWhiteSpace(value) ? fallback : value;
+
+    private async Task<(IReadOnlyList<string> Headers, IReadOnlyList<IReadOnlyList<string>> Rows)> BuildExportRowsAsync(
+        string reportType,
+        DateTime start,
+        DateTime endExclusive,
+        CancellationToken cancellationToken)
+    {
+        if (reportType == "Orders")
+        {
+            var productsById = await LoadProductsByIdAsync(cancellationToken);
+            var orders = await db.Orders.AsNoTracking()
+                .Where(o => o.CreatedAt >= start && o.CreatedAt < endExclusive)
+                .Include(o => o.Items)
+                .ThenInclude(i => i.Product)
+                .OrderBy(o => o.CreatedAt)
+                .ToListAsync(cancellationToken);
+            HydrateOrderItems(orders, productsById);
+            return BuildOrderExportRows(orders);
+        }
+
+        var employeeRows = await db.Employees.AsNoTracking().ToListAsync(cancellationToken);
+        var employeesById = employeeRows.GroupBy(e => e.Id).ToDictionary(g => g.Key, g => g.First());
+        var tableRows = await db.Tables.AsNoTracking().ToListAsync(cancellationToken);
+        var tablesById = tableRows.GroupBy(t => t.Id).ToDictionary(g => g.Key, g => g.First());
+
+        var rows = new List<IReadOnlyList<string>>();
+
+        var includeAttendance = reportType is "Daily" or "Employees";
+        var includeOrders = reportType is "Daily" or "Employees" or "Tables" or "Menu";
+        var includeReservations = reportType is "Daily" or "Tables";
+
+        if (includeAttendance)
+        {
+            var attendanceStartUtc = AttendanceCalendar.DayAnchorUtc(start.Date);
+            var attendanceEndExclusiveUtc = AttendanceCalendar.DayAnchorUtc(endExclusive.Date);
+            var attendanceRows = await db.EmployeeAttendances.AsNoTracking()
+                .Where(a => a.WorkDate >= attendanceStartUtc && a.WorkDate < attendanceEndExclusiveUtc)
+                .OrderBy(a => a.WorkDate)
+                .ThenBy(a => a.EmployeeId)
+                .ToListAsync(cancellationToken);
+
+            foreach (var row in attendanceRows)
+            {
+                employeesById.TryGetValue(row.EmployeeId, out var empAttach);
+                rows.Add(BuildAnalyticalRow(
+                    eventTime: row.ClockInTime ?? row.WorkDate.Date,
+                    eventType: "Attendance",
+                    employeeId: empAttach?.UniqueId ?? string.Empty,
+                    employeeName: empAttach?.Name ?? string.Empty,
+                    costOrPrice: string.Empty));
+            }
+        }
+
+        var includeSalaryLedger = reportType is "Daily" or "Employees";
+        if (includeSalaryLedger)
+        {
+            var salaryTx = await db.Transactions.AsNoTracking()
+                .Where(t =>
+                    t.Type == "Expense" &&
+                    t.Category == "Salary" &&
+                    t.Date >= start &&
+                    t.Date < endExclusive)
+                .OrderBy(t => t.Date)
+                .ThenBy(t => t.Id)
+                .ToListAsync(cancellationToken);
+
+            foreach (var t in salaryTx)
+            {
+                _ = TryParseEmployeeIdFromSalaryJustification(t.Justification ?? string.Empty, out var eid);
+                employeesById.TryGetValue(eid, out var empRef);
+                var j = t.Justification ?? string.Empty;
+                if (j.Length > 120)
+                    j = j[..120] + "…";
+
+                rows.Add(BuildAnalyticalRow(
+                    eventTime: t.Date,
+                    eventType: j.Contains("| ADVANCE:", StringComparison.Ordinal)
+                        ? "Salary advance (Money)"
+                        : "Salary payment (Money)",
+                    employeeId: empRef?.UniqueId ?? string.Empty,
+                    employeeName: empRef?.Name ?? string.Empty,
+                    orderId: j,
+                    costOrPrice: t.AmountUsd.ToString("0.00", CultureInfo.InvariantCulture)));
+            }
+        }
+
+        if (includeOrders)
+        {
+            var productsById = await LoadProductsByIdAsync(cancellationToken);
+            var ordersForLines = await db.Orders.AsNoTracking()
+                .Where(o => o.CreatedAt >= start && o.CreatedAt < endExclusive)
+                .Include(o => o.Items)
+                .ThenInclude(i => i.Product)
+                .OrderBy(o => o.CreatedAt)
+                .ToListAsync(cancellationToken);
+            HydrateOrderItems(ordersForLines, productsById);
+            var orderItems = ordersForLines
+                .SelectMany(o => o.Items)
+                .OrderBy(i => i.OrderRecord?.CreatedAt)
+                .ThenBy(i => i.Id)
+                .ToList();
+
+            foreach (var line in orderItems)
+            {
+                var order = line.OrderRecord;
+                if (order is null)
+                    continue;
+
+                employeesById.TryGetValue(line.PreparedByEmployeeId ?? 0, out var preparedByEmployee);
+                employeesById.TryGetValue(order.ServerId ?? 0, out var serverEmployee);
+                tablesById.TryGetValue(order.TableId ?? 0, out var table);
+
+                rows.Add(BuildAnalyticalRow(
+                    eventTime: order.CreatedAt,
+                    eventType: "Order",
+                    employeeId: preparedByEmployee?.UniqueId ?? string.Empty,
+                    employeeName: line.PreparedByName,
+                    serverId: serverEmployee?.UniqueId ?? string.Empty,
+                    serverName: order.ServerName,
+                    orderId: order.UniqueId,
+                    tableId: table?.UniqueId ?? string.Empty,
+                    tableName: order.TableName,
+                    productId: line.Product?.UniqueId ?? string.Empty,
+                    productName: line.Product?.Name ?? string.Empty,
+                    quantity: line.Quantity.ToString(CultureInfo.InvariantCulture),
+                    costOrPrice: line.Product?.Price.ToString("0.00", CultureInfo.InvariantCulture) ?? string.Empty,
+                    chefId: line.PreparedByRole == "Chef" ? preparedByEmployee?.UniqueId ?? string.Empty : string.Empty,
+                    chefName: line.PreparedByRole == "Chef" ? line.PreparedByName : string.Empty,
+                    barmanId: line.PreparedByRole == "Barman" ? preparedByEmployee?.UniqueId ?? string.Empty : string.Empty,
+                    barmanName: line.PreparedByRole == "Barman" ? line.PreparedByName : string.Empty));
+            }
+        }
+
+        if (reportType is "Daily" or "Inventory")
+        {
+            var inventoryActivityItems = await db.InventoryItems.AsNoTracking()
+                .Where(i => !string.IsNullOrWhiteSpace(i.Notes))
+                .ToListAsync(cancellationToken);
+
+            foreach (var item in inventoryActivityItems)
+            {
+                foreach (var rawLine in item.Notes!.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    var line = rawLine.Trim();
+                    if (string.IsNullOrWhiteSpace(line))
+                        continue;
+
+                    var ts = TryParseLeadingTimestamp(line);
+                    if (ts is null || ts.Value < start || ts.Value >= endExclusive)
+                        continue;
+
+                    var orderCol = line.Length > 200 ? line[..200] + "…" : line;
+                    rows.Add(BuildAnalyticalRow(
+                        eventTime: ts.Value,
+                        eventType: "Inventory activity",
+                        orderId: orderCol,
+                        ingredientId: item.UniqueId,
+                        ingredientName: item.Name));
+                }
+            }
+        }
+
+        if (includeReservations)
+        {
+            var reservationRows = await db.Reservations.AsNoTracking()
+                .Where(r => r.UpdatedAt >= start && r.UpdatedAt < endExclusive)
+                .OrderBy(r => r.UpdatedAt)
+                .ThenBy(r => r.Id)
+                .ToListAsync(cancellationToken);
+
+            foreach (var reservation in reservationRows)
+            {
+                tablesById.TryGetValue(reservation.TableId ?? 0, out var table);
+                var reservationName = string.IsNullOrWhiteSpace(reservation.ReservationName)
+                    ? DisplayOrFallback(reservation.GuestName, reservation.UniqueId)
+                    : reservation.ReservationName.Trim();
+
+                rows.Add(BuildAnalyticalRow(
+                    eventTime: reservation.UpdatedAt,
+                    eventType: "Reservation",
+                    orderId: reservation.UniqueId,
+                    tableId: table?.UniqueId ?? string.Empty,
+                    tableName: table is null ? string.Empty : $"Table {table.TableNumber} - {table.Name}",
+                    productId: string.Empty,
+                    productName: reservationName,
+                    quantity: reservation.PartySize.ToString(CultureInfo.InvariantCulture),
+                    costOrPrice: reservation.DepositAmountUsd.ToString("0.00", CultureInfo.InvariantCulture)));
+            }
+        }
+
+        rows = rows
+            .OrderBy(r => r[0])
+            .ThenBy(r => r[2])
+            .ThenBy(r => r[3])
+            .ToList();
+
+        return (AnalyticalHeaders, rows);
+    }
+
+    private static (IReadOnlyList<string> Headers, IReadOnlyList<IReadOnlyList<string>> Rows) BuildOrderExportRows(
+        IReadOnlyList<OrderRecord> orders)
+    {
+        var rows = new List<IReadOnlyList<string>>();
+        foreach (var order in orders)
+        {
+            var totalQty = order.Items.Sum(i => i.Quantity);
+            var menu = string.Join("; ",
+                order.Items.Select(i => $"{i.Product?.Name ?? "Unknown"} ×{i.Quantity}"));
+            var subtotal = order.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
+            var totals = OrderTotalsHelper.ComputeTotals(subtotal, "None", 0m);
+            var grandUsd = totals.GrandTotal;
+            var payUsd = order.PaymentAmountUsd > 0m ? order.PaymentAmountUsd : grandUsd;
+            var payFc = order.PaymentAmountFc > 0m ? order.PaymentAmountFc : CurrencyHelper.ConvertUsdToFc(payUsd);
+
+            rows.Add(
+            [
+                order.CreatedAt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                order.CreatedAt.ToString("dddd", CultureInfo.InvariantCulture),
+                order.CreatedAt.ToString("HH:mm", CultureInfo.InvariantCulture),
+                DisplayOrFallback(order.UniqueId, order.Id.ToString(CultureInfo.InvariantCulture)),
+                order.Status,
+                DisplayOrFallback(order.ServerName, "Unassigned"),
+                DisplayOrFallback(order.TableCode, string.Empty),
+                DisplayOrFallback(order.TableName, string.Empty),
+                menu,
+                totalQty.ToString(CultureInfo.InvariantCulture),
+                order.Items.Count.ToString(CultureInfo.InvariantCulture),
+                payUsd.ToString("0.00", CultureInfo.InvariantCulture),
+                payFc.ToString("0.##", CultureInfo.InvariantCulture),
+                order.PaymentCurrencyCode
+            ]);
+        }
+
+        return (OrderReportHeaders, rows);
+    }
+
+    private static readonly IReadOnlyList<string> OrderReportHeaders =
+    [
+        "Date",
+        "Day",
+        "Time",
+        "Order ID",
+        "Status",
+        "Server",
+        "Table Code",
+        "Table Name",
+        "Menu (lines)",
+        "Item Qty",
+        "Line Count",
+        "Total USD",
+        "Total FC",
+        "Pay Currency"
+    ];
+
+    private static readonly IReadOnlyList<string> AnalyticalHeaders =
+    [
+        "Date",
+        "Day",
+        "Time",
+        "Event Type",
+        "Employee ID",
+        "Employee Name",
+        "Server ID",
+        "Server Name",
+        "Order ID",
+        "Table ID",
+        "Table Name",
+        "Product ID",
+        "Product Name",
+        "Qty",
+        "Ingredient ID",
+        "Ingredient Name",
+        "Unit",
+        "Cost/Price",
+        "Cashier ID",
+        "Cashier Name",
+        "Chef ID",
+        "Chef Name",
+        "Barman ID",
+        "Barman Name"
+    ];
+
+    private static bool TryParseEmployeeIdFromSalaryJustification(string justification, out int employeeId)
+    {
+        employeeId = 0;
+        if (string.IsNullOrEmpty(justification))
+            return false;
+
+        const string marker = "| EMP:";
+        var idx = justification.IndexOf(marker, StringComparison.Ordinal);
+        if (idx < 0)
+            return false;
+
+        var from = idx + marker.Length;
+        var end = justification.IndexOf('|', from);
+        var slice = end >= 0 ? justification.Substring(from, end - from) : justification.Substring(from);
+        return int.TryParse(slice, NumberStyles.Integer, CultureInfo.InvariantCulture, out employeeId);
+    }
+
+    private static IReadOnlyList<string> BuildAnalyticalRow(
+        DateTime eventTime,
+        string eventType,
+        string employeeId = "",
+        string employeeName = "",
+        string serverId = "",
+        string serverName = "",
+        string orderId = "",
+        string tableId = "",
+        string tableName = "",
+        string productId = "",
+        string productName = "",
+        string quantity = "",
+        string ingredientId = "",
+        string ingredientName = "",
+        string unit = "",
+        string costOrPrice = "",
+        string cashierId = "",
+        string cashierName = "",
+        string chefId = "",
+        string chefName = "",
+        string barmanId = "",
+        string barmanName = "")
+    {
+        return
+        [
+            eventTime.ToString("yyyy-MM-dd"),
+            eventTime.ToString("dddd", CultureInfo.InvariantCulture),
+            eventTime.ToString("HH:mm"),
+            eventType,
+            employeeId,
+            employeeName,
+            serverId,
+            serverName,
+            orderId,
+            tableId,
+            tableName,
+            productId,
+            productName,
+            quantity,
+            ingredientId,
+            ingredientName,
+            unit,
+            costOrPrice,
+            cashierId,
+            cashierName,
+            chefId,
+            chefName,
+            barmanId,
+            barmanName
+        ];
+    }
+}

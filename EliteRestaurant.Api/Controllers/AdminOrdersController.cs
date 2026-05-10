@@ -14,7 +14,7 @@ namespace EliteRestaurant.Api.Controllers;
 
 [ApiController]
 [Route("api/admin/orders")]
-[AllowAnonymous]
+[Authorize(Policy = "OperationalWrite")]
 public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub> orderHub) : ControllerBase
 {
     private readonly AdminOrderOperationsService _ops = new(db);

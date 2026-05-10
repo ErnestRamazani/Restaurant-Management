@@ -155,6 +155,7 @@ public static class MoneyDashboardSnapshotBuilder
         string selectedPeriod)
         => selectedPeriod switch
         {
+            "Today" => ResolveTodayRange(today),
             "Month" => ResolveMonthRange(today),
             "Year" => ResolveYearRange(today),
             "All" => ResolveAllRange(transactions, today),
@@ -167,11 +168,18 @@ public static class MoneyDashboardSnapshotBuilder
         string selectedPeriod)
         => selectedPeriod switch
         {
+            "Today" => ResolveTodayRange(today),
             "Month" => ResolveMonthRange(today),
             "Year" => ResolveYearRange(today),
             "All" => ResolveAllRange(db, today),
             _ => ResolveWeekRange(today)
         };
+
+    private static (DateTime FromDate, DateTime ToDate, DateTime ToExclusive, string Label) ResolveTodayRange(DateTime today)
+    {
+        var d = today.Date;
+        return (d, d, d.AddDays(1), "Today");
+    }
 
     private static (DateTime FromDate, DateTime ToDate, DateTime ToExclusive, string Label) ResolveWeekRange(DateTime today)
     {

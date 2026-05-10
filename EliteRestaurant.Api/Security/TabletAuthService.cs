@@ -9,21 +9,35 @@ public sealed class TabletAuthService(AppDbContext db, JwtTokenService jwtTokenS
 {
     private static readonly TimeSpan SessionDuration = TimeSpan.FromHours(12);
 
-    public AuthenticatedStaffSession? Login(string staffId, string pin, string portal)
+    public TabletLoginOutcome Login(string staffId, string pin, string portal)
     {
         var id = (staffId ?? string.Empty).Trim();
         var normalizedPin = (pin ?? string.Empty).Trim();
         var normalizedPortal = (portal ?? string.Empty).Trim();
         if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(normalizedPin))
-            return null;
+            return new TabletLoginOutcome(null, "Enter both sign-in ID and PIN.");
 
         var idMatches = StaffPortalAuthentication
             .QueryActiveEmployeesMatchingStaffId(db.Employees.AsNoTracking(), id)
             .ToList();
+        if (idMatches.Count == 0)
+        {
+            return new TabletLoginOutcome(null,
+                "No active employee matches that sign-in ID. For the default web admin account use er4124 after the API has applied database migrations and startup seeding, or ask an administrator to add an AdminWeb user.");
+        }
+
         var candidates = StaffPortalAuthentication.FilterPinMatches(idMatches, normalizedPin);
+        if (candidates.Count == 0)
+            return new TabletLoginOutcome(null, "PIN is incorrect.");
+
         var employee = StaffPortalAuthentication.ResolvePortalCandidate(candidates, normalizedPortal);
         if (employee is null)
-            return null;
+        {
+            return new TabletLoginOutcome(null,
+                string.Equals(normalizedPortal, "AdminWeb", StringComparison.OrdinalIgnoreCase)
+                    ? "This account is not an AdminWeb user. Use an employee with role AdminWeb (or the seeded er4124 account)."
+                    : "This account cannot use the selected portal.");
+        }
 
         CleanupExpiredSessions(db);
 
@@ -45,7 +59,7 @@ public sealed class TabletAuthService(AppDbContext db, JwtTokenService jwtTokenS
         });
         db.SaveChanges();
 
-        return ToAuthenticatedSession(token, employee, canonicalPortal, expiresAtUtc);
+        return new TabletLoginOutcome(ToAuthenticatedSession(token, employee, canonicalPortal, expiresAtUtc), null);
     }
 
     public AuthenticatedStaffSession? Validate(string? token)
@@ -98,6 +112,9 @@ public sealed class TabletAuthService(AppDbContext db, JwtTokenService jwtTokenS
     private static void CleanupExpiredSessions(AppDbContext db)
     {
         var utcNow = DateTime.UtcNow;
-        db.TabletSessions.Where(s => s.ExpiresAtUtc <= utcNow).ExecuteDelete();
+        var stale = db.TabletSessions.Where(s => s.ExpiresAtUtc <= utcNow).ToList();
+        if (stale.Count == 0)
+            return;
+        db.TabletSessions.RemoveRange(stale);
     }
 }

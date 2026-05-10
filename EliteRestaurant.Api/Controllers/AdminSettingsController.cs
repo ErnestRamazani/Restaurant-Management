@@ -11,7 +11,7 @@ namespace EliteRestaurant.Api.Controllers;
 
 [ApiController]
 [Route("api/admin/settings")]
-[AllowAnonymous]
+[Authorize(Policy = "AdminOnly")]
 public sealed class AdminSettingsController(AppDbContext db) : ControllerBase
 {
     [HttpPost("cloud-profile")]

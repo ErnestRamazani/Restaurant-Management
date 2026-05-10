@@ -20,6 +20,8 @@ public static class StaffPortalAuthentication
 
     public static string CanonicalPortalForEmployee(Employee employee)
     {
+        if (employee.Role.Equals("AdminWeb", StringComparison.OrdinalIgnoreCase))
+            return "AdminWeb";
         if (employee.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase)
             || employee.Role.Equals("Manager", StringComparison.OrdinalIgnoreCase))
             return "Admin";
@@ -37,6 +39,8 @@ public static class StaffPortalAuthentication
             return "Server";
 
         var r = role.Trim();
+        if (r.Equals("AdminWeb", StringComparison.OrdinalIgnoreCase))
+            return "AdminWeb";
         if (r.Equals("Admin", StringComparison.OrdinalIgnoreCase)
             || r.Equals("Manager", StringComparison.OrdinalIgnoreCase))
             return "Admin";
@@ -101,6 +105,12 @@ public static class StaffPortalAuthentication
             return pinMatchedCandidates.FirstOrDefault(e =>
                 e.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase)
                 || e.Role.Equals("Manager", StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (string.Equals(normalizedPortal, "AdminWeb", StringComparison.OrdinalIgnoreCase))
+        {
+            return pinMatchedCandidates.FirstOrDefault(e =>
+                e.Role.Equals("AdminWeb", StringComparison.OrdinalIgnoreCase));
         }
 
         if (string.Equals(normalizedPortal, "Cashier", StringComparison.OrdinalIgnoreCase))

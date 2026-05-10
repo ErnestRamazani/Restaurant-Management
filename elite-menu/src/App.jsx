@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChefHat, CreditCard, MonitorCog, Utensils } from 'lucide-react'
+import { ChefHat, CreditCard, LayoutDashboard, MonitorCog, Utensils } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { BrowserRouter, Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { useCart } from './hooks/useCart'
@@ -86,6 +86,7 @@ function HubHome() {
     { to: '/staff/server', title: 'Server', desc: 'Take table orders and manage pickup.', icon: MonitorCog },
     { to: '/staff/cashier', title: 'Cashier', desc: 'Release, complete, and manage checks.', icon: CreditCard },
     { to: '/staff/kitchen', title: 'Kitchen', desc: 'Prep queue, receive tickets, mark ready — opens the kitchen portal.', icon: ChefHat },
+    { to: '/staff/admin', title: 'Admin web', desc: 'Read-only owner dashboard (separate sign-in).', icon: LayoutDashboard },
   ]
 
   return (
@@ -441,6 +442,7 @@ export default function App() {
         <Route path="/staff/server" element={<PortalRedirect path="/server/index.html" />} />
         <Route path="/staff/cashier" element={<PortalRedirect path="/cashier/index.html" />} />
         <Route path="/staff/kitchen" element={<PortalRedirect path="/kitchen/index.html" />} />
+        <Route path="/staff/admin" element={<PortalRedirect path="/admin/index.html" />} />
         <Route path="/kitchen" element={<Navigate to="/staff/kitchen" replace />} />
         <Route path="/reservation" element={<ReservationPage />} />
         <Route path="/login" element={<Navigate to="/staff" replace />} />

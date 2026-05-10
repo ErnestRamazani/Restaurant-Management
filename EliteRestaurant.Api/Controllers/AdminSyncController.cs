@@ -11,7 +11,7 @@ namespace EliteRestaurant.Api.Controllers;
 
 [ApiController]
 [Route("api/admin/sync")]
-[AllowAnonymous]
+[Authorize(Policy = "OperationalWrite")]
 public sealed class AdminSyncController(AppDbContext db) : ControllerBase
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);

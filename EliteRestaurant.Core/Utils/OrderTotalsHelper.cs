@@ -1,3 +1,5 @@
+using EliteRestaurant.Core.Models;
+
 namespace EliteRestaurant.Core.Utils;
 
 public static class OrderTotalsHelper
@@ -9,6 +11,50 @@ public static class OrderTotalsHelper
         decimal lineItemsSubtotal,
         string? discountMode,
         decimal discountValue)
+    {
+        var settings = SettingsManager.Load().CurrencyPricing;
+        var taxRate = settings.TaxPercent > 0m ? settings.TaxPercent / 100m : DefaultTaxRate;
+        var serviceRate = settings.ServicePercent > 0m ? settings.ServicePercent / 100m : DefaultServiceRate;
+        return ComputeTotalsWithRates(
+            lineItemsSubtotal,
+            discountMode,
+            discountValue,
+            taxRate,
+            serviceRate,
+            settings.RoundingSubtotal,
+            settings.RoundingLine,
+            settings.RoundingGrandTotal);
+    }
+
+    /// <summary>Order grand totals using stored public-menu pricing (API-safe; avoids file-based <see cref="SettingsManager"/>).</summary>
+    public static (decimal DiscountApplied, decimal TaxableSubtotal, decimal Tax, decimal Service, decimal GrandTotal) ComputeTotals(
+        decimal lineItemsSubtotal,
+        string? discountMode,
+        decimal discountValue,
+        PublicMenuSetting pricing)
+    {
+        var taxRate = pricing.TaxPercent > 0m ? pricing.TaxPercent / 100m : DefaultTaxRate;
+        var serviceRate = pricing.ServicePercent > 0m ? pricing.ServicePercent / 100m : DefaultServiceRate;
+        return ComputeTotalsWithRates(
+            lineItemsSubtotal,
+            discountMode,
+            discountValue,
+            taxRate,
+            serviceRate,
+            pricing.RoundingSubtotal,
+            pricing.RoundingLine,
+            pricing.RoundingGrandTotal);
+    }
+
+    private static (decimal DiscountApplied, decimal TaxableSubtotal, decimal Tax, decimal Service, decimal GrandTotal) ComputeTotalsWithRates(
+        decimal lineItemsSubtotal,
+        string? discountMode,
+        decimal discountValue,
+        decimal taxRate,
+        decimal serviceRate,
+        string? roundingSubtotal,
+        string? roundingLine,
+        string? roundingGrandTotal)
     {
         var mode = discountMode?.Trim() ?? "None";
         decimal discountApplied = 0m;
@@ -24,13 +70,10 @@ public static class OrderTotalsHelper
         }
 
         discountApplied = Math.Min(discountApplied, lineItemsSubtotal);
-        var settings = SettingsManager.Load().CurrencyPricing;
-        var taxRate = settings.TaxPercent > 0m ? settings.TaxPercent / 100m : DefaultTaxRate;
-        var serviceRate = settings.ServicePercent > 0m ? settings.ServicePercent / 100m : DefaultServiceRate;
-        var taxable = ApplyRounding(lineItemsSubtotal - discountApplied, settings.RoundingSubtotal);
-        var tax = ApplyRounding(taxable * taxRate, settings.RoundingLine);
-        var service = ApplyRounding(taxable * serviceRate, settings.RoundingLine);
-        var grand = ApplyRounding(taxable + tax + service, settings.RoundingGrandTotal);
+        var taxable = ApplyRounding(lineItemsSubtotal - discountApplied, roundingSubtotal);
+        var tax = ApplyRounding(taxable * taxRate, roundingLine);
+        var service = ApplyRounding(taxable * serviceRate, roundingLine);
+        var grand = ApplyRounding(taxable + tax + service, roundingGrandTotal);
         return (discountApplied, taxable, tax, service, grand);
     }
 

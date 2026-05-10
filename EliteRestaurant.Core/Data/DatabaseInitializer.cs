@@ -1,4 +1,6 @@
 using EliteRestaurant.Core.Utils;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace EliteRestaurant.Core.Data;
 
@@ -14,10 +16,21 @@ namespace EliteRestaurant.Core.Data;
 /// </remarks>
 public static class DatabaseInitializer
 {
-    public static void Initialize()
+    /// <param name="configuration">Web host configuration; supplies <c>DefaultConnection</c> so migrations match the API pool. Desktop/tools may pass null.</param>
+    public static void Initialize(IConfiguration? configuration = null)
     {
-        DatabaseMigrationRunner.ApplyPendingMigrations();
-        using var db = new AppDbContext();
+        var configurationDefaultConnection = configuration?.GetConnectionString("DefaultConnection");
+        DatabaseMigrationRunner.ApplyPendingMigrations(configurationDefaultConnection);
+
+        if (!AppDbContext.TryGetPostgreSqlConnectionString(out var cs, configurationDefaultConnection)
+            && !AppDbContext.TryGetDatabaseUrlLastResort(out cs))
+            return;
+
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseNpgsql(cs, npgsql => npgsql.EnableRetryOnFailure(5))
+            .Options;
+        using var db = new AppDbContext(options);
+        AdminWebLoginSeed.EnsureSeeded(db);
         SampleDataBootstrapper.SeedIfEnabled(db);
         SharedOrderDraftStore.PurgeDraftsOlderThan(TimeSpan.FromDays(30));
     }

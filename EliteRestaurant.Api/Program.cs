@@ -35,7 +35,7 @@ try
     builder.Host.UseSerilog();
 
     if (!builder.Environment.IsEnvironment("Testing"))
-        DatabaseInitializer.Initialize();
+        DatabaseInitializer.Initialize(builder.Configuration);
 
     builder.Services.Configure<CurrencyPricingOptions>(builder.Configuration.GetSection("CurrencyPricing"));
     builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
@@ -111,11 +111,16 @@ try
     builder.Services.AddAuthorization(options =>
     {
         options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin", "Manager"));
+        options.AddPolicy("AdminRead", policy => policy.RequireRole("Admin", "Manager", "AdminWeb"));
+        options.AddPolicy("AdminWrite", policy => policy.RequireRole("Admin", "Manager"));
+        options.AddPolicy("OperationalWrite", policy => policy.RequireRole(
+            "Admin", "Manager", "Chef", "Barman", "Bartender", "Sous Chef", "Cashier", "Server"));
         options.AddPolicy("ServerOnly", policy => policy.RequireRole("Server"));
         options.AddPolicy("CashierOnly", policy => policy.RequireRole("Cashier"));
         options.AddPolicy("KitchenOnly", policy => policy.RequireRole("Chef", "Barman", "Bartender", "Sous Chef"));
         options.AddPolicy("StaffAny", policy => policy.RequireAuthenticatedUser());
     });
+    builder.Services.AddScoped<EliteRestaurant.Core.Reporting.AdminReportAggregationService>();
     builder.Services.AddSignalR();
 
     builder.Services.AddRateLimiter(options =>
@@ -230,6 +235,7 @@ try
     app.UseCors(CorsPolicyAllowAll);
     app.UseRateLimiter();
     app.UseAuthentication();
+    app.UseMiddleware<EliteRestaurant.Api.Middleware.AdminWebReadOnlyApiMiddleware>();
     app.UseAuthorization();
     app.UseDefaultFiles();
     app.UseStaticFiles();
@@ -272,6 +278,19 @@ try
         context.Response.ContentType = "text/html; charset=utf-8";
         await context.Response.SendFileAsync(path);
     });
+    app.MapGet("/admin", () => Results.Redirect("/admin/index.html"));
+    app.MapGet("/admin/", async (IWebHostEnvironment env, HttpContext context) =>
+    {
+        var path = Path.Combine(env.WebRootPath, "admin", "index.html");
+        context.Response.ContentType = "text/html; charset=utf-8";
+        await context.Response.SendFileAsync(path);
+    });
+    app.MapGet("/admin/index.html", async (IWebHostEnvironment env, HttpContext context) =>
+    {
+        var path = Path.Combine(env.WebRootPath, "admin", "index.html");
+        context.Response.ContentType = "text/html; charset=utf-8";
+        await context.Response.SendFileAsync(path);
+    });
     app.MapControllers();
     app.MapHub<OrderHub>("/hubs/order");
     // Do not serve SPA index.html for /api/* — unknown API routes used to fall through and return HTML with 200,
@@ -292,7 +311,8 @@ try
         // Staff portals live under /server/, /cashier/, /kitchen/. Do not serve the customer SPA for unknown paths there.
         if (context.Request.Path.StartsWithSegments("/cashier")
             || context.Request.Path.StartsWithSegments("/kitchen")
-            || context.Request.Path.StartsWithSegments("/server"))
+            || context.Request.Path.StartsWithSegments("/server")
+            || context.Request.Path.StartsWithSegments("/admin"))
         {
             context.Response.StatusCode = StatusCodes.Status404NotFound;
             return;
@@ -309,6 +329,8 @@ try
         context.Response.ContentType = "text/html; charset=utf-8";
         await context.Response.SendFileAsync(file);
     });
+
+    IntegrationTestSeed.Ensure(app);
 
     app.Run();
 }

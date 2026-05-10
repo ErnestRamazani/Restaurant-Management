@@ -18,7 +18,24 @@ public static class ExcelExportService
         IReadOnlyList<(string SheetName, IReadOnlyList<string> Headers, IReadOnlyList<IReadOnlyList<string>> Rows)> sheets)
     {
         using var workbook = new XLWorkbook();
+        PopulateSheets(workbook, sheets);
+        workbook.SaveAs(filePath);
+    }
 
+    public static byte[] ExportWorkbookToByteArray(
+        IReadOnlyList<(string SheetName, IReadOnlyList<string> Headers, IReadOnlyList<IReadOnlyList<string>> Rows)> sheets)
+    {
+        using var workbook = new XLWorkbook();
+        PopulateSheets(workbook, sheets);
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        return stream.ToArray();
+    }
+
+    private static void PopulateSheets(
+        XLWorkbook workbook,
+        IReadOnlyList<(string SheetName, IReadOnlyList<string> Headers, IReadOnlyList<IReadOnlyList<string>> Rows)> sheets)
+    {
         foreach (var sheet in sheets)
         {
             var worksheet = workbook.Worksheets.Add(NormalizeSheetName(sheet.SheetName));
@@ -39,8 +56,6 @@ public static class ExcelExportService
             worksheet.ColumnsUsed().AdjustToContents();
             worksheet.SheetView.FreezeRows(1);
         }
-
-        workbook.SaveAs(filePath);
     }
 
     private static string NormalizeSheetName(string sheetName)
