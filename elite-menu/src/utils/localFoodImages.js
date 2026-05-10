@@ -1,8 +1,8 @@
-import cremeBrulee from '../assets/AR-228515-simple-creme-brulee-dessert-dmfs-4x3-821623e7a86548eeb89370ac23d5f251.jpg'
-import chickenParmesan from '../assets/easy-chicken-parmesan.jpg'
-import filetMignon from '../assets/filets-mignons-sauce-liqueur-d-erable-aux-quatres-poivres-550x550.jpeg'
-import chocolateLavaCake from '../assets/molten-lava-cake-feature.jpg'
-import genericPlate from '../assets/images.jpg'
+import cremeBrulee from '@repo-assets/images/menu/AR-228515-simple-creme-brulee-dessert-dmfs-4x3-821623e7a86548eeb89370ac23d5f251.jpg'
+import chickenParmesan from '@repo-assets/images/menu/easy-chicken-parmesan.jpg'
+import filetMignon from '@repo-assets/images/menu/filets-mignons-sauce-liqueur-d-erable-aux-quatres-poivres-550x550.jpeg'
+import chocolateLavaCake from '@repo-assets/images/menu/molten-lava-cake-feature.jpg'
+import genericPlate from '@repo-assets/images/menu/images.jpg'
 import { isDrinkProduct } from './menuKind'
 
 function urlString(url) {

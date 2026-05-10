@@ -9,6 +9,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 export default defineConfig({
   plugins: [react()],
   base: '/',
+  resolve: {
+    alias: {
+      '@repo-assets': path.resolve(__dirname, '../assets'),
+    },
+  },
   build: {
     outDir: path.resolve(__dirname, '../EliteRestaurant.Api/wwwroot'),
     emptyOutDir: false,

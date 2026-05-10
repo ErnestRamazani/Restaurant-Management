@@ -1,7 +1,8 @@
-// PRICING PRECEDENCE:
+// PRICING / BRANDING PRECEDENCE (aligned with PublicMenuController):
 // 1. API appsettings.json (CurrencyPricing section) — explicit operator override when values are positive.
-// 2. App file settings (SettingsManager / app-settings.json) — desktop-configured defaults.
-// Both must remain consistent for matching totals. See PricingPrecedenceTests.
+// 2. PublicMenuSettings row (Key=default) — cloud profile from POST api/admin/settings/cloud-profile (desktop push).
+// 3. App file settings (SettingsManager / app-settings.json) — local fallback when cloud fields are unset.
+// See PricingPrecedenceTests for tax/service matrix when cloud row is absent.
 using EliteRestaurant.Api.Dtos;
 using EliteRestaurant.Api.Security;
 using EliteRestaurant.Core.Data;
@@ -35,18 +36,30 @@ public sealed class ServerPortalController(
         var allSettings = SettingsManager.Load();
         var settings = allSettings.CurrencyPricing;
         var business = allSettings.BusinessProfile;
+        var cloudSettings = db.PublicMenuSettings.AsNoTracking().FirstOrDefault(s => s.Key == "default");
+        var restaurantName = string.IsNullOrWhiteSpace(cloudSettings?.RestaurantName)
+            ? (string.IsNullOrWhiteSpace(business.RestaurantName) ? "Elite Restaurant" : business.RestaurantName.Trim())
+            : cloudSettings!.RestaurantName.Trim();
         var logoUrl = "/api/server/assets/restaurant-logo";
         var employeePhotoUrl = "/api/server/assets/me-photo";
         var apiPricing = currencyPricingOptions.Value;
-        var taxPercent = PricingResolver.ResolveTaxRate(apiPricing.TaxPercent, settings.TaxPercent);
-        var servicePercent = PricingResolver.ResolveServicePercent(apiPricing.ServicePercent, settings.ServicePercent);
+        var effectiveTax = cloudSettings?.TaxPercent ?? settings.TaxPercent;
+        var effectiveService = cloudSettings?.ServicePercent ?? settings.ServicePercent;
+        var taxPercent = PricingResolver.ResolveTaxRate(apiPricing.TaxPercent, effectiveTax);
+        var servicePercent = PricingResolver.ResolveServicePercent(apiPricing.ServicePercent, effectiveService);
+        var displayMode = string.IsNullOrWhiteSpace(cloudSettings?.DefaultCurrencyDisplayMode)
+            ? (string.IsNullOrWhiteSpace(settings.DefaultCurrencyDisplayMode) ? "Dual" : settings.DefaultCurrencyDisplayMode.Trim())
+            : cloudSettings!.DefaultCurrencyDisplayMode.Trim();
+        var usdToFc = cloudSettings?.UsdToFcRate > 0m
+            ? cloudSettings.UsdToFcRate
+            : (settings.UsdToFcRate > 0m ? settings.UsdToFcRate : CurrencyHelper.DefaultFcPerUsd);
 
         return Ok(new ServerPortalConfigDto(
-            string.IsNullOrWhiteSpace(business.RestaurantName) ? "Elite Restaurant" : business.RestaurantName.Trim(),
+            restaurantName,
             logoUrl,
             employeePhotoUrl,
-            settings.DefaultCurrencyDisplayMode,
-            settings.UsdToFcRate > 0m ? settings.UsdToFcRate : CurrencyHelper.DefaultFcPerUsd,
+            displayMode,
+            usdToFc,
             taxPercent,
             servicePercent));
     }
@@ -57,6 +70,15 @@ public sealed class ServerPortalController(
         var session = RequireServerOrCashierSession();
         if (session is null)
             return Unauthorized();
+
+        var asset = db.PublicMenuAssets.AsNoTracking().FirstOrDefault(a => a.Key == "logo");
+        if (asset is { Content.Length: > 0 })
+        {
+            var contentType = string.IsNullOrWhiteSpace(asset.ContentType)
+                ? "image/png"
+                : asset.ContentType;
+            return File(asset.Content, contentType);
+        }
 
         var logoPath = SettingsManager.Load().BusinessProfile.LogoPath?.Trim() ?? string.Empty;
         return ServeImageFromPath(logoPath);
