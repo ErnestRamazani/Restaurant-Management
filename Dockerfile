@@ -5,6 +5,8 @@ WORKDIR /src/elite-menu
 COPY elite-menu/package*.json ./
 RUN npm ci
 COPY elite-menu ./
+# Repo-root assets (Vite alias @repo-assets -> ../assets from elite-menu)
+COPY assets /src/assets
 RUN npm run build
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS dotnet-build
