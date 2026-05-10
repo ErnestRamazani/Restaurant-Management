@@ -74,6 +74,8 @@ public sealed class AdminSettingsController(AppDbContext db) : ControllerBase
 
     private void SaveLogoIfPresent(AdminCloudSettingsRequest request)
     {
+        // Persists to DB for deployments without a repo logo file. When assets/images/logo contains an image,
+        // RestaurantWebLogoResolver serves that file first; DB logo is used only if no on-disk file is found.
         if (string.IsNullOrWhiteSpace(request.LogoBase64))
             return;
 

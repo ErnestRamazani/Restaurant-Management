@@ -1,8 +1,14 @@
-// PRICING / BRANDING PRECEDENCE (aligned with PublicMenuController):
+// PRICING PRECEDENCE (aligned with PublicMenuController):
 // 1. API appsettings.json (CurrencyPricing section) — explicit operator override when values are positive.
 // 2. PublicMenuSettings row (Key=default) — cloud profile from POST api/admin/settings/cloud-profile (desktop push).
 // 3. App file settings (SettingsManager / app-settings.json) — local fallback when cloud fields are unset.
 // See PricingPrecedenceTests for tax/service matrix when cloud row is absent.
+//
+// RESTAURANT LOGO (same order as /api/public/menu/assets/logo — see RestaurantWebLogoResolver remarks):
+// 1. On-disk assets/images/logo under the repo or build output (website-primary when present).
+// 2. PublicMenuAssets Key=logo (cloud upload).
+// 3. BusinessProfile.LogoPath (absolute path).
+using EliteRestaurant.Api.Branding;
 using EliteRestaurant.Api.Dtos;
 using EliteRestaurant.Api.Security;
 using EliteRestaurant.Core.Data;
@@ -10,6 +16,7 @@ using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Orders;
 using EliteRestaurant.Core.Utils;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +30,7 @@ namespace EliteRestaurant.Api.Controllers;
 [Authorize(Policy = "StaffAny")]
 public sealed class ServerPortalController(
     TabletAuthService authService,
+    IWebHostEnvironment environment,
     IOptions<CurrencyPricingOptions> currencyPricingOptions,
     AppDbContext db) : ControllerBase
 {
@@ -70,6 +78,13 @@ public sealed class ServerPortalController(
         var session = RequireServerOrCashierSession();
         if (session is null)
             return Unauthorized();
+
+        var repoLogo = RestaurantWebLogoResolver.TryResolveRepoLogoPath(environment);
+        if (repoLogo is not null && System.IO.File.Exists(repoLogo))
+        {
+            var bytes = System.IO.File.ReadAllBytes(repoLogo);
+            return File(bytes, RestaurantWebLogoResolver.GetContentTypeForPath(repoLogo));
+        }
 
         var asset = db.PublicMenuAssets.AsNoTracking().FirstOrDefault(a => a.Key == "logo");
         if (asset is { Content.Length: > 0 })

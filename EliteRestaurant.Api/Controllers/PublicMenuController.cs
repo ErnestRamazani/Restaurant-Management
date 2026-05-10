@@ -1,7 +1,9 @@
 using System.Text.Json;
+using EliteRestaurant.Api.Branding;
 using EliteRestaurant.Api.Dtos;
 using EliteRestaurant.Api.Hubs;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.StaticFiles;
@@ -19,6 +21,7 @@ namespace EliteRestaurant.Api.Controllers;
 [AllowAnonymous]
 public sealed class PublicMenuController(
     AppDbContext db,
+    IWebHostEnvironment environment,
     IOptions<CurrencyPricingOptions> currencyPricingOptions,
     IHubContext<OrderHub> hubContext) : ControllerBase
 {
@@ -55,6 +58,7 @@ public sealed class PublicMenuController(
             : taglineValue.Trim();
         var phone = cloudSettings?.Phone ?? business.Phone;
         var address = cloudSettings?.Address ?? business.Address;
+        // Logo URL is always this endpoint; the handler prefers on-disk assets/images/logo, then DB, then LogoPath.
         return Ok(new PublicMenuConfigDto(
             name,
             "/api/public/menu/assets/logo",
@@ -173,6 +177,15 @@ public sealed class PublicMenuController(
     [EnableRateLimiting("PublicMenuRead")]
     public IActionResult GetLogo()
     {
+        // 1) Repository assets/images/logo (see RestaurantWebLogoResolver) — primary for web when deployed.
+        var repoLogo = RestaurantWebLogoResolver.TryResolveRepoLogoPath(environment);
+        if (repoLogo is not null && System.IO.File.Exists(repoLogo))
+        {
+            var bytes = System.IO.File.ReadAllBytes(repoLogo);
+            return File(bytes, RestaurantWebLogoResolver.GetContentTypeForPath(repoLogo));
+        }
+
+        // 2) Cloud / admin-uploaded logo in DB (desktop "push" profile).
         var asset = db.PublicMenuAssets.AsNoTracking().FirstOrDefault(a => a.Key == "logo");
         if (asset is not null && asset.Content.Length > 0)
         {
@@ -182,6 +195,7 @@ public sealed class PublicMenuController(
             return File(asset.Content, contentType);
         }
 
+        // 3) Legacy absolute path from local settings (e.g. desktop-picked file).
         return ServeImageFromPath(SettingsManager.Load().BusinessProfile.LogoPath?.Trim() ?? string.Empty);
     }
 

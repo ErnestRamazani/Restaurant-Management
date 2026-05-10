@@ -26,4 +26,13 @@
     <ProjectReference Include="..\EliteRestaurant.Contracts\EliteRestaurant.Contracts.csproj" />
   </ItemGroup>
 
+  <!-- Customer web logo: copy repo assets/images/logo next to the API binary so publish/deploy finds files via AppContext.BaseDirectory. -->
+  <ItemGroup>
+    <None Include="..\assets\images\logo\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <Link>assets\images\logo\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </None>
+  </ItemGroup>
+
 </Project>
