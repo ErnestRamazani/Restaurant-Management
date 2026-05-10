@@ -37,6 +37,10 @@ public sealed class OrderDetailPanelViewModel : BaseViewModel
 
     public string OrderCode { get; private set; } = string.Empty;
     public string TableLabel { get; private set; } = string.Empty;
+    public string PackagingBannerLine { get; private set; } = string.Empty;
+
+    public bool ShowPackagingBanner => !string.IsNullOrWhiteSpace(PackagingBannerLine);
+
     public string ServerName { get; private set; } = string.Empty;
     public string Status { get; private set; } = string.Empty;
     public string CreatedText { get; private set; } = string.Empty;
@@ -100,6 +104,10 @@ public sealed class OrderDetailPanelViewModel : BaseViewModel
             CustomerNotes = string.IsNullOrWhiteSpace(order.CustomerNotes) ? "—" : order.CustomerNotes.Trim();
             AllergyNotes = string.IsNullOrWhiteSpace(order.AllergyNotes) ? "—" : order.AllergyNotes.Trim();
 
+            PackagingBannerLine = KitchenTicketPackaging.IsOnlinePackagingOrder(order)
+                ? "ONLINE — PACKAGING REQUIRED"
+                : string.Empty;
+
             Lines.Clear();
             foreach (var item in order.Items.OrderBy(i => i.Product?.Name))
             {
@@ -116,6 +124,8 @@ public sealed class OrderDetailPanelViewModel : BaseViewModel
             IsOpen = true;
             OnPropertyChanged(nameof(OrderCode));
             OnPropertyChanged(nameof(TableLabel));
+            OnPropertyChanged(nameof(PackagingBannerLine));
+            OnPropertyChanged(nameof(ShowPackagingBanner));
             OnPropertyChanged(nameof(ServerName));
             OnPropertyChanged(nameof(Status));
             OnPropertyChanged(nameof(CreatedText));

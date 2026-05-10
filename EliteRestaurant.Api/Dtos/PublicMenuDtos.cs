@@ -17,7 +17,7 @@ public sealed record PublicMenuConfigDto(
     string? TicketFooterText,
     string? TaxIdLegalInfo);
 
-public sealed record StaffLoginCodeRequest(string? Code);
+public sealed record StaffLoginCodeRequest(string? Code, string? SignInId = null, string? Pin = null);
 
 public sealed record StaffLoginCodeResponse(
     bool Success,
@@ -84,4 +84,15 @@ public sealed class PublicMenuDraftErrorDto
 {
     public bool Success { get; set; } = false;
     public IReadOnlyList<string> Errors { get; set; } = Array.Empty<string>();
+}
+
+/// <summary>Anonymous guest polling for order status (rate-limited).</summary>
+public sealed class PublicOrderStatusDto
+{
+    public string OrderCode { get; set; } = string.Empty;
+    public string WorkflowStatus { get; set; } = string.Empty;
+    /// <summary>Machine code when the kitchen has marked ready (ReadyForPickup / OutForDelivery).</summary>
+    public string? CustomerFulfillmentStatus { get; set; }
+    public string? CustomerFulfillmentDisplay { get; set; }
+    public string? TableLabel { get; set; }
 }

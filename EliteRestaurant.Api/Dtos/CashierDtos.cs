@@ -9,7 +9,9 @@ public sealed record CashierPendingOrderDto(
     string CreatedAtText,
     decimal GrandTotalUsd,
     string GrandTotalText,
-    string LinesSummary);
+    string LinesSummary,
+    string Status,
+    string OrderOrigin);
 
 public sealed record CashierCompleteOrderRequest(
     string? PaymentCurrencyCode,
@@ -34,7 +36,13 @@ public sealed record CashierOrderDetailDto(
     decimal DiscountAppliedUsd,
     decimal GrandTotalUsd,
     decimal GrandTotalFc,
-    IReadOnlyList<CashierOrderLineDto> Lines);
+    IReadOnlyList<CashierOrderLineDto> Lines,
+    string OrderOrigin,
+    string OrderSource,
+    decimal DeliveryFeeUsd,
+    string PaymentTiming,
+    decimal TaxableSubtotalUsd,
+    decimal MerchandiseGrandUsd);
 
 public sealed record CashierOrderLineDto(
     int ProductId,

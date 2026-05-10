@@ -33,6 +33,7 @@ public sealed class AdminOrdersApiClient(EliteApiClient? apiClient = null)
             snapshot.LiveDiscountAmount,
             snapshot.CustomerNotes,
             snapshot.AllergyNotes,
+            snapshot.PaymentTiming,
             snapshot.SelectedLines
                 .Select(line => new AdminOrderLineRequest(line.ProductId, line.Quantity))
                 .ToList());

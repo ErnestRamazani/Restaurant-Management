@@ -1,0 +1,64 @@
+<UserControl x:Class="EliteRestaurantPro.Views.ReservationFloorWebView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf">
+    <Grid>
+        <wv2:WebView2 x:Name="Browser"/>
+
+        <Border Background="#CC0D0D1A"
+                Visibility="{Binding ShowPasscodeGate, Converter={StaticResource BoolToVisibilityConverter}}">
+            <Border Margin="40"
+                    Padding="24"
+                   Background="#FF141428"
+                    BorderBrush="{StaticResource BorderSubtleBrush}"
+                    BorderThickness="1"
+                    CornerRadius="16"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    MaxWidth="420">
+                <StackPanel>
+                    <TextBlock Text="Reservation floor"
+                               FontFamily="Segoe UI Variable Display, Segoe UI"
+                               FontSize="20"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource GoldAccentBrush}"/>
+                    <TextBlock Margin="0,10,0,0"
+                               TextWrapping="Wrap"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               FontSize="13"
+                               Text="{Binding StatusMessage}"/>
+                    <TextBlock Margin="0,16,0,6"
+                               Text="Staff passcode"
+                               Foreground="{StaticResource TextMutedBrush}"
+                               FontSize="11"
+                               FontWeight="SemiBold"/>
+                    <PasswordBox x:Name="PasscodeBox"
+                                 Margin="0,0,0,12"
+                                 Padding="10,8"
+                                 FontSize="14"
+                                 Background="#22FFFFFF"
+                                 Foreground="{StaticResource TextPrimaryBrush}"
+                                 BorderBrush="{StaticResource BorderSubtleBrush}"/>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0"
+                                Content="Continue"
+                                Padding="12,8"
+                                Command="{Binding SubmitPasscodeCommand}"
+                                Style="{StaticResource GoldPrimaryButton}"/>
+                        <Button Grid.Column="2"
+                                Content="Retry cloud session"
+                                Padding="12,8"
+                                Command="{Binding RetryCloudSessionCommand}"
+                                Style="{StaticResource GhostButton}"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </Border>
+    </Grid>
+</UserControl>

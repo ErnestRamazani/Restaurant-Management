@@ -12,7 +12,7 @@ namespace EliteRestaurant.Api.Controllers;
 
 [ApiController]
 [Route("api/floor")]
-[Authorize(Policy = "StaffAny")]
+[Authorize(Policy = "CashierOrAdmin")]
 public sealed class FloorReservationController(
     AppDbContext db,
     ReservationSchedulingService scheduling,

@@ -43,6 +43,28 @@ public static class IntegrationTestSeed
             JoinDate = DateTime.Today
         });
 
+        db.Employees.Add(new Employee
+        {
+            UniqueId = "EMP-SRV-FLOOR-INT",
+            SignInId = "srvfloor",
+            Name = "Integration Server",
+            Role = "Server",
+            PinCode = EmployeePinHasher.HashForStorage("1111"),
+            EmploymentStatus = "Active",
+            JoinDate = DateTime.Today
+        });
+
+        db.Employees.Add(new Employee
+        {
+            UniqueId = "EMP-CASH-FLOOR-INT",
+            SignInId = "cashfloor",
+            Name = "Integration Cashier",
+            Role = "Cashier",
+            PinCode = EmployeePinHasher.HashForStorage("2222"),
+            EmploymentStatus = "Active",
+            JoinDate = DateTime.Today
+        });
+
         db.SaveChanges();
     }
 }

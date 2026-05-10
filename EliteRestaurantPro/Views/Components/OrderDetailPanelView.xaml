@@ -55,6 +55,9 @@
 
                 <ScrollViewer Grid.Row="1" Style="{StaticResource EliteScrollViewer}" Padding="16,12">
                     <StackPanel>
+                        <TextBlock Text="{Binding PackagingBannerLine}" TextWrapping="Wrap" FontSize="13" FontWeight="Bold"
+                                   Foreground="#FFF59E0B" Margin="0,0,0,10"
+                                   Visibility="{Binding ShowPackagingBanner, Converter={StaticResource BoolToVisibilityConverter}}"/>
                         <TextBlock Text="Lines" Foreground="{StaticResource GoldAccentBrush}" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,8"/>
                         <ItemsControl ItemsSource="{Binding Lines}">
                             <ItemsControl.ItemTemplate>

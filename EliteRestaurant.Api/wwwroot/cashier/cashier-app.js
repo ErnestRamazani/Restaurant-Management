@@ -748,7 +748,7 @@
   }
 
   async function openOrderDetail(orderId) {
-    const r = await api("/api/cashier/orders/" + orderId);
+    const r = await api("/api/cashier/orders/" + orderId + "/invoice");
     if (!r.ok) { alert(r.body?.message || "Could not load order"); return; }
     const d = r.body;
     const linesRaw = d.lines ?? d.Lines ?? [];
@@ -770,9 +770,22 @@
     const gfc = d.grandTotalFc ?? d.GrandTotalFc ?? 0;
     const cn = d.customerNotes ?? d.CustomerNotes ?? "-";
     const an = d.allergyNotes ?? d.AllergyNotes ?? "-";
+    const origin = d.orderOrigin ?? d.OrderOrigin ?? "";
+    const src = d.orderSource ?? d.OrderSource ?? "";
+    const pt = d.paymentTiming ?? d.PaymentTiming ?? "";
+    const dFee = Number(d.deliveryFeeUsd ?? d.DeliveryFeeUsd ?? 0);
+    const merch = Number(d.merchandiseGrandUsd ?? d.MerchandiseGrandUsd ?? 0);
+    const taxable = Number(d.taxableSubtotalUsd ?? d.TaxableSubtotalUsd ?? 0);
     $("detailBody").textContent =
-      "Table: " + (d.tableLabel ?? d.TableLabel) + "\nServer: " + (d.serverName ?? d.ServerName) + "\n\n" + lines + "\n\n" +
-      "Subtotal " + fmtUsd(sub) + "\nDiscount " + fmtUsd(disc) + "\nTax " + fmtUsd(tax) + "\nService " + fmtUsd(svc) + "\nGrand " + fmtUsd(gusd) + " (" + fmtFc(gfc) + ")\n\n" +
+      "Table: " + (d.tableLabel ?? d.TableLabel) + "\nServer: " + (d.serverName ?? d.ServerName) + "\n" +
+      "Origin: " + origin + " · Source: " + src + "\nPayment timing: " + pt + "\n\n" +
+      lines + "\n\n" +
+      "Line subtotal " + fmtUsd(sub) + "\n" +
+      "Taxable (after discount) " + fmtUsd(taxable) + "\n" +
+      "Discount " + fmtUsd(disc) + "\nTax " + fmtUsd(tax) + "\nService " + fmtUsd(svc) + "\n" +
+      "Merchandise total " + fmtUsd(merch) + "\n" +
+      (dFee > 0 ? "Delivery fee (20%) " + fmtUsd(dFee) + "\n" : "") +
+      "Grand " + fmtUsd(gusd) + " (" + fmtFc(gfc) + ")\n\n" +
       "Notes: " + cn + "\nAllergy: " + an;
     $("orderDetailModal").classList.remove("hidden");
   }
@@ -787,7 +800,7 @@
     $("payFc").value = "0";
     $("chgUsd").value = "0";
     $("chgFc").value = "0";
-    api("/api/cashier/orders/" + orderId).then(r => {
+    api("/api/cashier/orders/" + orderId + "/invoice").then(r => {
       if (!r.ok) { alert(r.body?.message || "Load failed"); return; }
       paymentDueUsd = Number(r.body.grandTotalUsd ?? r.body.GrandTotalUsd ?? 0);
       $("paymentDueLine").textContent = "Due: " + fmtUsd(paymentDueUsd) + " (≈ " + fmtFc(toFc(paymentDueUsd)) + ")";
@@ -938,6 +951,53 @@
     hubDebounce = setTimeout(() => { el.textContent = ""; hubDebounce = null; }, 6000);
   }
 
+  let orderReadyHubDebounce = null;
+  function scheduleOrderReadyFlash(msg) {
+    const el = $("orderReadyFlash");
+    if (!el) return;
+    el.textContent = msg || "";
+    if (orderReadyHubDebounce) clearTimeout(orderReadyHubDebounce);
+    orderReadyHubDebounce = setTimeout(() => { el.textContent = ""; orderReadyHubDebounce = null; }, 10000);
+  }
+
+  /**
+   * Browsers often block audio until a user gesture. Logging in counts as one; we warm the AudioContext then.
+   * Hub-driven beeps after that may still be silenced in strict modes — silent failure is OK.
+   */
+  function unlockCashierAudioFromUserGesture() {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      if (ctx.state === "suspended") void ctx.resume();
+      void ctx.close();
+    } catch (_) {}
+  }
+
+  function playOrderReadyBeep() {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = "sine";
+      o.frequency.value = 880;
+      o.connect(g);
+      g.connect(ctx.destination);
+      g.gain.setValueAtTime(0.0001, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.07, ctx.currentTime + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.14);
+      o.start(ctx.currentTime);
+      o.stop(ctx.currentTime + 0.15);
+      void ctx.resume().finally(() => {
+        setTimeout(() => {
+          try { ctx.close(); } catch (_) {}
+        }, 300);
+      });
+    } catch (_) {}
+  }
+
   async function startOrderHub() {
     if (typeof signalR === "undefined") return;
     if (orderHubConnection) {
@@ -952,12 +1012,33 @@
       scheduleDraftFlash("New customer draft — drafts refreshed.");
       if (currentView === "take") loadDrafts();
     });
+    conn.on("OrderReady", (payload) => {
+      const p = payload && typeof payload === "object" ? payload : {};
+      const code = (p.orderCode ?? p.OrderCode ?? "").toString().replace(/^#/, "");
+      const table = (p.tableLabel ?? p.TableLabel ?? "").toString();
+      const guest = (p.guestLabel ?? p.GuestLabel ?? "").toString();
+      const disp = (p.customerFulfillmentDisplay ?? p.CustomerFulfillmentDisplay ?? "").toString();
+      const origin = (p.orderOrigin ?? p.OrderOrigin ?? "").toString();
+      const loc = table.trim() || guest.trim() || "—";
+      const codePart = code ? "#" + code : "";
+      const bits = ["Order ready", codePart, loc, disp].filter(x => x && String(x).trim());
+      const msg = bits.join(" · ") + (origin ? " (" + origin + ")" : "");
+      scheduleOrderReadyFlash(msg);
+      playOrderReadyBeep();
+      void loadCashierAlerts();
+      if (currentView === "orders") loadOrdersTab().catch(() => {});
+    });
     conn.onreconnecting(() => setHubPill("degraded"));
-    conn.onreconnected(() => { setHubPill("live"); conn.invoke("JoinServer").catch(() => {}); });
+    conn.onreconnected(() => {
+      setHubPill("live");
+      conn.invoke("JoinServer").catch(() => {});
+      conn.invoke("JoinCashierDashboard").catch(() => {});
+    });
     conn.onclose(() => setHubPill("off"));
     try {
       await conn.start();
       await conn.invoke("JoinServer");
+      await conn.invoke("JoinCashierDashboard");
       orderHubConnection = conn;
       setHubPill("live");
     } catch (e) {
@@ -1010,6 +1091,7 @@
     await loadOrdersTab();
     setView("take");
     void startOrderHub();
+    unlockCashierAudioFromUserGesture();
     startPolling();
   };
 

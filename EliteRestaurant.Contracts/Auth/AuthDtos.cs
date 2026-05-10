@@ -17,3 +17,11 @@ public sealed record CloudLoginResponse(
     [property: JsonPropertyName("role")] string Role,
     [property: JsonPropertyName("signInId")] string SignInId,
     [property: JsonPropertyName("portal")] string Portal);
+
+/// <summary>Current JWT claims for staff (whoami-style).</summary>
+public sealed record AuthSessionDto(
+    [property: JsonPropertyName("employeeId")] int EmployeeId,
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("role")] string Role,
+    [property: JsonPropertyName("signInId")] string SignInId,
+    [property: JsonPropertyName("portal")] string Portal);

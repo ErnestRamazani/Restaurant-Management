@@ -56,7 +56,7 @@ public static class OrderSubmissionHelper
         IReadOnlyDictionary<int, decimal> priceByProductId)
     {
         var subtotal = items.Sum(i => (priceByProductId.TryGetValue(i.ProductId, out var price) ? price : 0m) * i.Quantity);
-        var totals = OrderTotalsHelper.ComputeTotals(subtotal, order.DiscountMode, order.DiscountValue);
+        var totals = OrderTotalsHelper.ComputeTotalsWithDeliveryFee(subtotal, order.DiscountMode, order.DiscountValue, order.DeliveryFeeUsd);
         var grand = totals.GrandTotal;
         order.DiscountAmountUsd = totals.DiscountApplied;
         order.PaymentAmountUsd = Math.Round(grand, 2);

@@ -15,8 +15,10 @@ import { ReservationScreen } from './components/screens/ReservationScreen'
 import { ConfirmDialog } from './components/ui/ConfirmDialog'
 import { ErrorScreen } from './components/ui/ErrorScreen'
 import { LoadingScreen } from './components/ui/LoadingScreen'
+import { ReservationOrderGatewayModal } from './components/ui/ReservationOrderGatewayModal'
 import { validateStaffLoginCode } from './utils/api'
 import { API_ORIGIN, pingApi } from './utils/apiClient'
+import { canAccessReservationFloorFromStoredToken } from './utils/staffAuth'
 
 const spring = { type: 'spring', stiffness: 300, damping: 34 }
 /** @internal history.state key for in-app back (cart → menu → hero) */
@@ -82,9 +84,13 @@ function CloudStatus({ className = '' }) {
 }
 
 function HubHome() {
+  const showFloorCard = canAccessReservationFloorFromStoredToken()
+
   const cards = [
     { to: '/', title: 'Consumer Menu', desc: 'Guests scan, browse, and send orders.', icon: Utensils },
-    { to: '/staff/floor', title: 'Reservation floor', desc: 'Live tables, check-in, and merge (staff token).', icon: Map },
+    ...(showFloorCard
+      ? [{ to: '/staff/floor', title: 'Reservation floor', desc: 'Live tables, check-in, and merge (Admin & Cashier).', icon: Map }]
+      : []),
     { to: '/staff/server', title: 'Server', desc: 'Take table orders and manage pickup.', icon: MonitorCog },
     { to: '/staff/cashier', title: 'Cashier', desc: 'Release, complete, and manage checks.', icon: CreditCard },
     { to: '/staff/kitchen', title: 'Kitchen', desc: 'Prep queue, receive tickets, mark ready — opens the kitchen portal.', icon: ChefHat },
@@ -158,8 +164,11 @@ function CustomerMenuApp() {
   const [manualTableId, setManualTableId] = useState(/** @type {number | null} */ (null))
   const [staffLoginOpen, setStaffLoginOpen] = useState(false)
   const [staffLoginCode, setStaffLoginCode] = useState('')
+  const [staffTabletId, setStaffTabletId] = useState('')
+  const [staffTabletPin, setStaffTabletPin] = useState('')
   const [staffLoginError, setStaffLoginError] = useState('')
   const [staffLoginBusy, setStaffLoginBusy] = useState(false)
+  const [guestGatewayOpen, setGuestGatewayOpen] = useState(false)
   const [orderRef, setOrderRef] = useState(
     /** @type {{ label: string; message: string; estimatedPrepMinutes: number | null }} */ ({
       label: '',
@@ -228,6 +237,8 @@ function CustomerMenuApp() {
     if (staffLoginBusy) return
     setStaffLoginOpen(false)
     setStaffLoginCode('')
+    setStaffTabletId('')
+    setStaffTabletPin('')
     setStaffLoginError('')
   }, [staffLoginBusy])
 
@@ -241,16 +252,18 @@ function CustomerMenuApp() {
     setStaffLoginBusy(true)
     setStaffLoginError('')
     try {
-      await validateStaffLoginCode(code)
+      await validateStaffLoginCode(code, { signInId: staffTabletId, pin: staffTabletPin })
       setStaffLoginOpen(false)
       setStaffLoginCode('')
+      setStaffTabletId('')
+      setStaffTabletPin('')
       navigate('/staff')
     } catch (error) {
       setStaffLoginError(error instanceof Error ? error.message : 'Incorrect staff passcode.')
     } finally {
       setStaffLoginBusy(false)
     }
-  }, [navigate, staffLoginCode])
+  }, [navigate, staffLoginCode, staffTabletId, staffTabletPin])
 
   useEffect(() => {
     if (typeof window === 'undefined' || loading || error) return
@@ -296,7 +309,7 @@ function CustomerMenuApp() {
             >
               <HeroScreen
                 config={config}
-                onEnterMenu={goMenu}
+                onEnterMenu={() => setGuestGatewayOpen(true)}
                 onReservation={() => navigate('/reservation')}
                 onStaffLogin={() => setStaffLoginOpen(true)}
               />
@@ -356,6 +369,13 @@ function CustomerMenuApp() {
         cart={cart}
       />
 
+      <ReservationOrderGatewayModal
+        open={guestGatewayOpen}
+        onClose={() => setGuestGatewayOpen(false)}
+        onBookTable={() => navigate('/reservation')}
+        onOrderOnline={goMenu}
+      />
+
       <ConfirmDialog
         open={cart.sectionConflict != null}
         title="Switch order type?"
@@ -373,12 +393,43 @@ function CustomerMenuApp() {
             <div className="text-center">
               <p className="font-body text-[0.66rem] font-bold uppercase tracking-[0.24em] text-gold/80">Staff access</p>
               <h2 className="mt-2 font-display text-2xl italic">Enter passcode</h2>
-              <p className="mt-2 font-body text-sm leading-relaxed text-champagne/60">
-                This area is for restaurant staff only.
-              </p>
+            <p className="mt-2 font-body text-sm leading-relaxed text-champagne/60">
+              Enter the venue passcode. For reservation floor access, add your tablet sign-in ID and PIN (same as POS).
+            </p>
             </div>
 
-            <label className="mt-5 block font-body text-xs font-bold uppercase tracking-[0.16em] text-champagne/55" htmlFor="staffLoginCode">
+            <label className="mt-5 block font-body text-xs font-bold uppercase tracking-[0.16em] text-champagne/55" htmlFor="staffTabletId">
+              Sign-in ID <span className="text-champagne/40">(optional)</span>
+            </label>
+            <input
+              id="staffTabletId"
+              value={staffTabletId}
+              onChange={(e) => {
+                setStaffTabletId(e.target.value)
+                setStaffLoginError('')
+              }}
+              type="text"
+              autoComplete="username"
+              placeholder="For cashier / admin floor"
+              className="mt-2 h-11 w-full rounded-2xl border border-gold/15 bg-black/20 px-4 text-left font-body text-sm text-champagne outline-none transition focus:border-gold focus:ring-2 focus:ring-gold/20"
+            />
+
+            <label className="mt-4 block font-body text-xs font-bold uppercase tracking-[0.16em] text-champagne/55" htmlFor="staffTabletPin">
+              PIN <span className="text-champagne/40">(optional)</span>
+            </label>
+            <input
+              id="staffTabletPin"
+              value={staffTabletPin}
+              onChange={(e) => {
+                setStaffTabletPin(e.target.value)
+                setStaffLoginError('')
+              }}
+              type="password"
+              autoComplete="current-password"
+              className="mt-2 h-11 w-full rounded-2xl border border-gold/15 bg-black/20 px-4 text-left font-body text-sm text-champagne outline-none transition focus:border-gold focus:ring-2 focus:ring-gold/20"
+            />
+
+            <label className="mt-4 block font-body text-xs font-bold uppercase tracking-[0.16em] text-champagne/55" htmlFor="staffLoginCode">
               Passcode
             </label>
             <input

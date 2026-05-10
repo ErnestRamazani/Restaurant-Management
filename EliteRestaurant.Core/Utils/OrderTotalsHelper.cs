@@ -77,6 +77,18 @@ public static class OrderTotalsHelper
         return (discountApplied, taxable, tax, service, grand);
     }
 
+    /// <summary>Merchandise totals plus a separate delivery fee line (USD), not included in tax/service base unless you change callers.</summary>
+    public static (decimal DiscountApplied, decimal TaxableSubtotal, decimal Tax, decimal Service, decimal GrandTotal) ComputeTotalsWithDeliveryFee(
+        decimal lineItemsSubtotal,
+        string? discountMode,
+        decimal discountValue,
+        decimal deliveryFeeUsd)
+    {
+        var core = ComputeTotals(lineItemsSubtotal, discountMode, discountValue);
+        var fee = Math.Round(Math.Max(0m, deliveryFeeUsd), 2);
+        return (core.DiscountApplied, core.TaxableSubtotal, core.Tax, core.Service, core.GrandTotal + fee);
+    }
+
     public static string FormatDiscountLabel(string? discountMode, decimal discountValue, decimal discountApplied)
     {
         if (discountApplied <= 0m)

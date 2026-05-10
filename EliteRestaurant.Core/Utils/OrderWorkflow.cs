@@ -1,9 +1,11 @@
 namespace EliteRestaurant.Core.Utils;
 
-/// <summary>Kitchen sees only <see cref="KitchenQueueStatuses"/>; servers submit <see cref="PendingCashier"/> first.</summary>
+/// <summary>Kitchen sees only kitchen-queue statuses; in-store tablet flow uses <see cref="PendingCashier"/>; public online uses <see cref="PendingApproval"/>.</summary>
 public static class OrderWorkflow
 {
     public const string PendingCashier = "Pending cashier";
+    /// <summary>Online-submitted orders await cashier approval before inventory deduction and kitchen queue.</summary>
+    public const string PendingApproval = "Pending approval";
 
     public static bool IsPendingCashier(string? status)
     {
@@ -11,6 +13,16 @@ public static class OrderWorkflow
             return false;
         return string.Equals(status.Trim(), PendingCashier, StringComparison.OrdinalIgnoreCase);
     }
+
+    public static bool IsPendingApproval(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+            return false;
+        return string.Equals(status.Trim(), PendingApproval, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static bool AwaitsCashierOrApprovalBeforeKitchen(string? status) =>
+        IsPendingCashier(status) || IsPendingApproval(status);
 
     /// <summary>
     /// Active line after cashier release: <c>Waiting</c> (kitchen should receive),
@@ -47,10 +59,10 @@ public static class OrderWorkflow
 
     /// <summary>Table stays occupied for in-service, unvalidated server tickets, and until payment (Served).</summary>
     public static bool OccupiesTable(string? status) =>
-        IsKitchenQueueStatus(status) || IsPendingCashier(status) || IsServed(status);
+        IsKitchenQueueStatus(status) || IsPendingCashier(status) || IsPendingApproval(status) || IsServed(status);
 
     /// <summary>One open check per table until completed or cancelled — can add more lines to the same ticket.</summary>
     /// <remarks>Do not use this inside EF IQueryable filters (not translatable). Use WhereOpenCheckForTable in OrderRecordQueryExtensions for database queries.</remarks>
     public static bool IsOpenCheckStatus(string? status) =>
-        IsPendingCashier(status) || IsKitchenQueueStatus(status) || IsServed(status);
+        IsPendingCashier(status) || IsPendingApproval(status) || IsKitchenQueueStatus(status) || IsServed(status);
 }

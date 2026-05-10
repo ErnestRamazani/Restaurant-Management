@@ -153,7 +153,7 @@ public abstract class AdminBaseViewModel : BaseViewModel
         NavigateToAttendanceCommand = new RelayCommand(_ => navigate(new AttendanceViewModel(navigate)));
         NavigateToTablesCommand = new RelayCommand(_ => navigate(new TablesViewModel(navigate)));
         NavigateToReservationsCommand = new RelayCommand(
-            _ => navigate(new ReservationsViewModel(navigate)),
+            _ => navigate(new ReservationFloorWebViewModel(navigate)),
             _ => ShowReservationsNav);
         NavigateToOrdersCommand = new RelayCommand(_ => navigate(new AdminOrdersViewModel(navigate)));
         NavigateToKitchenQueueCommand = new RelayCommand(_ => navigate(new KitchenOrdersViewModel(navigate)));

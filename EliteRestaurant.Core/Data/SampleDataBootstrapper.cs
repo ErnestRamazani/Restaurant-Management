@@ -604,6 +604,7 @@ internal static class SampleDataBootstrapper
                     ServerId = assignedServer?.Id,
                     ServerName = assignedServer?.Name ?? string.Empty,
                     Status = status,
+                    OrderOrigin = OrderOrigin.InStore,
                     CreatedAt = createdAt,
                     CompletedAt = string.Equals(status, "Completed", StringComparison.OrdinalIgnoreCase) ? createdAt : null
                 };

@@ -8,7 +8,8 @@ public sealed record AdminOrderSummaryRow(
     string ServerName,
     decimal GrandTotal,
     string ItemsPreview,
-    string Status);
+    string Status,
+    string OrderOrigin);
 
 public sealed record AdminEmployeeWebRow(
     int Id,

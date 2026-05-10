@@ -211,7 +211,8 @@ public class TablesViewModel : AdminBaseViewModel
             o.TableId == tableId &&
             (o.Status == "Waiting" || o.Status == "In Kitchen" || o.Status == "Ready" ||
              o.Status == OrderWorkflow.Served ||
-             o.Status == OrderWorkflow.PendingCashier));
+             o.Status == OrderWorkflow.PendingCashier ||
+             o.Status == OrderWorkflow.PendingApproval));
 
     private async Task SaveTableAsync()
     {

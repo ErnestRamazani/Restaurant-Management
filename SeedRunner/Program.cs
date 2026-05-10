@@ -242,6 +242,7 @@ for (var date = startDate; date <= DateTime.Today; date = date.AddDays(1))
             ServerId = server.Id,
             ServerName = server.Name,
             Status = status,
+            OrderOrigin = OrderOrigin.InStore,
             CustomerNotes = string.Empty,
             AllergyNotes = string.Empty,
             CreatedAt = createdAt,

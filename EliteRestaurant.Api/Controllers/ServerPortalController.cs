@@ -357,7 +357,7 @@ public sealed class ServerPortalController(
         OrderInventoryDeduction.InventoryValidationKind validationKind;
         if (request.AppendToOpenCheck && openOrder is not null)
         {
-            if (OrderWorkflow.IsPendingCashier(openOrder.Status))
+            if (OrderWorkflow.IsPendingCashier(openOrder.Status) || OrderWorkflow.IsPendingApproval(openOrder.Status))
             {
                 linesToValidate = MergeOrderItemsWithNewLines(openOrder.Items, normalizedLines);
                 validationKind = OrderInventoryDeduction.InventoryValidationKind.FullOrder;
@@ -415,8 +415,12 @@ public sealed class ServerPortalController(
                 openOrder.DiscountValue = discountValue;
             }
             openOrder.OrderSource = isDelivery ? "Delivery" : "WalkIn";
+            openOrder.OrderOrigin = isDelivery ? OrderOrigin.Online : OrderOrigin.InStore;
             openOrder.ReservationGuestName = isDelivery ? request.SourceReference.Trim() : string.Empty;
             openOrder.PaymentCurrencyCode = CurrencyHelper.NormalizeCurrencyCode(request.PaymentCurrencyCode);
+            var appendMerch = openOrder.Items.Sum(i =>
+                products.TryGetValue(i.ProductId, out var p) ? p.Price * i.Quantity : 0m);
+            openOrder.DeliveryFeeUsd = isDelivery ? Math.Round(appendMerch * 0.20m, 2) : 0m;
             OrderSubmissionHelper.SyncPaymentFields(openOrder, products);
             table.Status = "Occupied";
             DataReconciler.ReconcileTableStatusesWithOrders(db);
@@ -447,11 +451,16 @@ public sealed class ServerPortalController(
             PaymentCurrencyCode = CurrencyHelper.NormalizeCurrencyCode(request.PaymentCurrencyCode),
             CreatedAt = DateTime.Now,
             OrderSource = isDelivery ? "Delivery" : "WalkIn",
+            OrderOrigin = isDelivery ? OrderOrigin.Online : OrderOrigin.InStore,
             ReservationGuestName = isDelivery ? request.SourceReference.Trim() : string.Empty
         };
 
         foreach (var item in newItems)
             order.Items.Add(item);
+
+        var merchSubtotal = order.Items.Sum(i =>
+            products.TryGetValue(i.ProductId, out var p) ? p.Price * i.Quantity : 0m);
+        order.DeliveryFeeUsd = isDelivery ? Math.Round(merchSubtotal * 0.20m, 2) : 0m;
 
         OrderSubmissionHelper.SyncPaymentFields(order, products);
         db.Orders.Add(order);

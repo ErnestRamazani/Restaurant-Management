@@ -29,11 +29,13 @@ public static class AdminWebDashboardAggregator
 
         var activeStatuses = new[]
         {
-            "Waiting", "In Kitchen", "Ready", OrderWorkflow.Served, OrderWorkflow.PendingCashier
+            "Waiting", "In Kitchen", "Ready", OrderWorkflow.Served, OrderWorkflow.PendingCashier,
+            OrderWorkflow.PendingApproval
         };
 
         var pendingCashier = db.Orders.AsNoTracking()
-            .Count(o => o.Status == OrderWorkflow.PendingCashier);
+            .Count(o =>
+                o.Status == OrderWorkflow.PendingCashier || o.Status == OrderWorkflow.PendingApproval);
         var readyOrders = db.Orders.AsNoTracking()
             .Count(o => o.Status == "Ready");
         var activeOrdersCount = db.Orders.AsNoTracking()

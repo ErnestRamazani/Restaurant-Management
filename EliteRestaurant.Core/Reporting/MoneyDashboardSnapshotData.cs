@@ -17,4 +17,8 @@ public sealed class MoneyDashboardSnapshotData
     public string SalesSummaryText { get; init; } = "$ 0.00 | FC 0";
     public string TipsSummaryText { get; init; } = "$ 0.00 | FC 0";
     public string PayrollSummaryText { get; init; } = "$ 0.00 | FC 0";
+    /// <summary>Revenue rows with category Delivery Fee (same dual-currency formatting as sales).</summary>
+    public string DeliveryFeesSummaryText { get; init; } = "$ 0.00 | FC 0";
+    /// <summary>When set, snapshot was filtered by order origin (Online / InStore).</summary>
+    public string? OriginFilterLabel { get; init; }
 }

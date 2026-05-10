@@ -217,6 +217,7 @@
                             <TextBlock Text="Summary" Style="{StaticResource HeadingMedium}" FontSize="15"/>
                             <TextBlock Text="{Binding SalesSummaryText, StringFormat=Sales: {0}}" Margin="0,8,0,0" Foreground="{StaticResource TextSecondaryBrush}"/>
                             <TextBlock Text="{Binding TipsSummaryText, StringFormat=Tips: {0}}" Margin="0,4,0,0" Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <TextBlock Text="{Binding DeliveryFeesSummaryText, StringFormat=Delivery fees: {0}}" Margin="0,4,0,0" Foreground="{StaticResource TextSecondaryBrush}"/>
                             <TextBlock Text="{Binding PayrollSummaryText, StringFormat=Payroll: {0}}" Margin="0,4,0,0" Foreground="{StaticResource TextSecondaryBrush}"/>
                             <Button Content="Generate Report (PDF)" Margin="0,12,0,0" Height="34" Command="{Binding GenerateReportCommand}" Style="{StaticResource GhostButton}"/>
                         </StackPanel>

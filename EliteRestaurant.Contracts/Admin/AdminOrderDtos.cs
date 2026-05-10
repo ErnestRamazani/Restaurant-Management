@@ -22,6 +22,8 @@ public sealed record AdminCreateOrderRequest(
     decimal LiveDiscountAmount,
     string CustomerNotes,
     string AllergyNotes,
+    /// <summary>Optional: <c>Immediate</c> (default) or <c>Deferred</c> (pay at restaurant / on delivery).</summary>
+    string? PaymentTiming,
     IReadOnlyList<AdminOrderLineRequest> Lines);
 
 public sealed record AdminCreateOrderResponse(

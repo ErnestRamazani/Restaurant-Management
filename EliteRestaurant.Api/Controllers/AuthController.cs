@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using EliteRestaurant.Api.Security;
 using EliteRestaurant.Contracts.Auth;
 using Microsoft.AspNetCore.Authorization;
@@ -10,6 +11,24 @@ namespace EliteRestaurant.Api.Controllers;
 [AllowAnonymous]
 public sealed class AuthController(TabletAuthService authService, JwtTokenService jwtTokenService) : ControllerBase
 {
+    [HttpGet("session")]
+    [Authorize(Policy = "StaffAny")]
+    [ProducesResponseType(typeof(AuthSessionDto), 200)]
+    public ActionResult<AuthSessionDto> GetSession()
+    {
+        var role = User.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
+        var employeeIdText = User.FindFirstValue("employeeId")
+                               ?? User.FindFirstValue(ClaimTypes.NameIdentifier)
+                               ?? "0";
+        _ = int.TryParse(employeeIdText, out var employeeId);
+        return Ok(new AuthSessionDto(
+            EmployeeId: employeeId,
+            Name: User.FindFirstValue(ClaimTypes.Name) ?? string.Empty,
+            Role: role,
+            SignInId: User.FindFirstValue("signInId") ?? string.Empty,
+            Portal: User.FindFirstValue("portal") ?? string.Empty));
+    }
+
     [HttpPost("login")]
     public ActionResult<CloudLoginResponse> Login([FromBody] CloudLoginRequest request)
     {

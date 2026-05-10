@@ -43,14 +43,19 @@ public sealed class CashierPortalController(
             .AsNoTracking()
             .Include(o => o.Items)
             .ThenInclude(i => i.Product)
-            .Where(o => o.Status == OrderWorkflow.PendingCashier)
+            .Where(o =>
+                o.Status == OrderWorkflow.PendingCashier || o.Status == OrderWorkflow.PendingApproval)
             .OrderByDescending(o => o.CreatedAt)
             .ToList();
 
         var rows = pendingOrders.Select(o =>
         {
             var subtotal = o.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
-            var totals = OrderTotalsHelper.ComputeTotals(subtotal, o.DiscountMode, o.DiscountValue);
+            var totals = OrderTotalsHelper.ComputeTotalsWithDeliveryFee(
+                subtotal,
+                o.DiscountMode,
+                o.DiscountValue,
+                o.DeliveryFeeUsd);
             var lines = string.Join(", ",
                 o.Items.Select(i => $"{i.Product?.Name ?? "Item"} x{i.Quantity}"));
             return new CashierPendingOrderDto(
@@ -62,7 +67,9 @@ public sealed class CashierPortalController(
                 o.CreatedAt.ToString("MMM d, yyyy · HH:mm"),
                 totals.GrandTotal,
                 $"$ {totals.GrandTotal:N2}",
-                string.IsNullOrWhiteSpace(lines) ? "No lines" : lines);
+                string.IsNullOrWhiteSpace(lines) ? "No lines" : lines,
+                o.Status,
+                o.OrderOrigin);
         }).ToList();
 
         return Ok(rows);
@@ -168,7 +175,12 @@ public sealed class CashierPortalController(
             return NotFound(new { message = "Order not found." });
 
         var lineSubtotal = order.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
-        var totals = OrderTotalsHelper.ComputeTotals(lineSubtotal, order.DiscountMode, order.DiscountValue);
+        var merchTotals = OrderTotalsHelper.ComputeTotals(lineSubtotal, order.DiscountMode, order.DiscountValue);
+        var totals = OrderTotalsHelper.ComputeTotalsWithDeliveryFee(
+            lineSubtotal,
+            order.DiscountMode,
+            order.DiscountValue,
+            order.DeliveryFeeUsd);
         var lines = order.Items.Select(i => new CashierOrderLineDto(
             i.ProductId,
             i.Product?.Name ?? "Unknown",
@@ -191,15 +203,25 @@ public sealed class CashierPortalController(
             order.DiscountMode ?? "None",
             order.DiscountValue,
             lineSubtotal,
-            totals.Tax,
-            totals.Service,
-            totals.DiscountApplied,
+            merchTotals.Tax,
+            merchTotals.Service,
+            merchTotals.DiscountApplied,
             totals.GrandTotal,
             CurrencyHelper.ConvertUsdToFc(totals.GrandTotal),
-            lines);
+            lines,
+            string.IsNullOrWhiteSpace(order.OrderOrigin) ? OrderOrigin.InStore : order.OrderOrigin,
+            order.OrderSource ?? "WalkIn",
+            order.DeliveryFeeUsd,
+            string.IsNullOrWhiteSpace(order.PaymentTiming) ? OrderPaymentTiming.Immediate : order.PaymentTiming,
+            merchTotals.TaxableSubtotal,
+            merchTotals.GrandTotal);
 
         return Ok(dto);
     }
+
+    /// <summary>Alias for the full invoice breakdown (same payload as <see cref="GetOrderDetail"/>).</summary>
+    [HttpGet("orders/{orderId:int}/invoice")]
+    public ActionResult<CashierOrderDetailDto> GetOrderInvoice(int orderId) => GetOrderDetail(orderId);
 
     [HttpPost("orders/{orderId:int}/complete")]
     public ActionResult CompleteOrder(int orderId, [FromBody] CashierCompleteOrderRequest request)

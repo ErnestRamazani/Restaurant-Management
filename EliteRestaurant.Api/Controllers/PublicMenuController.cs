@@ -1,8 +1,10 @@
 using System.Text.Json;
+using EliteRestaurant.Api;
 using EliteRestaurant.Api.Branding;
 using EliteRestaurant.Api.Dtos;
 using EliteRestaurant.Api.Hubs;
 using EliteRestaurant.Api.Security;
+using EliteRestaurant.Contracts.PublicMenu;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
@@ -13,6 +15,8 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Options;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Orders;
+using EliteRestaurant.Core.Staff;
 using EliteRestaurant.Core.Utils;
 
 namespace EliteRestaurant.Api.Controllers;
@@ -104,7 +108,7 @@ public sealed class PublicMenuController(
     [ProducesResponseType(typeof(StaffLoginCodeResponse), 200)]
     [ProducesResponseType(typeof(StaffLoginCodeResponse), 400)]
     public ActionResult<StaffLoginCodeResponse> ValidateStaffLoginCode([FromBody] StaffLoginCodeRequest request)
-        => ValidateStaffLoginCodeValue(request.Code);
+        => ValidateStaffLoginCodeValue(request.Code, request.SignInId, request.Pin);
 
     [HttpPost("staff-login-code/{code}")]
     [EnableRateLimiting("PublicMenuDraft")]
@@ -120,7 +124,7 @@ public sealed class PublicMenuController(
     public ActionResult<StaffLoginCodeResponse> ValidateStaffLoginCodeFromPathGet(string code)
         => ValidateStaffLoginCodeValue(code);
 
-    private ActionResult<StaffLoginCodeResponse> ValidateStaffLoginCodeValue(string? code)
+    private ActionResult<StaffLoginCodeResponse> ValidateStaffLoginCodeValue(string? code, string? signInId = null, string? pin = null)
     {
         var configured = db.PublicMenuSettings.AsNoTracking()
                              .Where(s => s.Key == "default")
@@ -134,15 +138,50 @@ public sealed class PublicMenuController(
             return BadRequest(new StaffLoginCodeResponse(false, "Incorrect staff passcode."));
         }
 
-        var session = new AuthenticatedStaffSession(
-            Token: string.Empty,
-            EmployeeId: 0,
-            EmployeeUniqueId: "MENU-STAFF",
-            Name: "Menu Staff",
-            Role: "Server",
-            SignInId: "menu-staff",
-            Portal: "elite-menu",
-            ExpiresAtUtc: DateTime.UtcNow.AddHours(12));
+        var hasTabletId = !string.IsNullOrWhiteSpace(signInId);
+        var hasTabletPin = !string.IsNullOrWhiteSpace(pin);
+        if (hasTabletId != hasTabletPin)
+        {
+            return BadRequest(new StaffLoginCodeResponse(false, "Enter both sign-in ID and PIN (or leave both blank for generic staff access)."));
+        }
+
+        AuthenticatedStaffSession session;
+        if (hasTabletId && hasTabletPin)
+        {
+            var idMatches = StaffPortalAuthentication
+                .QueryActiveEmployeesMatchingStaffId(db.Employees.AsNoTracking(), signInId!)
+                .ToList();
+            var candidates = StaffPortalAuthentication.FilterPinMatches(idMatches, pin!.Trim());
+            var employee = StaffPortalAuthentication.ResolvePortalCandidate(candidates, "elite-menu");
+            if (employee is null)
+            {
+                return BadRequest(new StaffLoginCodeResponse(false, "Unknown staff sign-in ID or incorrect PIN."));
+            }
+
+            session = new AuthenticatedStaffSession(
+                Token: string.Empty,
+                EmployeeId: employee.Id,
+                EmployeeUniqueId: string.IsNullOrWhiteSpace(employee.UniqueId) ? "EMP" : employee.UniqueId.Trim(),
+                Name: string.IsNullOrWhiteSpace(employee.Name) ? "Staff" : employee.Name.Trim(),
+                Role: employee.Role,
+                SignInId: string.IsNullOrWhiteSpace(employee.SignInId) ? signInId!.Trim() : employee.SignInId.Trim(),
+                Portal: "elite-menu",
+                ExpiresAtUtc: DateTime.UtcNow.AddHours(12));
+        }
+        else
+        {
+            // Shared passcode only — role is generic "Server"; reservation floor API remains unavailable (CashierOrAdmin policy).
+            session = new AuthenticatedStaffSession(
+                Token: string.Empty,
+                EmployeeId: 0,
+                EmployeeUniqueId: "MENU-STAFF",
+                Name: "Menu Staff",
+                Role: "Server",
+                SignInId: "menu-staff",
+                Portal: "elite-menu",
+                ExpiresAtUtc: DateTime.UtcNow.AddHours(12));
+        }
+
         var jwt = jwtTokenService.CreateToken(session, out var expiresAtUtc);
         return Ok(new StaffLoginCodeResponse(true, null, jwt, expiresAtUtc));
     }
@@ -316,7 +355,7 @@ public sealed class PublicMenuController(
 
         if (body.Items is not null)
         {
-            foreach (var line in body.Items)
+            foreach (var line in body.Items!)
             {
                 if (line.Quantity is < 1 or > 20)
                 {
@@ -419,6 +458,164 @@ public sealed class PublicMenuController(
         });
     }
 
+    [HttpPost("orders/submit")]
+    [EnableRateLimiting("PublicMenuDraft")]
+    [ProducesResponseType(typeof(PublicOrderSubmitResponse), 201)]
+    [ProducesResponseType(typeof(PublicMenuDraftErrorDto), 400)]
+    public async Task<IActionResult> PostSubmitOrder([FromBody] PublicOrderSubmitRequest? body)
+    {
+        var errors = new List<string>();
+        if (body is null)
+        {
+            errors.Add("Request body is required.");
+            return BadRequest(new PublicMenuDraftErrorDto { Errors = errors });
+        }
+
+        var name = (body.CustomerName ?? string.Empty).Trim();
+        if (name.Length is < 1 or > 60)
+            errors.Add("Customer name is required (1–60 characters).");
+        if (name.IndexOf('<') >= 0 || name.IndexOf('>') >= 0)
+            errors.Add("Customer name may not contain HTML tags.");
+        if (body.TableId <= 0)
+            errors.Add("A valid table is required.");
+        if (body.Items is null || body.Items.Count == 0)
+            errors.Add("At least one item is required.");
+
+        var table = body.TableId > 0
+            ? await db.Tables.Include(t => t.AssignedServer).FirstOrDefaultAsync(t => t.Id == body.TableId)
+            : null;
+        if (body.TableId > 0 && table is null)
+            errors.Add("Table not found.");
+        else if (table is not null
+                 && string.Equals(table.Status, "Maintenance", StringComparison.OrdinalIgnoreCase))
+            errors.Add("This table is not available for ordering.");
+        else if (table is not null && (table.AssignedServerId is null || table.AssignedServer is null))
+            errors.Add("This table does not have an assigned server yet.");
+
+        if (body.Items is not null)
+        {
+            foreach (var line in body.Items!)
+            {
+                if (line.Quantity is < 1 or > 20)
+                {
+                    errors.Add("Each line quantity must be between 1 and 20.");
+                    break;
+                }
+            }
+        }
+
+        if (errors.Count > 0)
+            return BadRequest(new PublicMenuDraftErrorDto { Errors = DeduplicateErrors(errors) });
+
+        var productIds = body.Items!.Select(i => i.ProductId).Distinct().ToList();
+        var dbProducts = await db.Products.AsNoTracking()
+            .Where(p => productIds.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id);
+
+        foreach (var line in body.Items!)
+        {
+            if (!dbProducts.TryGetValue(line.ProductId, out var p))
+            {
+                errors.Add($"Product {line.ProductId} was not found.");
+                continue;
+            }
+
+            if (Math.Abs(line.UnitPrice - p.Price) > 0.02m)
+                errors.Add($"Unit price for \"{p.Name}\" does not match the current menu price.");
+        }
+
+        if (errors.Count > 0)
+            return BadRequest(new PublicMenuDraftErrorDto { Errors = DeduplicateErrors(errors) });
+
+        var inStock = await GetAvailabilityMapAsync(productIds);
+        foreach (var line in body.Items!)
+        {
+            if (!inStock.TryGetValue(line.ProductId, out var ok) || !ok)
+            {
+                errors.Add($"\"{dbProducts[line.ProductId].Name}\" is currently unavailable.");
+                break;
+            }
+        }
+
+        if (errors.Count > 0)
+            return BadRequest(new PublicMenuDraftErrorDto { Errors = DeduplicateErrors(errors) });
+
+        var normalized = body.Items
+            .GroupBy(i => i.ProductId)
+            .Select(g => (ProductId: g.Key, Quantity: g.Sum(x => x.Quantity)))
+            .ToList();
+
+        var stockMessage = OrderInventoryDeduction.TryValidateInventoryForProductQuantities(
+            db,
+            normalized,
+            OrderInventoryDeduction.InventoryValidationKind.FullOrder);
+        if (stockMessage is not null)
+            return BadRequest(new PublicMenuDraftErrorDto { Errors = new[] { stockMessage } });
+
+        var orderTable = table!;
+        var activeStaff = await db.Employees.AsNoTracking()
+            .Where(e => e.EmploymentStatus == "Active")
+            .ToListAsync();
+
+        var notesParts = new List<string> { $"Guest: {name}" };
+        if (!string.IsNullOrWhiteSpace(body.Notes))
+            notesParts.Add(body.Notes!.Trim());
+        var customerNotes = string.Join(" · ", notesParts.Where(s => s.Length > 0));
+        var allergyNotes = (body.AllergyNotes ?? string.Empty).Trim();
+
+        var order = new OrderRecord
+        {
+            UniqueId = UniqueIdGenerator.NewId("ORD"),
+            TableId = orderTable.Id,
+            TableCode = $"Table {orderTable.TableNumber}",
+            TableName = string.IsNullOrWhiteSpace(orderTable.Name) ? $"Table {orderTable.TableNumber}" : orderTable.Name,
+            ServerId = orderTable.AssignedServerId,
+            ServerName = orderTable.AssignedServer is { } srv ? srv.Name : string.Empty,
+            Status = OrderWorkflow.PendingApproval,
+            CustomerNotes = customerNotes,
+            AllergyNotes = allergyNotes,
+            DiscountMode = "None",
+            DiscountValue = 0m,
+            PaymentCurrencyCode = CurrencyHelper.Usd,
+            CreatedAt = DateTime.Now,
+            OrderSource = "WalkIn",
+            OrderOrigin = OrderOrigin.Online
+        };
+
+        foreach (var line in normalized)
+        {
+            var assignee = OrderSubmissionHelper.ResolveAssignee(dbProducts, activeStaff, line.ProductId);
+            order.Items.Add(new OrderItem
+            {
+                ProductId = line.ProductId,
+                Quantity = line.Quantity,
+                PreparedByEmployeeId = assignee.EmployeeId,
+                PreparedByRole = assignee.Role,
+                PreparedByName = assignee.Name
+            });
+        }
+
+        OrderSubmissionHelper.SyncPaymentFields(order, dbProducts);
+        db.Orders.Add(order);
+        orderTable.Status = "Occupied";
+        DataReconciler.ReconcileTableStatusesWithOrders(db);
+        await db.SaveChangesAsync();
+
+        await hubContext.Clients.Group("Cashier").SendAsync(
+            "CashierOrderBoardChanged",
+            new { reason = "online-order-submitted", orderId = order.Id });
+        await hubContext.Clients.Group("Server").SendAsync(
+            "CashierOrderBoardChanged",
+            new { reason = "online-order-submitted", orderId = order.Id });
+
+        var code = order.UniqueId;
+        return StatusCode(201, new PublicOrderSubmitResponse(
+            code,
+            order.Id,
+            order.Status,
+            order.OrderOrigin));
+    }
+
     private async Task<Dictionary<int, bool>> GetAvailabilityMapAsync(IReadOnlyList<int> productIds)
     {
         if (productIds.Count == 0)
@@ -475,6 +672,51 @@ public sealed class PublicMenuController(
 
     private static IReadOnlyList<string> DeduplicateErrors(List<string> errors) =>
         errors.Distinct(StringComparer.Ordinal).ToList();
+
+    /// <summary>Guest-visible status for an order (kitchen / payment stage + fulfillment line for online).</summary>
+    [HttpGet("orders/{orderCode}/status")]
+    [EnableRateLimiting("PublicMenuRead")]
+    [ProducesResponseType(typeof(PublicOrderStatusDto), 200)]
+    [ProducesResponseType(404)]
+    public async Task<ActionResult<PublicOrderStatusDto>> GetOrderStatus(string orderCode)
+    {
+        var raw = (orderCode ?? string.Empty).Trim();
+        if (raw.Length is < 3 or > 80)
+            return NotFound();
+
+        var norm = raw.ToUpperInvariant();
+        OrderRecord? row = null;
+        if (norm.StartsWith("#", StringComparison.Ordinal) && int.TryParse(norm.AsSpan(1), out var legacyId))
+        {
+            row = await db.Orders.AsNoTracking().FirstOrDefaultAsync(o => o.Id == legacyId);
+        }
+        else
+        {
+            row = await db.Orders.AsNoTracking()
+                .FirstOrDefaultAsync(o => o.UniqueId.ToUpper() == norm);
+        }
+
+        if (row is null)
+            return NotFound();
+
+        var code = string.IsNullOrWhiteSpace(row.UniqueId) ? $"#{row.Id:000}" : row.UniqueId;
+        var table = string.IsNullOrWhiteSpace(row.TableCode)
+            ? null
+            : (string.IsNullOrWhiteSpace(row.TableName) ? row.TableCode : $"{row.TableCode} · {row.TableName}");
+
+        string? display = string.IsNullOrWhiteSpace(row.CustomerFulfillmentStatus)
+            ? null
+            : CustomerFulfillmentStatuses.ToDisplay(row.CustomerFulfillmentStatus);
+
+        return Ok(new PublicOrderStatusDto
+        {
+            OrderCode = code,
+            WorkflowStatus = row.Status,
+            CustomerFulfillmentStatus = string.IsNullOrWhiteSpace(row.CustomerFulfillmentStatus) ? null : row.CustomerFulfillmentStatus,
+            CustomerFulfillmentDisplay = display,
+            TableLabel = string.IsNullOrWhiteSpace(table) ? null : table
+        });
+    }
 
     private IActionResult ServeImageFromPath(string absolutePath)
     {

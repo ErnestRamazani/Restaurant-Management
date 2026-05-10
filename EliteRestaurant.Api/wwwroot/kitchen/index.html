@@ -152,7 +152,59 @@
     .queue-col--prep h3 .dot { background: var(--kitchen); }
     .queue-body { flex: 1; overflow-y: auto; max-height: min(70vh, 920px); min-height: 52vh; -webkit-overflow-scrolling: touch; }
     .ticket {
-      padding: 12px 14px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.12s;
+      position: relative;
+      padding: 12px 14px 12px 14px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.12s, box-shadow 0.15s;
+    }
+    /* KDS origin: colored ring — online (pickup/delivery) vs in-store plating */
+    .ticket-origin-online {
+      box-shadow: inset 0 0 0 3px rgba(249, 115, 22, 0.95), 0 4px 18px rgba(249, 115, 22, 0.12);
+    }
+    .ticket-origin-instore {
+      box-shadow: inset 0 0 0 3px rgba(56, 189, 248, 0.92), 0 4px 18px rgba(56, 189, 248, 0.08);
+    }
+    .ticket--with-origin-corner { padding-top: 44px; }
+    .kds-origin-corner {
+      position: absolute;
+      left: 10px;
+      top: 8px;
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      max-width: calc(100% - 88px);
+    }
+    .kds-origin-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px 5px 7px;
+      border-radius: 8px;
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      line-height: 1;
+      white-space: nowrap;
+    }
+    .kds-origin-badge--online {
+      background: rgba(249, 115, 22, 0.18);
+      color: #fdba74;
+      border: 1px solid rgba(249, 115, 22, 0.55);
+      box-shadow: 0 0 22px rgba(249, 115, 22, 0.2);
+    }
+    .kds-origin-badge--instore {
+      background: rgba(56, 189, 248, 0.12);
+      color: #bae6fd;
+      border: 1px solid rgba(56, 189, 248, 0.5);
+      box-shadow: 0 0 18px rgba(56, 189, 248, 0.12);
+    }
+    .kds-origin-badge svg {
+      flex-shrink: 0;
+      width: 17px;
+      height: 17px;
     }
     .ticket:hover { background: var(--surface-hover); }
     .ticket.selected { background: rgba(232, 168, 56, 0.14); border-left: 3px solid var(--amber); padding-left: 11px; }
@@ -315,7 +367,7 @@
             <div><span>Server</span><span id="dServer"></span></div>
             <div><span>Status</span><span id="dStatus"></span></div>
             <div><span>Created</span><span id="dTime"></span></div>
-            <div><span>Grand total</span><strong id="dTotal"></strong></div>
+            <div><span>Fulfillment</span><strong id="dOrigin"></strong></div>
           </div>
           <div>
             <span class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;">Customer notes</span>
@@ -921,6 +973,99 @@
     }
   }
 
+  function normalizeOriginKey(v) {
+    if (v === null || v === undefined) return "";
+    const s = String(v).trim().toLowerCase();
+    return s.replace(/[\s_\-]/g, "");
+  }
+
+  /**
+   * KDS wiring: prefers `OriginType`; falls back to `OrderSource` (WalkIn, Delivery, Reservation, …). Missing ⇒ in-store plating.
+   * @returns {{ ringClass: string, headline: string, detailLabel: string, badgeMod: string, iconSvg: string }}
+   */
+  function parseKitchenOrigin(o) {
+    const rawOt = o.originType ?? o.OriginType;
+
+    /** @returns {null | { ring: string, headline: string, kind: string }} */
+    function fromOriginToken(raw) {
+      if (raw === null || raw === undefined || raw === "") return null;
+      const n = Number(raw);
+      if (Number.isFinite(n)) {
+        if (n === 2) return { ring: "online", headline: "DELIVERY", kind: "delivery" };
+        if (n === 1) return { ring: "online", headline: "TO GO", kind: "pickup" };
+        if (n === 0) return { ring: "instore", headline: "PLATED", kind: "dinein" };
+        return null;
+      }
+      const k = normalizeOriginKey(raw);
+      if (!k) return null;
+      if (k.includes("delivery") || k === "shipping") return { ring: "online", headline: "DELIVERY", kind: "delivery" };
+      if (
+        k.includes("pickup") ||
+        k.includes("takeaway") ||
+        k.includes("takeout") ||
+        k === "togo" ||
+        k.includes("carryout") ||
+        k.includes("parcel")
+      )
+        return { ring: "online", headline: "TO GO", kind: "pickup" };
+      if (
+        k.includes("walkin") ||
+        k.includes("instore") ||
+        k.includes("dinein") ||
+        k.includes("dine") ||
+        k.includes("tablet") ||
+        k === "floor" ||
+        k.includes("plated") ||
+        k.includes("kitchen") ||
+        k === "counter"
+      )
+        return { ring: "instore", headline: "PLATED", kind: "dinein" };
+      if (k.includes("online") || k.includes("digital")) return { ring: "online", headline: "TO GO", kind: "pickup" };
+      if (k.includes("reserve") || k.includes("tableservice"))
+        return { ring: "instore", headline: "PLATED", kind: "dinein" };
+      return null;
+    }
+
+    /** @returns {{ ring: string, headline: string, kind: string }} */
+    function fromOrderSource(os) {
+      const k = normalizeOriginKey(os);
+      if (!k || k === "walkin") return { ring: "instore", headline: "PLATED", kind: "dinein" };
+      if (k === "reservation") return { ring: "instore", headline: "PLATED", kind: "dinein" };
+      if (k === "delivery") return { ring: "online", headline: "DELIVERY", kind: "delivery" };
+      if (k === "pickup" || k === "takeout" || k === "togo") return { ring: "online", headline: "TO GO", kind: "pickup" };
+      return { ring: "instore", headline: "PLATED", kind: "dinein" };
+    }
+
+    const hit = fromOriginToken(rawOt) || fromOrderSource(o.orderSource ?? o.OrderSource);
+    const ringClass = hit.ring === "online" ? "ticket-origin-online" : "ticket-origin-instore";
+
+    const iconDelivery =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 18V6a2 2 0 0 0-2-2H4v14"/><path d="M14 18h8l4-6V8h-9"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/><path d="M2 18h3"/></svg>';
+    const iconPackage =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>';
+    const iconPlated =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v14a5 5 0 0 0 5 5h14"/><path d="M7 3v8"/><path d="M22 21H9"/><ellipse cx="16.5" cy="13" rx="3.5" ry="2"/></svg>';
+
+    let iconSvg = iconPlated;
+    if (hit.ring === "online") iconSvg = hit.kind === "delivery" ? iconDelivery : iconPackage;
+
+    const osHuman = String(o.orderSource ?? o.OrderSource ?? "").trim() || "—";
+    const otHuman =
+      rawOt !== null && rawOt !== undefined && String(rawOt).trim() !== "" ? String(rawOt).trim() : "—";
+    const detailLabel =
+      otHuman !== "—"
+        ? hit.headline + " · OriginType " + otHuman + " · OrderSource " + osHuman
+        : hit.headline + " · OrderSource " + osHuman;
+
+    return {
+      ringClass,
+      headline: hit.headline,
+      detailLabel,
+      badgeMod: hit.ring === "online" ? "kds-origin-badge--online" : "kds-origin-badge--instore",
+      iconSvg,
+    };
+  }
+
   function orderCode(o) {
     const uid = o.uniqueId || o.UniqueId;
     return (uid && String(uid).trim()) ? uid : ("#" + String(o.id ?? o.Id).padStart(3, "0"));
@@ -993,7 +1138,7 @@
       const id = e.id ?? e.Id;
       employees[id] = e;
     }
-    ordersCache = (ro.body.items || []).map(raw => {
+    ordersCache = (ro.body.items || ro.body.Items || []).map(raw => {
       const o = typeof raw === "object" && raw !== null ? { ...raw } : {};
       hydrateOrder(o);
       return o;
@@ -1039,15 +1184,26 @@
     }
   }
 
-  function ticketEl(o, kind) {
+  function ticketEl(o, _lane) {
     const id = o.id ?? o.Id;
+    hydrateOrder(o);
+    const origin = parseKitchenOrigin(o);
+
     const el = document.createElement("div");
-    el.className = "ticket" + (sameOrderId(selectedOrderId, id) ? " selected" : "");
+    el.className =
+      "ticket ticket--with-origin-corner " +
+      origin.ringClass +
+      (sameOrderId(selectedOrderId, id) ? " selected" : "");
     el.dataset.orderId = String(id);
-    const st = o.status || o.Status;
     const created = o.createdAt || o.CreatedAt;
     const timeShort = created ? new Date(created).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+
     el.innerHTML =
+      '<div class="kds-origin-corner" aria-label="Fulfillment">' +
+      '<span class="kds-origin-badge ' + origin.badgeMod + '">' +
+      origin.iconSvg +
+      "<span>" + escapeHtml(origin.headline) + "</span>" +
+      "</span></div>" +
       '<div class="ticket-top"><span class="ticket-code">' + escapeHtml(orderCode(o)) + '</span>' +
       '<span class="ticket-time">' + escapeHtml(timeShort) + '</span></div>' +
       '<div class="ticket-meta">' + escapeHtml(tableLabel(o)) + " · " + escapeHtml(serverName(o)) + '</div>' +
@@ -1080,6 +1236,7 @@
     $("dTotal").textContent = "$ " + computeGrandTotal(o).toFixed(2);
     $("dCust").textContent = (o.customerNotes || o.CustomerNotes || "").trim() || "—";
     $("dAllergy").textContent = (o.allergyNotes || o.AllergyNotes || "").trim() || "—";
+    $("dOrigin").textContent = parseKitchenOrigin(o).detailLabel;
 
     const tbody = $("dLines");
     tbody.innerHTML = "";

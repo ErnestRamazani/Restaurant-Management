@@ -26,17 +26,21 @@ public static class MoneyDashboardSnapshotBuilder
     }
 
     /// <summary>Desktop HTTP path: same dashboard as <see cref="Build"/> without opening SQL.</summary>
+    /// <param name="originFilter">Optional: <c>Online</c>, <c>InStore</c>, or null / <c>All</c> for no filter.</param>
     public static MoneyDashboardSnapshotData BuildFromTransactions(
         IReadOnlyList<MoneyTransaction> transactions,
         string selectedPeriod,
-        int maxLedgerRows = 200)
+        int maxLedgerRows = 200,
+        string? originFilter = null)
     {
         LogMoneyDebug($"Build snapshot (in-memory) start | period={selectedPeriod}");
         var startedAt = DateTime.UtcNow;
         var today = DateTime.Today;
         var tomorrow = today.AddDays(1);
 
-        var todaysTransactions = transactions
+        var scoped = transactions.Where(t => MatchesMoneyOriginFilter(t, originFilter)).ToList();
+
+        var todaysTransactions = scoped
             .Where(t => t.Date >= today && t.Date < tomorrow)
             .ToList();
         LogMoneyDebug($"Loaded today transactions: {todaysTransactions.Count}");
@@ -52,8 +56,8 @@ public static class MoneyDashboardSnapshotBuilder
         var todayExpensesUsd = MoneyReportingHelpers.SumByCurrency(todayExpenses, CurrencyHelper.Usd);
         var todayExpensesFc = MoneyReportingHelpers.SumByCurrency(todayExpenses, CurrencyHelper.CongoleseFranc);
 
-        var period = ResolvePeriodRange(transactions, today, selectedPeriod);
-        var periodRows = transactions
+        var period = ResolvePeriodRange(scoped, today, selectedPeriod);
+        var periodRows = scoped
             .Where(t => t.Date >= period.FromDate && t.Date < period.ToExclusive)
             .Select(t => new
             {
@@ -103,6 +107,9 @@ public static class MoneyDashboardSnapshotBuilder
         var salesTotal = periodRows
             .Where(t => t.Type == RevenueType && t.Category == "Sale")
             .ToList();
+        var deliveryFeesTotal = periodRows
+            .Where(t => t.Type == RevenueType && string.Equals(t.Category, "Delivery Fee", StringComparison.OrdinalIgnoreCase))
+            .ToList();
         var tipsTotal = periodRows
             .Where(t => t.Type == RevenueType && t.Category == "Tip")
             .ToList();
@@ -118,10 +125,14 @@ public static class MoneyDashboardSnapshotBuilder
         var netFc = totalRevenueFc - totalExpensesFc;
         var salesUsd = MoneyReportingHelpers.SumByCurrency(salesTotal, CurrencyHelper.Usd);
         var salesFc = MoneyReportingHelpers.SumByCurrency(salesTotal, CurrencyHelper.CongoleseFranc);
+        var deliveryFeesUsd = MoneyReportingHelpers.SumByCurrency(deliveryFeesTotal, CurrencyHelper.Usd);
+        var deliveryFeesFc = MoneyReportingHelpers.SumByCurrency(deliveryFeesTotal, CurrencyHelper.CongoleseFranc);
         var tipsUsd = MoneyReportingHelpers.SumByCurrency(tipsTotal, CurrencyHelper.Usd);
         var tipsFc = MoneyReportingHelpers.SumByCurrency(tipsTotal, CurrencyHelper.CongoleseFranc);
         var payrollUsd = MoneyReportingHelpers.SumByCurrency(payrollTotal, CurrencyHelper.Usd);
         var payrollFc = MoneyReportingHelpers.SumByCurrency(payrollTotal, CurrencyHelper.CongoleseFranc);
+
+        var originLabel = FormatOriginFilterLabel(originFilter);
 
         var snapshot = new MoneyDashboardSnapshotData
         {
@@ -143,10 +154,34 @@ public static class MoneyDashboardSnapshotBuilder
             NetProfitColor = netUsd >= 0m && netFc >= 0m ? "#2ECC71" : "#DC143C",
             SalesSummaryText = CurrencyHelper.FormatDualCurrency(salesUsd, salesFc),
             TipsSummaryText = CurrencyHelper.FormatDualCurrency(tipsUsd, tipsFc),
-            PayrollSummaryText = CurrencyHelper.FormatDualCurrency(payrollUsd, payrollFc)
+            PayrollSummaryText = CurrencyHelper.FormatDualCurrency(payrollUsd, payrollFc),
+            DeliveryFeesSummaryText = CurrencyHelper.FormatDualCurrency(deliveryFeesUsd, deliveryFeesFc),
+            OriginFilterLabel = originLabel
         };
         LogMoneyDebug($"Build snapshot (in-memory) done in {(DateTime.UtcNow - startedAt).TotalMilliseconds:N0} ms");
         return snapshot;
+    }
+
+    private static bool MatchesMoneyOriginFilter(MoneyTransaction t, string? originFilter)
+    {
+        if (string.IsNullOrWhiteSpace(originFilter) || string.Equals(originFilter, "All", StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (OrderOrigin.IsOnline(originFilter))
+            return OrderOrigin.IsOnline(t.OrderOriginType);
+        if (OrderOrigin.IsInStore(originFilter))
+            return string.IsNullOrWhiteSpace(t.OrderOriginType) || OrderOrigin.IsInStore(t.OrderOriginType);
+        return true;
+    }
+
+    private static string? FormatOriginFilterLabel(string? originFilter)
+    {
+        if (string.IsNullOrWhiteSpace(originFilter) || string.Equals(originFilter, "All", StringComparison.OrdinalIgnoreCase))
+            return null;
+        if (OrderOrigin.IsOnline(originFilter))
+            return "Online orders";
+        if (OrderOrigin.IsInStore(originFilter))
+            return "In-store orders";
+        return originFilter.Trim();
     }
 
     private static (DateTime FromDate, DateTime ToDate, DateTime ToExclusive, string Label) ResolvePeriodRange(

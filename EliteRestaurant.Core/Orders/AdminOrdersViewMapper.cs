@@ -46,6 +46,7 @@ public static class AdminOrdersViewMapper
         "Completed" => "#4CAF50",
         "Cancelled" => "#F44336",
         var s when string.Equals(s, OrderWorkflow.PendingCashier, StringComparison.OrdinalIgnoreCase) => "#CE93D8",
+        var s when string.Equals(s, OrderWorkflow.PendingApproval, StringComparison.OrdinalIgnoreCase) => "#B39DDB",
         _ => "#D4AF37"
     };
 }

@@ -231,7 +231,7 @@
                                    Width="22"
                                    VerticalAlignment="Center"
                                    Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
-                        <TextBlock Text="Reservations"
+                        <TextBlock Text="Reservation floor"
                                    Margin="10,0,0,0"
                                    FontFamily="Segoe UI Variable Text, Segoe UI"
                                    FontSize="13"

@@ -868,7 +868,8 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
             _serverEmployeeId,
             _serverEmployeeName,
             SelectedArrivedReservation?.UniqueId ?? string.Empty,
-            SelectedArrivedReservation?.GuestName ?? string.Empty);
+            SelectedArrivedReservation?.GuestName ?? string.Empty,
+            null);
 
     private void ApplyArrivedReservationSelection(ArrivedReservationOption? selected)
     {

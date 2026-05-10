@@ -13,17 +13,43 @@ public sealed class AdminOrderOperationsService(AppDbContext db)
 
     public sealed record ReleasePendingResult(bool Ok, string? ErrorMessage, string? ReleasedOrderCode);
 
+    /// <param name="SuppressBroadcast">True when no new transition happened (already ready, or concurrent advance won).</param>
+    public sealed record KitchenReadyResult(bool Ok, string? ErrorMessage, bool SuppressBroadcast, OrderReadyNotification? Notification);
+
     public ReleasePendingResult TryReleasePendingToKitchen(int orderId)
     {
         var order = _db.Orders
             .Include(o => o.Items)
             .ThenInclude(i => i.Product)
-            .FirstOrDefault(o => o.Id == orderId && o.Status == OrderWorkflow.PendingCashier);
+            .FirstOrDefault(o => o.Id == orderId);
         if (order is null)
-            return new ReleasePendingResult(false, "Order not found or already processed.", null);
+            return new ReleasePendingResult(false, "Order not found.", null);
+
+        if (OrderWorkflow.IsKitchenQueueStatus(order.Status))
+            return new ReleasePendingResult(false, "This order was already released to the kitchen.", null);
+
+        var releaseAllowed =
+            (OrderWorkflow.IsPendingCashier(order.Status) && OrderOrigin.IsInStore(order.OrderOrigin))
+            || (OrderWorkflow.IsPendingApproval(order.Status) && OrderOrigin.IsOnline(order.OrderOrigin));
+
+        if (!releaseAllowed)
+            return new ReleasePendingResult(false, "Order not found or not awaiting release.", null);
 
         return DatabaseResilientTransaction.Execute(_db, () =>
         {
+            if (IsInMemoryDatabase(_db))
+            {
+                var err = OrderInventoryDeduction.TryApplyForPlacedOrder(_db, order);
+                if (err is not null)
+                    return new ReleasePendingResult(false, err, null);
+
+                order.Status = "Waiting";
+                DataReconciler.ReconcileTableStatusesWithOrders(_db);
+                _db.SaveChanges();
+                var codeInMem = string.IsNullOrWhiteSpace(order.UniqueId) ? $"#{order.Id:000}" : order.UniqueId;
+                return new ReleasePendingResult(true, null, codeInMem);
+            }
+
             using var tx = _db.Database.BeginTransaction();
             try
             {
@@ -51,8 +77,15 @@ public sealed class AdminOrderOperationsService(AppDbContext db)
 
     public string? TryCancelPendingCashier(int orderId)
     {
-        var order = _db.Orders.FirstOrDefault(o => o.Id == orderId && o.Status == OrderWorkflow.PendingCashier);
+        var order = _db.Orders.FirstOrDefault(o => o.Id == orderId);
         if (order is null)
+            return "Order not found or already processed.";
+
+        var cancelAllowed =
+            (OrderWorkflow.IsPendingCashier(order.Status) && OrderOrigin.IsInStore(order.OrderOrigin))
+            || (OrderWorkflow.IsPendingApproval(order.Status) && OrderOrigin.IsOnline(order.OrderOrigin));
+
+        if (!cancelAllowed)
             return "Order not found or already processed.";
 
         return DatabaseResilientTransaction.Execute(_db, () =>
@@ -97,6 +130,7 @@ public sealed class AdminOrderOperationsService(AppDbContext db)
             ServerId = table.AssignedServerId,
             ServerName = table.AssignedServer.Name,
             Status = selectedOrderStatus,
+            OrderOrigin = OrderOrigin.InStore,
             PaymentCurrencyCode = CurrencyHelper.Usd,
             PaymentAmount = Math.Round(grandTotalUsd, 2),
             PaymentAmountUsd = Math.Round(grandTotalUsd, 2),
@@ -154,36 +188,75 @@ public sealed class AdminOrderOperationsService(AppDbContext db)
         });
     }
 
+    /// <summary>Kitchen marks <c>In Kitchen</c> → <c>Ready</c>. Idempotent: no broadcast if already <c>Ready</c> or a concurrent request won the transition.</summary>
+    public KitchenReadyResult TryMarkKitchenReadyForCashier(int orderId)
+    {
+        var order = _db.Orders.AsNoTracking().SingleOrDefault(o => o.Id == orderId);
+        if (order is null)
+            return new KitchenReadyResult(false, "Order not found.", true, null);
+
+        if (string.Equals(order.Status, "Ready", StringComparison.OrdinalIgnoreCase))
+            return new KitchenReadyResult(true, null, true, null);
+
+        if (!string.Equals(order.Status, "In Kitchen", StringComparison.OrdinalIgnoreCase))
+            return new KitchenReadyResult(false, "Only orders being prepared can be marked ready.", true, null);
+
+        return TryAtomicInKitchenToReady(orderId);
+    }
+
     /// <summary>
     /// Returns <c>null</c> when the order was advanced; empty string when the order no longer exists (silent no-op);
     /// otherwise an error message for the user.
     /// </summary>
     public string? TryAdvanceOrder(int orderId)
     {
+        var o = TryAdvanceOrderWithOutcome(orderId);
+        if (o.Missing)
+            return string.Empty;
+        if (o.Error is not null)
+            return o.Error;
+        return null;
+    }
+
+    /// <summary>Same semantics as <see cref="TryAdvanceOrder"/> with kitchen→ready payload for SignalR.</summary>
+    public AdvanceOrderOutcome TryAdvanceOrderWithOutcome(int orderId)
+    {
         var order = _db.Orders.SingleOrDefault(o => o.Id == orderId);
         if (order is null)
-            return string.Empty;
+            return new AdvanceOrderOutcome(true, string.Empty, false, null);
 
         if (!OrderWorkflow.CanAdminAdvanceOrderStatus(order.Status))
-            return "Advance is not available for this status.";
+            return new AdvanceOrderOutcome(false, "Advance is not available for this status.", false, null);
+
+        if (string.Equals(order.Status, "In Kitchen", StringComparison.OrdinalIgnoreCase))
+        {
+            var ready = TryAtomicInKitchenToReady(orderId);
+            if (!ready.Ok)
+                return new AdvanceOrderOutcome(false, ready.ErrorMessage, false, null);
+            return new AdvanceOrderOutcome(
+                false,
+                null,
+                !ready.SuppressBroadcast && ready.Notification is not null,
+                ready.SuppressBroadcast ? null : ready.Notification);
+        }
 
         return DatabaseResilientTransaction.Execute(_db, () =>
         {
             using var tx = _db.Database.BeginTransaction();
             try
             {
-                order.Status = order.Status switch
+                var tracked = _db.Orders.Single(o => o.Id == orderId);
+                tracked.Status = tracked.Status switch
                 {
                     "Waiting" => "In Kitchen",
-                    "In Kitchen" => "Ready",
                     "Ready" => OrderWorkflow.Served,
-                    _ => order.Status
+                    _ => tracked.Status
                 };
 
                 DataReconciler.ReconcileTableStatusesWithOrders(_db);
                 _db.SaveChanges();
                 tx.Commit();
-                return (string?)null;
+                return new AdvanceOrderOutcome(false, null, false, null);
             }
             catch
             {
@@ -191,6 +264,105 @@ public sealed class AdminOrderOperationsService(AppDbContext db)
                 throw;
             }
         });
+    }
+
+    /// <summary>Single row update — only one caller gets a broadcast when racing (SQL providers). In-memory uses a tracked update for tests.</summary>
+    private KitchenReadyResult TryAtomicInKitchenToReady(int orderId)
+    {
+        var src = _db.Orders.AsNoTracking().Where(o => o.Id == orderId).Select(o => o.OrderSource).FirstOrDefault();
+        var fulfill = CustomerFulfillmentStatuses.ResolveCodeForOrder(src);
+
+        if (IsInMemoryDatabase(_db))
+            return TryInKitchenToReadyForInMemory(orderId, fulfill);
+
+        return DatabaseResilientTransaction.Execute(_db, () =>
+        {
+            using var tx = _db.Database.BeginTransaction();
+            try
+            {
+                var affected = _db.Database.ExecuteSqlRaw(
+                    """UPDATE "Orders" SET "Status" = {0}, "CustomerFulfillmentStatus" = {1} WHERE "Id" = {2} AND "Status" = {3}""",
+                    "Ready",
+                    fulfill,
+                    orderId,
+                    "In Kitchen");
+
+                if (affected == 0)
+                {
+                    _db.ChangeTracker.Clear();
+                    var now = _db.Orders.AsNoTracking().Single(o => o.Id == orderId);
+                    if (string.Equals(now.Status, "Ready", StringComparison.OrdinalIgnoreCase))
+                    {
+                        DataReconciler.ReconcileTableStatusesWithOrders(_db);
+                        _db.SaveChanges();
+                        tx.Commit();
+                        return new KitchenReadyResult(true, null, true, null);
+                    }
+
+                    tx.Rollback();
+                    return new KitchenReadyResult(false, "Order changed — refresh and try again.", true, null);
+                }
+
+                _db.ChangeTracker.Clear();
+                DataReconciler.ReconcileTableStatusesWithOrders(_db);
+                _db.SaveChanges();
+                tx.Commit();
+
+                var fresh = _db.Orders.AsNoTracking().Single(o => o.Id == orderId);
+                var note = BuildOrderReadyNotification(fresh);
+                return new KitchenReadyResult(true, null, false, note);
+            }
+            catch
+            {
+                tx.Rollback();
+                throw;
+            }
+        });
+    }
+
+    private KitchenReadyResult TryInKitchenToReadyForInMemory(int orderId, string fulfill)
+    {
+        var order = _db.Orders.SingleOrDefault(o => o.Id == orderId);
+        if (order is null)
+            return new KitchenReadyResult(false, "Order not found.", true, null);
+
+        if (string.Equals(order.Status, "Ready", StringComparison.OrdinalIgnoreCase))
+            return new KitchenReadyResult(true, null, true, null);
+
+        if (!string.Equals(order.Status, "In Kitchen", StringComparison.OrdinalIgnoreCase))
+            return new KitchenReadyResult(false, "Only orders being prepared can be marked ready.", true, null);
+
+        order.Status = "Ready";
+        order.CustomerFulfillmentStatus = fulfill;
+        DataReconciler.ReconcileTableStatusesWithOrders(_db);
+        _db.SaveChanges();
+        _db.ChangeTracker.Clear();
+        var fresh = _db.Orders.AsNoTracking().Single(o => o.Id == orderId);
+        return new KitchenReadyResult(true, null, false, BuildOrderReadyNotification(fresh));
+    }
+
+    private static bool IsInMemoryDatabase(AppDbContext db) =>
+        db.Database.ProviderName?.Contains("InMemory", StringComparison.OrdinalIgnoreCase) == true;
+
+    private static OrderReadyNotification BuildOrderReadyNotification(OrderRecord o)
+    {
+        var code = string.IsNullOrWhiteSpace(o.UniqueId) ? $"#{o.Id:000}" : o.UniqueId;
+        string? table = string.IsNullOrWhiteSpace(o.TableCode)
+            ? null
+            : (string.IsNullOrWhiteSpace(o.TableName) ? o.TableCode : $"{o.TableCode} · {o.TableName}");
+        if (string.IsNullOrWhiteSpace(table))
+            table = null;
+        var guest = string.IsNullOrWhiteSpace(o.ReservationGuestName) ? null : o.ReservationGuestName.Trim();
+        var fc = o.CustomerFulfillmentStatus ?? CustomerFulfillmentStatuses.ResolveCodeForOrder(o.OrderSource);
+        return new OrderReadyNotification(
+            o.Id,
+            code,
+            o.OrderOrigin,
+            o.OrderSource,
+            table,
+            guest,
+            fc,
+            CustomerFulfillmentStatuses.ToDisplay(fc));
     }
 
     public void UpdateOrderStatus(
@@ -213,7 +385,11 @@ public sealed class AdminOrderOperationsService(AppDbContext db)
         if (status == "Completed")
         {
             var lineSubtotal = order.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
-            var totals = OrderTotalsHelper.ComputeTotals(lineSubtotal, order.DiscountMode, order.DiscountValue);
+            var totals = OrderTotalsHelper.ComputeTotalsWithDeliveryFee(
+                lineSubtotal,
+                order.DiscountMode,
+                order.DiscountValue,
+                order.DeliveryFeeUsd);
             var grandTotalUsd = totals.GrandTotal;
             var paidUsdRounded = Math.Round(Math.Max(0m, paidUsd), 2);
             var paidFcRounded = Math.Round(Math.Max(0m, paidFc), 2);
@@ -237,7 +413,10 @@ public sealed class AdminOrderOperationsService(AppDbContext db)
             order.ChangeGivenUsd = changeUsdRounded;
             order.ChangeGivenFc = changeFcRounded;
             if (!string.Equals(previousStatus, "Completed", StringComparison.OrdinalIgnoreCase))
+            {
                 order.CompletedAt = DateTime.Now;
+                order.PaymentConfirmedAt = DateTime.Now;
+            }
 
             var expectedChangeUsd = Math.Max(0m,
                 Math.Round((paidUsdRounded + CurrencyHelper.ConvertFcToUsd(paidFcRounded)) - grandTotalUsd, 2));
@@ -340,7 +519,8 @@ public sealed class AdminOrderOperationsService(AppDbContext db)
             o.TableId == tableId &&
             (o.Status == "Waiting" || o.Status == "In Kitchen" || o.Status == "Ready" ||
              o.Status == OrderWorkflow.Served ||
-             o.Status == OrderWorkflow.PendingCashier));
+             o.Status == OrderWorkflow.PendingCashier ||
+             o.Status == OrderWorkflow.PendingApproval));
 
         if (table.Status == "Maintenance")
             return;

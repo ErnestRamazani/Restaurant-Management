@@ -30,6 +30,16 @@ public class OrderRecord
     public decimal ChangeGivenFc { get; set; }
     public decimal ExchangeRateUsed { get; set; } = 2250m;
     public string OrderSource { get; set; } = "WalkIn";
+    /// <summary><see cref="Models.OrderOrigin.Online"/> or <see cref="Models.OrderOrigin.InStore"/>.</summary>
+    public string OrderOrigin { get; set; } = global::EliteRestaurant.Core.Models.OrderOrigin.InStore;
+    /// <summary>20% delivery add-on (USD), stored separately from merchandise for reporting.</summary>
+    public decimal DeliveryFeeUsd { get; set; }
+    /// <summary><see cref="OrderPaymentTiming"/> — when <see cref="OrderPaymentTiming.Deferred"/>, ledger revenue posts only after <see cref="PaymentConfirmedAt"/>.</summary>
+    public string PaymentTiming { get; set; } = OrderPaymentTiming.Immediate;
+    /// <summary>Cashier (or admin payment capture) confirmation — required before auto sale revenue is posted for completed orders.</summary>
+    public DateTime? PaymentConfirmedAt { get; set; }
+    /// <summary>When the kitchen marks <c>Ready</c>: customer fulfillment code for guest-facing tracking (ReadyForPickup / OutForDelivery).</summary>
+    public string? CustomerFulfillmentStatus { get; set; }
     public int? ReservationBookingId { get; set; }
     public string ReservationCode { get; set; } = string.Empty;
     public string ReservationGuestName { get; set; } = string.Empty;

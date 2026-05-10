@@ -124,6 +124,10 @@ public static class StaffPortalAuthentication
             return pinMatchedCandidates.FirstOrDefault(e => IsKitchenBarRole(e.Role));
         }
 
+        /// <summary>Elite Menu PWA: passcode gate + optional tablet ID+PIN — return the PIN-matched employee (any role).</summary>
+        if (string.Equals(normalizedPortal, "elite-menu", StringComparison.OrdinalIgnoreCase))
+            return pinMatchedCandidates.FirstOrDefault();
+
         return pinMatchedCandidates.FirstOrDefault(e =>
             e.Role.Equals("Server", StringComparison.OrdinalIgnoreCase));
     }

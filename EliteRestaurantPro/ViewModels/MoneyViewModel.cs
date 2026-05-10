@@ -57,6 +57,7 @@ public class MoneyViewModel : AdminBaseViewModel
     private string _netProfitColor = "#2ECC71";
     private string _salesSummaryText = "$ 0.00 | FC 0";
     private string _tipsSummaryText = "$ 0.00 | FC 0";
+    private string _deliveryFeesSummaryText = "$ 0.00 | FC 0";
     private string _payrollSummaryText = "$ 0.00 | FC 0";
     private string _selectedReportType = "Transactions";
     private string _selectedPeriod = "Week";
@@ -177,6 +178,12 @@ public class MoneyViewModel : AdminBaseViewModel
     {
         get => _tipsSummaryText;
         private set => SetField(ref _tipsSummaryText, value);
+    }
+
+    public string DeliveryFeesSummaryText
+    {
+        get => _deliveryFeesSummaryText;
+        private set => SetField(ref _deliveryFeesSummaryText, value);
     }
 
     public string PayrollSummaryText
@@ -380,6 +387,7 @@ public class MoneyViewModel : AdminBaseViewModel
             NetProfitColor = snapshot.NetProfitColor;
             SalesSummaryText = snapshot.SalesSummaryText;
             TipsSummaryText = snapshot.TipsSummaryText;
+            DeliveryFeesSummaryText = snapshot.DeliveryFeesSummaryText;
             PayrollSummaryText = snapshot.PayrollSummaryText;
         }
         catch (Exception ex)

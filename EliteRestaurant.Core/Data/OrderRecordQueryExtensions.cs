@@ -9,6 +9,7 @@ public static class OrderRecordQueryExtensions
     public static IQueryable<OrderRecord> WhereOpenCheckForTable(this IQueryable<OrderRecord> query, int tableId) =>
         query.Where(o => o.TableId == tableId &&
                          (o.Status == OrderWorkflow.PendingCashier
+                          || o.Status == OrderWorkflow.PendingApproval
                           || o.Status == "Waiting"
                           || o.Status == "In Kitchen"
                           || o.Status == "Ready"
@@ -19,6 +20,7 @@ public static class OrderRecordQueryExtensions
         query.Where(o =>
             o.TableId != null
             && (o.Status.ToLower() == "pending cashier"
+                || o.Status.ToLower() == "pending approval"
                 || o.Status.ToLower() == "waiting"
                 || o.Status.ToLower() == "in kitchen"
                 || o.Status.ToLower() == "ready"

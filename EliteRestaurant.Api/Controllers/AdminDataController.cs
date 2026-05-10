@@ -37,7 +37,7 @@ public sealed class AdminDataController(AppDbContext db) : ControllerBase
 
     /// <summary>Money dashboard snapshot (same aggregates as desktop). Under <c>/api/admin/data/...</c> so gateways that only proxy data routes still work.</summary>
     [HttpGet("money-web/snapshot")]
-    public ActionResult<MoneyDashboardSnapshotData> GetMoneyWebSnapshot([FromQuery] string period = "Week")
+    public ActionResult<MoneyDashboardSnapshotData> GetMoneyWebSnapshot([FromQuery] string period = "Week", [FromQuery] string? origin = null)
     {
         var p = (period ?? "Week").Trim().ToLowerInvariant() switch
         {
@@ -47,10 +47,25 @@ public sealed class AdminDataController(AppDbContext db) : ControllerBase
             "all" => "All",
             _ => "Week"
         };
+        var o = NormalizeMoneyOrigin(origin);
         MoneyDashboardTotals.EnsureSaleRevenueBackfill(db);
         var txs = db.Transactions.AsNoTracking().ToList();
-        var snap = MoneyDashboardSnapshotBuilder.BuildFromTransactions(txs, p, maxLedgerRows: 200);
+        var snap = MoneyDashboardSnapshotBuilder.BuildFromTransactions(txs, p, maxLedgerRows: 200, originFilter: o);
         return Ok(snap);
+    }
+
+    private static string? NormalizeMoneyOrigin(string? origin)
+    {
+        if (string.IsNullOrWhiteSpace(origin))
+            return null;
+        var t = origin.Trim();
+        if (string.Equals(t, "all", StringComparison.OrdinalIgnoreCase))
+            return null;
+        if (string.Equals(t, "online", StringComparison.OrdinalIgnoreCase))
+            return OrderOrigin.Online;
+        if (string.Equals(t, "instore", StringComparison.OrdinalIgnoreCase) || string.Equals(t, "in-store", StringComparison.OrdinalIgnoreCase))
+            return OrderOrigin.InStore;
+        return null;
     }
 
     private static readonly HashSet<string> AdminWebBlockedEntityKeys = new(StringComparer.OrdinalIgnoreCase)
@@ -304,7 +319,8 @@ public sealed class AdminDataController(AppDbContext db) : ControllerBase
                 serverName,
                 totals.GrandTotal,
                 preview,
-                o.Status));
+                o.Status,
+                o.OrderOrigin));
         }
 
         return rows.Select(ToJsonElement).ToList();

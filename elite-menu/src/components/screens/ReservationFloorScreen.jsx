@@ -1,7 +1,7 @@
 import * as signalR from '@microsoft/signalr'
 import { LogIn, RefreshCw, Users } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { FloorPlanCanvas } from '../reservation/FloorPlanCanvas'
 import {
   fetchFloorSnapshot,
@@ -11,6 +11,7 @@ import {
   floorRelease,
   getSignalRHubUrl,
 } from '../../utils/reservationApi'
+import { canAccessReservationFloorFromStoredToken } from '../../utils/staffAuth'
 
 function normalizeSnapshot(raw) {
   const placements = (raw?.placements ?? raw?.Placements ?? []).map((p) => ({
@@ -51,9 +52,15 @@ export function ReservationFloorScreen() {
   const [connectionState, setConnectionState] = useState('')
 
   const token = typeof window !== 'undefined' ? window.sessionStorage.getItem('elite_access_token') : ''
+  const canFloor = canAccessReservationFloorFromStoredToken()
+  const navigate = useNavigate()
 
   const reload = useCallback(async () => {
     setError('')
+    if (!canAccessReservationFloorFromStoredToken()) {
+      setLoading(false)
+      return
+    }
     try {
       const raw = await fetchFloorSnapshot()
       setSnapshot(normalizeSnapshot(raw))
@@ -65,12 +72,20 @@ export function ReservationFloorScreen() {
   }, [])
 
   useEffect(() => {
+    if (!token) {
+      setLoading(false)
+      return
+    }
+    if (!canFloor) {
+      setLoading(false)
+      return
+    }
     reload()
-  }, [reload])
+  }, [reload, token, canFloor])
 
   useEffect(() => {
-    if (!token) {
-      setConnectionState('offline')
+    if (!token || !canFloor) {
+      setConnectionState(!token ? 'offline' : '')
       return
     }
     const url = getSignalRHubUrl('/hubs/reservation-floor')
@@ -101,7 +116,7 @@ export function ReservationFloorScreen() {
       cancelled = true
       connection.stop()
     }
-  }, [token])
+  }, [token, canFloor])
 
   const selectedEngagement = useMemo(() => {
     if (selectedPlacementId == null) return null
@@ -142,7 +157,8 @@ export function ReservationFloorScreen() {
           <LogIn className="mx-auto h-10 w-10 text-gold" />
           <h1 className="mt-4 font-display text-2xl italic">Floor view</h1>
           <p className="mt-2 font-body text-sm text-champagne/65">
-            Sign in from the staff hub with your passcode to receive a session token, then return here.
+            Sign in from the staff hub with your venue passcode. For this screen, include sign-in ID and PIN for an
+            Admin or Cashier account.
           </p>
           <Link
             to="/staff"
@@ -150,6 +166,31 @@ export function ReservationFloorScreen() {
           >
             Open staff hub
           </Link>
+        </div>
+      </main>
+    )
+  }
+
+  if (!canFloor) {
+    return (
+      <main className="min-h-[100svh] bg-midnight px-5 py-10 text-champagne">
+        <div className="mx-auto max-w-md rounded-3xl border border-champagne/10 bg-midnight-2 p-6 text-center shadow-xl">
+          <LogIn className="mx-auto h-10 w-10 text-amber-400" />
+          <h1 className="mt-4 font-display text-2xl italic">Reservation floor</h1>
+          <p className="mt-2 font-body text-sm text-champagne/65">
+            This workspace is limited to Admin and Cashier roles. Sign out and unlock the staff hub again with your venue
+            passcode plus your tablet sign-in ID and PIN (the same ID/PIN you use on the cashier or admin login).
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              window.sessionStorage.removeItem('elite_access_token')
+              navigate('/staff', { replace: true })
+            }}
+            className="mt-6 inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-gold px-6 font-body text-sm font-extrabold uppercase tracking-[0.1em] text-black"
+          >
+            Back to staff hub
+          </button>
         </div>
       </main>
     )

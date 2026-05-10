@@ -43,7 +43,8 @@ public class FinancialLedgerTests
             TableCode = "Table 1",
             TableName = "Patio",
             CreatedAt = DateTime.UtcNow,
-            CompletedAt = DateTime.UtcNow
+            CompletedAt = DateTime.UtcNow,
+            PaymentConfirmedAt = DateTime.UtcNow
         };
         order.Items.Add(new OrderItem { ProductId = product.Id, Quantity = 2 });
         db.Orders.Add(order);
@@ -85,7 +86,8 @@ public class FinancialLedgerTests
             TableCode = "Table 2",
             TableName = "Bar",
             CreatedAt = DateTime.UtcNow,
-            CompletedAt = DateTime.UtcNow
+            CompletedAt = DateTime.UtcNow,
+            PaymentConfirmedAt = DateTime.UtcNow
         };
         order.Items.Add(new OrderItem { ProductId = product.Id, Quantity = 1 });
         db.Orders.Add(order);

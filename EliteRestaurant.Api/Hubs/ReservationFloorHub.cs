@@ -4,7 +4,7 @@ using System.Security.Claims;
 
 namespace EliteRestaurant.Api.Hubs;
 
-[Authorize(Policy = "StaffAny")]
+[Authorize(Policy = "CashierOrAdmin")]
 public sealed class ReservationFloorHub : Hub
 {
     public async Task JoinFloor()

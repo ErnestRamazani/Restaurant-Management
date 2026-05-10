@@ -307,6 +307,12 @@ namespace EliteRestaurant.Core.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("OrderOriginType")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("RelatedOrderId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasColumnType("text");
@@ -379,6 +385,9 @@ namespace EliteRestaurant.Core.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("CustomerFulfillmentStatus")
+                        .HasColumnType("text");
+
                     b.Property<string>("CustomerNotes")
                         .IsRequired()
                         .HasColumnType("text");
@@ -387,6 +396,9 @@ namespace EliteRestaurant.Core.Migrations
                         .HasColumnType("numeric");
 
                     b.Property<decimal>("CustomerPaidUsd")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("DeliveryFeeUsd")
                         .HasColumnType("numeric");
 
                     b.Property<decimal>("DiscountAmountUsd")
@@ -402,6 +414,10 @@ namespace EliteRestaurant.Core.Migrations
                     b.Property<decimal>("ExchangeRateUsed")
                         .HasColumnType("numeric");
 
+                    b.Property<string>("OrderOrigin")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("OrderSource")
                         .IsRequired()
                         .HasColumnType("text");
@@ -415,7 +431,14 @@ namespace EliteRestaurant.Core.Migrations
                     b.Property<decimal>("PaymentAmountUsd")
                         .HasColumnType("numeric");
 
+                    b.Property<DateTime?>("PaymentConfirmedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("PaymentCurrencyCode")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("PaymentTiming")
                         .IsRequired()
                         .HasColumnType("text");
 

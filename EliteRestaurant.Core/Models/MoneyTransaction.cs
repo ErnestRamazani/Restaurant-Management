@@ -3,6 +3,10 @@ namespace EliteRestaurant.Core.Models;
 public class MoneyTransaction
 {
     public int Id { get; set; }
+    /// <summary>When set, ties this row to an order for reporting filters (e.g. Money by origin).</summary>
+    public int? RelatedOrderId { get; set; }
+    /// <summary><see cref="OrderOrigin"/> from the source order when posted from a sale.</summary>
+    public string? OrderOriginType { get; set; }
     public decimal Amount { get; set; }
     public decimal AmountUsd { get; set; }
     public decimal AmountFc { get; set; }

@@ -241,7 +241,8 @@ public class AdminDashboardViewModel : AdminBaseViewModel
                 var yesterday = today.AddDays(-1);
                 var activeStatuses = new[]
                 {
-                    "Waiting", "In Kitchen", "Ready", OrderWorkflow.Served, OrderWorkflow.PendingCashier
+                    "Waiting", "In Kitchen", "Ready", OrderWorkflow.Served, OrderWorkflow.PendingCashier,
+                    OrderWorkflow.PendingApproval
                 };
 
                 var productPriceById = products.ToDictionary(p => p.Id, p => p.Price);

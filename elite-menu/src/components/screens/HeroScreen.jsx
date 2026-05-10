@@ -1,6 +1,7 @@
 ﻿import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { BottomSheet } from '../ui/BottomSheet'
+import { ReservationOrderGatewayModal } from '../ui/ReservationOrderGatewayModal'
 import { GoldDivider } from '../ui/GoldDivider'
 import { resolveApiAssetUrl } from '../../utils/apiClient'
 
@@ -69,6 +70,7 @@ function formatWebsiteHref(raw) {
 
 export function HeroScreen({ config, onEnterMenu, onReservation, onStaffLogin }) {
   const [info, setInfo] = useState(/** @type {null | 'about' | 'contact' | 'notes'} */ (null))
+  const [gatewayOpen, setGatewayOpen] = useState(false)
 
   const tagline =
     config?.tagline && String(config.tagline).trim()
@@ -145,37 +147,20 @@ export function HeroScreen({ config, onEnterMenu, onReservation, onStaffLogin })
         >
           <button
             type="button"
-            onClick={onEnterMenu}
-            className="relative min-h-[56px] min-w-[15rem] border border-gold/50 bg-gold/5 px-12 py-3.5 font-display text-[0.95rem] font-semibold uppercase tracking-[0.22em] text-gold shadow-[0_6px_28px_rgba(200,168,76,0.12)] transition-colors hover:border-gold hover:bg-[var(--gold-dim)] active:scale-[0.98]"
+            onClick={() => setGatewayOpen(true)}
+            className="relative min-h-[56px] min-w-[min(100%,15rem)] max-w-[calc(100vw-3rem)] border border-gold/50 bg-gold/5 px-6 py-3.5 font-display text-[clamp(0.72rem,3.2vw,0.95rem)] font-semibold uppercase tracking-[0.14em] text-gold shadow-[0_6px_28px_rgba(200,168,76,0.12)] transition-colors hover:border-gold hover:bg-[var(--gold-dim)] active:scale-[0.98] sm:min-w-[15rem] sm:px-12 sm:tracking-[0.22em]"
             style={{ fontFamily: '"Cinzel", "Playfair Display", serif' }}
           >
             <span className="pointer-events-none absolute left-[-3px] top-[-3px] h-3 w-3 border-l border-t border-gold/70" />
             <span className="pointer-events-none absolute right-[-3px] top-[-3px] h-3 w-3 border-r border-t border-gold/70" />
             <span className="pointer-events-none absolute bottom-[-3px] left-[-3px] h-3 w-3 border-b border-l border-gold/70" />
             <span className="pointer-events-none absolute bottom-[-3px] right-[-3px] h-3 w-3 border-b border-r border-gold/70" />
-            Explore our menu
+            [Reservation / Order]
           </button>
         </motion.div>
 
-        <div className="relative z-20 mt-16 pt-8 sm:mt-16 sm:pt-10">
-          <RoyalDivider className="mb-10" />
-          <div className="flex justify-center">
-            <a
-              href="/reservation"
-              onClick={(e) => {
-                e.preventDefault()
-                onReservation()
-              }}
-              className="relative inline-flex min-h-[48px] min-w-[13rem] items-center justify-center border border-gold/50 bg-gold/5 px-8 py-3 font-display text-[0.78rem] font-semibold uppercase tracking-[0.22em] text-gold shadow-[0_6px_28px_rgba(200,168,76,0.10)] transition-colors hover:border-gold hover:bg-[var(--gold-dim)] active:scale-[0.98]"
-              style={{ fontFamily: '"Cinzel", "Playfair Display", serif' }}
-            >
-              <span className="pointer-events-none absolute left-[-3px] top-[-3px] h-3 w-3 border-l border-t border-gold/70" />
-              <span className="pointer-events-none absolute right-[-3px] top-[-3px] h-3 w-3 border-r border-t border-gold/70" />
-              <span className="pointer-events-none absolute bottom-[-3px] left-[-3px] h-3 w-3 border-b border-l border-gold/70" />
-              <span className="pointer-events-none absolute bottom-[-3px] right-[-3px] h-3 w-3 border-b border-r border-gold/70" />
-              Reservation
-            </a>
-          </div>
+        <div className="relative z-20 mt-12 pt-6 sm:mt-14 sm:pt-8">
+          <RoyalDivider className="mb-8 sm:mb-10" />
           <nav
             className="mt-20 flex flex-wrap items-center justify-center gap-x-8 gap-y-3"
             aria-label="Footer"
@@ -203,6 +188,13 @@ export function HeroScreen({ config, onEnterMenu, onReservation, onStaffLogin })
           </div>
         </div>
       </div>
+
+      <ReservationOrderGatewayModal
+        open={gatewayOpen}
+        onClose={() => setGatewayOpen(false)}
+        onBookTable={onReservation}
+        onOrderOnline={onEnterMenu}
+      />
 
       <BottomSheet open={info !== null} onClose={() => setInfo(null)}>
         <div className="px-5 pb-6 pt-1">

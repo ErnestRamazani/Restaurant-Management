@@ -415,12 +415,18 @@ public static class OrderInventoryDeduction
 
     private static void EnsureAmbientTransaction(AppDbContext db)
     {
+        if (IsInMemoryProvider(db))
+            return;
         if (db.Database.CurrentTransaction is null)
         {
             throw new InvalidOperationException(
                 "Order inventory deduction must run inside Database.BeginTransaction() so stock changes commit with the order.");
         }
     }
+
+    private static bool IsInMemoryProvider(AppDbContext db) =>
+        db.Database.ProviderName is { } p &&
+        p.Contains("InMemory", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Single atomic decrement; returns rows affected (1 on success, 0 if insufficient stock or missing row).</summary>
     private static int ApplyAtomicStockDecrement(AppDbContext db, int inventoryItemId, decimal required, string deductionNote)

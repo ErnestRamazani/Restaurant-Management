@@ -19,6 +19,11 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
 {
     private readonly AdminOrderOperationsService _ops = new(db);
 
+    private static string NormalizePaymentTiming(string? raw) =>
+        string.Equals(raw, OrderPaymentTiming.Deferred, StringComparison.OrdinalIgnoreCase)
+            ? OrderPaymentTiming.Deferred
+            : OrderPaymentTiming.Immediate;
+
     [HttpPost("create")]
     public ActionResult<AdminCreateOrderResponse> Create(AdminCreateOrderRequest request)
     {
@@ -71,7 +76,10 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
         AppendNotes(existing, request.CustomerNotes, request.AllergyNotes);
         if (string.Equals(existing.Status, "Ready", StringComparison.OrdinalIgnoreCase)
             || string.Equals(existing.Status, OrderWorkflow.Served, StringComparison.OrdinalIgnoreCase))
+        {
             existing.Status = "In Kitchen";
+            existing.CustomerFulfillmentStatus = null;
+        }
 
         if (OrderDiscountParser.ShouldApplyDiscount(request.DiscountMode, request.DiscountInput))
         {
@@ -81,7 +89,17 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
                 : OrderDiscountParser.Parse(request.DiscountInput);
         }
 
-        OrderSubmissionHelper.SyncPaymentFields(existing, productById);
+        var mergedIds = existing.Items.Select(i => i.ProductId).Distinct().ToList();
+        var fullProducts = db.Products.AsNoTracking().Where(p => mergedIds.Contains(p.Id)).ToDictionary(p => p.Id, p => p);
+        var merchSub = existing.Items.Sum(i =>
+        {
+            var price = fullProducts.TryGetValue(i.ProductId, out var p) ? p.Price : 0m;
+            return price * i.Quantity;
+        });
+        if (string.Equals(existing.OrderSource, "Delivery", StringComparison.OrdinalIgnoreCase))
+            existing.DeliveryFeeUsd = Math.Round(merchSub * 0.20m, 2);
+
+        OrderSubmissionHelper.SyncPaymentFields(existing, fullProducts);
         OrderSubmissionHelper.ApplyReservationLink(
             existing,
             db,
@@ -107,9 +125,15 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
         var discountRaw = OrderDiscountParser.Parse(request.DiscountInput);
         var discountValue = string.Equals(request.DiscountMode, "None", StringComparison.OrdinalIgnoreCase) ? 0m : discountRaw;
         var paymentCurrency = request.SelectedPaymentCurrency;
-        var payUsd = Math.Round(request.LiveGrandTotal, 2);
-        var payFc = request.LiveGrandTotalFc;
         var status = request.IsTabletStaffOrderFlow ? OrderWorkflow.PendingCashier : request.SelectedOrderStatus;
+
+        var merchSubtotal = lines.Sum(l =>
+        {
+            var price = productById[l.ProductId].Price;
+            return price * l.Quantity;
+        });
+        var isDeliverySource = string.Equals(request.SelectedOrderSource, "Delivery", StringComparison.OrdinalIgnoreCase);
+        var deliveryFee = isDeliverySource ? Math.Round(merchSubtotal * 0.20m, 2) : 0m;
 
         var order = new OrderRecord
         {
@@ -134,19 +158,22 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
             DiscountValue = discountValue,
             DiscountAmountUsd = request.LiveDiscountAmount,
             PaymentCurrencyCode = paymentCurrency,
-            PaymentAmountUsd = payUsd,
-            PaymentAmountFc = payFc,
-            PaymentAmount = string.Equals(paymentCurrency, CurrencyHelper.CongoleseFranc, StringComparison.OrdinalIgnoreCase) ? payFc : payUsd,
             ExchangeRateUsed = CurrencyHelper.FcPerUsd,
             CreatedAt = DateTime.Now,
-            OrderSource = string.Equals(request.SelectedOrderSource, "Delivery", StringComparison.OrdinalIgnoreCase) ? "Delivery" : "WalkIn",
-            ReservationGuestName = string.Equals(request.SelectedOrderSource, "Delivery", StringComparison.OrdinalIgnoreCase)
+            OrderSource = isDeliverySource ? "Delivery" : "WalkIn",
+            OrderOrigin = isDeliverySource ? OrderOrigin.Online : OrderOrigin.InStore,
+            PaymentTiming = NormalizePaymentTiming(request.PaymentTiming),
+            DeliveryFeeUsd = deliveryFee,
+            ReservationGuestName = isDeliverySource
                 ? request.SourceReference.Trim()
                 : string.Empty
         };
 
         foreach (var item in BuildOrderItems(lines, productById, activeStaff))
             order.Items.Add(item);
+
+        order.DeliveryFeeUsd = deliveryFee;
+        OrderSubmissionHelper.SyncPaymentFields(order, productById);
 
         if (!request.IsTabletStaffOrderFlow)
         {
@@ -208,13 +235,22 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
     [HttpPost("{orderId:int}/advance")]
     public async Task<ActionResult<AdminOrderAdvanceResponse>> Advance(int orderId)
     {
-        var msg = _ops.TryAdvanceOrder(orderId);
-        if (msg == string.Empty)
+        var outcome = _ops.TryAdvanceOrderWithOutcome(orderId);
+        if (outcome.Missing)
             return Ok(new AdminOrderAdvanceResponse("missing", null));
-        if (msg is not null)
-            return Ok(new AdminOrderAdvanceResponse("error", msg));
+        if (outcome.Error is not null)
+            return Ok(new AdminOrderAdvanceResponse("error", outcome.Error));
 
         await orderHub.Clients.Group("Kitchen").SendAsync("KitchenQueueChanged", new { reason = "advance", orderId });
+
+        if (outcome.BecameReady && outcome.ReadyNotification is not null)
+        {
+            await orderHub.Clients.Group("Cashier").SendAsync("OrderReady", outcome.ReadyNotification);
+            await orderHub.Clients.Group("Cashier").SendAsync(
+                "CashierOrderBoardChanged",
+                new { reason = "order-ready", orderId, orderCode = outcome.ReadyNotification.OrderCode });
+        }
+
         return Ok(new AdminOrderAdvanceResponse("advanced", null));
     }
 

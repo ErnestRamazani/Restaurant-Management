@@ -2048,6 +2048,7 @@
         if (hint) sessionStorage.removeItem(NAV_FILTER_KEY + ":money");
 
         let period = "Week";
+        let origin = "All";
         let lastSnap = null;
 
         function isoLocalDateFromApi(d) {
@@ -2089,7 +2090,8 @@
             "<div class=\"money-kpi\"><div class=\"money-kpi-lbl\">Today net</div><div class=\"money-kpi-val\" id=\"moneyKpiNet\">—</div></div>" +
             "</div>" +
             "<div class=\"money-toolbar\">" +
-            "<div class=\"money-toolbar-showing\">Showing: <strong id=\"moneyPeriodLabel\">—</strong></div>" +
+            "<div class=\"money-toolbar-showing\">Showing: <strong id=\"moneyPeriodLabel\">—</strong>" +
+            "<span class=\"muted\" id=\"moneyOriginHint\" style=\"margin-left:10px;font-weight:400;display:none\"></span></div>" +
             "<div class=\"money-preset-group\" id=\"moneyPresetGroup\">" +
             "<button type=\"button\" class=\"money-preset-btn\" data-money-preset=\"Today\">Today</button>" +
             "<button type=\"button\" class=\"money-preset-btn\" data-money-preset=\"Week\">Week</button>" +
@@ -2097,6 +2099,11 @@
             ("<button type=\"button\" class=\"money-preset-btn\" data-money-preset=\"Year\">Year</button>" +
             "<button type=\"button\" class=\"money-preset-btn\" data-money-preset=\"All\">All</button>") +
             "</div>" +
+            "<div class=\"field\" style=\"min-width:150px\">" +
+            "<label for=\"moneyOriginSelect\" style=\"font-size:11px;color:#94a3b8;display:block;margin-bottom:4px;\">Order origin</label>" +
+            "<select id=\"moneyOriginSelect\" style=\"width:100%;padding:8px;border-radius:8px;background:#0f172a;color:#e8eef4;border:1px solid #334155\">" +
+            "<option value=\"All\">All</option><option value=\"Online\">Online</option><option value=\"InStore\">In-store</option>" +
+            "</select></div>" +
             "<button type=\"button\" class=\"btn btn-sm\" style=\"background:var(--accent-blue);color:#0b1220;border:none;font-weight:700\" id=\"moneyBtnRefresh\">Refresh</button>" +
             "</div>" +
             "<div class=\"money-dash-main\">" +
@@ -2114,13 +2121,21 @@
             "<h3>Summary</h3><dl>" +
             "<dt>Sales</dt><dd id=\"moneySumSales\">—</dd>" +
             "<dt>Tips</dt><dd id=\"moneySumTips\">—</dd>" +
-            "<dt>Payroll</dt><dd id=\"moneySumPayroll\">—</dd>" +
+            "<dt>Delivery fees</dt><dd id=\"moneySumDelivery\">—</dd>" +
             "</dl></div>" +
             "<div><button type=\"button\" class=\"money-report-btn\" id=\"moneyBtnReport\">Generate Report (PDF)</button>" +
             "<p class=\"money-report-note\">Backend export is Excel (Daily timeline) for the dates in this view.</p></div>" +
             "</aside></div></div>";
 
           el.querySelector("#moneyBtnRefresh").addEventListener("click", () => load());
+          const oriSel = el.querySelector("#moneyOriginSelect");
+          if (oriSel) {
+            oriSel.value = origin;
+            oriSel.addEventListener("change", () => {
+              origin = oriSel.value || "All";
+              load();
+            });
+          }
           el.querySelector("#moneyPresetGroup").addEventListener("click", (ev) => {
             const btn = ev.target.closest("[data-money-preset]");
             if (!btn) return;
@@ -2154,7 +2169,20 @@
 
           el.querySelector("#moneySumSales").textContent = snap.salesSummaryText ?? snap.SalesSummaryText ?? "—";
           el.querySelector("#moneySumTips").textContent = snap.tipsSummaryText ?? snap.TipsSummaryText ?? "—";
+          el.querySelector("#moneySumDelivery").textContent = snap.deliveryFeesSummaryText ?? snap.DeliveryFeesSummaryText ?? "—";
           el.querySelector("#moneySumPayroll").textContent = snap.payrollSummaryText ?? snap.PayrollSummaryText ?? "—";
+
+          const hint = snap.originFilterLabel ?? snap.OriginFilterLabel;
+          const hintEl = el.querySelector("#moneyOriginHint");
+          if (hintEl) {
+            if (hint) {
+              hintEl.style.display = "inline";
+              hintEl.textContent = "· " + hint;
+            } else {
+              hintEl.style.display = "none";
+              hintEl.textContent = "";
+            }
+          }
 
           const items = snap.ledgerItems ?? snap.LedgerItems ?? [];
           const tb = el.querySelector("#moneyLedgerBody");
@@ -2178,7 +2206,9 @@
         }
 
         async function load() {
-          const r = await api("/api/admin/data/money-web/snapshot?period=" + encodeURIComponent(period), "GET", null, true);
+          const qs = "/api/admin/data/money-web/snapshot?period=" + encodeURIComponent(period) +
+            "&origin=" + encodeURIComponent(origin);
+          const r = await api(qs, "GET", null, true);
           if (!r.ok) {
             if (!el.querySelector("#moneyDashRoot")) {
               el.innerHTML = "<div class='danger'>Money dashboard failed (HTTP " + r.status + ").</div>";
