@@ -8,31 +8,26 @@ namespace EliteRestaurant.Api.Branding;
 /// </summary>
 /// <remarks>
 /// <para><b>Customer website / public menu</b> (<c>/api/public/menu/assets/logo</c>) and
-/// <b>server portal</b> (<c>/api/server/assets/restaurant-logo</c>) use the same precedence:</para>
+/// <b>server portal</b> (<c>/api/server/assets/restaurant-logo</c>) resolve in this order:</para>
 /// <list type="number">
 /// <item>
 /// <description>
-/// <b>Repository assets (primary for the website when present on disk):</b>
-/// file under <c>assets/images/logo</c> — see <see cref="CanonicalLogoFileNames"/>.
-/// If none of those exist, the first image file in that directory (alphabetically) is used so
-/// drop-in files keep working before rename to a canonical name.
+/// <b>Database:</b> <c>PublicMenuAssets</c> row <c>Key == "logo"</c> — desktop/cloud profile push; wins over static
+/// repo files so branding updates publish without overwriting deployed assets each time.
 /// </description>
 /// </item>
 /// <item>
 /// <description>
-/// <b>Database:</b> <c>PublicMenuAssets</c> row <c>Key == "logo"</c> (cloud profile upload from
-/// desktop admin). Used when no suitable on-disk file is found.
+/// <b>Repository assets:</b> file under <c>assets/images/logo</c> — see <see cref="CanonicalLogoFileNames"/>.
+/// If none of those exist, the first image file in that directory (alphabetically) is used.
 /// </description>
 /// </item>
 /// <item>
 /// <description>
-/// <b>Local settings:</b> <c>BusinessProfile.LogoPath</c> absolute path (legacy / desktop local file).
+/// <b>Local settings:</b> <c>BusinessProfile.LogoPath</c> absolute path (legacy when the logo file exists on the API host).
 /// </description>
 /// </item>
 /// </list>
-/// On-disk repo logos take precedence so the committed <c>assets/images/logo</c> folder is the
-/// source of truth for web branding when those files exist; DB still stores operator uploads when
-/// no repo file is deployed.
 /// </remarks>
 public static class RestaurantWebLogoResolver
 {

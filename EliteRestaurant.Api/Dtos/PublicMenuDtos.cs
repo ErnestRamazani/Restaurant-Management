@@ -11,7 +11,11 @@ public sealed record PublicMenuConfigDto(
     decimal TaxPercent,
     decimal ServicePercent,
     string? Phone,
-    string? Address);
+    string? Address,
+    string? WebsiteDomain,
+    string? SocialMedia,
+    string? TicketFooterText,
+    string? TaxIdLegalInfo);
 
 public sealed record StaffLoginCodeRequest(string? Code);
 

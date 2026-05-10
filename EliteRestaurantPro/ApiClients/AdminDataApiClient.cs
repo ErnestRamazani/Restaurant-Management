@@ -10,6 +10,8 @@ public sealed class AdminDataApiClient(EliteApiClient? apiClient = null)
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly EliteApiClient _apiClient = apiClient ?? new EliteApiClient();
 
+    public void ReloadFromSettings() => _apiClient.ReloadFromSettings();
+
     public Task<IReadOnlyList<Product>> GetProductsAsync(CancellationToken cancellationToken = default) =>
         GetListAsync<Product>("products", cancellationToken);
 

@@ -19,6 +19,8 @@ public sealed class EliteApiClient
         ConfigureFromSettings();
     }
 
+    public void ReloadFromSettings() => ConfigureFromSettings();
+
     public bool IsConfigured => _http.BaseAddress is not null;
 
     public void ConfigureFromSettings()

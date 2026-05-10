@@ -17,6 +17,30 @@ export const API_ORIGIN =
 
 export const API_BASE = API_ORIGIN ? `${API_ORIGIN}/api` : '/api'
 
+/**
+ * Turn API-relative URLs ("/api/public/…") into an absolute URL for images when the SPA is hosted
+ * on another origin via VITE_API_BASE_URL or when opening the menu from a non-API host.
+ */
+export function resolveApiAssetUrl(assetPath) {
+  const raw = typeof assetPath === 'string' ? assetPath.trim() : ''
+  if (!raw || /^https?:\/\//i.test(raw)) {
+    return raw
+  }
+
+  try {
+    const base =
+      typeof API_ORIGIN === 'string' && API_ORIGIN.length > 0
+        ? API_ORIGIN.replace(/\/$/, '')
+        : typeof window !== 'undefined'
+          ? window.location.origin.replace(/\/$/, '')
+          : ''
+    if (!base) return raw
+    const pathPart = raw.startsWith('/') ? raw : `/${raw}`
+    return new URL(pathPart, `${base}/`).href
+  } catch {
+    return raw
+  }
+}
 export async function pingApi(options = {}) {
   const response = await fetch(`${API_BASE}/health`, {
     method: 'GET',

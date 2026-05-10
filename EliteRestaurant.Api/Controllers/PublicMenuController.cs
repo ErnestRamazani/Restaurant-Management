@@ -43,9 +43,7 @@ public sealed class PublicMenuController(
         var apiPricing = currencyPricingOptions.Value;
         var tax = PricingResolver.ResolveTaxRate(apiPricing.TaxPercent, cloudSettings?.TaxPercent ?? pricing.TaxPercent);
         var service = PricingResolver.ResolveServicePercent(apiPricing.ServicePercent, cloudSettings?.ServicePercent ?? pricing.ServicePercent);
-        var name = string.IsNullOrWhiteSpace(cloudSettings?.RestaurantName)
-            ? (string.IsNullOrWhiteSpace(business.RestaurantName) ? "Elite Restaurant" : business.RestaurantName.Trim())
-            : cloudSettings!.RestaurantName.Trim();
+        var name = PublicMenuBrandingMerge.RestaurantDisplayName(cloudSettings, business);
         var mode = string.IsNullOrWhiteSpace(cloudSettings?.DefaultCurrencyDisplayMode)
             ? (string.IsNullOrWhiteSpace(pricing.DefaultCurrencyDisplayMode) ? "Dual" : pricing.DefaultCurrencyDisplayMode.Trim())
             : cloudSettings!.DefaultCurrencyDisplayMode.Trim();
@@ -56,9 +54,32 @@ public sealed class PublicMenuController(
         var tagline = string.IsNullOrWhiteSpace(taglineValue)
             ? null
             : taglineValue.Trim();
-        var phone = cloudSettings?.Phone ?? business.Phone;
-        var address = cloudSettings?.Address ?? business.Address;
-        // Logo URL is always this endpoint; the handler prefers on-disk assets/images/logo, then DB, then LogoPath.
+        var phone = PublicMenuBrandingMerge.ProfileString(
+            cloudSettings is not null,
+            cloudSettings?.Phone,
+            business.Phone);
+        var address = PublicMenuBrandingMerge.ProfileString(
+            cloudSettings is not null,
+            cloudSettings?.Address,
+            business.Address);
+        var website = PublicMenuBrandingMerge.ProfileString(
+            cloudSettings is not null,
+            cloudSettings?.WebsiteDomain,
+            business.WebsiteDomain);
+        var socialMedia = PublicMenuBrandingMerge.ProfileString(
+            cloudSettings is not null,
+            cloudSettings?.SocialMedia,
+            business.SocialMedia);
+        var ticketFooter = PublicMenuBrandingMerge.ProfileString(
+            cloudSettings is not null,
+            cloudSettings?.TicketFooterText,
+            business.TicketFooterText);
+        var taxId = PublicMenuBrandingMerge.ProfileString(
+            cloudSettings is not null,
+            cloudSettings?.TaxIdLegalInfo,
+            business.TaxIdLegalInfo);
+        // Logo URL is always this endpoint; the handler prefers cloud DB blob, then on-disk repo assets/images/logo,
+        // then legacy LogoPath.
         return Ok(new PublicMenuConfigDto(
             name,
             "/api/public/menu/assets/logo",
@@ -67,9 +88,14 @@ public sealed class PublicMenuController(
             rate,
             tax,
             service,
-            string.IsNullOrWhiteSpace(phone) ? null : phone.Trim(),
-            string.IsNullOrWhiteSpace(address) ? null : address.Trim()));
+            phone,
+            address,
+            website,
+            socialMedia,
+            ticketFooter,
+            taxId));
     }
+
 
     [HttpPost("staff-login-code")]
     [EnableRateLimiting("PublicMenuDraft")]
@@ -177,15 +203,7 @@ public sealed class PublicMenuController(
     [EnableRateLimiting("PublicMenuRead")]
     public IActionResult GetLogo()
     {
-        // 1) Repository assets/images/logo (see RestaurantWebLogoResolver) — primary for web when deployed.
-        var repoLogo = RestaurantWebLogoResolver.TryResolveRepoLogoPath(environment);
-        if (repoLogo is not null && System.IO.File.Exists(repoLogo))
-        {
-            var bytes = System.IO.File.ReadAllBytes(repoLogo);
-            return File(bytes, RestaurantWebLogoResolver.GetContentTypeForPath(repoLogo));
-        }
-
-        // 2) Cloud / admin-uploaded logo in DB (desktop "push" profile).
+        // 1) Cloud logo (desktop push) — authoritative when deployed without replacing repo files each time.
         var asset = db.PublicMenuAssets.AsNoTracking().FirstOrDefault(a => a.Key == "logo");
         if (asset is not null && asset.Content.Length > 0)
         {
@@ -195,7 +213,15 @@ public sealed class PublicMenuController(
             return File(asset.Content, contentType);
         }
 
-        // 3) Legacy absolute path from local settings (e.g. desktop-picked file).
+        // 2) Repository assets/images/logo (see RestaurantWebLogoResolver) — default marketing asset when no cloud blob.
+        var repoLogo = RestaurantWebLogoResolver.TryResolveRepoLogoPath(environment);
+        if (repoLogo is not null && System.IO.File.Exists(repoLogo))
+        {
+            var bytes = System.IO.File.ReadAllBytes(repoLogo);
+            return File(bytes, RestaurantWebLogoResolver.GetContentTypeForPath(repoLogo));
+        }
+
+        // 3) Legacy absolute path from local settings (e.g. desktop-picked file on API host).
         return ServeImageFromPath(SettingsManager.Load().BusinessProfile.LogoPath?.Trim() ?? string.Empty);
     }
 

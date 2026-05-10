@@ -2,6 +2,7 @@
 import { motion } from 'framer-motion'
 import { BottomSheet } from '../ui/BottomSheet'
 import { GoldDivider } from '../ui/GoldDivider'
+import { resolveApiAssetUrl } from '../../utils/apiClient'
 
 function Particles() {
   const dots = Array.from({ length: 10 }, (_, i) => ({
@@ -59,6 +60,13 @@ function RoyalDivider({ className = '' }) {
   )
 }
 
+function formatWebsiteHref(raw) {
+  const s = String(raw ?? '').trim()
+  if (!s) return ''
+  if (/^https?:\/\//i.test(s)) return s
+  return `https://${s}`
+}
+
 export function HeroScreen({ config, onEnterMenu, onReservation, onStaffLogin }) {
   const [info, setInfo] = useState(/** @type {null | 'about' | 'contact' | 'notes'} */ (null))
 
@@ -68,9 +76,14 @@ export function HeroScreen({ config, onEnterMenu, onReservation, onStaffLogin })
       : 'Cuisine moderne · Kinshasa'
   const name = config?.restaurantName ? String(config.restaurantName) : 'Elite Restaurant'
   const logoUrl = config?.logoUrl ? String(config.logoUrl) : ''
-  const logoSrc = logoUrl.startsWith('http') ? logoUrl : `${window.location.origin}${logoUrl}`
+  const logoSrc = logoUrl ? resolveApiAssetUrl(logoUrl) : ''
   const phone = config ? String(config.phone ?? config.Phone ?? '').trim() : ''
   const address = config ? String(config.address ?? config.Address ?? '').trim() : ''
+  const website = config ? String(config.websiteDomain ?? config.WebsiteDomain ?? '').trim() : ''
+  const socialMedia = config ? String(config.socialMedia ?? config.SocialMedia ?? '').trim() : ''
+  const taxLegal = config ? String(config.taxIdLegalInfo ?? config.TaxIdLegalInfo ?? '').trim() : ''
+
+  const websiteHref = formatWebsiteHref(website)
 
   return (
     <div className="relative flex min-h-[100svh] flex-col overflow-hidden bg-midnight">
@@ -227,6 +240,19 @@ export function HeroScreen({ config, onEnterMenu, onReservation, onStaffLogin })
               ) : (
                 <p className="font-body text-[0.9rem] text-[var(--text-muted)]">Phone is set in the restaurant back office.</p>
               )}
+              {websiteHref ? (
+                <a
+                  href={websiteHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-4 inline-block min-h-[44px] font-body text-base font-semibold text-gold underline"
+                >
+                  {website}
+                </a>
+              ) : null}
+              {socialMedia ? (
+                <p className="mt-3 font-body text-[0.9rem] leading-relaxed text-champagne/75">{socialMedia}</p>
+              ) : null}
             </>
           ) : null}
           {info === 'notes' ? (
@@ -243,6 +269,9 @@ export function HeroScreen({ config, onEnterMenu, onReservation, onStaffLogin })
                 <strong className="text-gold/90">Orders:</strong> The kitchen sees your order as a request. Timing may
                 vary during busy service.
               </p>
+              {taxLegal ? (
+                <p className="mt-3 font-body text-[0.85rem] leading-relaxed text-champagne/60">{taxLegal}</p>
+              ) : null}
             </>
           ) : null}
           <button

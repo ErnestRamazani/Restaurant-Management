@@ -8,9 +8,17 @@ public sealed class AdminSettingsApiClient(EliteApiClient? apiClient = null)
 {
     private readonly EliteApiClient _apiClient = apiClient ?? new EliteApiClient();
 
-    public async Task PushSettingsAsync(AppSettings settings, CancellationToken cancellationToken = default)
+    public async Task PushSettingsAsync(
+        AppSettings settings,
+        bool applyLogoChanges = false,
+        CancellationToken cancellationToken = default)
     {
         var logo = ReadLogo(settings.BusinessProfile.LogoPath);
+        var menuBaseUrl = CloudEndpoints.NormalizeApiBaseUrl(
+            string.IsNullOrWhiteSpace(settings.BusinessProfile.PublicMenuBaseUrl?.Trim())
+                ? settings.CloudApi.BaseUrl
+                : settings.BusinessProfile.PublicMenuBaseUrl);
+
         var request = new AdminCloudSettingsRequest(
             settings.BusinessProfile.RestaurantName,
             settings.BusinessProfile.Phone,
@@ -30,7 +38,9 @@ public sealed class AdminSettingsApiClient(EliteApiClient? apiClient = null)
             settings.CurrencyPricing.ServicePercent,
             logo.FileName,
             logo.ContentType,
-            logo.Base64);
+            logo.Base64,
+            applyLogoChanges,
+            menuBaseUrl);
 
         await _apiClient.PostAsync<AdminCloudSettingsRequest, AdminCloudSettingsResponse>(
             "api/admin/settings/cloud-profile",

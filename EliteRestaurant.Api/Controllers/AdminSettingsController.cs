@@ -21,7 +21,7 @@ public sealed class AdminSettingsController(AppDbContext db) : ControllerBase
     {
         var row = await db.PublicMenuSettings.FirstOrDefaultAsync(s => s.Key == "default", cancellationToken)
                   ?? new PublicMenuSetting { Key = "default" };
-        row.RestaurantName = Normalize(request.RestaurantName, "Elite Restaurant");
+        row.RestaurantName = request.RestaurantName?.Trim() ?? string.Empty;
         row.Phone = request.Phone?.Trim() ?? string.Empty;
         row.Address = request.Address?.Trim() ?? string.Empty;
         row.WebsiteDomain = request.WebsiteDomain?.Trim() ?? string.Empty;
@@ -32,7 +32,7 @@ public sealed class AdminSettingsController(AppDbContext db) : ControllerBase
         row.StaffLoginPasscode = string.IsNullOrWhiteSpace(request.StaffLoginPasscode)
             ? "er4124"
             : request.StaffLoginPasscode.Trim();
-        row.TicketFooterText = Normalize(request.TicketFooterText, "MERCI / THANK YOU");
+        row.TicketFooterText = request.TicketFooterText?.Trim() ?? string.Empty;
         row.TaxIdLegalInfo = request.TaxIdLegalInfo?.Trim() ?? string.Empty;
         row.DefaultCurrencyDisplayMode = Normalize(request.DefaultCurrencyDisplayMode, "Dual");
         row.UsdToFcRate = request.UsdToFcRate > 0 ? request.UsdToFcRate : CurrencyHelper.DefaultFcPerUsd;
@@ -45,7 +45,7 @@ public sealed class AdminSettingsController(AppDbContext db) : ControllerBase
         if (row.Id == 0)
             db.PublicMenuSettings.Add(row);
 
-        SaveLogoIfPresent(request);
+        MergeLogoAssets(request);
         await db.SaveChangesAsync(cancellationToken);
 
         // Keep the existing file-based settings as a local fallback for older deployments.
@@ -59,7 +59,9 @@ public sealed class AdminSettingsController(AppDbContext db) : ControllerBase
         settings.BusinessProfile.StaffLoginPasscode = row.StaffLoginPasscode;
         settings.BusinessProfile.TicketFooterText = row.TicketFooterText;
         settings.BusinessProfile.TaxIdLegalInfo = row.TaxIdLegalInfo;
-        settings.BusinessProfile.PublicMenuBaseUrl = CloudEndpoints.ProductionApiBaseUrl;
+        if (!string.IsNullOrWhiteSpace(request.PublicMenuBaseUrl))
+            settings.BusinessProfile.PublicMenuBaseUrl =
+                CloudEndpoints.NormalizeApiBaseUrl(request.PublicMenuBaseUrl.Trim());
         settings.CurrencyPricing.DefaultCurrencyDisplayMode = row.DefaultCurrencyDisplayMode;
         settings.CurrencyPricing.UsdToFcRate = row.UsdToFcRate;
         settings.CurrencyPricing.RoundingLine = row.RoundingLine;
@@ -72,10 +74,25 @@ public sealed class AdminSettingsController(AppDbContext db) : ControllerBase
         return Ok(new AdminCloudSettingsResponse(true, "/api/public/menu/assets/logo", "Cloud settings saved."));
     }
 
-    private void SaveLogoIfPresent(AdminCloudSettingsRequest request)
+    private void MergeLogoAssets(AdminCloudSettingsRequest request)
     {
-        // Persists to DB for deployments without a repo logo file. When assets/images/logo contains an image,
-        // RestaurantWebLogoResolver serves that file first; DB logo is used only if no on-disk file is found.
+        if (!request.ApplyLogoChanges)
+            return;
+
+        if (string.IsNullOrWhiteSpace(request.LogoBase64))
+        {
+            var stale = db.PublicMenuAssets.FirstOrDefault(a => a.Key == "logo");
+            if (stale is not null)
+                db.PublicMenuAssets.Remove(stale);
+
+            return;
+        }
+
+        SaveLogoFromPayload(request);
+    }
+
+    private void SaveLogoFromPayload(AdminCloudSettingsRequest request)
+    {
         if (string.IsNullOrWhiteSpace(request.LogoBase64))
             return;
 

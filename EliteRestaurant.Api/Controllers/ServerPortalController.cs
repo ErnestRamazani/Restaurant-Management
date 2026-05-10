@@ -5,9 +5,7 @@
 // See PricingPrecedenceTests for tax/service matrix when cloud row is absent.
 //
 // RESTAURANT LOGO (same order as /api/public/menu/assets/logo — see RestaurantWebLogoResolver remarks):
-// 1. On-disk assets/images/logo under the repo or build output (website-primary when present).
-// 2. PublicMenuAssets Key=logo (cloud upload).
-// 3. BusinessProfile.LogoPath (absolute path).
+// 1. PublicMenuAssets Key=logo (cloud upload / desktop push); 2. on-disk repo assets/images/logo; 3. BusinessProfile.LogoPath.
 using EliteRestaurant.Api.Branding;
 using EliteRestaurant.Api.Dtos;
 using EliteRestaurant.Api.Security;
@@ -45,9 +43,7 @@ public sealed class ServerPortalController(
         var settings = allSettings.CurrencyPricing;
         var business = allSettings.BusinessProfile;
         var cloudSettings = db.PublicMenuSettings.AsNoTracking().FirstOrDefault(s => s.Key == "default");
-        var restaurantName = string.IsNullOrWhiteSpace(cloudSettings?.RestaurantName)
-            ? (string.IsNullOrWhiteSpace(business.RestaurantName) ? "Elite Restaurant" : business.RestaurantName.Trim())
-            : cloudSettings!.RestaurantName.Trim();
+        var restaurantName = PublicMenuBrandingMerge.RestaurantDisplayName(cloudSettings, business);
         var logoUrl = "/api/server/assets/restaurant-logo";
         var employeePhotoUrl = "/api/server/assets/me-photo";
         var apiPricing = currencyPricingOptions.Value;
@@ -80,11 +76,6 @@ public sealed class ServerPortalController(
             return Unauthorized();
 
         var repoLogo = RestaurantWebLogoResolver.TryResolveRepoLogoPath(environment);
-        if (repoLogo is not null && System.IO.File.Exists(repoLogo))
-        {
-            var bytes = System.IO.File.ReadAllBytes(repoLogo);
-            return File(bytes, RestaurantWebLogoResolver.GetContentTypeForPath(repoLogo));
-        }
 
         var asset = db.PublicMenuAssets.AsNoTracking().FirstOrDefault(a => a.Key == "logo");
         if (asset is { Content.Length: > 0 })
@@ -93,6 +84,12 @@ public sealed class ServerPortalController(
                 ? "image/png"
                 : asset.ContentType;
             return File(asset.Content, contentType);
+        }
+
+        if (repoLogo is not null && System.IO.File.Exists(repoLogo))
+        {
+            var bytes = System.IO.File.ReadAllBytes(repoLogo);
+            return File(bytes, RestaurantWebLogoResolver.GetContentTypeForPath(repoLogo));
         }
 
         var logoPath = SettingsManager.Load().BusinessProfile.LogoPath?.Trim() ?? string.Empty;

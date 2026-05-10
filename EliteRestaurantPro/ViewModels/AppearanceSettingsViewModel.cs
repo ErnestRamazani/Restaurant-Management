@@ -668,8 +668,11 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
             ? "er4124"
             : StaffLoginPasscode.Trim();
 
+        _settings.CloudApi.BaseUrl = CloudEndpoints.NormalizeApiBaseUrl(_settings.BusinessProfile.PublicMenuBaseUrl);
+
         SettingsManager.Save(_settings);
-        _ = new AdminSettingsApiClient().PushSettingsAsync(_settings);
+        _adminData.ReloadFromSettings();
+        _ = new AdminSettingsApiClient().PushSettingsAsync(_settings, applyLogoChanges: true);
         RefreshBusinessProfileBindings();
         var msg = "Business profile saved.";
         if (PublicMenuUrlHelper.LooksLikeLocalHostOnly(_settings.BusinessProfile.PublicMenuBaseUrl))
@@ -706,9 +709,11 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         _settings.CurrencyPricing.TaxPercent = tax;
         _settings.CurrencyPricing.ServicePercent = service;
 
+        _settings.CloudApi.BaseUrl = CloudEndpoints.NormalizeApiBaseUrl(_settings.BusinessProfile.PublicMenuBaseUrl);
+
         SettingsManager.Save(_settings);
-        _ = new AdminSettingsApiClient().PushSettingsAsync(_settings);
-        ExchangeRateLastUpdated = _settings.CurrencyPricing.ExchangeRateLastUpdatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+        _adminData.ReloadFromSettings();
+        _ = new AdminSettingsApiClient().PushSettingsAsync(_settings, applyLogoChanges: false);
         StatusMessage = "Currency & pricing settings saved.";
     }
 

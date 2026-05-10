@@ -57,6 +57,8 @@ public sealed record AdminCloudSettingsRequest(
     decimal ServicePercent,
     string? LogoFileName,
     string? LogoContentType,
-    string? LogoBase64);
+    string? LogoBase64,
+    bool ApplyLogoChanges = false,
+    string? PublicMenuBaseUrl = null);
 
 public sealed record AdminCloudSettingsResponse(bool Success, string? LogoUrl, string Message);
