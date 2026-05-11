@@ -38,6 +38,8 @@ public class OrderRecord
     public string PaymentTiming { get; set; } = OrderPaymentTiming.Immediate;
     /// <summary>Cashier (or admin payment capture) confirmation — required before auto sale revenue is posted for completed orders.</summary>
     public DateTime? PaymentConfirmedAt { get; set; }
+    /// <summary>Guest payment intent on public online checkout (Cash / Card / MobileMoney).</summary>
+    public string? GuestPaymentMethod { get; set; }
     /// <summary>When the kitchen marks <c>Ready</c>: customer fulfillment code for guest-facing tracking (ReadyForPickup / OutForDelivery).</summary>
     public string? CustomerFulfillmentStatus { get; set; }
     public int? ReservationBookingId { get; set; }

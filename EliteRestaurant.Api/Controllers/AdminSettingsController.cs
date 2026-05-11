@@ -41,11 +41,22 @@ public sealed class AdminSettingsController(AppDbContext db) : ControllerBase
         row.RoundingGrandTotal = Normalize(request.RoundingGrandTotal, "Nearest");
         row.TaxPercent = Math.Max(0, request.TaxPercent);
         row.ServicePercent = Math.Max(0, request.ServicePercent);
+        row.OnlineOrdersTableId = request.OnlineOrdersTableId;
+        row.OnlinePromoTitle = string.IsNullOrWhiteSpace(request.OnlinePromoTitle)
+            ? null
+            : request.OnlinePromoTitle.Trim();
+        row.OnlinePromoSubtitle = string.IsNullOrWhiteSpace(request.OnlinePromoSubtitle)
+            ? null
+            : request.OnlinePromoSubtitle.Trim();
+        row.OnlinePromoCtaLabel = string.IsNullOrWhiteSpace(request.OnlinePromoCtaLabel)
+            ? null
+            : request.OnlinePromoCtaLabel.Trim();
         row.UpdatedAtUtc = DateTime.UtcNow;
         if (row.Id == 0)
             db.PublicMenuSettings.Add(row);
 
         MergeLogoAssets(request);
+        MergeOnlinePromoAssets(request);
         await db.SaveChangesAsync(cancellationToken);
 
         // Keep the existing file-based settings as a local fallback for older deployments.
@@ -70,6 +81,10 @@ public sealed class AdminSettingsController(AppDbContext db) : ControllerBase
         settings.CurrencyPricing.TaxPercent = row.TaxPercent;
         settings.CurrencyPricing.ServicePercent = row.ServicePercent;
         settings.CurrencyPricing.ExchangeRateLastUpdatedUtc = DateTime.UtcNow;
+        settings.BusinessProfile.OnlineOrdersTableId = row.OnlineOrdersTableId;
+        settings.BusinessProfile.OnlinePromoTitle = row.OnlinePromoTitle;
+        settings.BusinessProfile.OnlinePromoSubtitle = row.OnlinePromoSubtitle;
+        settings.BusinessProfile.OnlinePromoCtaLabel = row.OnlinePromoCtaLabel;
         SettingsManager.Save(settings);
         return Ok(new AdminCloudSettingsResponse(true, "/api/public/menu/assets/logo", "Cloud settings saved."));
     }
@@ -129,6 +144,66 @@ public sealed class AdminSettingsController(AppDbContext db) : ControllerBase
         asset.ContentType = string.IsNullOrWhiteSpace(request.LogoContentType)
             ? "image/png"
             : request.LogoContentType.Trim();
+        asset.Content = bytes;
+        asset.UpdatedAtUtc = DateTime.UtcNow;
+        if (asset.Id == 0)
+            db.PublicMenuAssets.Add(asset);
+    }
+
+    private void MergeOnlinePromoAssets(AdminCloudSettingsRequest request)
+    {
+        if (!request.ApplyOnlinePromoImageChanges)
+            return;
+
+        if (string.IsNullOrWhiteSpace(request.OnlinePromoImageBase64))
+        {
+            var stale = db.PublicMenuAssets.FirstOrDefault(a => a.Key == "online-promo");
+            if (stale is not null)
+                db.PublicMenuAssets.Remove(stale);
+            return;
+        }
+
+        SaveOnlinePromoFromPayload(request);
+    }
+
+    private void SaveOnlinePromoFromPayload(AdminCloudSettingsRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.OnlinePromoImageBase64))
+            return;
+
+        byte[] bytes;
+        try
+        {
+            bytes = Convert.FromBase64String(request.OnlinePromoImageBase64);
+        }
+        catch
+        {
+            return;
+        }
+
+        if (bytes.Length == 0 || bytes.Length > 4 * 1024 * 1024)
+            return;
+
+        var extension = Path.GetExtension(request.OnlinePromoImageFileName ?? string.Empty);
+        if (string.IsNullOrWhiteSpace(extension)
+            && !string.IsNullOrWhiteSpace(request.OnlinePromoImageContentType)
+            && new FileExtensionContentTypeProvider().Mappings
+                .FirstOrDefault(m => string.Equals(m.Value, request.OnlinePromoImageContentType, StringComparison.OrdinalIgnoreCase)).Key is { } mapped)
+        {
+            extension = mapped;
+        }
+
+        if (string.IsNullOrWhiteSpace(extension))
+            extension = ".jpg";
+
+        var asset = db.PublicMenuAssets.FirstOrDefault(a => a.Key == "online-promo")
+                    ?? new PublicMenuAsset { Key = "online-promo" };
+        asset.FileName = string.IsNullOrWhiteSpace(request.OnlinePromoImageFileName)
+            ? "online-promo" + extension.ToLowerInvariant()
+            : request.OnlinePromoImageFileName.Trim();
+        asset.ContentType = string.IsNullOrWhiteSpace(request.OnlinePromoImageContentType)
+            ? "image/jpeg"
+            : request.OnlinePromoImageContentType.Trim();
         asset.Content = bytes;
         asset.UpdatedAtUtc = DateTime.UtcNow;
         if (asset.Id == 0)

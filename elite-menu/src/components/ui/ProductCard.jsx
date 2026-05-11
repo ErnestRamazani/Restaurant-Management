@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import { getCategoryColor } from '../../utils/placeholders'
 import { formatUsd } from '../../utils/format'
 import { productIsAvailable } from '../../utils/availability'
@@ -21,7 +21,7 @@ function stopBub(e) {
   e.nativeEvent?.stopImmediatePropagation?.()
 }
 
-export function ProductCard({ product, qty, onOpen, onAdd, onMinus, onPlus }) {
+export function ProductCard({ product, qty, onOpen, onAdd, onMinus, onPlus, onRemoveLine }) {
   const available = productIsAvailable(product)
   const cat = product.category || ''
   const sub = product.subcategory || 'General'
@@ -143,7 +143,11 @@ export function ProductCard({ product, qty, onOpen, onAdd, onMinus, onPlus }) {
             </span>
           )}
         </div>
-        <div className="shrink-0" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+        <div
+          className="flex shrink-0 items-center gap-1.5"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
           {qty === 0 ? (
             available ? (
               <button
@@ -167,13 +171,28 @@ export function ProductCard({ product, qty, onOpen, onAdd, onMinus, onPlus }) {
               </span>
             )
           ) : (
-            <QuantityControl
-              variant="compact"
-              value={qty}
-              onMinus={onMinus}
-              onPlus={onPlus}
-              disablePlus={!available}
-            />
+            <>
+              <QuantityControl
+                variant="compact"
+                value={qty}
+                onMinus={onMinus}
+                onPlus={onPlus}
+                disablePlus={!available || qty >= 20}
+              />
+              {typeof onRemoveLine === 'function' ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    stopBub(e)
+                    onRemoveLine(product)
+                  }}
+                  className="inline-flex h-[32px] w-[32px] min-h-[32px] min-w-[32px] touch-manipulation select-none items-center justify-center rounded-full border border-champagne/20 bg-midnight-2 text-champagne/70 transition hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300 active:scale-95"
+                  aria-label="Remove line from cart"
+                >
+                  <Trash2 className="h-3.5 w-3.5" strokeWidth={2.25} />
+                </button>
+              ) : null}
+            </>
           )}
         </div>
       </div>

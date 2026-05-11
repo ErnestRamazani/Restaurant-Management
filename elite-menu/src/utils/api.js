@@ -54,6 +54,17 @@ export async function submitDraft(payload) {
   }
 }
 
+export async function submitOnlineOrder(payload) {
+  try {
+    return await apiFetch(`${BASE}/orders/online`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  } catch (error) {
+    throw new Error(error instanceof Error ? error.message : 'Failed to place order', { cause: error })
+  }
+}
+
 /** Public: kitchen / payment stage + fulfillment text when you have the ticket code from checkout. */
 export async function fetchOrderStatusByCode(orderCode) {
   const c = encodeURIComponent(String(orderCode ?? '').trim())

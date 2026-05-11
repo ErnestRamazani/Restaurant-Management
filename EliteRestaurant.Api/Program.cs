@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Serilog.Context;
@@ -354,6 +355,11 @@ try
     IntegrationTestSeed.Ensure(app);
 
     app.Run();
+}
+catch (HostAbortedException)
+{
+    // dotnet ef and other design-time tools build the host then abort it — not a runtime failure.
+    throw;
 }
 catch (Exception ex)
 {

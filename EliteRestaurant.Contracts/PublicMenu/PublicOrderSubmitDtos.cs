@@ -14,3 +14,15 @@ public sealed record PublicOrderSubmitResponse(
     int OrderId,
     string Status,
     string OrderOrigin);
+
+/// <summary>Guest online checkout: pickup vs delivery, mixed food+drink cart, payment intent.</summary>
+public sealed record PublicOnlineOrderSubmitRequest(
+    string CustomerName,
+    string FulfillmentMode,
+    IReadOnlyList<PublicOrderSubmitLine> Items,
+    string? DeliveryAddress = null,
+    string? DeliveryInstructions = null,
+    string? PaymentMethod = null,
+    string? PaymentTiming = null,
+    string? Notes = null,
+    string? AllergyNotes = null);

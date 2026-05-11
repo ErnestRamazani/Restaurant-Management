@@ -13,6 +13,8 @@ using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Options;
+using Npgsql;
+using Serilog;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Orders;
@@ -36,6 +38,8 @@ public sealed class PublicMenuController(
         WriteIndented = false,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
+
+    private const string OnlinePromoAssetKey = "online-promo";
 
     [HttpGet("config")]
     [EnableRateLimiting("PublicMenuRead")]
@@ -84,6 +88,20 @@ public sealed class PublicMenuController(
             cloudSettings is not null,
             cloudSettings?.TaxIdLegalInfo,
             business.TaxIdLegalInfo);
+        var onlinePromoUrl = db.PublicMenuAssets.AsNoTracking()
+            .Any(a => a.Key == OnlinePromoAssetKey && a.Content.Length > 0)
+            ? "/api/public/menu/assets/online-promo"
+            : null;
+        var onlineTableId = cloudSettings?.OnlineOrdersTableId;
+        var promoTitle = string.IsNullOrWhiteSpace(cloudSettings?.OnlinePromoTitle)
+            ? null
+            : cloudSettings!.OnlinePromoTitle.Trim();
+        var promoSubtitle = string.IsNullOrWhiteSpace(cloudSettings?.OnlinePromoSubtitle)
+            ? null
+            : cloudSettings!.OnlinePromoSubtitle.Trim();
+        var promoCta = string.IsNullOrWhiteSpace(cloudSettings?.OnlinePromoCtaLabel)
+            ? null
+            : cloudSettings!.OnlinePromoCtaLabel.Trim();
         // Logo URL is always this endpoint; the handler prefers cloud DB blob, then on-disk repo assets/images/logo,
         // then legacy LogoPath.
         return Ok(new PublicMenuConfigDto(
@@ -99,7 +117,12 @@ public sealed class PublicMenuController(
             website,
             socialMedia,
             ticketFooter,
-            taxId));
+            taxId,
+            onlineTableId,
+            promoTitle,
+            promoSubtitle,
+            promoCta,
+            onlinePromoUrl));
     }
 
 
@@ -274,6 +297,21 @@ public sealed class PublicMenuController(
 
         // 3) Legacy absolute path from local settings (e.g. desktop-picked file on API host).
         return ServeImageFromPath(SettingsManager.Load().BusinessProfile.LogoPath?.Trim() ?? string.Empty);
+    }
+
+    [HttpGet("assets/online-promo")]
+    [EnableRateLimiting("PublicMenuRead")]
+    public IActionResult GetOnlinePromoHero()
+    {
+        var asset = db.PublicMenuAssets.AsNoTracking()
+            .FirstOrDefault(a => a.Key == OnlinePromoAssetKey);
+        if (asset is not { Content.Length: > 0 })
+            return NotFound();
+
+        var contentType = string.IsNullOrWhiteSpace(asset.ContentType)
+            ? "image/jpeg"
+            : asset.ContentType;
+        return File(asset.Content, contentType);
     }
 
     [HttpGet("assets/product/{id:int}")]
@@ -599,14 +637,16 @@ public sealed class PublicMenuController(
         db.Orders.Add(order);
         orderTable.Status = "Occupied";
         DataReconciler.ReconcileTableStatusesWithOrders(db);
-        await db.SaveChangesAsync();
+        try
+        {
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            return HandlePublicMenuOrderSaveFailure(ex, "orders/submit");
+        }
 
-        await hubContext.Clients.Group("Cashier").SendAsync(
-            "CashierOrderBoardChanged",
-            new { reason = "online-order-submitted", orderId = order.Id });
-        await hubContext.Clients.Group("Server").SendAsync(
-            "CashierOrderBoardChanged",
-            new { reason = "online-order-submitted", orderId = order.Id });
+        await TryNotifyCashierOrderBoardChangedAsync(hubContext, order.Id, "online-order-submitted");
 
         var code = order.UniqueId;
         return StatusCode(201, new PublicOrderSubmitResponse(
@@ -614,6 +654,293 @@ public sealed class PublicMenuController(
             order.Id,
             order.Status,
             order.OrderOrigin));
+    }
+
+    /// <summary>Guest online order: mixed cart, pickup or delivery, payment intent; <see cref="OrderWorkflow.PendingApproval"/>.</summary>
+    [HttpPost("orders/online")]
+    [EnableRateLimiting("PublicMenuDraft")]
+    [ProducesResponseType(typeof(PublicOrderSubmitResponse), 201)]
+    [ProducesResponseType(typeof(PublicMenuDraftErrorDto), 400)]
+    [ProducesResponseType(typeof(PublicMenuDraftErrorDto), 503)]
+    [ProducesResponseType(typeof(ProblemDetails), 500)]
+    public async Task<IActionResult> PostOnlineOrder([FromBody] PublicOnlineOrderSubmitRequest? body)
+    {
+        var errors = new List<string>();
+        if (body is null)
+        {
+            errors.Add("Request body is required.");
+            return BadRequest(new PublicMenuDraftErrorDto { Errors = errors });
+        }
+
+        try
+        {
+        var name = (body.CustomerName ?? string.Empty).Trim();
+        if (name.Length is < 1 or > 60)
+            errors.Add("Customer name is required (1–60 characters).");
+        if (name.IndexOf('<') >= 0 || name.IndexOf('>') >= 0)
+            errors.Add("Customer name may not contain HTML tags.");
+
+        var mode = (body.FulfillmentMode ?? string.Empty).Trim();
+        var isDelivery = string.Equals(mode, "Delivery", StringComparison.OrdinalIgnoreCase);
+        var isPickup = string.Equals(mode, "Pickup", StringComparison.OrdinalIgnoreCase);
+        if (!isDelivery && !isPickup)
+            errors.Add("Fulfillment mode must be Pickup or Delivery.");
+
+        if (isDelivery)
+        {
+            var addr = (body.DeliveryAddress ?? string.Empty).Trim();
+            if (addr.Length is < 5 or > 500)
+                errors.Add("Delivery address is required (5–500 characters) for delivery orders.");
+        }
+
+        if (body.Items is null || body.Items.Count == 0)
+            errors.Add("At least one item is required.");
+
+        if (body.Items is not null)
+        {
+            foreach (var line in body.Items!)
+            {
+                if (line.Quantity is < 1 or > 20)
+                {
+                    errors.Add("Each line quantity must be between 1 and 20.");
+                    break;
+                }
+            }
+        }
+
+        if (errors.Count > 0)
+            return BadRequest(new PublicMenuDraftErrorDto { Errors = DeduplicateErrors(errors) });
+
+        var productIds = body.Items!.Select(i => i.ProductId).Distinct().ToList();
+        var dbProducts = await db.Products.AsNoTracking()
+            .Where(p => productIds.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id);
+
+        foreach (var line in body.Items!)
+        {
+            if (!dbProducts.TryGetValue(line.ProductId, out var p))
+            {
+                errors.Add($"Product {line.ProductId} was not found.");
+                continue;
+            }
+
+            if (Math.Abs(line.UnitPrice - p.Price) > 0.02m)
+                errors.Add($"Unit price for \"{p.Name}\" does not match the current menu price.");
+        }
+
+        if (errors.Count > 0)
+            return BadRequest(new PublicMenuDraftErrorDto { Errors = DeduplicateErrors(errors) });
+
+        var inStock = await GetAvailabilityMapAsync(productIds);
+        foreach (var line in body.Items!)
+        {
+            if (!inStock.TryGetValue(line.ProductId, out var ok) || !ok)
+            {
+                errors.Add($"\"{dbProducts[line.ProductId].Name}\" is currently unavailable.");
+                break;
+            }
+        }
+
+        if (errors.Count > 0)
+            return BadRequest(new PublicMenuDraftErrorDto { Errors = DeduplicateErrors(errors) });
+
+        var normalized = body.Items
+            .GroupBy(i => i.ProductId)
+            .Select(g => (ProductId: g.Key, Quantity: g.Sum(x => x.Quantity)))
+            .ToList();
+
+        var stockMessage = OrderInventoryDeduction.TryValidateInventoryForProductQuantities(
+            db,
+            normalized,
+            OrderInventoryDeduction.InventoryValidationKind.FullOrder);
+        if (stockMessage is not null)
+            return BadRequest(new PublicMenuDraftErrorDto { Errors = new[] { stockMessage } });
+
+        var tableResolution = await ResolveOnlineOrdersTableAsync();
+        if (tableResolution.Table is null)
+        {
+            return BadRequest(new PublicMenuDraftErrorDto
+            {
+                Errors = new[]
+                {
+                    tableResolution.ErrorMessage
+                        ?? "Online ordering is not available: configure an online orders table with an assigned server, or add a table with a server in the back office."
+                }
+            });
+        }
+
+        var orderTable = tableResolution.Table;
+
+        var activeStaff = await db.Employees.AsNoTracking()
+            .Where(e => e.EmploymentStatus == "Active")
+            .ToListAsync();
+
+        var merchSubtotal = normalized.Sum(x =>
+            dbProducts.TryGetValue(x.ProductId, out var p) ? p.Price * x.Quantity : 0m);
+        var deliveryFee = isDelivery ? Math.Round(merchSubtotal * 0.20m, 2) : 0m;
+        var orderSource = isDelivery ? "Delivery" : "TakeOut";
+
+        var notesParts = new List<string> { $"Guest: {name}", $"Online · {(isDelivery ? "Delivery" : "Pickup")}" };
+        if (isDelivery)
+        {
+            notesParts.Add($"Address: {(body.DeliveryAddress ?? string.Empty).Trim()}");
+            var instr = (body.DeliveryInstructions ?? string.Empty).Trim();
+            if (instr.Length > 0)
+                notesParts.Add($"Instructions: {instr}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(body.Notes))
+            notesParts.Add(body.Notes!.Trim());
+
+        var payLabel = NormalizeGuestPaymentIntent(body.PaymentMethod);
+        notesParts.Add($"Pay: {payLabel}");
+
+        var paymentTiming = string.IsNullOrWhiteSpace(body.PaymentTiming)
+            ? OrderPaymentTiming.Deferred
+            : body.PaymentTiming!.Trim();
+        if (!string.Equals(paymentTiming, OrderPaymentTiming.Deferred, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(paymentTiming, OrderPaymentTiming.Immediate, StringComparison.OrdinalIgnoreCase))
+            paymentTiming = OrderPaymentTiming.Deferred;
+
+        var customerNotes = string.Join(" · ", notesParts.Where(s => s.Length > 0));
+        var allergyNotes = (body.AllergyNotes ?? string.Empty).Trim();
+
+        var order = new OrderRecord
+        {
+            UniqueId = UniqueIdGenerator.NewId("ORD"),
+            TableId = orderTable.Id,
+            TableCode = $"Table {orderTable.TableNumber}",
+            TableName = string.IsNullOrWhiteSpace(orderTable.Name) ? $"Table {orderTable.TableNumber}" : orderTable.Name,
+            ServerId = orderTable.AssignedServerId,
+            ServerName = orderTable.AssignedServer is { } srv ? srv.Name : string.Empty,
+            Status = OrderWorkflow.PendingApproval,
+            CustomerNotes = customerNotes,
+            AllergyNotes = allergyNotes,
+            DiscountMode = "None",
+            DiscountValue = 0m,
+            PaymentCurrencyCode = CurrencyHelper.Usd,
+            CreatedAt = DateTime.Now,
+            OrderSource = orderSource,
+            OrderOrigin = OrderOrigin.Online,
+            DeliveryFeeUsd = deliveryFee,
+            PaymentTiming = paymentTiming,
+            GuestPaymentMethod = payLabel
+        };
+
+        foreach (var line in normalized)
+        {
+            var assignee = OrderSubmissionHelper.ResolveAssignee(dbProducts, activeStaff, line.ProductId);
+            order.Items.Add(new OrderItem
+            {
+                ProductId = line.ProductId,
+                Quantity = line.Quantity,
+                PreparedByEmployeeId = assignee.EmployeeId,
+                PreparedByRole = assignee.Role,
+                PreparedByName = assignee.Name
+            });
+        }
+
+        OrderSubmissionHelper.SyncPaymentFields(order, dbProducts);
+        db.Orders.Add(order);
+        orderTable.Status = "Occupied";
+        DataReconciler.ReconcileTableStatusesWithOrders(db);
+        try
+        {
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            return HandlePublicMenuOrderSaveFailure(ex, "orders/online");
+        }
+
+        await TryNotifyCashierOrderBoardChangedAsync(hubContext, order.Id, "online-order-submitted");
+
+        return StatusCode(201, new PublicOrderSubmitResponse(
+            order.UniqueId,
+            order.Id,
+            order.Status,
+            order.OrderOrigin));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Log.Error(
+                ex,
+                "PostOnlineOrder failed outside of SaveChanges (CorrelationId={CorrelationId})",
+                HttpContext.Response.Headers["X-Correlation-ID"].ToString());
+            return Problem(
+                statusCode: StatusCodes.Status500InternalServerError,
+                title: "Could not place online order",
+                detail: "An unexpected error occurred. Please try again or contact the restaurant.");
+        }
+    }
+
+    private sealed record OnlineOrdersTableResolution(Table? Table, string? ErrorMessage);
+
+    /// <summary>
+    /// When <see cref="PublicMenuSetting.OnlineOrdersTableId"/> is set, it must exist and be usable — otherwise guests get a clear 400 (no silent fallback to another table).
+    /// </summary>
+    private async Task<OnlineOrdersTableResolution> ResolveOnlineOrdersTableAsync()
+    {
+        var settingsRow = await db.PublicMenuSettings.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Key == "default");
+
+        if (settingsRow?.OnlineOrdersTableId is int configuredId and > 0)
+        {
+            var configured = await db.Tables
+                .Include(x => x.AssignedServer)
+                .FirstOrDefaultAsync(x => x.Id == configuredId);
+
+            if (configured is null)
+            {
+                return new OnlineOrdersTableResolution(null,
+                    $"Online ordering is not available: the configured online orders table (id {configuredId}) was not found. Update the online orders table id in Appearance settings or sync tables from the back office.");
+            }
+
+            if (string.Equals(configured.Status, "Maintenance", StringComparison.OrdinalIgnoreCase))
+            {
+                return new OnlineOrdersTableResolution(null,
+                    "Online ordering is not available: the configured online orders table is under maintenance. Clear maintenance on that table or choose another online orders table.");
+            }
+
+            if (configured.AssignedServerId is null || configured.AssignedServer is null)
+            {
+                return new OnlineOrdersTableResolution(null,
+                    "Online ordering is not available: the configured online orders table has no assigned server. Assign an active server to that table in the back office.");
+            }
+
+            return new OnlineOrdersTableResolution(configured, null);
+        }
+
+        var fallback = await db.Tables
+            .Include(t => t.AssignedServer)
+            .Where(t => t.AssignedServerId != null
+                        && t.AssignedServer != null
+                        && !string.Equals(t.Status, "Maintenance", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(t => t.TableNumber)
+            .FirstOrDefaultAsync();
+
+        if (fallback is null)
+        {
+            return new OnlineOrdersTableResolution(null,
+                "Online ordering is not available: add at least one non-maintenance table with an assigned server, or set an online orders table in Appearance settings.");
+        }
+
+        return new OnlineOrdersTableResolution(fallback, null);
+    }
+
+    private static string NormalizeGuestPaymentIntent(string? raw)
+    {
+        var s = (raw ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(s))
+            return "Cash";
+        if (string.Equals(s, "Cash", StringComparison.OrdinalIgnoreCase))
+            return "Cash";
+        if (string.Equals(s, "Card", StringComparison.OrdinalIgnoreCase))
+            return "Card";
+        if (string.Equals(s, "MobileMoney", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(s, "Mobile Money", StringComparison.OrdinalIgnoreCase))
+            return "MobileMoney";
+        return s;
     }
 
     private async Task<Dictionary<int, bool>> GetAvailabilityMapAsync(IReadOnlyList<int> productIds)
@@ -672,6 +999,104 @@ public sealed class PublicMenuController(
 
     private static IReadOnlyList<string> DeduplicateErrors(List<string> errors) =>
         errors.Distinct(StringComparer.Ordinal).ToList();
+
+    /// <summary>
+    /// Maps common PostgreSQL failures (missing migrations, bad FK data) to a guest-safe message instead of HTTP 500.
+    /// </summary>
+    private static string? TryTranslatePublicMenuOrderSaveFailure(DbUpdateException ex)
+    {
+        var pg = FindPostgresException(ex);
+        if (pg is null)
+            return null;
+
+        return pg.SqlState switch
+        {
+            "42703" or "42P01" or "42P02" =>
+                "Online ordering is temporarily unavailable: the restaurant database needs the latest update. Ask the owner to deploy API migrations, then retry.",
+            "23502" =>
+                "Online ordering is temporarily unavailable: a required value or column is missing on the restaurant database. Ask the owner to run API database migrations, then retry.",
+            "23514" =>
+                "Online ordering cannot be completed: the order could not be validated against the restaurant database. Try different items or ask the owner to check data settings.",
+            "23503" =>
+                "Online ordering cannot be completed: table or staff assignment in the restaurant configuration is invalid. A manager should verify the online orders table and assigned server, then retry.",
+            "23505" =>
+                "Could not place your order due to a duplicate reference. Please try again.",
+            "40001" or "40P01" =>
+                "The order could not be saved because the database was busy. Please try again.",
+            "08006" or "08003" or "57P01" =>
+                "The order could not be saved due to a database connection issue. Please try again in a moment.",
+            _ => null
+        };
+    }
+
+    private static PostgresException? FindPostgresException(Exception? ex)
+    {
+        if (ex is null)
+            return null;
+        if (ex is PostgresException pg)
+            return pg;
+        if (ex is AggregateException agg)
+        {
+            foreach (var inner in agg.Flatten().InnerExceptions)
+            {
+                var found = FindPostgresException(inner);
+                if (found is not null)
+                    return found;
+            }
+        }
+
+        return FindPostgresException(ex.InnerException);
+    }
+
+    private IActionResult HandlePublicMenuOrderSaveFailure(DbUpdateException ex, string endpoint)
+    {
+        var hint = TryTranslatePublicMenuOrderSaveFailure(ex);
+        if (hint is not null)
+            return BadRequest(new PublicMenuDraftErrorDto { Errors = new[] { hint } });
+
+        var pg = FindPostgresException(ex);
+        if (pg is not null)
+        {
+            Log.Warning(
+                ex,
+                "Public menu order save ({Endpoint}): unmapped Postgres SqlState={SqlState} Message={Message}",
+                endpoint,
+                pg.SqlState,
+                pg.MessageText);
+            return StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
+                new PublicMenuDraftErrorDto
+                {
+                    Errors = new[]
+                    {
+                        "We could not save your order right now because of a database error. Please try again shortly, or contact the restaurant if this keeps happening."
+                    }
+                });
+        }
+
+        Log.Error(ex, "Public menu order save ({Endpoint}): DbUpdateException without Postgres inner", endpoint);
+        return Problem(
+            statusCode: StatusCodes.Status500InternalServerError,
+            title: "Could not save order",
+            detail: "An unexpected error occurred while saving. Please try again.");
+    }
+
+    private static async Task TryNotifyCashierOrderBoardChangedAsync(
+        IHubContext<OrderHub> hubContext,
+        int orderId,
+        string reason)
+    {
+        try
+        {
+            var payload = new { reason, orderId };
+            await hubContext.Clients.Group("Cashier").SendAsync("CashierOrderBoardChanged", payload);
+            await hubContext.Clients.Group("Server").SendAsync("CashierOrderBoardChanged", payload);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "SignalR CashierOrderBoardChanged failed ({Reason}, order {OrderId})", reason, orderId);
+        }
+    }
 
     /// <summary>Guest-visible status for an order (kitchen / payment stage + fulfillment line for online).</summary>
     [HttpGet("orders/{orderCode}/status")]

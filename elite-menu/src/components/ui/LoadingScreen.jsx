@@ -9,6 +9,13 @@ export function LoadingScreen() {
         transition={{ repeat: Infinity, duration: 0.9, ease: 'linear' }}
       />
       <p className="mt-6 font-body text-sm text-[var(--text-muted)]">Preparing your experience…</p>
+      {import.meta.env.DEV ? (
+        <p className="mt-4 max-w-sm text-center font-body text-xs leading-relaxed text-champagne/40">
+          Dev: the menu calls the API via <span className="text-champagne/55">/api</span> →{' '}
+          <span className="text-champagne/55">localhost:8080</span>. If this stays here, start{' '}
+          <span className="text-champagne/55">EliteRestaurant.Api</span> (or wait for the request to time out).
+        </p>
+      ) : null}
     </div>
   )
 }

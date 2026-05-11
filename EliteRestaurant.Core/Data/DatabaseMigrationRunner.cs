@@ -49,6 +49,9 @@ public static class DatabaseMigrationRunner
                 AdvisoryLockKey2);
             database.Migrate();
             TabletSessionsSchemaRepair.EnsureTableExists(db);
+            Console.WriteLine(
+                "[EliteRestaurant] EF Core migrations applied (or already current). Database: "
+                + AppDbContext.GetDatabaseTargetDescription());
         }
         finally
         {

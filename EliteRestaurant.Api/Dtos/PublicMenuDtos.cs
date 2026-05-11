@@ -15,7 +15,12 @@ public sealed record PublicMenuConfigDto(
     string? WebsiteDomain,
     string? SocialMedia,
     string? TicketFooterText,
-    string? TaxIdLegalInfo);
+    string? TaxIdLegalInfo,
+    int? OnlineOrdersTableId,
+    string? OnlinePromoTitle,
+    string? OnlinePromoSubtitle,
+    string? OnlinePromoCtaLabel,
+    string? OnlinePromoImageUrl);
 
 public sealed record StaffLoginCodeRequest(string? Code, string? SignInId = null, string? Pin = null);
 

@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { BottomSheet } from '../ui/BottomSheet'
 import { ReservationOrderGatewayModal } from '../ui/ReservationOrderGatewayModal'
@@ -96,7 +96,7 @@ export function HeroScreen({ config, onEnterMenu, onOrderOnline, onReservation, 
       <div className="relative z-10 flex min-h-0 flex-1 flex-col px-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]">
         <motion.div
           className="flex flex-col items-center"
-          initial={{ opacity: 0, y: 24 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2, duration: 0.55 }}
         >
@@ -120,13 +120,13 @@ export function HeroScreen({ config, onEnterMenu, onOrderOnline, onReservation, 
 
         <motion.div
           className="mt-2 flex flex-col items-center"
-          initial={{ opacity: 0 }}
+          initial={false}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.45 }}
         >
           <motion.div
             className="w-full"
-            initial={{ scaleX: 0 }}
+            initial={false}
             animate={{ scaleX: 1 }}
             transition={{ delay: 0.45, duration: 0.45 }}
           >
@@ -141,7 +141,7 @@ export function HeroScreen({ config, onEnterMenu, onOrderOnline, onReservation, 
 
         <motion.div
           className="mb-4 flex w-full max-w-md flex-col items-stretch gap-3 self-center px-0 sm:max-w-lg"
-          initial={{ opacity: 0, y: 12 }}
+          initial={false}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.65, duration: 0.4 }}
         >

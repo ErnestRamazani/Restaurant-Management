@@ -182,7 +182,7 @@ export function ReservationScreen({ config }) {
             </p>
             <button
               type="button"
-              onClick={() => navigate('/', { state: { startOnlineOrder: true } })}
+              onClick={() => navigate('/order-online')}
               className="mt-3 min-h-[48px] w-full rounded-xl border border-amber-400/50 bg-amber-500/15 font-display text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-amber-50 transition hover:border-amber-300 hover:bg-amber-500/25"
             >
               Order online

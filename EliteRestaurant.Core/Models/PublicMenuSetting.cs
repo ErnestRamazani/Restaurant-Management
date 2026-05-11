@@ -20,5 +20,10 @@ public sealed class PublicMenuSetting
     public string RoundingGrandTotal { get; set; } = "Nearest";
     public decimal TaxPercent { get; set; } = 7m;
     public decimal ServicePercent { get; set; } = 10m;
+    /// <summary>Optional: POS table id for guest online orders (must have assigned server in ops).</summary>
+    public int? OnlineOrdersTableId { get; set; }
+    public string? OnlinePromoTitle { get; set; }
+    public string? OnlinePromoSubtitle { get; set; }
+    public string? OnlinePromoCtaLabel { get; set; }
     public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
 }

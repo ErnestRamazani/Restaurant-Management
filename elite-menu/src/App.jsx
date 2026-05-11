@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { ChefHat, CreditCard, LayoutDashboard, Map, MonitorCog, Utensils } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { useCart } from './hooks/useCart'
 import { useMenu } from './hooks/useMenu'
 import { useTable } from './hooks/useTable'
@@ -10,6 +10,7 @@ import { ConfirmScreen } from './components/screens/ConfirmScreen'
 import { HeroScreen } from './components/screens/HeroScreen'
 import { MenuScreen } from './components/screens/MenuScreen'
 import { ProductSheet } from './components/screens/ProductSheet'
+import { OnlineOrderApp } from './components/online/OnlineOrderApp'
 import { ReservationFloorScreen } from './components/screens/ReservationFloorScreen'
 import { ReservationScreen } from './components/screens/ReservationScreen'
 import { ConfirmDialog } from './components/ui/ConfirmDialog'
@@ -155,7 +156,6 @@ function ReservationPage() {
 
 function CustomerMenuApp() {
   const navigate = useNavigate()
-  const location = useLocation()
   const { tableId: tableIdFromUrl, hadInvalidTableParam } = useTable()
   const { config, products, loading, error, refetch } = useMenu()
   const cart = useCart(config)
@@ -168,7 +168,6 @@ function CustomerMenuApp() {
   const [staffTabletPin, setStaffTabletPin] = useState('')
   const [staffLoginError, setStaffLoginError] = useState('')
   const [staffLoginBusy, setStaffLoginBusy] = useState(false)
-  const [guestOrderMode, setGuestOrderMode] = useState(/** @type {'browse' | 'online'} */ ('browse'))
   const [orderRef, setOrderRef] = useState(
     /** @type {{ label: string; message: string; estimatedPrepMinutes: number | null }} */ ({
       label: '',
@@ -187,13 +186,6 @@ function CustomerMenuApp() {
   }, [loading, error])
 
   const goMenuBrowse = useCallback(() => {
-    setGuestOrderMode('browse')
-    setScreen('menu')
-    history.pushState({ [H]: 'menu' }, '', window.location.href)
-  }, [])
-
-  const goMenuOnline = useCallback(() => {
-    setGuestOrderMode('online')
     setScreen('menu')
     history.pushState({ [H]: 'menu' }, '', window.location.href)
   }, [])
@@ -294,21 +286,6 @@ function CustomerMenuApp() {
     return () => window.removeEventListener('popstate', onPop)
   }, [loading, error])
 
-  useEffect(() => {
-    if (screen === 'hero') setGuestOrderMode('browse')
-  }, [screen])
-
-  useEffect(() => {
-    if (loading || error) return
-    const st = location.state
-    if (!st || typeof st !== 'object') return
-    if (!('startOnlineOrder' in st) || !/** @type {any} */ (st).startOnlineOrder) return
-    setGuestOrderMode('online')
-    setScreen('menu')
-    history.replaceState({ [H]: 'menu' }, '', window.location.href)
-    navigate(location.pathname, { replace: true, state: {} })
-  }, [loading, error, location.state, location.pathname, navigate])
-
   if (loading) {
     return <LoadingScreen />
   }
@@ -324,7 +301,7 @@ function CustomerMenuApp() {
             <motion.div
               key="hero"
               className="min-h-[100svh]"
-              initial={{ opacity: 0 }}
+              initial={false}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={spring}
@@ -332,7 +309,7 @@ function CustomerMenuApp() {
               <HeroScreen
                 config={config}
                 onEnterMenu={goMenuBrowse}
-                onOrderOnline={goMenuOnline}
+                onOrderOnline={() => navigate('/order-online')}
                 onReservation={() => navigate('/reservation')}
                 onStaffLogin={() => setStaffLoginOpen(true)}
               />
@@ -343,7 +320,7 @@ function CustomerMenuApp() {
             <motion.div
               key="menu"
               className="min-h-[100svh]"
-              initial={{ opacity: 0, x: 32 }}
+              initial={false}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -32 }}
               transition={spring}
@@ -351,7 +328,7 @@ function CustomerMenuApp() {
               <MenuScreen
                 config={config}
                 products={products}
-                guestOrderMode={guestOrderMode}
+                guestOrderMode="browse"
                 onBack={onMenuBack}
                 onOpenProduct={setSheetProduct}
                 cart={cart}
@@ -364,7 +341,7 @@ function CustomerMenuApp() {
             <CartScreen
               key="cart"
               cart={cart}
-              guestOrderMode={guestOrderMode}
+              guestOrderMode="browse"
               tableIdFromUrl={tableIdFromUrl}
               hadInvalidTableParam={hadInvalidTableParam}
               manualTableId={manualTableId}
@@ -509,6 +486,7 @@ export default function App() {
         <Route path="/" element={<CustomerMenuApp />} />
         <Route path="/menu/*" element={<CustomerMenuApp />} />
         <Route path="/order/*" element={<CustomerMenuApp />} />
+        <Route path="/order-online" element={<OnlineOrderApp />} />
         <Route path="/staff" element={<HubHome />} />
         <Route path="/staff/server" element={<PortalRedirect path="/server/index.html" />} />
         <Route path="/staff/cashier" element={<PortalRedirect path="/cashier/index.html" />} />

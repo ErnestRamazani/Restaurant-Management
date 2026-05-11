@@ -11,9 +11,11 @@ public sealed class AdminSettingsApiClient(EliteApiClient? apiClient = null)
     public async Task PushSettingsAsync(
         AppSettings settings,
         bool applyLogoChanges = false,
+        bool applyOnlinePromoImageChanges = false,
         CancellationToken cancellationToken = default)
     {
         var logo = ReadLogo(settings.BusinessProfile.LogoPath);
+        var promo = ReadOnlinePromo(settings.BusinessProfile.OnlinePromoImagePath);
         var menuBaseUrl = CloudEndpoints.NormalizeApiBaseUrl(
             string.IsNullOrWhiteSpace(settings.BusinessProfile.PublicMenuBaseUrl?.Trim())
                 ? settings.CloudApi.BaseUrl
@@ -40,7 +42,15 @@ public sealed class AdminSettingsApiClient(EliteApiClient? apiClient = null)
             logo.ContentType,
             logo.Base64,
             applyLogoChanges,
-            menuBaseUrl);
+            menuBaseUrl,
+            settings.BusinessProfile.OnlineOrdersTableId,
+            settings.BusinessProfile.OnlinePromoTitle,
+            settings.BusinessProfile.OnlinePromoSubtitle,
+            settings.BusinessProfile.OnlinePromoCtaLabel,
+            promo.FileName,
+            promo.ContentType,
+            promo.Base64,
+            applyOnlinePromoImageChanges);
 
         await _apiClient.PostAsync<AdminCloudSettingsRequest, AdminCloudSettingsResponse>(
             "api/admin/settings/cloud-profile",
@@ -68,4 +78,7 @@ public sealed class AdminSettingsApiClient(EliteApiClient? apiClient = null)
 
         return (Path.GetFileName(path), contentType, Convert.ToBase64String(bytes));
     }
+
+    private static (string? FileName, string? ContentType, string? Base64) ReadOnlinePromo(string? path)
+        => ReadLogo(path);
 }

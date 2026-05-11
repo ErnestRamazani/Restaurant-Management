@@ -77,6 +77,15 @@ public sealed class BusinessProfileSettings
     public string HomepageBackgroundImagePath { get; set; } = string.Empty;
     public string TicketFooterText { get; set; } = "MERCI / THANK YOU";
     public string TaxIdLegalInfo { get; set; } = string.Empty;
+
+    /// <summary>Hero card on public online order PWA (synced to cloud).</summary>
+    public string? OnlinePromoTitle { get; set; }
+    public string? OnlinePromoSubtitle { get; set; }
+    public string? OnlinePromoCtaLabel { get; set; }
+    /// <summary>Local image path; pushed to public menu assets as <c>online-promo</c>.</summary>
+    public string OnlinePromoImagePath { get; set; } = string.Empty;
+    /// <summary>Optional table id for routing guest online orders in the POS (matches <see cref="PublicMenuSetting.OnlineOrdersTableId"/>).</summary>
+    public int? OnlineOrdersTableId { get; set; }
 }
 
 public sealed class CurrencyPricingSettings

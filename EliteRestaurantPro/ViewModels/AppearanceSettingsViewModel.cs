@@ -64,6 +64,11 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     private string _publicMenuBaseUrl = CloudEndpoints.ProductionApiBaseUrl;
     private string _customerMenuTagline = string.Empty;
     private string _staffLoginPasscode = "er4124";
+    private string _onlinePromoTitle = string.Empty;
+    private string _onlinePromoSubtitle = string.Empty;
+    private string _onlinePromoCtaLabel = string.Empty;
+    private string _onlinePromoImagePath = string.Empty;
+    private string _onlineOrdersTableId = string.Empty;
 
     public override string ActivePage => "AppearanceSettings";
 
@@ -274,6 +279,37 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         set => SetField(ref _staffLoginPasscode, value);
     }
 
+    public string OnlinePromoTitle
+    {
+        get => _onlinePromoTitle;
+        set => SetField(ref _onlinePromoTitle, value);
+    }
+
+    public string OnlinePromoSubtitle
+    {
+        get => _onlinePromoSubtitle;
+        set => SetField(ref _onlinePromoSubtitle, value);
+    }
+
+    public string OnlinePromoCtaLabel
+    {
+        get => _onlinePromoCtaLabel;
+        set => SetField(ref _onlinePromoCtaLabel, value);
+    }
+
+    public string OnlinePromoImagePath
+    {
+        get => _onlinePromoImagePath;
+        set => SetField(ref _onlinePromoImagePath, value);
+    }
+
+    /// <summary>Optional POS table id for routing public online orders.</summary>
+    public string OnlineOrdersTableId
+    {
+        get => _onlineOrdersTableId;
+        set => SetField(ref _onlineOrdersTableId, value);
+    }
+
     public ObservableCollection<MenuQrTableRow> MenuQrRows { get; } = new();
 
     public string DefaultCurrencyDisplayMode
@@ -437,6 +473,8 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     public ICommand SaveBusinessProfileCommand { get; }
     public ICommand SaveCurrencyPricingCommand { get; }
     public ICommand BrowseLogoCommand { get; }
+    public ICommand BrowseOnlinePromoImageCommand { get; }
+    public ICommand ClearOnlinePromoImageCommand { get; }
     public ICommand BrowseHomepageBackgroundCommand { get; }
     public ICommand BrowseMenuBackgroundCommand { get; }
     public ICommand SaveMenuBackgroundCommand { get; }
@@ -457,6 +495,8 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         SaveBusinessProfileCommand = new RelayCommand(_ => SaveBusinessProfile());
         SaveCurrencyPricingCommand = new RelayCommand(_ => SaveCurrencyPricing());
         BrowseLogoCommand = new RelayCommand(_ => BrowseLogo());
+        BrowseOnlinePromoImageCommand = new RelayCommand(_ => BrowseOnlinePromoImage());
+        ClearOnlinePromoImageCommand = new RelayCommand(_ => OnlinePromoImagePath = string.Empty);
         BrowseHomepageBackgroundCommand = new RelayCommand(_ => BrowseHomepageBackground());
         BrowseMenuBackgroundCommand = new RelayCommand(_ => BrowseMenuBackground());
         SaveMenuBackgroundCommand = new RelayCommand(_ => SaveMenuBackground());
@@ -634,6 +674,11 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         StaffLoginPasscode = string.IsNullOrWhiteSpace(business.StaffLoginPasscode)
             ? "er4124"
             : business.StaffLoginPasscode.Trim();
+        OnlinePromoTitle = business.OnlinePromoTitle ?? string.Empty;
+        OnlinePromoSubtitle = business.OnlinePromoSubtitle ?? string.Empty;
+        OnlinePromoCtaLabel = business.OnlinePromoCtaLabel ?? string.Empty;
+        OnlinePromoImagePath = business.OnlinePromoImagePath ?? string.Empty;
+        OnlineOrdersTableId = business.OnlineOrdersTableId?.ToString() ?? string.Empty;
 
         var pricing = _settings.CurrencyPricing;
         DefaultCurrencyDisplayMode = pricing.DefaultCurrencyDisplayMode;
@@ -667,12 +712,26 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         _settings.BusinessProfile.StaffLoginPasscode = string.IsNullOrWhiteSpace(StaffLoginPasscode)
             ? "er4124"
             : StaffLoginPasscode.Trim();
+        _settings.BusinessProfile.OnlinePromoTitle = string.IsNullOrWhiteSpace(OnlinePromoTitle)
+            ? null
+            : OnlinePromoTitle.Trim();
+        _settings.BusinessProfile.OnlinePromoSubtitle = string.IsNullOrWhiteSpace(OnlinePromoSubtitle)
+            ? null
+            : OnlinePromoSubtitle.Trim();
+        _settings.BusinessProfile.OnlinePromoCtaLabel = string.IsNullOrWhiteSpace(OnlinePromoCtaLabel)
+            ? null
+            : OnlinePromoCtaLabel.Trim();
+        _settings.BusinessProfile.OnlinePromoImagePath = (OnlinePromoImagePath ?? string.Empty).Trim();
+        if (int.TryParse((OnlineOrdersTableId ?? string.Empty).Trim(), out var onlineTid) && onlineTid > 0)
+            _settings.BusinessProfile.OnlineOrdersTableId = onlineTid;
+        else
+            _settings.BusinessProfile.OnlineOrdersTableId = null;
 
         _settings.CloudApi.BaseUrl = CloudEndpoints.NormalizeApiBaseUrl(_settings.BusinessProfile.PublicMenuBaseUrl);
 
         SettingsManager.Save(_settings);
         _adminData.ReloadFromSettings();
-        _ = new AdminSettingsApiClient().PushSettingsAsync(_settings, applyLogoChanges: true);
+        _ = new AdminSettingsApiClient().PushSettingsAsync(_settings, applyLogoChanges: true, applyOnlinePromoImageChanges: true);
         RefreshBusinessProfileBindings();
         var msg = "Business profile saved.";
         if (PublicMenuUrlHelper.LooksLikeLocalHostOnly(_settings.BusinessProfile.PublicMenuBaseUrl))
@@ -713,7 +772,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
 
         SettingsManager.Save(_settings);
         _adminData.ReloadFromSettings();
-        _ = new AdminSettingsApiClient().PushSettingsAsync(_settings, applyLogoChanges: false);
+        _ = new AdminSettingsApiClient().PushSettingsAsync(_settings, applyLogoChanges: false, applyOnlinePromoImageChanges: false);
         StatusMessage = "Currency & pricing settings saved.";
     }
 
@@ -737,6 +796,18 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
 
         if (dialog.ShowDialog() == true)
             RestaurantLogoPath = dialog.FileName;
+    }
+
+    private void BrowseOnlinePromoImage()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Online order hero image (public menu)",
+            Filter = "Image files (*.png;*.jpg;*.jpeg;*.webp)|*.png;*.jpg;*.jpeg;*.webp|All files (*.*)|*.*"
+        };
+
+        if (dialog.ShowDialog() == true)
+            OnlinePromoImagePath = dialog.FileName;
     }
 
     private void BrowseHomepageBackground()

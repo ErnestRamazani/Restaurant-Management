@@ -158,9 +158,12 @@
       cursor: pointer;
       transition: background 0.12s, box-shadow 0.15s;
     }
-    /* KDS origin: colored ring — online (pickup/delivery) vs in-store plating */
-    .ticket-origin-online {
+    /* KDS origin: colored ring — online delivery vs online pickup vs in-store plating */
+    .ticket-origin-online-delivery {
       box-shadow: inset 0 0 0 3px rgba(249, 115, 22, 0.95), 0 4px 18px rgba(249, 115, 22, 0.12);
+    }
+    .ticket-origin-online-pickup {
+      box-shadow: inset 0 0 0 3px rgba(52, 211, 153, 0.9), 0 4px 18px rgba(52, 211, 153, 0.1);
     }
     .ticket-origin-instore {
       box-shadow: inset 0 0 0 3px rgba(56, 189, 248, 0.92), 0 4px 18px rgba(56, 189, 248, 0.08);
@@ -189,11 +192,17 @@
       line-height: 1;
       white-space: nowrap;
     }
-    .kds-origin-badge--online {
-      background: rgba(249, 115, 22, 0.18);
-      color: #fdba74;
+    .kds-origin-badge--online-delivery {
+      background: rgba(249, 115, 22, 0.2);
+      color: #fed7aa;
       border: 1px solid rgba(249, 115, 22, 0.55);
-      box-shadow: 0 0 22px rgba(249, 115, 22, 0.2);
+      box-shadow: 0 0 22px rgba(249, 115, 22, 0.22);
+    }
+    .kds-origin-badge--online-pickup {
+      background: rgba(52, 211, 153, 0.14);
+      color: #a7f3d0;
+      border: 1px solid rgba(52, 211, 153, 0.45);
+      box-shadow: 0 0 20px rgba(52, 211, 153, 0.15);
     }
     .kds-origin-badge--instore {
       background: rgba(56, 189, 248, 0.12);
@@ -1032,12 +1041,16 @@
       if (!k || k === "walkin") return { ring: "instore", headline: "PLATED", kind: "dinein" };
       if (k === "reservation") return { ring: "instore", headline: "PLATED", kind: "dinein" };
       if (k === "delivery") return { ring: "online", headline: "DELIVERY", kind: "delivery" };
-      if (k === "pickup" || k === "takeout" || k === "togo") return { ring: "online", headline: "TO GO", kind: "pickup" };
+      if (k === "pickup" || k === "takeout" || k === "togo" || k === "onlinepickup")
+        return { ring: "online", headline: "TO GO", kind: "pickup" };
       return { ring: "instore", headline: "PLATED", kind: "dinein" };
     }
 
     const hit = fromOriginToken(rawOt) || fromOrderSource(o.orderSource ?? o.OrderSource);
-    const ringClass = hit.ring === "online" ? "ticket-origin-online" : "ticket-origin-instore";
+    let ringClass = "ticket-origin-instore";
+    if (hit.ring === "online") {
+      ringClass = hit.kind === "delivery" ? "ticket-origin-online-delivery" : "ticket-origin-online-pickup";
+    }
 
     const iconDelivery =
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 18V6a2 2 0 0 0-2-2H4v14"/><path d="M14 18h8l4-6V8h-9"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/><path d="M2 18h3"/></svg>';
@@ -1057,11 +1070,16 @@
         ? hit.headline + " · OriginType " + otHuman + " · OrderSource " + osHuman
         : hit.headline + " · OrderSource " + osHuman;
 
+    let badgeMod = "kds-origin-badge--instore";
+    if (hit.ring === "online") {
+      badgeMod = hit.kind === "delivery" ? "kds-origin-badge--online-delivery" : "kds-origin-badge--online-pickup";
+    }
+
     return {
       ringClass,
       headline: hit.headline,
       detailLabel,
-      badgeMod: hit.ring === "online" ? "kds-origin-badge--online" : "kds-origin-badge--instore",
+      badgeMod,
       iconSvg,
     };
   }

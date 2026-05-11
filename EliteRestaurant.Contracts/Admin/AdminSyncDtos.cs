@@ -59,6 +59,14 @@ public sealed record AdminCloudSettingsRequest(
     string? LogoContentType,
     string? LogoBase64,
     bool ApplyLogoChanges = false,
-    string? PublicMenuBaseUrl = null);
+    string? PublicMenuBaseUrl = null,
+    int? OnlineOrdersTableId = null,
+    string? OnlinePromoTitle = null,
+    string? OnlinePromoSubtitle = null,
+    string? OnlinePromoCtaLabel = null,
+    string? OnlinePromoImageFileName = null,
+    string? OnlinePromoImageContentType = null,
+    string? OnlinePromoImageBase64 = null,
+    bool ApplyOnlinePromoImageChanges = false);
 
 public sealed record AdminCloudSettingsResponse(bool Success, string? LogoUrl, string Message);
