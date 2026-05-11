@@ -1,7 +1,6 @@
 ﻿import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { BottomSheet } from '../ui/BottomSheet'
-import { ReservationOrderGatewayModal } from '../ui/ReservationOrderGatewayModal'
 import { GoldDivider } from '../ui/GoldDivider'
 import { resolveApiAssetUrl } from '../../utils/apiClient'
 
@@ -68,9 +67,8 @@ function formatWebsiteHref(raw) {
   return `https://${s}`
 }
 
-export function HeroScreen({ config, onEnterMenu, onReservation, onStaffLogin }) {
+export function HeroScreen({ config, onEnterMenu, onOrderOnline, onReservation, onStaffLogin }) {
   const [info, setInfo] = useState(/** @type {null | 'about' | 'contact' | 'notes'} */ (null))
-  const [gatewayOpen, setGatewayOpen] = useState(false)
 
   const tagline =
     config?.tagline && String(config.tagline).trim()
@@ -140,23 +138,41 @@ export function HeroScreen({ config, onEnterMenu, onReservation, onStaffLogin })
         <div className="min-h-[5rem] flex-1" aria-hidden />
 
         <motion.div
-          className="mb-4 flex flex-col items-center"
+          className="mb-4 flex w-full max-w-[min(100%,22rem)] flex-col items-stretch gap-3 sm:max-w-xl"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.65, duration: 0.4 }}
         >
           <button
             type="button"
-            onClick={() => setGatewayOpen(true)}
-            className="relative min-h-[56px] min-w-[min(100%,15rem)] max-w-[calc(100vw-3rem)] border border-gold/50 bg-gold/5 px-6 py-3.5 font-display text-[clamp(0.72rem,3.2vw,0.95rem)] font-semibold uppercase tracking-[0.14em] text-gold shadow-[0_6px_28px_rgba(200,168,76,0.12)] transition-colors hover:border-gold hover:bg-[var(--gold-dim)] active:scale-[0.98] sm:min-w-[15rem] sm:px-12 sm:tracking-[0.22em]"
+            onClick={onEnterMenu}
+            className="relative min-h-[56px] w-full border border-gold/50 bg-gold/5 px-6 py-3.5 font-display text-[clamp(0.72rem,3.2vw,0.95rem)] font-semibold uppercase tracking-[0.14em] text-gold shadow-[0_6px_28px_rgba(200,168,76,0.12)] transition-colors hover:border-gold hover:bg-[var(--gold-dim)] active:scale-[0.98] sm:tracking-[0.18em]"
             style={{ fontFamily: '"Cinzel", "Playfair Display", serif' }}
           >
             <span className="pointer-events-none absolute left-[-3px] top-[-3px] h-3 w-3 border-l border-t border-gold/70" />
             <span className="pointer-events-none absolute right-[-3px] top-[-3px] h-3 w-3 border-r border-t border-gold/70" />
             <span className="pointer-events-none absolute bottom-[-3px] left-[-3px] h-3 w-3 border-b border-l border-gold/70" />
             <span className="pointer-events-none absolute bottom-[-3px] right-[-3px] h-3 w-3 border-b border-r border-gold/70" />
-            [Reservation / Order]
+            Explore our menu
           </button>
+          <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
+            <button
+              type="button"
+              onClick={onOrderOnline}
+              className="min-h-[52px] flex-1 rounded-2xl border border-amber-400/55 bg-amber-500/10 px-5 py-3 font-display text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-amber-100/95 shadow-[0_4px_20px_rgba(251,191,36,0.08)] transition hover:border-amber-300 hover:bg-amber-500/15 active:scale-[0.98] sm:text-[0.7rem]"
+              style={{ fontFamily: '"Cinzel", "Playfair Display", serif' }}
+            >
+              Order online
+            </button>
+            <button
+              type="button"
+              onClick={onReservation}
+              className="min-h-[52px] flex-1 rounded-2xl border border-champagne/25 bg-champagne/5 px-5 py-3 font-display text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-champagne/90 transition hover:border-gold/40 hover:text-gold active:scale-[0.98] sm:text-[0.7rem]"
+              style={{ fontFamily: '"Cinzel", "Playfair Display", serif' }}
+            >
+              Reserve a table
+            </button>
+          </div>
         </motion.div>
 
         <div className="relative z-20 mt-12 pt-6 sm:mt-14 sm:pt-8">
@@ -188,13 +204,6 @@ export function HeroScreen({ config, onEnterMenu, onReservation, onStaffLogin })
           </div>
         </div>
       </div>
-
-      <ReservationOrderGatewayModal
-        open={gatewayOpen}
-        onClose={() => setGatewayOpen(false)}
-        onBookTable={onReservation}
-        onOrderOnline={onEnterMenu}
-      />
 
       <BottomSheet open={info !== null} onClose={() => setInfo(null)}>
         <div className="px-5 pb-6 pt-1">

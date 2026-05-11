@@ -13,6 +13,7 @@ import { QuantityControl } from '../ui/QuantityControl'
 
 export function CartScreen({
   cart,
+  guestOrderMode = 'browse',
   tableIdFromUrl,
   hadInvalidTableParam = false,
   manualTableId,
@@ -127,9 +128,23 @@ export function CartScreen({
         >
           ←
         </button>
-        <h2 className="flex-1 text-center font-display text-lg font-semibold text-champagne">Your Order</h2>
+        <h2 className="flex-1 text-center font-display text-lg font-semibold text-champagne">
+          {guestOrderMode === 'online' ? 'Your online order' : 'Your order'}
+        </h2>
         <div className="w-11" aria-hidden />
       </header>
+
+      {guestOrderMode === 'online' ? (
+        <div className="mx-4 mt-3 rounded-xl border border-amber-400/35 bg-amber-500/10 px-3 py-2.5">
+          <p className="font-body text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-amber-100/90">
+            Pickup or delivery
+          </p>
+          <p className="mt-1 font-body text-[0.72rem] leading-snug text-amber-50/90">
+            Select the table or takeout code your cashier gave you, then send the order. Staff will confirm payment and
+            packaging.
+          </p>
+        </div>
+      ) : null}
 
       <div className="border border-gold/25 bg-[var(--gold-dim)] mx-4 mt-3 flex flex-col gap-2 rounded-[10px] px-3 py-2.5">
         <p className="font-body text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-gold/90">

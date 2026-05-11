@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { ChefHat, CreditCard, LayoutDashboard, Map, MonitorCog, Utensils } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { BrowserRouter, Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { useCart } from './hooks/useCart'
 import { useMenu } from './hooks/useMenu'
 import { useTable } from './hooks/useTable'
@@ -15,7 +15,6 @@ import { ReservationScreen } from './components/screens/ReservationScreen'
 import { ConfirmDialog } from './components/ui/ConfirmDialog'
 import { ErrorScreen } from './components/ui/ErrorScreen'
 import { LoadingScreen } from './components/ui/LoadingScreen'
-import { ReservationOrderGatewayModal } from './components/ui/ReservationOrderGatewayModal'
 import { validateStaffLoginCode } from './utils/api'
 import { API_ORIGIN, pingApi } from './utils/apiClient'
 import { canAccessReservationFloorFromStoredToken } from './utils/staffAuth'
@@ -156,6 +155,7 @@ function ReservationPage() {
 
 function CustomerMenuApp() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { tableId: tableIdFromUrl, hadInvalidTableParam } = useTable()
   const { config, products, loading, error, refetch } = useMenu()
   const cart = useCart(config)
@@ -168,7 +168,7 @@ function CustomerMenuApp() {
   const [staffTabletPin, setStaffTabletPin] = useState('')
   const [staffLoginError, setStaffLoginError] = useState('')
   const [staffLoginBusy, setStaffLoginBusy] = useState(false)
-  const [guestGatewayOpen, setGuestGatewayOpen] = useState(false)
+  const [guestOrderMode, setGuestOrderMode] = useState(/** @type {'browse' | 'online'} */ ('browse'))
   const [orderRef, setOrderRef] = useState(
     /** @type {{ label: string; message: string; estimatedPrepMinutes: number | null }} */ ({
       label: '',
@@ -186,7 +186,14 @@ function CustomerMenuApp() {
     history.replaceState({ [H]: 'hero' }, '', window.location.href)
   }, [loading, error])
 
-  const goMenu = useCallback(() => {
+  const goMenuBrowse = useCallback(() => {
+    setGuestOrderMode('browse')
+    setScreen('menu')
+    history.pushState({ [H]: 'menu' }, '', window.location.href)
+  }, [])
+
+  const goMenuOnline = useCallback(() => {
+    setGuestOrderMode('online')
     setScreen('menu')
     history.pushState({ [H]: 'menu' }, '', window.location.href)
   }, [])
@@ -287,6 +294,21 @@ function CustomerMenuApp() {
     return () => window.removeEventListener('popstate', onPop)
   }, [loading, error])
 
+  useEffect(() => {
+    if (screen === 'hero') setGuestOrderMode('browse')
+  }, [screen])
+
+  useEffect(() => {
+    if (loading || error) return
+    const st = location.state
+    if (!st || typeof st !== 'object') return
+    if (!('startOnlineOrder' in st) || !/** @type {any} */ (st).startOnlineOrder) return
+    setGuestOrderMode('online')
+    setScreen('menu')
+    history.replaceState({ [H]: 'menu' }, '', window.location.href)
+    navigate(location.pathname, { replace: true, state: {} })
+  }, [loading, error, location.state, location.pathname, navigate])
+
   if (loading) {
     return <LoadingScreen />
   }
@@ -309,7 +331,8 @@ function CustomerMenuApp() {
             >
               <HeroScreen
                 config={config}
-                onEnterMenu={() => setGuestGatewayOpen(true)}
+                onEnterMenu={goMenuBrowse}
+                onOrderOnline={goMenuOnline}
                 onReservation={() => navigate('/reservation')}
                 onStaffLogin={() => setStaffLoginOpen(true)}
               />
@@ -328,6 +351,7 @@ function CustomerMenuApp() {
               <MenuScreen
                 config={config}
                 products={products}
+                guestOrderMode={guestOrderMode}
                 onBack={onMenuBack}
                 onOpenProduct={setSheetProduct}
                 cart={cart}
@@ -340,6 +364,7 @@ function CustomerMenuApp() {
             <CartScreen
               key="cart"
               cart={cart}
+              guestOrderMode={guestOrderMode}
               tableIdFromUrl={tableIdFromUrl}
               hadInvalidTableParam={hadInvalidTableParam}
               manualTableId={manualTableId}
@@ -367,13 +392,6 @@ function CustomerMenuApp() {
         open={sheetProduct != null}
         onClose={closeProductSheet}
         cart={cart}
-      />
-
-      <ReservationOrderGatewayModal
-        open={guestGatewayOpen}
-        onClose={() => setGuestGatewayOpen(false)}
-        onBookTable={() => navigate('/reservation')}
-        onOrderOnline={goMenu}
       />
 
       <ConfirmDialog

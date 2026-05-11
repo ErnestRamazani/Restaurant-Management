@@ -46,7 +46,7 @@ function subcategoryOptionsForSection(inSection) {
   return ['All', ...rest]
 }
 
-export function MenuScreen({ config, products, onBack, onOpenProduct, cart, onViewCart }) {
+export function MenuScreen({ config, products, guestOrderMode = 'browse', onBack, onOpenProduct, cart, onViewCart }) {
   const [section, setSection] = useState(/** @type {'food' | 'drink'} */ ('food'))
   /** @type 'All' | 'Starters' | 'Main' | 'Dessert' */
   const [course, setCourse] = useState('All')
@@ -117,7 +117,8 @@ export function MenuScreen({ config, products, onBack, onOpenProduct, cart, onVi
           'radial-gradient(ellipse 80% 60% at 50% 20%, #1c2732 0%, #0f1923 55%, #080e13 100%)',
       }}
     >
-      <header className="flex h-14 shrink-0 items-center border-b border-champagne/10 bg-midnight-2 px-2">
+      <header className="flex h-14 shrink-0 flex-col border-b border-champagne/10 bg-midnight-2">
+        <div className="flex h-14 items-center px-2">
         <button
           type="button"
           onClick={onBack}
@@ -130,6 +131,12 @@ export function MenuScreen({ config, products, onBack, onOpenProduct, cart, onVi
           {restaurantTitle}
         </h2>
         <div className="w-11" />
+        </div>
+        {guestOrderMode === 'online' ? (
+          <p className="border-t border-amber-500/20 bg-amber-500/10 px-3 py-2 text-center font-body text-[0.62rem] font-semibold uppercase leading-snug tracking-[0.14em] text-amber-100/95">
+            Online order — pickup or delivery. Your cart is for off‑premise service.
+          </p>
+        ) : null}
       </header>
 
       <div className="shrink-0 border-b border-champagne/10 bg-midnight-2 px-4 pb-3 pt-2">

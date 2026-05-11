@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useCallback, useEffect, useState } from 'react'
 import { GoldDivider } from '../ui/GoldDivider'
 import { publicAvailability, publicBookFloor, publicSuggestPlacements } from '../../utils/reservationApi'
@@ -18,6 +18,7 @@ function addMinutesIso(iso, minutes) {
 }
 
 export function ReservationScreen({ config }) {
+  const navigate = useNavigate()
   const name = config?.restaurantName ? String(config.restaurantName) : 'Elite Restaurant'
   const phone = config ? String(config.phone ?? config.Phone ?? '').trim() : ''
   const address = config ? String(config.address ?? config.Address ?? '').trim() : ''
@@ -171,6 +172,22 @@ export function ReservationScreen({ config }) {
           <p className="font-body text-[0.95rem] leading-relaxed text-champagne/80">
             Book online for {name}, or reach us by phone.
           </p>
+
+          <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/[0.07] p-4">
+            <p className="font-body text-[0.65rem] font-bold uppercase tracking-[0.2em] text-amber-200/90">
+              Order food instead
+            </p>
+            <p className="mt-2 font-body text-[0.82rem] leading-relaxed text-champagne/75">
+              Pickup or delivery — browse the menu and send an order without reserving a table.
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate('/', { state: { startOnlineOrder: true } })}
+              className="mt-3 min-h-[48px] w-full rounded-xl border border-amber-400/50 bg-amber-500/15 font-display text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-amber-50 transition hover:border-amber-300 hover:bg-amber-500/25"
+            >
+              Order online
+            </button>
+          </div>
 
           <div className="mt-6 space-y-4 rounded-2xl border border-champagne/10 bg-black/15 p-4">
             <p className="font-body text-[0.65rem] font-bold uppercase tracking-[0.2em] text-gold/70">Online booking</p>
