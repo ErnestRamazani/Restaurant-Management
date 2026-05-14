@@ -19,6 +19,7 @@ using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Orders;
 using EliteRestaurant.Core.Staff;
+using EliteRestaurant.Core.Menu;
 using EliteRestaurant.Core.Utils;
 
 namespace EliteRestaurant.Api.Controllers;
@@ -93,6 +94,8 @@ public sealed class PublicMenuController(
             ? "/api/public/menu/assets/online-promo"
             : null;
         var onlineTableId = cloudSettings?.OnlineOrdersTableId;
+        var reservationLeadDays = Math.Clamp(SettingsManager.Load().BusinessProfile.ReservationLeadDays, 0, 30);
+        var reservationMaxMonthsAhead = Math.Clamp(SettingsManager.Load().BusinessProfile.ReservationMaxMonthsAhead, 1, 24);
         var promoTitle = string.IsNullOrWhiteSpace(cloudSettings?.OnlinePromoTitle)
             ? null
             : cloudSettings!.OnlinePromoTitle.Trim();
@@ -102,6 +105,9 @@ public sealed class PublicMenuController(
         var promoCta = string.IsNullOrWhiteSpace(cloudSettings?.OnlinePromoCtaLabel)
             ? null
             : cloudSettings!.OnlinePromoCtaLabel.Trim();
+        var menuTaxonomyJson = !string.IsNullOrWhiteSpace(cloudSettings?.MenuTaxonomyJson)
+            ? cloudSettings!.MenuTaxonomyJson!.Trim()
+            : MenuTaxonomyHelper.Serialize(MenuTaxonomyHelper.Resolve(all.MenuTaxonomy));
         // Logo URL is always this endpoint; the handler prefers cloud DB blob, then on-disk repo assets/images/logo,
         // then legacy LogoPath.
         return Ok(new PublicMenuConfigDto(
@@ -119,10 +125,13 @@ public sealed class PublicMenuController(
             ticketFooter,
             taxId,
             onlineTableId,
+            reservationLeadDays,
+            reservationMaxMonthsAhead,
             promoTitle,
             promoSubtitle,
             promoCta,
-            onlinePromoUrl));
+            onlinePromoUrl,
+            menuTaxonomyJson));
     }
 
 
@@ -211,6 +220,7 @@ public sealed class PublicMenuController(
 
     [HttpGet("products")]
     [EnableRateLimiting("PublicMenuRead")]
+    [ResponseCache(Location = ResponseCacheLocation.None, NoStore = true)]
     [ProducesResponseType(typeof(IReadOnlyList<PublicProductDto>), 200)]
     public ActionResult<IReadOnlyList<PublicProductDto>> GetProducts()
     {
@@ -764,7 +774,7 @@ public sealed class PublicMenuController(
                 Errors = new[]
                 {
                     tableResolution.ErrorMessage
-                        ?? "Online ordering is not available: configure an online orders table with an assigned server, or add a table with a server in the back office."
+                        ?? "Online ordering is not available: configure an online orders table in Appearance settings, or add at least one non-maintenance table."
                 }
             });
         }
@@ -811,8 +821,8 @@ public sealed class PublicMenuController(
             TableId = orderTable.Id,
             TableCode = $"Table {orderTable.TableNumber}",
             TableName = string.IsNullOrWhiteSpace(orderTable.Name) ? $"Table {orderTable.TableNumber}" : orderTable.Name,
-            ServerId = orderTable.AssignedServerId,
-            ServerName = orderTable.AssignedServer is { } srv ? srv.Name : string.Empty,
+            ServerId = null,
+            ServerName = string.Empty,
             Status = OrderWorkflow.PendingApproval,
             CustomerNotes = customerNotes,
             AllergyNotes = allergyNotes,
@@ -902,27 +912,19 @@ public sealed class PublicMenuController(
                     "Online ordering is not available: the configured online orders table is under maintenance. Clear maintenance on that table or choose another online orders table.");
             }
 
-            if (configured.AssignedServerId is null || configured.AssignedServer is null)
-            {
-                return new OnlineOrdersTableResolution(null,
-                    "Online ordering is not available: the configured online orders table has no assigned server. Assign an active server to that table in the back office.");
-            }
-
             return new OnlineOrdersTableResolution(configured, null);
         }
 
         var fallback = await db.Tables
-            .Include(t => t.AssignedServer)
-            .Where(t => t.AssignedServerId != null
-                        && t.AssignedServer != null
-                        && !string.Equals(t.Status, "Maintenance", StringComparison.OrdinalIgnoreCase))
+            .AsNoTracking()
+            .Where(t => t.Status == null || t.Status.ToLower() != "maintenance")
             .OrderBy(t => t.TableNumber)
             .FirstOrDefaultAsync();
 
         if (fallback is null)
         {
             return new OnlineOrdersTableResolution(null,
-                "Online ordering is not available: add at least one non-maintenance table with an assigned server, or set an online orders table in Appearance settings.");
+                "Online ordering is not available: add at least one table, or set an online orders table in Appearance settings.");
         }
 
         return new OnlineOrdersTableResolution(fallback, null);

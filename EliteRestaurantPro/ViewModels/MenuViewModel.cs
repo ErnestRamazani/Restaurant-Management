@@ -1,13 +1,18 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
 using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Menu;
 using EliteRestaurant.Core.Sync;
 using EliteRestaurant.Core.Utils;
 using EliteRestaurantPro.ApiClients;
 using EliteRestaurantPro.Services;
+using EliteRestaurantPro.Utils;
+using Microsoft.Win32;
 
 namespace EliteRestaurantPro.ViewModels;
 
@@ -31,7 +36,7 @@ public class MenuViewModel : AdminBaseViewModel
         public ObservableCollection<MenuCategoryGroup> Categories { get; } = new();
     }
 
-    private static readonly Dictionary<string, List<string>> CategoryMap = new()
+    private static readonly Dictionary<string, List<string>> LegacyCategoryMap = new()
     {
         ["Drink"] = new() { "Beer", "Champagne", "Cocktail", "Juice", "Mocktail", "Soft Drink", "Water", "Whisky" },
         ["Starter/Appetizer"] = new() { "Starter/Appetizer" },
@@ -56,6 +61,18 @@ public class MenuViewModel : AdminBaseViewModel
     private string _selectedViewCategory = "All";
     private string _selectedViewSubCategory = "All";
     private string _searchText = string.Empty;
+    private bool _isDetailsDialogMode;
+    private string _detailsProductName = string.Empty;
+    private string _detailsUniqueId = string.Empty;
+    private string _detailsCategory = string.Empty;
+    private string _detailsSubCategory = string.Empty;
+    private string _detailsPrice = string.Empty;
+    private string _detailsDescription = string.Empty;
+    private string _detailsComposition = string.Empty;
+    private string _productImagePath = string.Empty;
+    private bool _removeProductImage;
+    private ImageSource? _editorImagePreview;
+    private ImageSource? _detailsImagePreview;
 
     public override string ActivePage => "Menu";
 
@@ -77,13 +94,17 @@ public class MenuViewModel : AdminBaseViewModel
     public ObservableCollection<string> SubCategories { get; } = new();
     public ObservableCollection<string> ViewCategories { get; } = new();
     public ObservableCollection<string> ViewSubCategories { get; } = new();
-    public ObservableCollection<string> Categories { get; } =
-        new(["Drink", "Starter/Appetizer", "Main", "Dessert"]);
+    public ObservableCollection<string> Categories { get; } = new();
 
     public bool IsDialogOpen
     {
         get => _isDialogOpen;
-        set => SetField(ref _isDialogOpen, value);
+        set
+        {
+            if (!SetField(ref _isDialogOpen, value))
+                return;
+            OnPropertyChanged(nameof(IsMainContentEnabled));
+        }
     }
 
     public string DialogTitle
@@ -164,27 +185,180 @@ public class MenuViewModel : AdminBaseViewModel
         }
     }
 
+    public bool IsDetailsDialogMode
+    {
+        get => _isDetailsDialogMode;
+        set
+        {
+            if (!SetField(ref _isDetailsDialogMode, value))
+                return;
+            OnPropertyChanged(nameof(IsEditorDialogMode));
+        }
+    }
+
+    public bool IsEditorDialogMode => !IsDetailsDialogMode;
+    public bool IsMainContentEnabled => !IsDialogOpen;
+
+    public string DetailsProductName
+    {
+        get => _detailsProductName;
+        set => SetField(ref _detailsProductName, value);
+    }
+
+    public string DetailsUniqueId
+    {
+        get => _detailsUniqueId;
+        set => SetField(ref _detailsUniqueId, value);
+    }
+
+    public string DetailsCategory
+    {
+        get => _detailsCategory;
+        set => SetField(ref _detailsCategory, value);
+    }
+
+    public string DetailsSubCategory
+    {
+        get => _detailsSubCategory;
+        set => SetField(ref _detailsSubCategory, value);
+    }
+
+    public string DetailsPrice
+    {
+        get => _detailsPrice;
+        set => SetField(ref _detailsPrice, value);
+    }
+
+    public string DetailsDescription
+    {
+        get => _detailsDescription;
+        set => SetField(ref _detailsDescription, value);
+    }
+
+    public string DetailsComposition
+    {
+        get => _detailsComposition;
+        set => SetField(ref _detailsComposition, value);
+    }
+
+    public string ProductImagePath
+    {
+        get => _productImagePath;
+        set
+        {
+            if (!SetField(ref _productImagePath, value))
+                return;
+            _removeProductImage = false;
+            RefreshEditorImagePreview();
+        }
+    }
+
+    public bool HasEditorImagePreview => _editorImagePreview is not null;
+    public bool HasNoEditorImagePreview => !HasEditorImagePreview;
+    public ImageSource? EditorImagePreview
+    {
+        get => _editorImagePreview;
+        private set
+        {
+            if (SetField(ref _editorImagePreview, value))
+            {
+                OnPropertyChanged(nameof(HasEditorImagePreview));
+                OnPropertyChanged(nameof(HasNoEditorImagePreview));
+            }
+        }
+    }
+
+    public bool HasDetailsImagePreview => _detailsImagePreview is not null;
+    public bool HasNoDetailsImagePreview => !HasDetailsImagePreview;
+    public ImageSource? DetailsImagePreview
+    {
+        get => _detailsImagePreview;
+        private set
+        {
+            if (SetField(ref _detailsImagePreview, value))
+            {
+                OnPropertyChanged(nameof(HasDetailsImagePreview));
+                OnPropertyChanged(nameof(HasNoDetailsImagePreview));
+            }
+        }
+    }
+
     public ICommand OpenAddDialogCommand { get; }
     public ICommand EditProductCommand { get; }
     public ICommand DeleteProductCommand { get; }
+    public ICommand ShowProductDetailsCommand { get; }
     public ICommand SaveProductCommand { get; }
     public ICommand CancelDialogCommand { get; }
+    public ICommand BrowseProductImageCommand { get; }
+    public ICommand ClearProductImageCommand { get; }
 
     public MenuViewModel(Action<BaseViewModel> navigate) : base(navigate)
     {
         OpenAddDialogCommand = new RelayCommand(_ => OpenAddDialog());
         EditProductCommand = new RelayCommand(product => _ = OpenEditDialogAsync(product as Product));
         DeleteProductCommand = new RelayCommand(product => _ = DeleteProductAsync(product as Product));
+        ShowProductDetailsCommand = new RelayCommand(product => OpenDetailsDialog(product as Product));
         SaveProductCommand = new RelayCommand(_ => _ = SaveProductAsync());
         CancelDialogCommand = new RelayCommand(_ => CloseDialog());
+        BrowseProductImageCommand = new RelayCommand(_ => BrowseProductImage());
+        ClearProductImageCommand = new RelayCommand(_ => ClearProductImage());
+
+        SettingsManager.SettingsChanged += OnMenuSettingsChanged;
+
+        RebuildCategoryUiFromSettings();
+        UpdateSubCategories(SelectedCategory);
+        _ = LoadProductsAsync();
+    }
+
+    private void OnMenuSettingsChanged()
+    {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher is null)
+            return;
+        if (dispatcher.CheckAccess())
+            ApplyMenuSettingsFromDisk();
+        else
+            dispatcher.BeginInvoke(ApplyMenuSettingsFromDisk);
+    }
+
+    private void ApplyMenuSettingsFromDisk()
+    {
+        RebuildCategoryUiFromSettings();
+        InitializeViewCategories();
+        UpdateViewSubCategories();
+        RefreshGroupedProducts();
+    }
+
+    private void RebuildCategoryUiFromSettings()
+    {
+        var tax = MenuTaxonomyHelper.Resolve(SettingsManager.Load().MenuTaxonomy);
+        var ordered = MenuTaxonomyHelper.GetOrderedSectionNames(tax).ToList();
+        foreach (var p in _allProducts)
+        {
+            var c = (p.Category ?? string.Empty).Trim();
+            if (c.Length > 0 && !ordered.Any(o => o.Equals(c, StringComparison.OrdinalIgnoreCase)))
+                ordered.Add(c);
+        }
+
+        Categories.Clear();
+        foreach (var c in ordered)
+            Categories.Add(c);
+
+        if (Categories.Count == 0)
+        {
+            foreach (var x in new[] { "Alcohol", "Non-Alcohol", "Starter/Appetizer", "Main", "Dessert" })
+                Categories.Add(x);
+        }
+
+        if (!Categories.Contains(SelectedCategory, StringComparer.OrdinalIgnoreCase))
+            SelectedCategory = Categories.FirstOrDefault() ?? "Main";
 
         UpdateSubCategories(SelectedCategory);
-        InitializeViewCategories();
-        _ = LoadProductsAsync();
     }
 
     private async Task LoadProductsAsync()
     {
+        MenuImagePreview.ClearRemoteImageCache();
         Products.Clear();
         GroupedProducts.Clear();
         InventorySelections.Clear();
@@ -221,9 +395,14 @@ public class MenuViewModel : AdminBaseViewModel
             }
 
             _allProducts = products;
+
+            await Task.Run(() => MenuImagePreview.PrefetchProductPhotoUrls(products.Select(p => p.Id)))
+                .ConfigureAwait(true);
+
             foreach (var product in products)
                 Products.Add(product);
 
+            RebuildCategoryUiFromSettings();
             InitializeViewCategories();
             UpdateViewSubCategories();
             RefreshGroupedProducts();
@@ -257,7 +436,9 @@ public class MenuViewModel : AdminBaseViewModel
     {
         GroupedProducts.Clear();
         foreach (var topSection in products
-                     .GroupBy(p => GetTopSection(p.Category))
+                     .GroupBy(p => MenuTaxonomyHelper.GetTypeNameForProductOrFallback(
+                         p,
+                         MenuTaxonomyHelper.Resolve(SettingsManager.Load().MenuTaxonomy)))
                      .OrderBy(g => g.Key))
         {
             var topGroup = new MenuTopGroup { Name = topSection.Key };
@@ -285,9 +466,6 @@ public class MenuViewModel : AdminBaseViewModel
             GroupedProducts.Add(topGroup);
         }
     }
-
-    private static string GetTopSection(string category) =>
-        category.Equals("Drink", StringComparison.OrdinalIgnoreCase) ? "Drink" : "Food";
 
     private void RefreshGroupedProducts()
     {
@@ -322,19 +500,24 @@ public class MenuViewModel : AdminBaseViewModel
 
     private void InitializeViewCategories()
     {
-        var allCategories = Products
-            .Select(p => p.Category)
-            .Where(c => !string.IsNullOrWhiteSpace(c))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(c => c)
-            .ToList();
+        var tax = MenuTaxonomyHelper.Resolve(SettingsManager.Load().MenuTaxonomy);
+        var ordered = MenuTaxonomyHelper.GetOrderedSectionNames(tax).ToList();
+        foreach (var p in Products)
+        {
+            var c = (p.Category ?? string.Empty).Trim();
+            if (c.Length > 0 && !ordered.Any(o => o.Equals(c, StringComparison.OrdinalIgnoreCase)))
+                ordered.Add(c);
+        }
 
-        if (allCategories.Count == 0)
-            allCategories = Categories.ToList();
+        if (ordered.Count == 0)
+        {
+            foreach (var c in Categories)
+                ordered.Add(c);
+        }
 
         ViewCategories.Clear();
         ViewCategories.Add("All");
-        foreach (var category in allCategories)
+        foreach (var category in ordered)
             ViewCategories.Add(category);
 
         if (!ViewCategories.Contains(SelectedViewCategory))
@@ -363,6 +546,7 @@ public class MenuViewModel : AdminBaseViewModel
     {
         if (AppSession.IsStaffTablet) return;
 
+        IsDetailsDialogMode = false;
         _editingProductId = null;
         DialogTitle = "Add Product";
         ProductName = string.Empty;
@@ -371,6 +555,9 @@ public class MenuViewModel : AdminBaseViewModel
         PriceText = string.Empty;
         ProductDescription = string.Empty;
         ProductComposition = string.Empty;
+        ProductImagePath = string.Empty;
+        _removeProductImage = false;
+        DetailsImagePreview = null;
         foreach (var ingredient in InventorySelections)
         {
             ingredient.IsSelected = false;
@@ -400,6 +587,7 @@ public class MenuViewModel : AdminBaseViewModel
         if (product is null) return;
         if (AppSession.IsStaffTablet) return;
 
+        IsDetailsDialogMode = false;
         _editingProductId = product.Id;
         DialogTitle = "Edit Product";
         ProductName = product.Name;
@@ -410,7 +598,11 @@ public class MenuViewModel : AdminBaseViewModel
         PriceText = product.Price.ToString("0.00", CultureInfo.InvariantCulture);
         ProductDescription = product.Description ?? string.Empty;
         ProductComposition = product.Composition ?? string.Empty;
+        ProductImagePath = string.Empty;
+        _removeProductImage = false;
+        DetailsImagePreview = null;
         OnPropertyChanged(nameof(DescriptionCharCountRemaining));
+        RefreshEditorImagePreview();
 
         foreach (var ingredient in InventorySelections)
         {
@@ -438,6 +630,57 @@ public class MenuViewModel : AdminBaseViewModel
                 MessageBoxImage.Warning);
             return;
         }
+
+        IsDialogOpen = true;
+    }
+
+    private void OpenDetailsDialog(Product? product)
+    {
+        if (product is null)
+            return;
+
+        IsDetailsDialogMode = true;
+        _editingProductId = null;
+        DialogTitle = "Product Details";
+
+        DetailsProductName = string.IsNullOrWhiteSpace(product.Name) ? "Unnamed product" : product.Name;
+        DetailsUniqueId = string.IsNullOrWhiteSpace(product.UniqueId) ? "N/A" : product.UniqueId;
+        DetailsCategory = string.IsNullOrWhiteSpace(product.Category) ? "Uncategorized" : product.Category;
+        DetailsSubCategory = string.IsNullOrWhiteSpace(product.SubCategory) ? "General" : product.SubCategory;
+        DetailsPrice = product.Price.ToString("N2", CultureInfo.InvariantCulture);
+        DetailsDescription = string.IsNullOrWhiteSpace(product.Description)
+            ? "No description provided."
+            : product.Description.Trim();
+        DetailsComposition = string.IsNullOrWhiteSpace(product.Composition)
+            ? "No composition provided."
+            : product.Composition.Trim();
+        DetailsImagePreview = MenuImagePreview.TryLoadFromPathOrUrl(MenuImagePreview.GetProductPhotoAssetUrl(product.Id));
+
+        ProductIngredientsSummary.Clear();
+        foreach (var ingredient in (product.Ingredients ?? [])
+                     .Where(i => i is not null)
+                     .OrderBy(i => i?.InventoryItem?.Name))
+        {
+            if (ingredient is null)
+                continue;
+
+            var ingredientName = ingredient.InventoryItem?.Name;
+            if (string.IsNullOrWhiteSpace(ingredientName) &&
+                _inventoryNameById.TryGetValue(ingredient.InventoryItemId, out var cached))
+            {
+                ingredientName = cached;
+            }
+
+            if (string.IsNullOrWhiteSpace(ingredientName))
+                ingredientName = $"Inventory #{ingredient.InventoryItemId}";
+
+            var unit = ingredient.InventoryItem?.Unit;
+            var unitSuffix = string.IsNullOrWhiteSpace(unit) ? string.Empty : $" {unit}";
+            ProductIngredientsSummary.Add($"{ingredientName} - {ingredient.Quantity:0.##}{unitSuffix}");
+        }
+
+        if (ProductIngredientsSummary.Count == 0)
+            ProductIngredientsSummary.Add("No inventory ingredients linked.");
 
         IsDialogOpen = true;
     }
@@ -490,7 +733,15 @@ public class MenuViewModel : AdminBaseViewModel
                 existing.Description = string.IsNullOrWhiteSpace(desc) ? null : desc;
                 existing.Composition = string.IsNullOrWhiteSpace(comp) ? null : comp;
                 ops.Add(DesktopCloudPersistence.UpsertOperation(existing));
+                if (_removeProductImage)
+                {
+                    ops.Add(DesktopCloudPersistence.DeleteOperation(new PublicMenuAsset
+                    {
+                        Key = ProductPhotoAssetKey(productId)
+                    }));
+                }
                 DesktopCloudPersistence.PushBatchBlocking(ops);
+                UpsertProductImageAssetIfSelected(productId);
 
                 foreach (var ingredient in selectedIngredients)
                 {
@@ -547,6 +798,7 @@ public class MenuViewModel : AdminBaseViewModel
                         Quantity = ingredient.Quantity
                     });
                 }
+                UpsertProductImageAssetIfSelected(created.Id);
             }
 
             CloseDialog();
@@ -582,6 +834,10 @@ public class MenuViewModel : AdminBaseViewModel
                 .Where(pi => pi.ProductId == product.Id)
                 .ToList();
             var ops = pis.Select(DesktopCloudPersistence.DeleteOperation).ToList();
+            ops.Add(DesktopCloudPersistence.DeleteOperation(new PublicMenuAsset
+            {
+                Key = ProductPhotoAssetKey(product.Id)
+            }));
             ops.Add(DesktopCloudPersistence.DeleteOperation(product));
             DesktopCloudPersistence.PushBatchBlocking(ops);
             await LoadProductsAsync().ConfigureAwait(true);
@@ -615,14 +871,89 @@ public class MenuViewModel : AdminBaseViewModel
     {
         IsDialogOpen = false;
         _editingProductId = null;
+        ProductImagePath = string.Empty;
+        _removeProductImage = false;
+        EditorImagePreview = null;
+        DetailsImagePreview = null;
     }
+
+    private void BrowseProductImage()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Select product image",
+            Filter = "Image files (*.png;*.jpg;*.jpeg;*.webp)|*.png;*.jpg;*.jpeg;*.webp|All files (*.*)|*.*"
+        };
+        if (dialog.ShowDialog() == true)
+            ProductImagePath = dialog.FileName;
+    }
+
+    private void ClearProductImage()
+    {
+        ProductImagePath = string.Empty;
+        _removeProductImage = _editingProductId is int;
+        RefreshEditorImagePreview();
+    }
+
+    private void RefreshEditorImagePreview()
+    {
+        if (!string.IsNullOrWhiteSpace(ProductImagePath))
+        {
+            EditorImagePreview = MenuImagePreview.TryLoadFromPathOrUrl(ProductImagePath);
+            return;
+        }
+
+        if (!_removeProductImage && _editingProductId is int id)
+        {
+            EditorImagePreview = MenuImagePreview.TryLoadFromPathOrUrl(MenuImagePreview.GetProductPhotoAssetUrl(id));
+            return;
+        }
+
+        EditorImagePreview = null;
+    }
+
+    private void UpsertProductImageAssetIfSelected(int productId)
+    {
+        var path = (ProductImagePath ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            return;
+
+        var bytes = File.ReadAllBytes(path);
+        if (bytes.Length == 0 || bytes.Length > 4 * 1024 * 1024)
+            return;
+
+        DesktopCloudPersistence.PushUpsertBlocking(new PublicMenuAsset
+        {
+            Key = ProductPhotoAssetKey(productId),
+            FileName = Path.GetFileName(path),
+            ContentType = GuessImageContentType(path),
+            Content = bytes,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+    }
+
+    private static string ProductPhotoAssetKey(int productId) => $"product:{productId}";
+
+    private static string GuessImageContentType(string path) =>
+        Path.GetExtension(path).ToLowerInvariant() switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".webp" => "image/webp",
+            ".gif" => "image/gif",
+            _ => "image/png"
+        };
 
     private void UpdateSubCategories(string category)
     {
         SubCategories.Clear();
-
-        if (!CategoryMap.TryGetValue(category, out var subCategories))
-            subCategories = new List<string> { category };
+        var map = MenuTaxonomyHelper.GetCategoryEditorMap(MenuTaxonomyHelper.Resolve(SettingsManager.Load().MenuTaxonomy));
+        if (!map.TryGetValue(category, out var subCategories))
+        {
+            if (LegacyCategoryMap.TryGetValue(category, out var legacy))
+                subCategories = legacy;
+            else
+                subCategories = new List<string> { category };
+        }
 
         foreach (var item in subCategories)
             SubCategories.Add(item);

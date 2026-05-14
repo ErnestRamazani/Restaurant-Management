@@ -1,5 +1,6 @@
 using System.IO;
 using EliteRestaurant.Contracts.Admin;
+using EliteRestaurant.Core.Menu;
 using EliteRestaurant.Core.Utils;
 
 namespace EliteRestaurantPro.ApiClients;
@@ -44,13 +45,16 @@ public sealed class AdminSettingsApiClient(EliteApiClient? apiClient = null)
             applyLogoChanges,
             menuBaseUrl,
             settings.BusinessProfile.OnlineOrdersTableId,
+            settings.BusinessProfile.ReservationLeadDays,
+            settings.BusinessProfile.ReservationMaxMonthsAhead,
             settings.BusinessProfile.OnlinePromoTitle,
             settings.BusinessProfile.OnlinePromoSubtitle,
             settings.BusinessProfile.OnlinePromoCtaLabel,
             promo.FileName,
             promo.ContentType,
             promo.Base64,
-            applyOnlinePromoImageChanges);
+            applyOnlinePromoImageChanges,
+            MenuTaxonomyHelper.Serialize(MenuTaxonomyHelper.Resolve(settings.MenuTaxonomy)));
 
         await _apiClient.PostAsync<AdminCloudSettingsRequest, AdminCloudSettingsResponse>(
             "api/admin/settings/cloud-profile",

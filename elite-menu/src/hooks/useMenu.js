@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fetchConfig, fetchProducts } from '../utils/api'
-import { withLocalFoodPhoto } from '../utils/localFoodImages'
 
 export function useMenu() {
   const [config, setConfig] = useState(null)
@@ -14,7 +13,8 @@ export function useMenu() {
     try {
       const [c, p] = await Promise.all([fetchConfig(), fetchProducts()])
       setConfig(c)
-      setProducts(Array.isArray(p) ? p.map(withLocalFoodPhoto) : [])
+      // Web menu must mirror API/desktop data exactly (no local fallback injection).
+      setProducts(Array.isArray(p) ? p : [])
     } catch (e) {
       const raw = e instanceof Error ? e.message : String(e)
       const dev =

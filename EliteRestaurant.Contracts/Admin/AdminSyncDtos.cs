@@ -61,12 +61,15 @@ public sealed record AdminCloudSettingsRequest(
     bool ApplyLogoChanges = false,
     string? PublicMenuBaseUrl = null,
     int? OnlineOrdersTableId = null,
+    int ReservationLeadDays = 2,
+    int ReservationMaxMonthsAhead = 6,
     string? OnlinePromoTitle = null,
     string? OnlinePromoSubtitle = null,
     string? OnlinePromoCtaLabel = null,
     string? OnlinePromoImageFileName = null,
     string? OnlinePromoImageContentType = null,
     string? OnlinePromoImageBase64 = null,
-    bool ApplyOnlinePromoImageChanges = false);
+    bool ApplyOnlinePromoImageChanges = false,
+    string? MenuTaxonomyJson = null);
 
 public sealed record AdminCloudSettingsResponse(bool Success, string? LogoUrl, string Message);

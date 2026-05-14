@@ -1,4 +1,5 @@
 using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace EliteRestaurant.Core.Utils;
@@ -20,10 +21,17 @@ public static class StaffOrderAlerts
 
         using var db = new AppDbContext();
 
-        static string Label(string? uid, string? tableCode)
+        static string Label(string? uid, string? tableCode, string? orderOrigin, string? orderSource)
         {
-            var code = string.IsNullOrWhiteSpace(tableCode) ? "?" : tableCode;
             var id = string.IsNullOrWhiteSpace(uid) ? "?" : uid;
+            if (OrderOrigin.IsOnline(orderOrigin))
+            {
+                var delivery = string.Equals(orderSource, "Delivery", StringComparison.OrdinalIgnoreCase);
+                var cap = delivery ? "Online · Delivery" : "Online · Pickup";
+                return $"{id} ({cap})";
+            }
+
+            var code = string.IsNullOrWhiteSpace(tableCode) ? "?" : tableCode;
             return $"{id} ({code})";
         }
 
@@ -31,7 +39,7 @@ public static class StaffOrderAlerts
             .AsNoTracking()
             .Where(o => o.Status == "Ready")
             .OrderBy(o => o.CreatedAt)
-            .Select(o => new { o.UniqueId, o.ServerId, o.TableCode, o.TableName })
+            .Select(o => new { o.UniqueId, o.ServerId, o.TableCode, o.TableName, o.OrderOrigin, o.OrderSource })
             .ToList();
 
         if (AppSession.IsServerTablet)
@@ -41,7 +49,7 @@ public static class StaffOrderAlerts
             .AsNoTracking()
             .Where(o => o.Status == OrderWorkflow.Served)
             .OrderBy(o => o.CreatedAt)
-            .Select(o => new { o.UniqueId, o.ServerId, o.TableCode })
+            .Select(o => new { o.UniqueId, o.ServerId, o.TableCode, o.OrderOrigin, o.OrderSource })
             .ToList();
 
         if (AppSession.IsServerTablet)
@@ -51,14 +59,14 @@ public static class StaffOrderAlerts
 
         if (ready.Count > 0)
         {
-            var parts = ready.Take(4).Select(o => Label(o.UniqueId, o.TableCode)).ToList();
+            var parts = ready.Take(4).Select(o => Label(o.UniqueId, o.TableCode, o.OrderOrigin, o.OrderSource)).ToList();
             var more = ready.Count > 4 ? $" (+{ready.Count - 4} more)" : string.Empty;
             lines.Add("Ready for pickup — " + string.Join(" · ", parts) + more);
         }
 
         if (served.Count > 0)
         {
-            var parts = served.Take(4).Select(o => Label(o.UniqueId, o.TableCode)).ToList();
+            var parts = served.Take(4).Select(o => Label(o.UniqueId, o.TableCode, o.OrderOrigin, o.OrderSource)).ToList();
             var more = served.Count > 4 ? $" (+{served.Count - 4} more)" : string.Empty;
             var prefix = AppSession.IsCashierTablet
                 ? "Awaiting checkout (Served) — "

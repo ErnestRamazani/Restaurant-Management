@@ -9,7 +9,8 @@ export async function fetchConfig() {
 
 /** @returns {Promise<Record<string, unknown>[]>} */
 export async function fetchProducts() {
-  return apiFetch(`${BASE}/products`)
+  const bust = Date.now()
+  return apiFetch(`${BASE}/products?_=${bust}`, { cache: 'no-store' })
 }
 
 /** @returns {Promise<Record<string, unknown>[]>} */

@@ -14,6 +14,9 @@ public class OrderEntry
     public DateTime CreatedAt { get; set; }
     public decimal Total { get; set; }
 
+    /// <summary><see cref="Models.OrderOrigin.Online"/> or <see cref="Models.OrderOrigin.InStore"/>.</summary>
+    public string OrderOrigin { get; set; } = global::EliteRestaurant.Core.Models.OrderOrigin.InStore;
+
     private string _statusColor = "#4CAF50";
     public string StatusColor
     {
@@ -24,7 +27,7 @@ public class OrderEntry
     /// <summary>Admin Orders: show manual advance for Waiting / In Kitchen only.</summary>
     public bool ShowAdvanceInOrders { get; set; }
 
-    /// <summary>Admin Orders: complete payment only when status is Served.</summary>
+    /// <summary>Cashier Orders: complete when Served (dine-in) or Ready/Served (online pickup/delivery).</summary>
     public bool ShowCompleteInOrders { get; set; }
 
     /// <summary>Cashier and full admin may open ticket preview.</summary>

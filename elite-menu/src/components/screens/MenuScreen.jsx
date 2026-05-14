@@ -2,7 +2,12 @@ import { ChevronLeft, Search, X } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { productMatchesCourse } from '../../utils/courseBucket'
 import { productMatchesDrinkAlcohol } from '../../utils/drinkAlcoholBucket'
-import { isDrinkProduct } from '../../utils/menuKind'
+import {
+  getMenuKindWithTaxonomy,
+  parseMenuTaxonomy,
+  productMatchesDrinkTaxonomy,
+  productMatchesFoodTaxonomy,
+} from '../../utils/menuTaxonomy'
 import { sameProductId } from '../../utils/productId'
 import { CategoryBar } from '../ui/CategoryBar'
 import { CartButton } from '../ui/CartButton'
@@ -15,9 +20,13 @@ const DRINK_ALCOHOL = Object.freeze(['All', 'Alcohol', 'Non-alcohol'])
 /**
  * @param {Record<string, unknown>[]} products
  * @param {'food' | 'drink'} section
+ * @param {ReturnType<typeof parseMenuTaxonomy>} taxonomy
  */
-function productsForSection(products, section) {
-  return products.filter((p) => (section === 'drink' ? isDrinkProduct(p) : !isDrinkProduct(p)))
+function productsForSection(products, section, taxonomy) {
+  return products.filter((p) => {
+    const kind = getMenuKindWithTaxonomy(p, taxonomy)
+    return section === 'drink' ? kind === 'drink' : kind === 'food'
+  })
 }
 
 /**
@@ -47,23 +56,41 @@ function subcategoryOptionsForSection(inSection) {
 }
 
 export function MenuScreen({ config, products, guestOrderMode = 'browse', onBack, onOpenProduct, cart, onViewCart }) {
+  const taxonomy = useMemo(() => parseMenuTaxonomy(config), [config?.menuTaxonomyJson])
+
+  const foodType = useMemo(() => taxonomy?.types?.find((t) => !t.isDrink) ?? null, [taxonomy])
+  const drinkType = useMemo(() => taxonomy?.types?.find((t) => t.isDrink) ?? null, [taxonomy])
+
+  const foodTabLabel = foodType?.name?.trim() ? String(foodType.name).trim() : 'Food'
+  const drinkTabLabel = drinkType?.name?.trim() ? String(drinkType.name).trim() : 'Drinks'
+
+  const foodCourseTabs = useMemo(() => {
+    if (foodType?.sections?.length) return ['All', ...foodType.sections.map((s) => String(s.name || '').trim()).filter(Boolean)]
+    return [...FOOD_COURSES]
+  }, [foodType])
+
+  const drinkSecondTabs = useMemo(() => {
+    if (drinkType?.sections?.length) return ['All', ...drinkType.sections.map((s) => String(s.name || '').trim()).filter(Boolean)]
+    return [...DRINK_ALCOHOL]
+  }, [drinkType])
+
   const [section, setSection] = useState(/** @type {'food' | 'drink'} */ ('food'))
-  /** @type 'All' | 'Starters' | 'Main' | 'Dessert' */
   const [course, setCourse] = useState('All')
-  /** @type 'All' | 'Alcohol' | 'Non-alcohol' */
   const [drinkAlcohol, setDrinkAlcohol] = useState('All')
   const [subCat, setSubCat] = useState('All')
   const [q, setQ] = useState('')
 
-  const inSection = useMemo(() => productsForSection(products, section), [products, section])
+  const inSection = useMemo(() => productsForSection(products, section, taxonomy), [products, section, taxonomy])
 
   /** After course (food) or alcohol filter (drinks). */
   const afterMainFilter = useMemo(() => {
     if (section === 'drink') {
+      if (drinkType?.sections?.length) return inSection.filter((p) => productMatchesDrinkTaxonomy(p, drinkAlcohol, drinkType))
       return inSection.filter((p) => productMatchesDrinkAlcohol(p, drinkAlcohol))
     }
+    if (foodType?.sections?.length) return inSection.filter((p) => productMatchesFoodTaxonomy(p, course, foodType))
     return inSection.filter((p) => productMatchesCourse(p, course))
-  }, [inSection, section, course, drinkAlcohol])
+  }, [inSection, section, course, drinkAlcohol, drinkType, foodType])
 
   const subOptions = useMemo(() => subcategoryOptionsForSection(afterMainFilter), [afterMainFilter])
 
@@ -90,7 +117,7 @@ export function MenuScreen({ config, products, guestOrderMode = 'browse', onBack
   }, [])
 
   const onDrinkAlcoholSelect = useCallback((next) => {
-    setDrinkAlcohol(/** @type {'All' | 'Alcohol' | 'Non-alcohol'} */ (next))
+    setDrinkAlcohol(next)
     setSubCat('All')
   }, [])
 
@@ -159,7 +186,7 @@ export function MenuScreen({ config, products, guestOrderMode = 'browse', onBack
                 : 'text-champagne/45 hover:text-champagne/75'
             }`}
           >
-            Food
+            {foodTabLabel}
           </button>
           <button
             type="button"
@@ -172,7 +199,7 @@ export function MenuScreen({ config, products, guestOrderMode = 'browse', onBack
                 : 'text-champagne/45 hover:text-champagne/75'
             }`}
           >
-            Drinks
+            {drinkTabLabel}
           </button>
         </div>
         <p className="mt-1.5 text-center font-body text-[0.7rem] leading-snug text-[var(--text-muted)]">
@@ -181,10 +208,10 @@ export function MenuScreen({ config, products, guestOrderMode = 'browse', onBack
       </div>
 
       {section === 'food' ? (
-        <CategoryBar categories={FOOD_COURSES} active={course} onSelect={onCourseSelect} sectionKind="food" />
+        <CategoryBar categories={foodCourseTabs} active={course} onSelect={onCourseSelect} sectionKind="food" />
       ) : (
         <CategoryBar
-          categories={DRINK_ALCOHOL}
+          categories={drinkSecondTabs}
           active={drinkAlcohol}
           onSelect={onDrinkAlcoholSelect}
           sectionKind="drink"

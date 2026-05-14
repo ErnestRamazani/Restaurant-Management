@@ -1,37 +1,32 @@
-using System.Text.Json;
+using System.Collections.ObjectModel;
 using System.Windows.Input;
-using EliteRestaurant.Core.Utils;
 using EliteRestaurantPro.ApiClients;
 
 namespace EliteRestaurantPro.ViewModels;
 
 public sealed class ReservationFloorWebViewModel : AdminBaseViewModel
 {
-    private readonly PublicMenuStaffAuthClient _staffAuth = new();
-    private string _passcode = string.Empty;
+    private readonly CashierReservationsApiClient _reservations = new();
+    private bool _isLoading;
+    private bool _isDetailOpen;
     private string _statusMessage = string.Empty;
-    private bool _showPasscodeGate;
+    private string _rescheduleLocalText = string.Empty;
+    private CashierEngagementDetailDto? _selectedDetail;
 
     public override string ActivePage => "Reservations";
 
-    /// <summary>Public menu origin (no trailing slash), same source as elite-menu base URL.</summary>
-    public string FloorPageUrl
+    public ObservableCollection<CashierEngagementListRow> Reservations { get; } = [];
+
+    public bool IsLoading
     {
-        get
-        {
-            var settings = SettingsManager.Load();
-            var raw = settings.BusinessProfile.PublicMenuBaseUrl;
-            if (string.IsNullOrWhiteSpace(raw))
-                raw = settings.CloudApi.BaseUrl;
-            var baseUrl = CloudEndpoints.NormalizeApiBaseUrl(raw);
-            return $"{baseUrl.TrimEnd('/')}/staff/floor";
-        }
+        get => _isLoading;
+        private set => SetField(ref _isLoading, value);
     }
 
-    public string Passcode
+    public bool IsDetailOpen
     {
-        get => _passcode;
-        set => SetField(ref _passcode, value);
+        get => _isDetailOpen;
+        private set => SetField(ref _isDetailOpen, value);
     }
 
     public string StatusMessage
@@ -40,75 +35,218 @@ public sealed class ReservationFloorWebViewModel : AdminBaseViewModel
         private set => SetField(ref _statusMessage, value);
     }
 
-    public bool ShowPasscodeGate
+    public string RescheduleLocalText
     {
-        get => _showPasscodeGate;
-        private set => SetField(ref _showPasscodeGate, value);
+        get => _rescheduleLocalText;
+        set => SetField(ref _rescheduleLocalText, value);
     }
 
-    public ICommand SubmitPasscodeCommand { get; }
-    public ICommand RetryCloudSessionCommand { get; }
-
-    /// <summary>Raised when the WebView should re-apply token script and navigate.</summary>
-    public event EventHandler<string>? FloorSessionTokenReady;
-
-    public ReservationFloorWebViewModel(Action<BaseViewModel> navigate) : base(navigate)
+    public CashierEngagementDetailDto? SelectedDetail
     {
-        SubmitPasscodeCommand = new RelayCommand(async _ => await SubmitPasscodeAsync());
-        RetryCloudSessionCommand = new RelayCommand(_ => OnWebViewHostReady());
-    }
-
-    /// <summary>Cloud session JWT from admin or cashier <c>api/auth/login</c> (persisted in settings).</summary>
-    public string? ReadPersistedCloudAccessToken()
-    {
-        var token = (SettingsManager.Load().CloudApi.AccessToken ?? string.Empty).Trim();
-        return token.Length > 0 ? token : null;
-    }
-
-    /// <summary>Called when the view is ready; opens floor if a persisted token exists, otherwise shows passcode gate.</summary>
-    public void OnWebViewHostReady()
-    {
-        if (ReadPersistedCloudAccessToken() is { } jwt)
+        get => _selectedDetail;
+        private set
         {
-            ShowPasscodeGate = false;
+            if (!SetField(ref _selectedDetail, value))
+                return;
+            OnPropertyChanged(nameof(SelectedStatusBadge));
+            OnPropertyChanged(nameof(SelectedStatusText));
+            OnPropertyChanged(nameof(CanRunScheduledActions));
+            OnPropertyChanged(nameof(IsCheckedInSelection));
+            OnPropertyChanged(nameof(SelectedArrivalText));
+            OnPropertyChanged(nameof(SelectedEndText));
+            OnPropertyChanged(nameof(SelectedActualArrivalText));
+            OnPropertyChanged(nameof(SelectedActualReleaseText));
+            OnPropertyChanged(nameof(SelectedCreatedText));
+            OnPropertyChanged(nameof(SelectedUpdatedText));
+        }
+    }
+
+    public string SelectedStatusText => EngagementStatusLabel(SelectedDetail?.Status ?? string.Empty);
+    public string SelectedStatusBadge => SelectedDetailStatusClass(SelectedDetail?.Status ?? string.Empty);
+    public bool CanRunScheduledActions => string.Equals(SelectedDetail?.Status, "Scheduled", StringComparison.OrdinalIgnoreCase);
+    public bool IsCheckedInSelection => string.Equals(SelectedDetail?.Status, "CheckedIn", StringComparison.OrdinalIgnoreCase);
+    public string SelectedArrivalText => FormatDateTimeLocal(SelectedDetail?.PlannedStartUtc);
+    public string SelectedEndText => FormatDateTimeLocal(SelectedDetail?.PlannedEndUtc);
+    public string SelectedActualArrivalText => FormatDateTimeLocal(SelectedDetail?.ActualStartUtc);
+    public string SelectedActualReleaseText => FormatDateTimeLocal(SelectedDetail?.ActualEndUtc);
+    public string SelectedCreatedText => FormatDateTimeLocal(SelectedDetail?.CreatedAtUtc);
+    public string SelectedUpdatedText => FormatDateTimeLocal(SelectedDetail?.UpdatedAtUtc);
+
+    public ICommand RefreshCommand { get; }
+    public ICommand OpenDetailCommand { get; }
+    public ICommand CloseDetailCommand { get; }
+    public ICommand MarkArrivedCommand { get; }
+    public ICommand MarkNoShowCommand { get; }
+    public ICommand MarkCancelledCommand { get; }
+    public ICommand ShowReschedulePanelCommand { get; }
+    public ICommand SaveRescheduleCommand { get; }
+
+    public ReservationFloorWebViewModel(Action<BaseViewModel> navigate)
+        : base(navigate)
+    {
+        RefreshCommand = new RelayCommand(async _ => await LoadReservationsAsync());
+        OpenDetailCommand = new RelayCommand(async id => await OpenDetailAsync(id));
+        CloseDetailCommand = new RelayCommand(_ => CloseDetail());
+        MarkArrivedCommand = new RelayCommand(async _ => await RunScheduledActionAsync("arrived"));
+        MarkNoShowCommand = new RelayCommand(async _ => await RunScheduledActionAsync("no-show"));
+        MarkCancelledCommand = new RelayCommand(async _ => await RunScheduledActionAsync("cancel"));
+        ShowReschedulePanelCommand = new RelayCommand(_ => ShowReschedulePanel());
+        SaveRescheduleCommand = new RelayCommand(async _ => await SaveRescheduleAsync());
+        _ = LoadReservationsAsync();
+    }
+
+    private async Task LoadReservationsAsync()
+    {
+        IsLoading = true;
+        StatusMessage = string.Empty;
+        try
+        {
+            var rows = await _reservations.ListEngagementsAsync().ConfigureAwait(true);
+            Reservations.Clear();
+            foreach (var row in rows)
+                Reservations.Add(row);
+            if (rows.Count == 0)
+                StatusMessage = "No upcoming reservations. New guest bookings appear automatically.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = ex.GetBaseException().Message;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private async Task OpenDetailAsync(object? engagementId)
+    {
+        if (!TryResolveId(engagementId, out var id))
+            return;
+        try
+        {
+            var detail = await _reservations.GetEngagementAsync(id).ConfigureAwait(true);
+            if (detail is null)
+                return;
+            SelectedDetail = detail;
+            IsDetailOpen = true;
+            RescheduleLocalText = ToLocalDatetimeLocalValue(detail.PlannedStartUtc);
             StatusMessage = string.Empty;
-            FloorSessionTokenReady?.Invoke(this, jwt);
-            return;
         }
-
-        ShowPasscodeGate = true;
-        StatusMessage = "Sign in with the restaurant staff passcode (same as elite-menu staff hub), or log in as admin/cashier to use your cloud session token.";
+        catch (Exception ex)
+        {
+            StatusMessage = ex.GetBaseException().Message;
+        }
     }
 
-    private async Task SubmitPasscodeAsync()
+    private async Task RunScheduledActionAsync(string action)
     {
-        StatusMessage = string.Empty;
-        var code = (Passcode ?? string.Empty).Trim();
-        if (code.Length == 0)
-        {
-            StatusMessage = "Enter the staff passcode.";
+        if (SelectedDetail is null || !CanRunScheduledActions)
             return;
-        }
-
-        var settings = SettingsManager.Load();
-        var apiBase = settings.BusinessProfile.PublicMenuBaseUrl;
-        if (string.IsNullOrWhiteSpace(apiBase))
-            apiBase = settings.CloudApi.BaseUrl;
-
-        var (ok, token, error) = await _staffAuth.PostStaffLoginCodeAsync(apiBase, code).ConfigureAwait(true);
-        if (!ok || string.IsNullOrEmpty(token))
+        try
         {
-            StatusMessage = error ?? "Could not validate passcode.";
-            return;
-        }
+            if (action == "arrived")
+                await _reservations.MarkArrivedAsync(SelectedDetail.Id).ConfigureAwait(true);
+            else if (action == "no-show")
+                await _reservations.MarkNoShowAsync(SelectedDetail.Id).ConfigureAwait(true);
+            else if (action == "cancel")
+                await _reservations.MarkCancelledAsync(SelectedDetail.Id).ConfigureAwait(true);
 
-        Passcode = string.Empty;
-        ShowPasscodeGate = false;
-        StatusMessage = string.Empty;
-        FloorSessionTokenReady?.Invoke(this, token);
+            IsDetailOpen = false;
+            SelectedDetail = null;
+            await LoadReservationsAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = ex.GetBaseException().Message;
+        }
     }
 
-    /// <summary>JavaScript snippet executed before document scripts run (elite-menu reads sessionStorage <c>elite_access_token</c>).</summary>
-    public static string SessionStorageTokenScript(string jwt)
-        => "sessionStorage.setItem('elite_access_token', " + JsonSerializer.Serialize(jwt) + ");";
+    private void ShowReschedulePanel()
+    {
+        if (SelectedDetail is null)
+            return;
+        RescheduleLocalText = ToLocalDatetimeLocalValue(SelectedDetail.PlannedStartUtc);
+    }
+
+    private async Task SaveRescheduleAsync()
+    {
+        if (SelectedDetail is null || !CanRunScheduledActions)
+            return;
+        if (!TryParseLocalDatetimeValue(RescheduleLocalText, out var localValue))
+        {
+            StatusMessage = "Choose a valid local date/time to reschedule.";
+            return;
+        }
+
+        try
+        {
+            var utc = DateTime.SpecifyKind(localValue, DateTimeKind.Local).ToUniversalTime();
+            await _reservations.RescheduleAsync(SelectedDetail.Id, utc).ConfigureAwait(true);
+            await OpenDetailAsync(SelectedDetail.Id).ConfigureAwait(true);
+            await LoadReservationsAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = ex.GetBaseException().Message;
+        }
+    }
+
+    private void CloseDetail()
+    {
+        IsDetailOpen = false;
+        SelectedDetail = null;
+        RescheduleLocalText = string.Empty;
+    }
+
+    private static bool TryResolveId(object? value, out int id)
+    {
+        id = 0;
+        return value switch
+        {
+            int i when i > 0 => (id = i) > 0,
+            string s when int.TryParse(s, out var parsed) && parsed > 0 => (id = parsed) > 0,
+            CashierEngagementListRow row when row.Id > 0 => (id = row.Id) > 0,
+            _ => false
+        };
+    }
+
+    private static string ToLocalDatetimeLocalValue(DateTime utc)
+    {
+        var local = DateTime.SpecifyKind(utc, DateTimeKind.Utc).ToLocalTime();
+        return local.ToString("yyyy-MM-ddTHH:mm");
+    }
+
+    private static bool TryParseLocalDatetimeValue(string? text, out DateTime value)
+    {
+        var trimmed = (text ?? string.Empty).Trim();
+        return DateTime.TryParse(trimmed, out value);
+    }
+
+    private static string FormatDateTimeLocal(DateTime? utc) =>
+        utc is null ? "—" : DateTime.SpecifyKind(utc.Value, DateTimeKind.Utc).ToLocalTime().ToString("g");
+
+    public static string EngagementStatusLabel(string raw)
+    {
+        var s = (raw ?? string.Empty).Trim().ToLowerInvariant();
+        return s switch
+        {
+            "scheduled" => "Scheduled",
+            "checkedin" => "Checked in",
+            "noshow" => "No show",
+            "cancelled" => "Cancelled",
+            "completed" => "Completed",
+            _ => string.IsNullOrWhiteSpace(raw) ? "—" : raw
+        };
+    }
+
+    public static string SelectedDetailStatusClass(string raw)
+    {
+        var s = (raw ?? string.Empty).Trim().ToLowerInvariant();
+        return s switch
+        {
+            "scheduled" => "Scheduled",
+            "checkedin" => "CheckedIn",
+            _ => "Muted"
+        };
+    }
 }

@@ -164,8 +164,6 @@ function CustomerMenuApp() {
   const [manualTableId, setManualTableId] = useState(/** @type {number | null} */ (null))
   const [staffLoginOpen, setStaffLoginOpen] = useState(false)
   const [staffLoginCode, setStaffLoginCode] = useState('')
-  const [staffTabletId, setStaffTabletId] = useState('')
-  const [staffTabletPin, setStaffTabletPin] = useState('')
   const [staffLoginError, setStaffLoginError] = useState('')
   const [staffLoginBusy, setStaffLoginBusy] = useState(false)
   const [orderRef, setOrderRef] = useState(
@@ -236,8 +234,6 @@ function CustomerMenuApp() {
     if (staffLoginBusy) return
     setStaffLoginOpen(false)
     setStaffLoginCode('')
-    setStaffTabletId('')
-    setStaffTabletPin('')
     setStaffLoginError('')
   }, [staffLoginBusy])
 
@@ -251,18 +247,16 @@ function CustomerMenuApp() {
     setStaffLoginBusy(true)
     setStaffLoginError('')
     try {
-      await validateStaffLoginCode(code, { signInId: staffTabletId, pin: staffTabletPin })
+      await validateStaffLoginCode(code)
       setStaffLoginOpen(false)
       setStaffLoginCode('')
-      setStaffTabletId('')
-      setStaffTabletPin('')
       navigate('/staff')
     } catch (error) {
       setStaffLoginError(error instanceof Error ? error.message : 'Incorrect staff passcode.')
     } finally {
       setStaffLoginBusy(false)
     }
-  }, [navigate, staffLoginCode, staffTabletId, staffTabletPin])
+  }, [navigate, staffLoginCode])
 
   useEffect(() => {
     if (typeof window === 'undefined' || loading || error) return
@@ -388,43 +382,10 @@ function CustomerMenuApp() {
             <div className="text-center">
               <p className="font-body text-[0.66rem] font-bold uppercase tracking-[0.24em] text-gold/80">Staff access</p>
               <h2 className="mt-2 font-display text-2xl italic">Enter passcode</h2>
-            <p className="mt-2 font-body text-sm leading-relaxed text-champagne/60">
-              Enter the venue passcode. For reservation floor access, add your tablet sign-in ID and PIN (same as POS).
-            </p>
+              <p className="mt-2 font-body text-sm leading-relaxed text-champagne/60">Enter the venue passcode.</p>
             </div>
 
-            <label className="mt-5 block font-body text-xs font-bold uppercase tracking-[0.16em] text-champagne/55" htmlFor="staffTabletId">
-              Sign-in ID <span className="text-champagne/40">(optional)</span>
-            </label>
-            <input
-              id="staffTabletId"
-              value={staffTabletId}
-              onChange={(e) => {
-                setStaffTabletId(e.target.value)
-                setStaffLoginError('')
-              }}
-              type="text"
-              autoComplete="username"
-              placeholder="For cashier / admin floor"
-              className="mt-2 h-11 w-full rounded-2xl border border-gold/15 bg-black/20 px-4 text-left font-body text-sm text-champagne outline-none transition focus:border-gold focus:ring-2 focus:ring-gold/20"
-            />
-
-            <label className="mt-4 block font-body text-xs font-bold uppercase tracking-[0.16em] text-champagne/55" htmlFor="staffTabletPin">
-              PIN <span className="text-champagne/40">(optional)</span>
-            </label>
-            <input
-              id="staffTabletPin"
-              value={staffTabletPin}
-              onChange={(e) => {
-                setStaffTabletPin(e.target.value)
-                setStaffLoginError('')
-              }}
-              type="password"
-              autoComplete="current-password"
-              className="mt-2 h-11 w-full rounded-2xl border border-gold/15 bg-black/20 px-4 text-left font-body text-sm text-champagne outline-none transition focus:border-gold focus:ring-2 focus:ring-gold/20"
-            />
-
-            <label className="mt-4 block font-body text-xs font-bold uppercase tracking-[0.16em] text-champagne/55" htmlFor="staffLoginCode">
+            <label className="mt-6 block font-body text-xs font-bold uppercase tracking-[0.16em] text-champagne/55" htmlFor="staffLoginCode">
               Passcode
             </label>
             <input

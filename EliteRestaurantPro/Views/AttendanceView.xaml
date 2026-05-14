@@ -12,6 +12,41 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+        <Style x:Key="ShiftFilterButtonStyle" TargetType="Button" BasedOn="{StaticResource SapphireButton}">
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="Padding" Value="18,8"/>
+            <Setter Property="MinWidth" Value="118"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#FFF7FAFF"/>
+        </Style>
+        <Style x:Key="ShiftFilterButtonAllStyle" TargetType="Button" BasedOn="{StaticResource ShiftFilterButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ShiftFilterAllSelected}" Value="True">
+                    <Setter Property="Background" Value="{StaticResource GoldAccentBrush}"/>
+                    <Setter Property="Foreground" Value="#FF0D0D1A"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource GoldAccentBrush}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="ShiftFilterButtonMorningStyle" TargetType="Button" BasedOn="{StaticResource ShiftFilterButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ShiftFilterMorningSelected}" Value="True">
+                    <Setter Property="Background" Value="{StaticResource GoldAccentBrush}"/>
+                    <Setter Property="Foreground" Value="#FF0D0D1A"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource GoldAccentBrush}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="ShiftFilterButtonNightStyle" TargetType="Button" BasedOn="{StaticResource ShiftFilterButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ShiftFilterNightSelected}" Value="True">
+                    <Setter Property="Background" Value="{StaticResource GoldAccentBrush}"/>
+                    <Setter Property="Foreground" Value="#FF0D0D1A"/>
+                    <Setter Property="BorderBrush" Value="{StaticResource GoldAccentBrush}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
     </UserControl.Resources>
     <Grid>
         <Grid.ColumnDefinitions>
@@ -27,8 +62,13 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <Grid Grid.Row="0" Margin="32,24,32,20">
+            <Border Grid.Row="0"
+                    Margin="24,20,24,12"
+                    Padding="20,18,20,16"
+                    Style="{StaticResource GlassCard}">
+            <Grid>
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
@@ -37,12 +77,30 @@
                         <Run Text="Attendance" Foreground="{StaticResource TextPrimaryBrush}"/>
                         <Run Text=" Control" Foreground="{StaticResource GoldAccentBrush}"/>
                     </TextBlock>
-                    <TextBlock Text="Morning shift: 12:00 PM-06:00 PM | Night shift: 06:00 PM-11:00 PM | Late window: 30 min from shift start"
+                    <TextBlock Text="{Binding AttendanceShiftSummaryText}"
                                Style="{StaticResource BodyText}"
                                FontSize="13"
-                               Margin="0,5,0,0"/>
+                               Margin="0,8,0,0"
+                               TextWrapping="Wrap"/>
                 </StackPanel>
-                <TextBox Grid.Row="1"
+                <StackPanel Grid.Row="1" Margin="0,14,0,0" Orientation="Horizontal">
+                    <TextBlock Text="Show:"
+                               Foreground="{StaticResource TextMutedBrush}"
+                               VerticalAlignment="Center"
+                               Margin="0,0,12,0"
+                               FontSize="13"/>
+                    <Button Content="All"
+                            Command="{Binding SetShiftFilterAllCommand}"
+                            Style="{StaticResource ShiftFilterButtonAllStyle}"/>
+                    <Button Content="Morning shift"
+                            Command="{Binding SetShiftFilterMorningCommand}"
+                            Style="{StaticResource ShiftFilterButtonMorningStyle}"/>
+                    <Button Content="Night shift"
+                            Margin="0"
+                            Command="{Binding SetShiftFilterNightCommand}"
+                            Style="{StaticResource ShiftFilterButtonNightStyle}"/>
+                </StackPanel>
+                <TextBox Grid.Row="2"
                          Margin="0,16,0,0"
                          Style="{StaticResource EliteTextBox}"
                          Height="42"
@@ -51,8 +109,9 @@
                          Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                          ToolTip="Search by employee name, ID, shift, or status"/>
             </Grid>
+            </Border>
 
-            <ScrollViewer Grid.Row="1" Margin="24,0,24,24" VerticalScrollBarVisibility="Auto" Style="{StaticResource EliteScrollViewer}">
+            <ScrollViewer Grid.Row="1" Margin="24,4,24,24" VerticalScrollBarVisibility="Auto" Style="{StaticResource EliteScrollViewer}">
                 <ItemsControl ItemsSource="{Binding AttendanceDayGroups}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
@@ -87,7 +146,7 @@
                                 <ItemsControl ItemsSource="{Binding Rows}" Margin="0,8,0,0">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Border Style="{StaticResource GlassCard}" Margin="0,0,0,12" Padding="16">
+                                            <Border Style="{StaticResource GlassCard}" Margin="0,0,0,12" Padding="18">
                                                 <Grid>
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="*"/>
@@ -175,7 +234,7 @@
                                                                    Margin="0,6,0,0"/>
                                                     </StackPanel>
 
-                                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="12,0,0,0">
+                                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="16,2,0,0" VerticalAlignment="Top">
                                                         <Button Width="100"
                                                                 Margin="0,0,6,0"
                                                                 Content="Clock In"

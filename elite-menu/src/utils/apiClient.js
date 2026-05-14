@@ -13,7 +13,7 @@ export const API_ORIGIN =
     ? configuredBase.replace(/\/$/, '')
     : import.meta.env.DEV
       ? ''
-      : PRODUCTION_API_ORIGIN
+      : ''
 
 export const API_BASE = API_ORIGIN ? `${API_ORIGIN}/api` : '/api'
 

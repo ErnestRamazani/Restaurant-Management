@@ -30,7 +30,35 @@ function Particles() {
   )
 }
 
-export function ConfirmScreen({ label, message, estimatedPrepMinutes, onOrderMore, onBackToStart }) {
+/**
+ * @param {object} props
+ * @param {string} [props.heading]
+ * @param {string} [props.primaryCtaLabel]
+ * @param {string} [props.secondaryCtaLabel]
+ * @param {'emerald' | 'gold'} [props.accent]
+ * @param {{ label: string; value: string }[]} [props.details]
+ */
+export function ConfirmScreen({
+  label,
+  message,
+  estimatedPrepMinutes,
+  onOrderMore,
+  onBackToStart,
+  heading,
+  primaryCtaLabel,
+  secondaryCtaLabel,
+  accent = 'emerald',
+  details,
+}) {
+  const headingText = heading ?? 'We received it'
+  const primaryLabel = primaryCtaLabel ?? 'Order more'
+  const secondaryLabel = secondaryCtaLabel ?? 'Back to start'
+  const ringAccent =
+    accent === 'gold'
+      ? 'border-amber-400/45 bg-amber-500/10 shadow-[0_0_32px_rgba(200,168,76,0.22)]'
+      : 'border-emerald-500/40 bg-emerald-500/10 shadow-[0_0_32px_rgba(16,185,129,0.2)]'
+  const iconAccent = accent === 'gold' ? 'text-amber-300' : 'text-emerald-400'
+
   return (
     <motion.div
       className="relative flex min-h-[100svh] flex-col overflow-hidden bg-midnight"
@@ -48,15 +76,30 @@ export function ConfirmScreen({ label, message, estimatedPrepMinutes, onOrderMor
           initial={{ scale: 0.6, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ type: 'spring', stiffness: 400, damping: 22, delay: 0.05 }}
-          className="mb-6 flex h-20 w-20 items-center justify-center rounded-full border-2 border-emerald-500/40 bg-emerald-500/10 shadow-[0_0_32px_rgba(16,185,129,0.2)]"
+          className={'mb-6 flex h-20 w-20 items-center justify-center rounded-full border-2 ' + ringAccent}
         >
-          <Check className="h-9 w-9 text-emerald-400" strokeWidth={2.5} />
+          <Check className={'h-9 w-9 ' + iconAccent} strokeWidth={2.5} />
         </motion.div>
 
-        <h2 className="text-center font-display text-2xl italic font-semibold text-champagne">We received it</h2>
+        <h2 className="text-center font-display text-2xl italic font-semibold text-champagne">{headingText}</h2>
         <p className="mt-2 max-w-[300px] text-center font-body text-sm leading-relaxed text-[var(--text-muted)]">
           {message || 'The kitchen and your server can see this order as a request.'}
         </p>
+        {details != null && details.length > 0 ? (
+          <div className="mt-6 w-full max-w-[320px] space-y-3">
+            {details.map((row) => (
+              <div
+                key={row.label}
+                className="rounded-2xl border border-champagne/15 bg-midnight-2 px-5 py-3 text-left shadow-[0_12px_40px_rgba(0,0,0,0.2)]"
+              >
+                <p className="font-body text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-gold/80">
+                  {row.label}
+                </p>
+                <p className="mt-1 font-body text-sm font-medium leading-snug text-champagne">{row.value}</p>
+              </div>
+            ))}
+          </div>
+        ) : null}
         {label ? (
           <div className="mt-6 rounded-2xl border border-gold/20 bg-[var(--gold-dim)] px-6 py-3 text-center">
             <p className="font-body text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-gold/80">Reference</p>
@@ -80,7 +123,7 @@ export function ConfirmScreen({ label, message, estimatedPrepMinutes, onOrderMor
             onClick={onOrderMore}
             className="min-h-[50px] w-full rounded-xl border border-gold/45 bg-gold/10 font-body text-[0.9rem] font-bold uppercase tracking-[0.1em] text-gold transition-colors hover:bg-gold/15"
           >
-            Order more
+            {primaryLabel}
           </button>
           {onBackToStart ? (
             <button
@@ -88,7 +131,7 @@ export function ConfirmScreen({ label, message, estimatedPrepMinutes, onOrderMor
               onClick={onBackToStart}
               className="min-h-[44px] w-full font-body text-sm text-champagne/50 hover:text-champagne/80"
             >
-              Back to start
+              {secondaryLabel}
             </button>
           ) : null}
         </div>

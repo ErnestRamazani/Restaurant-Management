@@ -17,10 +17,13 @@ public sealed record PublicMenuConfigDto(
     string? TicketFooterText,
     string? TaxIdLegalInfo,
     int? OnlineOrdersTableId,
+    int ReservationLeadDays,
+    int ReservationMaxMonthsAhead,
     string? OnlinePromoTitle,
     string? OnlinePromoSubtitle,
     string? OnlinePromoCtaLabel,
-    string? OnlinePromoImageUrl);
+    string? OnlinePromoImageUrl,
+    string? MenuTaxonomyJson);
 
 public sealed record StaffLoginCodeRequest(string? Code, string? SignInId = null, string? Pin = null);
 

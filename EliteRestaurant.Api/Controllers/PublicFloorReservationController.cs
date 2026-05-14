@@ -3,6 +3,7 @@ using EliteRestaurant.Api.Services;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Reservations;
+using EliteRestaurant.Core.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -31,6 +32,9 @@ public sealed class PublicFloorReservationController(
 
         if (request.PartySize < placement.MinPartyCapacity || request.PartySize > placement.MaxPartyCapacity)
             return BadRequest(new { message = "Party size is out of range for this table." });
+
+        if (TryGetPublicBookingScheduleError(request.PlannedStartUtc, out var scheduleErr))
+            return BadRequest(new { message = scheduleErr });
 
         if (!string.Equals(placement.Status, PlacementUnitStatuses.Available, StringComparison.OrdinalIgnoreCase))
             return Conflict(new PublicFloorConflictDto(true, null, "This table is not available for new bookings right now."));
@@ -135,5 +139,52 @@ public sealed class PublicFloorReservationController(
             .ToList();
 
         return Ok(dto);
+    }
+
+    /// <summary>No past dates; enforce configurable lead-time and max horizon from business settings.</summary>
+    private static bool TryGetPublicBookingScheduleError(DateTime plannedStartUtc, out string? message)
+    {
+        message = null;
+        var startUtc = plannedStartUtc.Kind switch
+        {
+            DateTimeKind.Utc => plannedStartUtc,
+            DateTimeKind.Local => plannedStartUtc.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(plannedStartUtc, DateTimeKind.Utc)
+        };
+
+        if (startUtc <= DateTime.UtcNow)
+        {
+            message = "Reservation time must be in the future.";
+            return true;
+        }
+
+        var startDay = startUtc.Date;
+        var todayUtc = DateTime.UtcNow.Date;
+        if (startDay < todayUtc)
+        {
+            message = "You cannot reserve a past date.";
+            return true;
+        }
+
+        var business = SettingsManager.Load().BusinessProfile;
+        var leadDays = Math.Clamp(business.ReservationLeadDays, 0, 30);
+        var maxMonthsAhead = Math.Clamp(business.ReservationMaxMonthsAhead, 1, 24);
+        if (startDay < todayUtc.AddDays(leadDays))
+        {
+            message =
+                leadDays <= 0
+                    ? "Reservation time must be in the future."
+                    : $"Reservations require at least {leadDays} day(s) notice. For sooner dates, please call the restaurant.";
+            return true;
+        }
+
+        var latestAllowed = todayUtc.AddMonths(maxMonthsAhead);
+        if (startDay > latestAllowed)
+        {
+            message = $"Reservations may be booked up to {maxMonthsAhead} month(s) ahead.";
+            return true;
+        }
+
+        return false;
     }
 }

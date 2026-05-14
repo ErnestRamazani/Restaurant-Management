@@ -1,20 +1,60 @@
+using System.Globalization;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace EliteRestaurant.Core.Utils;
 
+/// <summary>Shift boundaries (local time-of-day) used for attendance, payroll, and auto-absence.</summary>
+public readonly record struct AttendanceShiftSchedule(
+    TimeSpan MorningStart,
+    TimeSpan MorningEnd,
+    TimeSpan NightStart,
+    TimeSpan NightEnd)
+{
+    public static AttendanceShiftSchedule Defaults { get; } = new(
+        new TimeSpan(12, 0, 0),
+        new TimeSpan(18, 0, 0),
+        new TimeSpan(18, 0, 0),
+        new TimeSpan(23, 0, 0));
+
+    public static AttendanceShiftSchedule FromSettings(AttendanceSettings? settings)
+    {
+        if (settings is null)
+            return Defaults;
+
+        return new AttendanceShiftSchedule(
+            ClampToDay(settings.MorningShiftStart),
+            ClampToDay(settings.MorningShiftEnd),
+            ClampToDay(settings.NightShiftStart),
+            ClampToDay(settings.NightShiftEnd));
+    }
+
+    private static TimeSpan ClampToDay(TimeSpan t)
+    {
+        if (t < TimeSpan.Zero)
+            return TimeSpan.Zero;
+        if (t >= TimeSpan.FromDays(1))
+            return TimeSpan.FromDays(1).Subtract(TimeSpan.FromTicks(1));
+        return t;
+    }
+
+    public string FormatMorningRange()
+        => $"{FormatTime12h(MorningStart)}-{FormatTime12h(MorningEnd)}";
+
+    public string FormatNightRange()
+        => $"{FormatTime12h(NightStart)}-{FormatTime12h(NightEnd)}";
+
+    private static string FormatTime12h(TimeSpan timeOfDay) =>
+        DateTime.Today.Add(timeOfDay).ToString("h:mm tt", CultureInfo.CurrentCulture);
+}
+
 /// <summary>Shift resolution and auto-absence generation for scheduled workdays.</summary>
 public static class AttendanceScheduleHelper
 {
-    private static readonly TimeSpan MorningShiftStart = new(12, 0, 0);
-    private static readonly TimeSpan MorningShiftEnd = new(18, 0, 0);
-    private static readonly TimeSpan NightShiftStart = new(18, 0, 0);
-    private static readonly TimeSpan NightShiftEnd = new(23, 0, 0);
-
     public readonly record struct ShiftWindow(string Name, TimeSpan Start, TimeSpan End, string WindowText, bool IsOff);
 
-    public static ShiftWindow ResolveShiftWindow(Employee employee, DateTime day)
+    public static ShiftWindow ResolveShiftWindow(Employee employee, DateTime day, AttendanceShiftSchedule schedule)
     {
         var configuredShift = day.DayOfWeek switch
         {
@@ -31,32 +71,43 @@ public static class AttendanceScheduleHelper
         var normalized = (configuredShift ?? string.Empty).Trim();
 
         if (normalized.Equals("Off", StringComparison.OrdinalIgnoreCase))
-            return new ShiftWindow("Off", MorningShiftStart, MorningShiftEnd, "Off day", IsOff: true);
+            return new ShiftWindow("Off", schedule.MorningStart, schedule.MorningEnd, "Off day", IsOff: true);
 
         if (normalized.Contains("Night", StringComparison.OrdinalIgnoreCase) ||
             normalized.Contains("Evening", StringComparison.OrdinalIgnoreCase))
         {
-            return new ShiftWindow("Night Shift", NightShiftStart, NightShiftEnd, "06:00 PM - 11:00 PM", IsOff: false);
+            var w = $"{schedule.FormatNightRange().Replace("-", " - ")}";
+            return new ShiftWindow("Night Shift", schedule.NightStart, schedule.NightEnd, w, IsOff: false);
         }
 
         if (normalized.Contains("Morning", StringComparison.OrdinalIgnoreCase) ||
             normalized.Contains("Afternoon", StringComparison.OrdinalIgnoreCase))
         {
-            return new ShiftWindow("Morning Shift", MorningShiftStart, MorningShiftEnd, "12:00 PM - 06:00 PM", IsOff: false);
+            var w = $"{schedule.FormatMorningRange().Replace("-", " - ")}";
+            return new ShiftWindow("Morning Shift", schedule.MorningStart, schedule.MorningEnd, w, IsOff: false);
         }
 
-        return new ShiftWindow("Morning Shift", MorningShiftStart, MorningShiftEnd, "12:00 PM - 06:00 PM", IsOff: false);
+        {
+            var w = $"{schedule.FormatMorningRange().Replace("-", " - ")}";
+            return new ShiftWindow("Morning Shift", schedule.MorningStart, schedule.MorningEnd, w, IsOff: false);
+        }
     }
 
     /// <summary>
     /// For each past scheduled workday up to yesterday, ensure an absence row exists when there was no clock-in.
     /// </summary>
     public static void EnsureAutoAbsences(AppDbContext db, DateTime fromDate, DateTime throughDate)
-        => EnsureAutoAbsences(db, fromDate, throughDate, null);
+        => EnsureAutoAbsences(db, fromDate, throughDate, null, null);
 
     /// <param name="skipDates">Calendar dates already validated by admin — left unchanged.</param>
-    public static void EnsureAutoAbsences(AppDbContext db, DateTime fromDate, DateTime throughDate, IReadOnlySet<DateTime>? skipDates)
+    public static void EnsureAutoAbsences(
+        AppDbContext db,
+        DateTime fromDate,
+        DateTime throughDate,
+        IReadOnlySet<DateTime>? skipDates,
+        AttendanceShiftSchedule? schedule = null)
     {
+        var sched = schedule ?? AttendanceShiftSchedule.FromSettings(SettingsManager.Load().Attendance);
         var end = throughDate.Date < DateTime.Today
             ? throughDate.Date
             : DateTime.Today.AddDays(-1);
@@ -71,7 +122,7 @@ public static class AttendanceScheduleHelper
 
             foreach (var emp in employees)
             {
-                var shift = ResolveShiftWindow(emp, d);
+                var shift = ResolveShiftWindow(emp, d, sched);
                 if (shift.IsOff)
                     continue;
 

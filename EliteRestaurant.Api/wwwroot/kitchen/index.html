@@ -118,7 +118,8 @@
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
       gap: 12px;
-      flex: 1;
+      flex: 0 0 auto;
+      height: clamp(300px, 52vh, 620px);
       min-height: 280px;
       align-items: stretch;
     }
@@ -150,7 +151,7 @@
     .queue-col h3 .dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; }
     .queue-col--waiting h3 .dot { background: var(--waiting); }
     .queue-col--prep h3 .dot { background: var(--kitchen); }
-    .queue-body { flex: 1; overflow-y: auto; max-height: min(70vh, 920px); min-height: 52vh; -webkit-overflow-scrolling: touch; }
+    .queue-body { flex: 1; overflow-y: auto; min-height: 0; -webkit-overflow-scrolling: touch; }
     .ticket {
       position: relative;
       padding: 12px 14px 12px 14px;
@@ -226,6 +227,8 @@
     .detail-card {
       background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px;
       box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+      max-height: 42vh;
+      overflow: auto;
     }
     .detail-card h4 { margin: 0 0 12px; font-size: 1rem; color: #e8eaef; }
     .detail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; font-size: 13px; margin-bottom: 12px; }
@@ -233,7 +236,9 @@
     .line-table { width: 100%; border-collapse: collapse; font-size: 13px; }
     .line-table th { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; }
     .line-table td { padding: 10px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
-    .actions-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+    .actions-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 14px; padding: 12px; border: 1px solid rgba(56,189,248,0.22); border-radius: var(--radius-sm); background: rgba(56,189,248,0.06); }
+    .actions-row:empty { display: none; }
+    .line-empty { color: #fbbf24; background: rgba(245, 158, 11, 0.08); }
     .btn-waiting { background: rgba(56, 189, 248, 0.15); color: #7dd3fc; border: 1px solid rgba(56, 189, 248, 0.35); }
     .btn-ready { background: rgba(45, 212, 191, 0.15); color: #5eead4; border: 1px solid rgba(45, 212, 191, 0.35); }
     .mono { font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
@@ -376,8 +381,10 @@
             <div><span>Server</span><span id="dServer"></span></div>
             <div><span>Status</span><span id="dStatus"></span></div>
             <div><span>Created</span><span id="dTime"></span></div>
+            <div><span>Ticket total</span><strong id="dTotal"></strong></div>
             <div><span>Fulfillment</span><strong id="dOrigin"></strong></div>
           </div>
+          <div class="actions-row" id="detailActions"></div>
           <div>
             <span class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;">Customer notes</span>
             <p id="dCust" style="margin:6px 0 10px;font-size:13px;"></p>
@@ -388,7 +395,6 @@
             <thead><tr><th>Item</th><th>Qty</th><th>Station</th></tr></thead>
             <tbody id="dLines"></tbody>
           </table>
-          <div class="actions-row" id="detailActions"></div>
         </div>
       </div>
       </div>
@@ -479,6 +485,28 @@
   function sameOrderId(a, b) {
     if (a == null || b == null) return false;
     return Number(a) === Number(b);
+  }
+
+  /** Line items from `/api/admin/data/orders` — tolerate PascalCase keys or a rare object-shaped payload. */
+  function orderLineItems(o) {
+    if (!o || typeof o !== "object") return [];
+    const raw = o.items ?? o.Items;
+    if (raw == null) return [];
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === "object") return Object.values(raw);
+    return [];
+  }
+
+  /** Lowercase, collapse spaces — matches literals like `Pending approval`, `In kitchen`. */
+  function kitchenStatusKey(st) {
+    const n = String(st ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+    if (n === "waiting") return "waiting";
+    if (n === "pending approval") return "pendingApproval";
+    if (n === "in kitchen") return "inKitchen";
+    if (n === "ready") return "ready";
+    if (n === "served") return "served";
+    if (n === "pending cashier") return "pendingCashier";
+    return "other";
   }
 
   function newIdempotencyKey() {
@@ -941,7 +969,7 @@
   function round2(n) { return Math.round(n * 100) / 100; }
 
   function lineSubtotal(order) {
-    const items = order.items || order.Items || [];
+    const items = orderLineItems(order);
     let s = 0;
     for (const it of items) {
       const pid = it.productId ?? it.ProductId;
@@ -974,7 +1002,7 @@
     const sid = o.serverId ?? o.ServerId;
     if (sid && employees[sid] && !o.server && !o.Server) o._server = employees[sid];
     else o._server = o.server || o.Server;
-    const items = o.items || o.Items || [];
+    const items = orderLineItems(o);
     for (const it of items) {
       const pid = it.productId ?? it.ProductId;
       if (pid && products[pid] && !it.product && !it.Product) it._product = products[pid];
@@ -1119,7 +1147,7 @@
   }
 
   function shortenLines(o) {
-    const items = o.items || o.Items || [];
+    const items = orderLineItems(o);
     const parts = [];
     for (const it of items) {
       hydrateOrder(o);
@@ -1130,6 +1158,10 @@
       parts.push(name + " ×" + q);
     }
     return parts.join(", ") || "—";
+  }
+
+  function itemPreviewText(o) {
+    return String(o.itemsPreview ?? o.ItemsPreview ?? "").trim();
   }
 
   async function loadQueue() {
@@ -1167,17 +1199,20 @@
   }
 
   function renderLists() {
-    const waiting = ordersCache.filter(o => (o.status || o.Status) === "Waiting").sort((a, b) => {
+    const waiting = ordersCache.filter(o => {
+      const k = kitchenStatusKey(o.status || o.Status);
+      return k === "waiting" || k === "pendingApproval" || k === "pendingCashier";
+    }).sort((a, b) => {
       const ca = new Date(a.createdAt || a.CreatedAt).getTime();
       const cb = new Date(b.createdAt || b.CreatedAt).getTime();
       return ca - cb;
     });
-    const prep = ordersCache.filter(o => (o.status || o.Status) === "In Kitchen").sort((a, b) => {
+    const prep = ordersCache.filter(o => kitchenStatusKey(o.status || o.Status) === "inKitchen").sort((a, b) => {
       const ca = new Date(a.createdAt || a.CreatedAt).getTime();
       const cb = new Date(b.createdAt || b.CreatedAt).getTime();
       return ca - cb;
     });
-    const ready = ordersCache.filter(o => (o.status || o.Status) === "Ready").sort((a, b) => {
+    const ready = ordersCache.filter(o => kitchenStatusKey(o.status || o.Status) === "ready").sort((a, b) => {
       const ca = new Date(a.createdAt || a.CreatedAt).getTime();
       const cb = new Date(b.createdAt || b.CreatedAt).getTime();
       return ca - cb;
@@ -1246,23 +1281,34 @@
     $("detailContent").classList.remove("hidden");
     hydrateOrder(o);
     const st = o.status || o.Status;
+    const stKey = kitchenStatusKey(st);
     $("dCode").textContent = orderCode(o);
     $("dTable").textContent = tableLabel(o);
     $("dServer").textContent = serverName(o);
     $("dStatus").textContent = st;
     $("dTime").textContent = formatTime(o.createdAt || o.CreatedAt);
-    $("dTotal").textContent = "$ " + computeGrandTotal(o).toFixed(2);
+    const totEl = $("dTotal");
+    if (totEl) totEl.textContent = "$ " + computeGrandTotal(o).toFixed(2);
     $("dCust").textContent = (o.customerNotes || o.CustomerNotes || "").trim() || "—";
     $("dAllergy").textContent = (o.allergyNotes || o.AllergyNotes || "").trim() || "—";
     $("dOrigin").textContent = parseKitchenOrigin(o).detailLabel;
 
     const tbody = $("dLines");
     tbody.innerHTML = "";
-    const items = o.items || o.Items || [];
+    const items = orderLineItems(o);
     const sorted = [...items].sort((a, b) => {
       const na = ((a._product || {}).name || (a._product || {}).Name || "").localeCompare(((b._product || {}).name || (b._product || {}).Name || ""));
       return na;
     });
+    if (!sorted.length) {
+      const tr = document.createElement("tr");
+      const preview = itemPreviewText(o);
+      tr.className = "line-empty";
+      tr.innerHTML = preview
+        ? '<td colspan="3"><strong>Items:</strong> ' + escapeHtml(preview) + '</td>'
+        : '<td colspan="3"><strong>No item lines were sent for this ticket.</strong> Refresh the queue. If this stays empty, the order was saved without cookable line items.</td>';
+      tbody.appendChild(tr);
+    }
     for (const it of sorted) {
       const pid = it.productId ?? it.ProductId;
       const pr = it._product || products[pid];
@@ -1277,34 +1323,66 @@
     const actions = $("detailActions");
     actions.innerHTML = "";
     const id = o.id ?? o.Id;
-    if (st === "Waiting") {
+    if (stKey === "pendingApproval" || stKey === "pendingCashier") {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "btn btn-waiting";
+      b.textContent = "Release to kitchen";
+      b.onclick = () => releasePendingToKitchen(id);
+      actions.appendChild(b);
+      const hint = document.createElement("p");
+      hint.className = "muted";
+      hint.style.margin = "8px 0 0";
+      hint.textContent =
+        stKey === "pendingCashier"
+          ? "Ticket is still with cashier: confirm and send to prep (inventory deducted, status becomes Waiting)."
+          : "Guest online order: approve and send to prep (inventory deducted, status becomes Waiting).";
+      actions.appendChild(hint);
+    } else if (stKey === "waiting") {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "btn btn-waiting";
       b.textContent = "Receive → In kitchen";
       b.onclick = () => advanceOrder(id, "waiting");
       actions.appendChild(b);
-    } else if (st === "In Kitchen") {
+    } else if (stKey === "inKitchen") {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "btn btn-ready";
       b.textContent = "Mark ready for pickup";
       b.onclick = () => advanceOrder(id, "prep");
       actions.appendChild(b);
-    } else if (st === "Ready") {
+    } else if (stKey === "ready") {
       const p = document.createElement("p");
       p.className = "muted";
       p.style.margin = "0";
       p.textContent = "This ticket is ready for server pickup. Advance it from a server tablet or the admin orders screen.";
       actions.appendChild(p);
+    } else {
+      const p = document.createElement("p");
+      p.className = "muted";
+      p.style.margin = "0";
+      p.textContent = "No kitchen action is available for status: " + (st || "Unknown") + ". Refresh if the ticket changed.";
+      actions.appendChild(p);
     }
   }
 
+  async function releasePendingToKitchen(orderId) {
+    if (!confirm("Approve this order and release it to the kitchen? Inventory will be deducted.")) return;
+    const res = await api("/api/admin/orders/pending/" + orderId + "/release-to-kitchen", "POST", {}, true);
+    const ok = res.body?.ok ?? res.body?.Ok;
+    if (!res.ok || ok === false) {
+      alert(res.body?.errorMessage || res.body?.ErrorMessage || "Release failed (" + res.status + ")");
+      return;
+    }
+    await loadQueue();
+  }
+
   async function advanceOrder(orderId, from) {
-    const o = ordersCache.find(x => (x.id ?? x.Id) === orderId);
-    const st = o ? (o.status || o.Status) : "";
-    if (from === "waiting" && st !== "Waiting") { await loadQueue(); return; }
-    if (from === "prep" && st !== "In Kitchen") { await loadQueue(); return; }
+    const o = ordersCache.find(x => sameOrderId(x.id ?? x.Id, orderId));
+    const stKey = o ? kitchenStatusKey(o.status || o.Status) : "other";
+    if (from === "waiting" && stKey !== "waiting") { await loadQueue(); return; }
+    if (from === "prep" && stKey !== "inKitchen") { await loadQueue(); return; }
     const msg = from === "waiting"
       ? "Start preparing this ticket? Status moves from Waiting to In kitchen."
       : "Mark this ticket ready for pickup? Servers and cashier will see it.";

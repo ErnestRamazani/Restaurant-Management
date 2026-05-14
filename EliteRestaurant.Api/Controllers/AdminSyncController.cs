@@ -33,7 +33,8 @@ public sealed class AdminSyncController(AppDbContext db) : ControllerBase
         [nameof(WaitlistEntry)] = typeof(WaitlistEntry),
         [nameof(SharedOrderDraft)] = typeof(SharedOrderDraft),
         [nameof(TabletSession)] = typeof(TabletSession),
-        [nameof(AttendanceDayValidation)] = typeof(AttendanceDayValidation)
+        [nameof(AttendanceDayValidation)] = typeof(AttendanceDayValidation),
+        [nameof(PublicMenuAsset)] = typeof(PublicMenuAsset)
     };
 
     [HttpPost]
@@ -126,29 +127,38 @@ public sealed class AdminSyncController(AppDbContext db) : ControllerBase
         }
 
         var uniqueId = GetStringProperty(incoming, "UniqueId");
-        if (string.IsNullOrWhiteSpace(uniqueId))
-            return null;
+        if (!string.IsNullOrWhiteSpace(uniqueId))
+            return await FindByStringPropertyAsync(entityType, "UniqueId", uniqueId, cancellationToken);
 
-        return await FindByUniqueIdAsync(entityType, uniqueId, cancellationToken);
+        var key = GetStringProperty(incoming, "Key");
+        if (!string.IsNullOrWhiteSpace(key))
+            return await FindByStringPropertyAsync(entityType, "Key", key, cancellationToken);
+
+        return null;
     }
 
-    private async Task<object?> FindByUniqueIdAsync(Type entityType, string uniqueId, CancellationToken cancellationToken)
+    private async Task<object?> FindByStringPropertyAsync(
+        Type entityType,
+        string propertyName,
+        string value,
+        CancellationToken cancellationToken)
     {
         var method = typeof(AdminSyncController)
-            .GetMethod(nameof(FindByUniqueIdGeneric), BindingFlags.NonPublic | BindingFlags.Static)!
+            .GetMethod(nameof(FindByStringPropertyGeneric), BindingFlags.NonPublic | BindingFlags.Static)!
             .MakeGenericMethod(entityType);
 
-        return await (Task<object?>)method.Invoke(null, [db, uniqueId, cancellationToken])!;
+        return await (Task<object?>)method.Invoke(null, [db, propertyName, value, cancellationToken])!;
     }
 
-    private static async Task<object?> FindByUniqueIdGeneric<TEntity>(
+    private static async Task<object?> FindByStringPropertyGeneric<TEntity>(
         AppDbContext db,
-        string uniqueId,
+        string propertyName,
+        string value,
         CancellationToken cancellationToken)
         where TEntity : class
     {
         return await db.Set<TEntity>().FirstOrDefaultAsync(
-            e => EF.Property<string>(e, "UniqueId") == uniqueId,
+            e => EF.Property<string>(e, propertyName) == value,
             cancellationToken);
     }
 
@@ -175,7 +185,9 @@ public sealed class AdminSyncController(AppDbContext db) : ControllerBase
                || type == typeof(string)
                || type == typeof(decimal)
                || type == typeof(DateTime)
-               || type == typeof(Guid);
+               || type == typeof(Guid)
+               // PublicMenuAsset.Content (product photos, logo bytes) must overwrite on upsert.
+               || type == typeof(byte[]);
     }
 
     private static int GetIntProperty(object instance, string name) =>

@@ -61,8 +61,8 @@ public sealed class CashierPortalController(
             return new CashierPendingOrderDto(
                 o.Id,
                 string.IsNullOrWhiteSpace(o.UniqueId) ? $"#{o.Id:000}" : o.UniqueId,
-                $"{o.TableCode} · {o.TableName}".Trim(' ', '·'),
-                o.ServerName ?? string.Empty,
+                OrderRecordUiLabels.TableCaption(o),
+                OrderRecordUiLabels.ServerCaption(o),
                 o.CreatedAt,
                 o.CreatedAt.ToString("MMM d, yyyy · HH:mm"),
                 totals.GrandTotal,
@@ -191,12 +191,8 @@ public sealed class CashierPortalController(
         var dto = new CashierOrderDetailDto(
             order.Id,
             string.IsNullOrWhiteSpace(order.UniqueId) ? $"#{order.Id:000}" : order.UniqueId,
-            string.IsNullOrWhiteSpace(order.TableCode)
-                ? $"Table {order.Table?.TableNumber ?? 0}"
-                : $"{order.TableCode} · {order.TableName}",
-            string.IsNullOrWhiteSpace(order.ServerName)
-                ? (order.Server?.Name ?? "Unassigned")
-                : order.ServerName,
+            OrderRecordUiLabels.TableCaption(order),
+            OrderRecordUiLabels.ServerCaption(order),
             order.Status,
             order.CustomerNotes ?? string.Empty,
             order.AllergyNotes ?? string.Empty,
@@ -233,11 +229,13 @@ public sealed class CashierPortalController(
         var order = db.Orders.AsNoTracking().SingleOrDefault(o => o.Id == orderId);
         if (order is null)
             return NotFound(new { message = "Order not found." });
-        if (!OrderWorkflow.CanCashierComplete(order.Status))
+        if (!OrderWorkflow.CanCashierComplete(order.Status, order.OrderOrigin))
             return BadRequest(new
             {
                 message =
-                    "Complete is only available when the order is Served. Flow: kitchen marks Ready → server marks Served → cashier completes payment."
+                    OrderOrigin.IsOnline(order.OrderOrigin)
+                        ? "Complete is only available when the order is Ready (kitchen finished) or Served. For guest online orders you can pay as soon as it is Ready — no server step required."
+                        : "Complete is only available when the order is Served. Flow: kitchen marks Ready → server marks Served → cashier completes payment."
             });
 
         try

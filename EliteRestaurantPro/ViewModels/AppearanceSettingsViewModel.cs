@@ -1,10 +1,13 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using EliteRestaurant.Core.Menu;
 using EliteRestaurant.Core.Utils;
 using EliteRestaurantPro.ApiClients;
 using EliteRestaurantPro.Services;
@@ -69,6 +72,13 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     private string _onlinePromoCtaLabel = string.Empty;
     private string _onlinePromoImagePath = string.Empty;
     private string _onlineOrdersTableId = string.Empty;
+    private string _reservationLeadDays = "2";
+    private string _reservationMaxMonthsAhead = "6";
+    private string _attendanceMorningStartText = "12:00";
+    private string _attendanceMorningEndText = "18:00";
+    private string _attendanceNightStartText = "18:00";
+    private string _attendanceNightEndText = "23:00";
+    private string _attendanceLateGraceMinutesText = "30";
 
     public override string ActivePage => "AppearanceSettings";
 
@@ -138,7 +148,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         set => SetField(ref _statusMessage, value);
     }
 
-    public ObservableCollection<string> SettingsSections { get; } = new(["All", "Business Profile", "Currency & Pricing", "Menu Backgrounds", "Menu QR Codes", "Database", "Appearance"]);
+    public ObservableCollection<string> SettingsSections { get; } = new(["All", "Business Profile", "Reservations", "Menu categories", "Currency & Pricing", "Attendance & shifts", "Menu Backgrounds", "Menu QR Codes", "Database", "Appearance"]);
     public ObservableCollection<string> BackgroundMenuKeys { get; } = new(["Dashboard", "Employees", "Menu", "Inventory", "Attendance", "Tables", "Reservations", "Orders", "CreateOrder", "Money", "Salary", "Reports", "KitchenQueue", "ServerPickup"]);
     public ObservableCollection<string> DatabaseProviders { get; } = new(["PostgreSql"]);
 
@@ -155,10 +165,19 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
             OnPropertyChanged(nameof(ShowDatabaseSection));
             OnPropertyChanged(nameof(ShowAppearanceSection));
             OnPropertyChanged(nameof(ShowMenuQrSection));
+            OnPropertyChanged(nameof(ShowAttendanceSection));
+            OnPropertyChanged(nameof(ShowReservationsSection));
+            OnPropertyChanged(nameof(ShowMenuTaxonomySection));
             if (ShowMenuQrSection)
                 _ = RefreshMenuQrRowsAsync();
         }
     }
+
+    public bool ShowAttendanceSection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Attendance & shifts";
+
+    public bool ShowReservationsSection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Reservations";
+
+    public bool ShowMenuTaxonomySection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Menu categories";
 
     public bool ShowBusinessSection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Business Profile";
     public bool ShowCurrencySection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Currency & Pricing";
@@ -308,6 +327,48 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     {
         get => _onlineOrdersTableId;
         set => SetField(ref _onlineOrdersTableId, value);
+    }
+
+    public string ReservationLeadDays
+    {
+        get => _reservationLeadDays;
+        set => SetField(ref _reservationLeadDays, value);
+    }
+
+    public string ReservationMaxMonthsAhead
+    {
+        get => _reservationMaxMonthsAhead;
+        set => SetField(ref _reservationMaxMonthsAhead, value);
+    }
+
+    public string AttendanceMorningStartText
+    {
+        get => _attendanceMorningStartText;
+        set => SetField(ref _attendanceMorningStartText, value);
+    }
+
+    public string AttendanceMorningEndText
+    {
+        get => _attendanceMorningEndText;
+        set => SetField(ref _attendanceMorningEndText, value);
+    }
+
+    public string AttendanceNightStartText
+    {
+        get => _attendanceNightStartText;
+        set => SetField(ref _attendanceNightStartText, value);
+    }
+
+    public string AttendanceNightEndText
+    {
+        get => _attendanceNightEndText;
+        set => SetField(ref _attendanceNightEndText, value);
+    }
+
+    public string AttendanceLateGraceMinutesText
+    {
+        get => _attendanceLateGraceMinutesText;
+        set => SetField(ref _attendanceLateGraceMinutesText, value);
     }
 
     public ObservableCollection<MenuQrTableRow> MenuQrRows { get; } = new();
@@ -483,6 +544,13 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     public ICommand TestDatabaseConnectionCommand { get; }
     public ICommand PrintAllMenuQrCommand { get; }
     public ICommand ApplyPhoneFriendlyMenuUrlCommand { get; }
+    public ICommand SaveAttendanceShiftsCommand { get; }
+    public ICommand SaveReservationSettingsCommand { get; }
+    public ICommand SaveMenuTaxonomyCommand { get; }
+    public ICommand ResetMenuTaxonomyCommand { get; }
+    public ICommand AddMenuTaxonomyTypeCommand { get; }
+
+    public ObservableCollection<MenuTaxonomyTypeEditVm> MenuTaxonomyTypes { get; } = new();
 
     public AppearanceSettingsViewModel(Action<BaseViewModel> navigate) : base(navigate)
     {
@@ -505,7 +573,13 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         TestDatabaseConnectionCommand = new RelayCommand(_ => _ = TestDatabaseConnectionAsync());
         PrintAllMenuQrCommand = new RelayCommand(_ => _ = PrintAllMenuQrToPdfAsync());
         ApplyPhoneFriendlyMenuUrlCommand = new RelayCommand(_ => ApplyPhoneFriendlyMenuUrl());
+        SaveAttendanceShiftsCommand = new RelayCommand(_ => SaveAttendanceShifts());
+        SaveReservationSettingsCommand = new RelayCommand(_ => SaveReservationSettings());
+        SaveMenuTaxonomyCommand = new RelayCommand(_ => SaveMenuTaxonomy());
+        ResetMenuTaxonomyCommand = new RelayCommand(_ => ResetMenuTaxonomyUi());
+        AddMenuTaxonomyTypeCommand = new RelayCommand(_ => AddMenuTaxonomyType());
         LoadBusinessAndPricingSettings();
+        LoadMenuTaxonomyUi();
         LoadBackgroundSettings();
         LoadDatabaseSettings();
         LoadFromCurrentTheme();
@@ -679,6 +753,8 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         OnlinePromoCtaLabel = business.OnlinePromoCtaLabel ?? string.Empty;
         OnlinePromoImagePath = business.OnlinePromoImagePath ?? string.Empty;
         OnlineOrdersTableId = business.OnlineOrdersTableId?.ToString() ?? string.Empty;
+        ReservationLeadDays = Math.Clamp(business.ReservationLeadDays, 0, 30).ToString(CultureInfo.InvariantCulture);
+        ReservationMaxMonthsAhead = Math.Clamp(business.ReservationMaxMonthsAhead, 1, 24).ToString(CultureInfo.InvariantCulture);
 
         var pricing = _settings.CurrencyPricing;
         DefaultCurrencyDisplayMode = pricing.DefaultCurrencyDisplayMode;
@@ -689,6 +765,225 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         RoundingGrandTotal = pricing.RoundingGrandTotal;
         TaxPercent = pricing.TaxPercent.ToString("0.##");
         ServicePercent = pricing.ServicePercent.ToString("0.##");
+        LoadAttendanceSettings();
+    }
+
+    private void LoadAttendanceSettings()
+    {
+        _settings.Attendance ??= new AttendanceSettings();
+        var a = _settings.Attendance;
+        AttendanceMorningStartText = FormatTimeForSettings(a.MorningShiftStart);
+        AttendanceMorningEndText = FormatTimeForSettings(a.MorningShiftEnd);
+        AttendanceNightStartText = FormatTimeForSettings(a.NightShiftStart);
+        AttendanceNightEndText = FormatTimeForSettings(a.NightShiftEnd);
+        AttendanceLateGraceMinutesText = a.LateClockInGraceMinutes.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private static string FormatTimeForSettings(TimeSpan t)
+    {
+        var totalMinutes = (int)t.TotalMinutes % (24 * 60);
+        if (totalMinutes < 0)
+            totalMinutes += 24 * 60;
+        var h = totalMinutes / 60;
+        var m = totalMinutes % 60;
+        return $"{h:00}:{m:00}";
+    }
+
+    private void SaveAttendanceShifts()
+    {
+        if (!TryParseWorkTime(AttendanceMorningStartText, out var mStart) ||
+            !TryParseWorkTime(AttendanceMorningEndText, out var mEnd) ||
+            !TryParseWorkTime(AttendanceNightStartText, out var nStart) ||
+            !TryParseWorkTime(AttendanceNightEndText, out var nEnd))
+        {
+            StatusMessage = "Shift times must be valid (use HH:mm, e.g. 12:00 and 18:00).";
+            return;
+        }
+
+        if (mEnd <= mStart || nEnd <= nStart)
+        {
+            StatusMessage = "Each shift end must be after its start.";
+            return;
+        }
+
+        if (!int.TryParse((AttendanceLateGraceMinutesText ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var grace) ||
+            grace < 0 || grace > 240)
+        {
+            StatusMessage = "Late clock-in grace must be an integer from 0 to 240 (minutes).";
+            return;
+        }
+
+        _settings.Attendance ??= new AttendanceSettings();
+        _settings.Attendance.MorningShiftStart = mStart;
+        _settings.Attendance.MorningShiftEnd = mEnd;
+        _settings.Attendance.NightShiftStart = nStart;
+        _settings.Attendance.NightShiftEnd = nEnd;
+        _settings.Attendance.LateClockInGraceMinutes = grace;
+        SettingsManager.Save(_settings);
+        StatusMessage = "Attendance shift settings saved.";
+    }
+
+    private void SaveReservationSettings()
+    {
+        if (!int.TryParse((ReservationLeadDays ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var leadDays))
+        {
+            StatusMessage = "Reservation lead days must be a whole number (0–30).";
+            return;
+        }
+
+        if (!int.TryParse((ReservationMaxMonthsAhead ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var maxMonths))
+        {
+            StatusMessage = "Reservation horizon (months) must be a whole number (1–24).";
+            return;
+        }
+
+        _settings.BusinessProfile.ReservationLeadDays = Math.Clamp(leadDays, 0, 30);
+        _settings.BusinessProfile.ReservationMaxMonthsAhead = Math.Clamp(maxMonths, 1, 24);
+        SettingsManager.Save(_settings);
+        _adminData.ReloadFromSettings();
+        _ = new AdminSettingsApiClient().PushSettingsAsync(_settings, applyLogoChanges: false, applyOnlinePromoImageChanges: false);
+        ReservationLeadDays = _settings.BusinessProfile.ReservationLeadDays.ToString(CultureInfo.InvariantCulture);
+        ReservationMaxMonthsAhead = _settings.BusinessProfile.ReservationMaxMonthsAhead.ToString(CultureInfo.InvariantCulture);
+        StatusMessage = "Reservation settings saved and pushed to the public menu.";
+    }
+
+    private void LoadMenuTaxonomyUi()
+    {
+        MenuTaxonomyTypes.Clear();
+        foreach (var type in MenuTaxonomyHelper.Resolve(_settings.MenuTaxonomy).Types)
+        {
+            var typeVm = new MenuTaxonomyTypeEditVm(this)
+            {
+                Name = type.Name,
+                IsDrink = type.IsDrink
+            };
+            foreach (var sec in type.Sections)
+            {
+                var itemsJoined = string.Join(", ", sec.Items.Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Trim()));
+                typeVm.Sections.Add(new MenuTaxonomySectionEditVm(this, typeVm)
+                {
+                    Name = sec.Name,
+                    ItemsText = itemsJoined
+                });
+            }
+
+            MenuTaxonomyTypes.Add(typeVm);
+        }
+    }
+
+    private void ResetMenuTaxonomyUi()
+    {
+        _settings.MenuTaxonomy = MenuTaxonomyDefaults.CreateEliteDefault();
+        LoadMenuTaxonomyUi();
+        StatusMessage = "Menu categories reset to Elite defaults in this screen. Click Save menu categories to persist and push.";
+    }
+
+    private void AddMenuTaxonomyType()
+    {
+        var typeVm = new MenuTaxonomyTypeEditVm(this) { Name = "New type", IsDrink = false };
+        typeVm.Sections.Add(new MenuTaxonomySectionEditVm(this, typeVm) { Name = "Section", ItemsText = string.Empty });
+        MenuTaxonomyTypes.Add(typeVm);
+    }
+
+    internal void RemoveMenuTaxonomyType(MenuTaxonomyTypeEditVm typeVm) => MenuTaxonomyTypes.Remove(typeVm);
+
+    internal void AddMenuTaxonomySection(MenuTaxonomyTypeEditVm typeVm) =>
+        typeVm.Sections.Add(new MenuTaxonomySectionEditVm(this, typeVm) { Name = "Section", ItemsText = string.Empty });
+
+    internal void RemoveMenuTaxonomySection(MenuTaxonomyTypeEditVm typeVm, MenuTaxonomySectionEditVm sectionVm) =>
+        typeVm.Sections.Remove(sectionVm);
+
+    private void SaveMenuTaxonomy()
+    {
+        var types = new List<MenuTaxonomyType>();
+        foreach (var t in MenuTaxonomyTypes)
+        {
+            var typeName = (t.Name ?? string.Empty).Trim();
+            if (typeName.Length == 0)
+            {
+                StatusMessage = "Each menu type needs a name.";
+                return;
+            }
+
+            var sections = new List<MenuTaxonomySection>();
+            foreach (var s in t.Sections)
+            {
+                var secName = (s.Name ?? string.Empty).Trim();
+                if (secName.Length == 0)
+                {
+                    StatusMessage = "Each section needs a name (this is saved as the product category).";
+                    return;
+                }
+
+                var items = (s.ItemsText ?? string.Empty)
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Where(x => x.Length > 0)
+                    .ToList();
+                sections.Add(new MenuTaxonomySection { Name = secName, Items = items });
+            }
+
+            if (sections.Count == 0)
+            {
+                StatusMessage = "Each menu type needs at least one section.";
+                return;
+            }
+
+            types.Add(new MenuTaxonomyType { Name = typeName, IsDrink = t.IsDrink, Sections = sections });
+        }
+
+        if (types.Count == 0)
+        {
+            StatusMessage = "Add at least one menu type (for example Food and Drink).";
+            return;
+        }
+
+        _settings.MenuTaxonomy = new MenuTaxonomySettings { Types = types };
+        SettingsManager.Save(_settings);
+        var refreshed = SettingsManager.Load();
+        _settings.MenuTaxonomy = refreshed.MenuTaxonomy;
+        _adminData.ReloadFromSettings();
+        LoadMenuTaxonomyUi();
+        StatusMessage = "Menu categories saved on this PC. Pushing to cloud…";
+        _ = PushMenuTaxonomyCloudAsync();
+    }
+
+    private async Task PushMenuTaxonomyCloudAsync()
+    {
+        try
+        {
+            await new AdminSettingsApiClient().PushSettingsAsync(_settings, applyLogoChanges: false, applyOnlinePromoImageChanges: false)
+                .ConfigureAwait(true);
+            StatusMessage = "Menu categories saved and pushed to the public menu API.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage =
+                $"Menu categories saved on this PC. Cloud push failed: {ex.GetBaseException().Message}. Fix API URL/token and use Save again to push.";
+        }
+    }
+
+    private static bool TryParseWorkTime(string? text, out TimeSpan value)
+    {
+        value = default;
+        var s = (text ?? string.Empty).Trim();
+        if (s.Length == 0)
+            return false;
+
+        if (TimeSpan.TryParse(s, CultureInfo.InvariantCulture, out value))
+            return true;
+        foreach (var fmt in new[] { @"hh\:mm", @"h\:mm" })
+        {
+            if (TimeSpan.TryParseExact(s, fmt, CultureInfo.InvariantCulture, out value))
+                return true;
+        }
+
+        if (DateTime.TryParse(s, CultureInfo.CurrentCulture, DateTimeStyles.None, out var dt))
+        {
+            value = dt.TimeOfDay;
+            return true;
+        }
+
+        return false;
     }
 
     private void SaveBusinessProfile()
@@ -726,6 +1021,13 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
             _settings.BusinessProfile.OnlineOrdersTableId = onlineTid;
         else
             _settings.BusinessProfile.OnlineOrdersTableId = null;
+
+        if (!int.TryParse((ReservationLeadDays ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var leadDaysBp))
+            leadDaysBp = _settings.BusinessProfile.ReservationLeadDays;
+        if (!int.TryParse((ReservationMaxMonthsAhead ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var maxMonthsBp))
+            maxMonthsBp = _settings.BusinessProfile.ReservationMaxMonthsAhead;
+        _settings.BusinessProfile.ReservationLeadDays = Math.Clamp(leadDaysBp, 0, 30);
+        _settings.BusinessProfile.ReservationMaxMonthsAhead = Math.Clamp(maxMonthsBp, 1, 24);
 
         _settings.CloudApi.BaseUrl = CloudEndpoints.NormalizeApiBaseUrl(_settings.BusinessProfile.PublicMenuBaseUrl);
 

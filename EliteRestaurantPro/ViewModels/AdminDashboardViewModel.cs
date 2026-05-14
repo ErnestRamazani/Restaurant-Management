@@ -1,3 +1,4 @@
+using System;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows.Input;
@@ -10,11 +11,13 @@ using EliteRestaurantPro.ApiClients;
 
 namespace EliteRestaurantPro.ViewModels;
 
-public sealed class DashboardAlertItem
+/// <summary>One row in the dashboard inventory list (color from <see cref="QuantityBand"/>).</summary>
+public sealed class DashboardInventoryRowItem
 {
-    public string Title { get; init; } = string.Empty;
-    public string Detail { get; init; } = string.Empty;
-    public bool IsCritical { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public string QuantityLine { get; init; } = string.Empty;
+    /// <summary>Matches <see cref="InventoryItem.QuantityStatus"/>: Out, Critical, Low, Healthy.</summary>
+    public string QuantityBand { get; init; } = string.Empty;
 }
 
 public sealed class DashboardTopDishItem
@@ -78,8 +81,7 @@ public class AdminDashboardViewModel : AdminBaseViewModel
     public string HourlyChartLinePoints { get; private set; } = string.Empty;
     public string HourlyChartMaxLabel { get; private set; } = "$0";
 
-    public ObservableCollection<DashboardAlertItem> CriticalInventoryAlerts { get; } = [];
-    public ObservableCollection<DashboardAlertItem> ReorderInventoryAlerts { get; } = [];
+    public ObservableCollection<DashboardInventoryRowItem> InventoryDashboardRows { get; } = [];
     public ObservableCollection<DashboardTopDishItem> TopSellingDishes { get; } = [];
     public ObservableCollection<DashboardStaffPresenceItem> StaffPresence { get; } = [];
     public ObservableCollection<ActivityItem> RecentActivities { get; } = [];
@@ -126,7 +128,7 @@ public class AdminDashboardViewModel : AdminBaseViewModel
         {
             DashboardDrilldownType.TodaySales => "Today's Sales",
             DashboardDrilldownType.ActiveOrders => "Active Orders",
-            DashboardDrilldownType.LowStockAlerts => "Low Stock Alerts",
+            DashboardDrilldownType.LowStockAlerts => "Inventory",
             DashboardDrilldownType.ClockedInStaff => "Clocked-In Staff",
             DashboardDrilldownType.WeeklyRevenue => "Weekly Revenue",
             _ => "Recent Activity"
@@ -136,7 +138,7 @@ public class AdminDashboardViewModel : AdminBaseViewModel
         {
             DashboardDrilldownType.TodaySales => "All non-cancelled orders created today.",
             DashboardDrilldownType.ActiveOrders => "Orders currently in service flow.",
-            DashboardDrilldownType.LowStockAlerts => "Inventory items with quantity 10 or below.",
+            DashboardDrilldownType.LowStockAlerts => "On hand (lowest first).",
             DashboardDrilldownType.ClockedInStaff => "Today attendance with clock-in information.",
             DashboardDrilldownType.WeeklyRevenue => "Revenue grouped by day for current work week.",
             _ => $"Last {DashboardDrilldownViewModel.RecentActivityMaxItems} operational events from orders, team attendance, and stock notes."
@@ -305,7 +307,6 @@ public class AdminDashboardViewModel : AdminBaseViewModel
 
                 var activeOrdersCount = allOrders.Count(o => activeStatuses.Contains(o.Status));
                 var inKitchenCount = allOrders.Count(o => string.Equals(o.Status, "In Kitchen", StringComparison.OrdinalIgnoreCase));
-                var lowStockAlerts = inventorySnapshot.Count(i => i.StockQuantity <= 10);
                 var totalActiveEmployees = employeesSnapshot.Count(e => e.EmploymentStatus == "Active");
                 var clockedInCount = attendancesSnapshot.Count(a =>
                     a.WorkDate >= attendanceTodayStartUtc && a.WorkDate < attendanceTodayEndExclusiveUtc && a.ClockInTime != null);
@@ -349,36 +350,16 @@ public class AdminDashboardViewModel : AdminBaseViewModel
                     .ToList();
                 var maxDishQty = topDishes.Count == 0 ? 1 : topDishes.Max(d => d.Qty);
 
-                var inventoryItems = inventorySnapshot.OrderBy(i => i.Name).ToList();
-                var criticalAlerts = new List<DashboardAlertItem>();
-                var reorderAlerts = new List<DashboardAlertItem>();
-                foreach (var item in inventoryItems)
-                {
-                    var status = item.ExpirationStatus;
-                    var critical = status is "Expired" or "Critical" || item.StockQuantity <= 3m;
-                    var reorder = !critical && (status == "Bad" || (item.StockQuantity > 3m && item.StockQuantity <= 10m));
-
-                    if (critical)
+                var inventoryRows = inventorySnapshot
+                    .OrderBy(i => i.StockQuantity)
+                    .ThenBy(i => i.Name, StringComparer.OrdinalIgnoreCase)
+                    .Select(item => new DashboardInventoryRowItem
                     {
-                        criticalAlerts.Add(new DashboardAlertItem
-                        {
-                            Title = item.Name,
-                            Detail = $"{item.StockQuantity:0.##} {item.Unit} · {status}" +
-                                     (item.ExpirationDate.HasValue ? $" · Expires {item.ExpirationDate:yyyy-MM-dd}" : string.Empty),
-                            IsCritical = true
-                        });
-                    }
-                    else if (reorder)
-                    {
-                        reorderAlerts.Add(new DashboardAlertItem
-                        {
-                            Title = item.Name,
-                            Detail = $"{item.StockQuantity:0.##} {item.Unit} · {status}" +
-                                     (item.ExpirationDate.HasValue ? $" · Expires {item.ExpirationDate:yyyy-MM-dd}" : string.Empty),
-                            IsCritical = false
-                        });
-                    }
-                }
+                        Name = item.Name,
+                        QuantityLine = $"{item.StockQuantity:0.##} {item.Unit}",
+                        QuantityBand = item.QuantityStatus
+                    })
+                    .ToList();
 
                 var todayAttendance = attendancesSnapshot
                     .Where(a => a.WorkDate >= attendanceTodayStartUtc && a.WorkDate < attendanceTodayEndExclusiveUtc)
@@ -449,16 +430,15 @@ public class AdminDashboardViewModel : AdminBaseViewModel
                     .ToList();
 
                 var lowStockItems = inventorySnapshot
-                    .Where(i => i.StockQuantity <= 10)
                     .OrderBy(i => i.StockQuantity)
-                    .ThenBy(i => i.Name)
+                    .ThenBy(i => i.Name, StringComparer.OrdinalIgnoreCase)
                     .Select(item => new DashboardDrilldownItem
                     {
                         Title = item.Name,
-                        Subtitle = item.UniqueId,
-                        Detail = $"Stock: {item.StockQuantity:0.##} {item.Unit}",
-                        Meta = item.ExpirationDate.HasValue ? $"Expiry: {item.ExpirationDate:yyyy-MM-dd}" : "No expiry date",
-                        AccentColor = "#FF9800"
+                        Subtitle = string.Empty,
+                        Detail = $"{item.StockQuantity:0.##} {item.Unit}",
+                        Meta = string.Empty,
+                        AccentColor = DrilldownAccentForQuantityBand(item.QuantityStatus)
                     })
                     .ToList();
 
@@ -536,7 +516,6 @@ public class AdminDashboardViewModel : AdminBaseViewModel
                     completedDelta,
                     activeOrdersCount,
                     inKitchenCount,
-                    lowStockAlerts,
                     totalActiveEmployees,
                     clockedInCount,
                     occupiedTables,
@@ -551,8 +530,7 @@ public class AdminDashboardViewModel : AdminBaseViewModel
                     attendanceItems,
                     revenueItems,
                     activityItems,
-                    criticalAlerts,
-                    reorderAlerts,
+                    inventoryRows,
                     staffPresence,
                     topDishVms,
                     salaryWarningShow = salaryOverdue.ShowWarning,
@@ -601,12 +579,9 @@ public class AdminDashboardViewModel : AdminBaseViewModel
                 BuildSparkline(snapshot.revenueLast7);
                 BuildHourlyChart(snapshot.hourlySales);
 
-                CriticalInventoryAlerts.Clear();
-                foreach (var a in snapshot.criticalAlerts.Take(8))
-                    CriticalInventoryAlerts.Add(a);
-                ReorderInventoryAlerts.Clear();
-                foreach (var a in snapshot.reorderAlerts.Take(8))
-                    ReorderInventoryAlerts.Add(a);
+                InventoryDashboardRows.Clear();
+                foreach (var row in snapshot.inventoryRows)
+                    InventoryDashboardRows.Add(row);
 
                 TopSellingDishes.Clear();
                 foreach (var d in snapshot.topDishVms)
@@ -728,4 +703,12 @@ public class AdminDashboardViewModel : AdminBaseViewModel
         HourlyChartLinePoints = string.Join(" ", linePoints);
         HourlyChartAreaPoints = $"{HourlyChartLinePoints} {w},{h} 0,{h}";
     }
+
+    private static string DrilldownAccentForQuantityBand(string band) =>
+        band switch
+        {
+            "Out" or "Critical" => "#F44336",
+            "Low" => "#FF9800",
+            _ => "#4CAF50"
+        };
 }

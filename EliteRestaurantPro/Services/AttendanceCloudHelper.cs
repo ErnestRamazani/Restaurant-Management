@@ -28,7 +28,10 @@ internal static class AttendanceCloudHelper
 
             foreach (var emp in activeEmployees)
             {
-                var shift = AttendanceScheduleHelper.ResolveShiftWindow(emp, d);
+                var shift = AttendanceScheduleHelper.ResolveShiftWindow(
+                    emp,
+                    d,
+                    AttendanceShiftSchedule.FromSettings(SettingsManager.Load().Attendance));
                 if (shift.IsOff)
                     continue;
 

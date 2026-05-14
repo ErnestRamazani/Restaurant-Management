@@ -61,6 +61,9 @@
                     <!-- Admin ID -->
                     <TextBlock Text="ADMIN ID" Style="{StaticResource HeadingSmall}"
                                Margin="0,0,0,8"/>
+                    <TextBlock Text="Sign-in ID, employee code, or your name as shown in Employees."
+                               Style="{StaticResource BodyText}" FontSize="11" Opacity="0.75"
+                               TextWrapping="Wrap" Margin="0,0,0,6"/>
                     <TextBox Text="{Binding AdminId, UpdateSourceTrigger=PropertyChanged}"
                              Style="{StaticResource EliteTextBox}"/>
 

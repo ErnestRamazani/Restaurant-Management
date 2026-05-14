@@ -1,6 +1,7 @@
+using EliteRestaurant.Core.Models;
+
 namespace EliteRestaurant.Core.Utils;
 
-/// <summary>Kitchen sees only kitchen-queue statuses; in-store tablet flow uses <see cref="PendingCashier"/>; public online uses <see cref="PendingApproval"/>.</summary>
 public static class OrderWorkflow
 {
     public const string PendingCashier = "Pending cashier";
@@ -45,8 +46,18 @@ public static class OrderWorkflow
         !string.IsNullOrWhiteSpace(status) &&
         string.Equals(status.Trim(), Served, StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>Cashier/admin may record payment only when the server has confirmed served.</summary>
+    public static bool IsReady(string? status) =>
+        !string.IsNullOrWhiteSpace(status) &&
+        string.Equals(status.Trim(), "Ready", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>In-store: cashier records payment only after server marks <see cref="Served"/>. Online pickup/delivery: after kitchen marks <c>Ready</c> (no server handoff).</summary>
     public static bool CanCashierComplete(string? status) => IsServed(status);
+
+    /// <inheritdoc cref="CanCashierComplete(string?)"/>
+    public static bool CanCashierComplete(string? status, string? orderOrigin) =>
+        OrderOrigin.IsOnline(orderOrigin)
+            ? IsReady(status) || IsServed(status)
+            : IsServed(status);
 
     /// <summary>
     /// Admin-only manual steps on the Orders screen (kitchen tablet still owns Waiting → In Kitchen → Ready).

@@ -1,7 +1,12 @@
 <UserControl x:Class="EliteRestaurantPro.Views.MenuView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:components="clr-namespace:EliteRestaurantPro.Views.Components">
+             xmlns:components="clr-namespace:EliteRestaurantPro.Views.Components"
+             xmlns:converters="clr-namespace:EliteRestaurantPro.Converters">
+    <UserControl.Resources>
+        <converters:ProductToMenuCardPhotoConverter x:Key="ProductToMenuCardPhotoConverter"/>
+        <converters:ProductMenuMonogramConverter x:Key="ProductMenuMonogramConverter"/>
+    </UserControl.Resources>
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="230"/>
@@ -45,6 +50,7 @@
                           Margin="24,0,24,24"
                           VerticalScrollBarVisibility="Auto"
                           CanContentScroll="False"
+                          IsEnabled="{Binding IsMainContentEnabled}"
                           Style="{StaticResource EliteScrollViewer}">
                 <StackPanel>
                     <Border Style="{StaticResource GlassCard}" Padding="14" Margin="0,0,0,16">
@@ -126,6 +132,24 @@
                                                                                         Margin="0,0,16,16"
                                                                                         Padding="18">
                                                                                     <StackPanel>
+                                                                                        <Border Height="132"
+                                                                                                CornerRadius="10"
+                                                                                                ClipToBounds="True"
+                                                                                                Margin="0,0,0,12"
+                                                                                                Background="#1E1E28">
+                                                                                            <Grid>
+                                                                                                <TextBlock Text="{Binding Converter={StaticResource ProductMenuMonogramConverter}}"
+                                                                                                           Foreground="{StaticResource TextMutedBrush}"
+                                                                                                           FontFamily="Segoe UI Variable Display, Segoe UI"
+                                                                                                           FontSize="40"
+                                                                                                           FontWeight="SemiBold"
+                                                                                                           Opacity="0.4"
+                                                                                                           HorizontalAlignment="Center"
+                                                                                                           VerticalAlignment="Center"/>
+                                                                                                <Image Source="{Binding Converter={StaticResource ProductToMenuCardPhotoConverter}}"
+                                                                                                       Stretch="UniformToFill"/>
+                                                                                            </Grid>
+                                                                                        </Border>
                                                                                         <TextBlock Text="{Binding Name}"
                                                                                                    Margin="0,2,0,8"
                                                                                                    Foreground="{StaticResource TextPrimaryBrush}"
@@ -144,39 +168,62 @@
                                                                                             <Run Text="{Binding Price, StringFormat=N2}"/>
                                                                                         </TextBlock>
 
-                                                                                        <ItemsControl Margin="0,10,0,0" ItemsSource="{Binding Ingredients}">
-                                                                                            <ItemsControl.ItemTemplate>
-                                                                                                <DataTemplate>
-                                                                                                    <TextBlock FontSize="11"
-                                                                                                               Foreground="{StaticResource TextMutedBrush}">
-                                                                                                        <Run Text="• "/>
-                                                                                                        <Run Text="{Binding InventoryItem.Name}"/>
-                                                                                                        <Run Text=" "/>
-                                                                                                        <Run Text="{Binding Quantity, StringFormat={}{0:0.##}}"/>
-                                                                                                        <Run Text=" "/>
-                                                                                                        <Run Text="{Binding InventoryItem.Unit}"/>
-                                                                                                    </TextBlock>
-                                                                                                </DataTemplate>
-                                                                                            </ItemsControl.ItemTemplate>
-                                                                                        </ItemsControl>
+                                                                                        <Expander Margin="0,10,0,0"
+                                                                                                  IsExpanded="False"
+                                                                                                  Foreground="{StaticResource TextPrimaryBrush}">
+                                                                                            <Expander.Header>
+                                                                                                <TextBlock Foreground="{StaticResource TextMutedBrush}"
+                                                                                                           FontFamily="Segoe UI Variable Text, Segoe UI"
+                                                                                                           FontSize="12"
+                                                                                                           FontWeight="SemiBold"
+                                                                                                           Text="{Binding Path=Ingredients.Count, StringFormat=Ingredients ({0})}"/>
+                                                                                            </Expander.Header>
+                                                                                            <ScrollViewer MaxHeight="200"
+                                                                                                          VerticalScrollBarVisibility="Auto"
+                                                                                                          Margin="0,6,0,0">
+                                                                                                <ItemsControl ItemsSource="{Binding Ingredients}">
+                                                                                                    <ItemsControl.ItemTemplate>
+                                                                                                        <DataTemplate>
+                                                                                                            <TextBlock FontSize="11"
+                                                                                                                       Foreground="{StaticResource TextMutedBrush}"
+                                                                                                                       Margin="0,0,0,6">
+                                                                                                                <Run Text="• "/>
+                                                                                                                <Run Text="{Binding InventoryItem.Name}"/>
+                                                                                                                <Run Text=" "/>
+                                                                                                                <Run Text="{Binding Quantity, StringFormat={}{0:0.##}}"/>
+                                                                                                                <Run Text=" "/>
+                                                                                                                <Run Text="{Binding InventoryItem.Unit}"/>
+                                                                                                            </TextBlock>
+                                                                                                        </DataTemplate>
+                                                                                                    </ItemsControl.ItemTemplate>
+                                                                                                </ItemsControl>
+                                                                                            </ScrollViewer>
+                                                                                        </Expander>
 
                                                                                         <Grid Margin="0,18,0,0"
                                                                                               Visibility="{Binding DataContext.ShowFullAdminNav, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}">
                                                                                             <Grid.ColumnDefinitions>
                                                                                                 <ColumnDefinition Width="*"/>
                                                                                                 <ColumnDefinition Width="*"/>
+                                                                                                <ColumnDefinition Width="*"/>
                                                                                             </Grid.ColumnDefinitions>
                                                                                             <Button Grid.Column="0"
-                                                                                                    Content="Edit"
-                                                                                                    Margin="0,0,8,0"
-                                                                                                    Command="{Binding DataContext.EditProductCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                                                                    CommandParameter="{Binding}"
-                                                                                                    Style="{StaticResource SapphireButton}"/>
+                                                                                                    Content="Details"
+                                                                                                    Margin="0,0,6,0"
+                                                                                                    Command="{Binding DataContext.ShowProductDetailsCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                                                    CommandParameter="{Binding .}"
+                                                                                                    Style="{StaticResource GhostButton}"/>
                                                                                             <Button Grid.Column="1"
+                                                                                                    Content="Edit"
+                                                                                                    Margin="6,0,6,0"
+                                                                                                    Command="{Binding DataContext.EditProductCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                                                    CommandParameter="{Binding .}"
+                                                                                                    Style="{StaticResource SapphireButton}"/>
+                                                                                            <Button Grid.Column="2"
                                                                                                     Content="Delete"
-                                                                                                    Margin="8,0,0,0"
+                                                                                                    Margin="6,0,0,0"
                                                                                                     Command="{Binding DataContext.DeleteProductCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                                                                    CommandParameter="{Binding}"
+                                                                                                    CommandParameter="{Binding .}"
                                                                                                     Style="{StaticResource DangerButton}"/>
                                                                                         </Grid>
                                                                                     </StackPanel>
@@ -207,95 +254,221 @@
                         VerticalAlignment="Center"
                         Width="520"
                         MaxHeight="640">
-                    <ScrollViewer MaxHeight="560" VerticalScrollBarVisibility="Auto" Style="{StaticResource EliteScrollViewer}">
+                    <ScrollViewer MaxHeight="560" VerticalScrollBarVisibility="Auto" PanningMode="VerticalOnly">
                     <StackPanel>
                         <TextBlock Text="{Binding DialogTitle}"
                                    Style="{StaticResource HeadingMedium}"
                                    FontSize="22"/>
 
-                        <TextBlock Text="PRODUCT NAME" Style="{StaticResource HeadingSmall}" Margin="0,22,0,8"/>
-                        <TextBox Text="{Binding ProductName, UpdateSourceTrigger=PropertyChanged}"
-                                 Style="{StaticResource EliteTextBox}"/>
+                        <StackPanel Visibility="{Binding IsEditorDialogMode, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <TextBlock Text="PRODUCT NAME" Style="{StaticResource HeadingSmall}" Margin="0,22,0,8"/>
+                            <TextBox Text="{Binding ProductName, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource EliteTextBox}"/>
 
-                        <TextBlock Text="SECTION" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
-                        <ComboBox ItemsSource="{Binding Categories}"
-                                  SelectedItem="{Binding SelectedCategory}"
-                                  Style="{StaticResource EliteComboBox}"
-                                  ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
+                            <TextBlock Text="SECTION" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                            <ComboBox ItemsSource="{Binding Categories}"
+                                      SelectedItem="{Binding SelectedCategory}"
+                                      Style="{StaticResource EliteComboBox}"
+                                      ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
 
-                        <TextBlock Text="TYPE" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
-                        <ComboBox ItemsSource="{Binding SubCategories}"
-                                  SelectedItem="{Binding SelectedSubCategory}"
-                                  Style="{StaticResource EliteComboBox}"
-                                  ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
+                            <TextBlock Text="TYPE" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                            <ComboBox ItemsSource="{Binding SubCategories}"
+                                      SelectedItem="{Binding SelectedSubCategory}"
+                                      Style="{StaticResource EliteComboBox}"
+                                      ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
 
-                        <TextBlock Text="PRICE" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
-                        <TextBox Text="{Binding PriceText, UpdateSourceTrigger=PropertyChanged}"
-                                 Style="{StaticResource EliteTextBox}"/>
+                            <TextBlock Text="PRICE" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                            <TextBox Text="{Binding PriceText, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource EliteTextBox}"/>
 
-                        <TextBlock Text="DESCRIPTION (CUSTOMER MENU)" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
-                        <TextBox Text="{Binding ProductDescription, UpdateSourceTrigger=PropertyChanged}"
-                                 Style="{StaticResource EliteTextBox}"
-                                 TextWrapping="Wrap"
-                                 AcceptsReturn="True"
-                                 MinHeight="72"
-                                 MaxLength="350"
-                                 VerticalScrollBarVisibility="Auto"/>
-                        <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,4,0,0"
-                                   Text="{Binding DescriptionCharCountRemaining, StringFormat=Characters remaining: {0}}"/>
+                            <TextBlock Text="DESCRIPTION (CUSTOMER MENU)" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                            <TextBox Text="{Binding ProductDescription, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource EliteTextBox}"
+                                     TextWrapping="Wrap"
+                                     AcceptsReturn="True"
+                                     MinHeight="72"
+                                     MaxLength="350"
+                                     VerticalScrollBarVisibility="Auto"/>
+                            <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,4,0,0"
+                                       Text="{Binding DescriptionCharCountRemaining, StringFormat=Characters remaining: {0}}"/>
 
-                        <TextBlock Text="COMPOSITION (CUSTOMER, COMMA-SEPARATED)" Style="{StaticResource HeadingSmall}" Margin="0,12,0,8"/>
-                        <TextBox Text="{Binding ProductComposition, UpdateSourceTrigger=PropertyChanged}"
-                                 Style="{StaticResource EliteTextBox}"
-                                 TextWrapping="Wrap"
-                                 AcceptsReturn="True"
-                                 MinHeight="56"
-                                 VerticalScrollBarVisibility="Auto"/>
+                            <TextBlock Text="COMPOSITION (CUSTOMER, COMMA-SEPARATED)" Style="{StaticResource HeadingSmall}" Margin="0,12,0,8"/>
+                            <TextBox Text="{Binding ProductComposition, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource EliteTextBox}"
+                                     TextWrapping="Wrap"
+                                     AcceptsReturn="True"
+                                     MinHeight="56"
+                                     VerticalScrollBarVisibility="Auto"/>
 
-                        <TextBlock Text="INGREDIENTS FROM INVENTORY"
-                                   Style="{StaticResource HeadingSmall}"
-                                   Margin="0,18,0,8"/>
-                        <Border Style="{StaticResource GlassCard}" Padding="10" MaxHeight="180">
-                            <ScrollViewer VerticalScrollBarVisibility="Auto" Style="{StaticResource EliteScrollViewer}">
-                                <ItemsControl ItemsSource="{Binding InventorySelections}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Grid Margin="0,0,0,8">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="70"/>
-                                                </Grid.ColumnDefinitions>
-                                                <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                                <StackPanel Grid.Column="1">
-                                                    <TextBlock Foreground="{StaticResource TextPrimaryBrush}" FontSize="12">
-                                                        <Run Text="{Binding Name}"/>
-                                                        <Run Text=" "/>
-                                                        <Run Text="("/>
-                                                        <Run Text="{Binding UniqueId}"/>
-                                                        <Run Text=")"/>
-                                                    </TextBlock>
-                                                    <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="10">
-                                                        <Run Text="Stock: "/>
-                                                        <Run Text="{Binding StockQuantity, StringFormat={}{0:0.##}}"/>
-                                                        <Run Text=" "/>
-                                                        <Run Text="{Binding Unit}"/>
-                                                    </TextBlock>
-                                                </StackPanel>
-                                                <TextBox Grid.Column="2"
-                                                         Text="{Binding Quantity, UpdateSourceTrigger=PropertyChanged}"
-                                                         Style="{StaticResource EliteTextBox}"
-                                                         Height="34"
-                                                         VerticalContentAlignment="Center"
-                                                         HorizontalContentAlignment="Center"/>
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </ScrollViewer>
-                        </Border>
+                            <TextBlock Text="PRODUCT IMAGE" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox Grid.Column="0"
+                                         Text="{Binding ProductImagePath, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource EliteTextBox}"/>
+                                <Button Grid.Column="1"
+                                        Content="Browse"
+                                        Margin="8,0,0,0"
+                                        Command="{Binding BrowseProductImageCommand}"
+                                        Style="{StaticResource SapphireButton}"/>
+                                <Button Grid.Column="2"
+                                        Content="Clear"
+                                        Margin="8,0,0,0"
+                                        Command="{Binding ClearProductImageCommand}"
+                                        Style="{StaticResource GhostButton}"/>
+                            </Grid>
+                            <Border Style="{StaticResource GlassCard}" Height="148" Padding="10" Margin="0,10,0,0">
+                                <Grid>
+                                    <Image Source="{Binding EditorImagePreview}"
+                                           Stretch="UniformToFill"
+                                           Visibility="{Binding HasEditorImagePreview, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                    <TextBlock Text="No image selected"
+                                               Foreground="{StaticResource TextMutedBrush}"
+                                               FontSize="12"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Visibility="{Binding HasNoEditorImagePreview, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                </Grid>
+                            </Border>
 
-                        <Grid Margin="0,24,0,0">
+                            <Expander Margin="0,18,0,0"
+                                      IsExpanded="False"
+                                      Foreground="{StaticResource TextPrimaryBrush}">
+                                <Expander.Header>
+                                    <TextBlock Text="Ingredients from inventory"
+                                               Foreground="{StaticResource TextMutedBrush}"
+                                               FontFamily="Segoe UI Variable Text, Segoe UI"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"/>
+                                </Expander.Header>
+                                <Border Style="{StaticResource GlassCard}" Padding="10" Margin="0,8,0,0">
+                                    <ScrollViewer MaxHeight="280" VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl ItemsSource="{Binding InventorySelections}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,0,0,8">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="70"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                        <StackPanel Grid.Column="1">
+                                                            <TextBlock Foreground="{StaticResource TextPrimaryBrush}" FontSize="12">
+                                                                <Run Text="{Binding Name}"/>
+                                                                <Run Text=" "/>
+                                                                <Run Text="("/>
+                                                                <Run Text="{Binding UniqueId}"/>
+                                                                <Run Text=")"/>
+                                                            </TextBlock>
+                                                            <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="10">
+                                                                <Run Text="Stock: "/>
+                                                                <Run Text="{Binding StockQuantity, StringFormat={}{0:0.##}}"/>
+                                                                <Run Text=" "/>
+                                                                <Run Text="{Binding Unit}"/>
+                                                            </TextBlock>
+                                                        </StackPanel>
+                                                        <TextBox Grid.Column="2"
+                                                                 Text="{Binding Quantity, UpdateSourceTrigger=PropertyChanged}"
+                                                                 Style="{StaticResource EliteTextBox}"
+                                                                 Height="34"
+                                                                 VerticalContentAlignment="Center"
+                                                                 HorizontalContentAlignment="Center"/>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </Border>
+                            </Expander>
+                        </StackPanel>
+
+                        <StackPanel Visibility="{Binding IsDetailsDialogMode, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <TextBlock Text="{Binding DetailsProductName}"
+                                       Foreground="{StaticResource GoldAccentBrush}"
+                                       FontFamily="Segoe UI Variable Display, Segoe UI"
+                                       FontSize="24"
+                                       FontWeight="SemiBold"
+                                       Margin="0,18,0,10"/>
+
+                            <Border Style="{StaticResource GlassCard}" Height="148" Padding="14">
+                                <Grid>
+                                    <Image Source="{Binding DetailsImagePreview}"
+                                           Stretch="UniformToFill"
+                                           Visibility="{Binding HasDetailsImagePreview, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                    <TextBlock Text="No image available"
+                                               Foreground="{StaticResource TextMutedBrush}"
+                                               FontSize="12"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Visibility="{Binding HasNoDetailsImagePreview, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                </Grid>
+                            </Border>
+
+                            <UniformGrid Columns="2" Margin="0,14,0,0">
+                                <StackPanel Margin="0,0,8,8">
+                                    <TextBlock Text="PRODUCT ID" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBlock Text="{Binding DetailsUniqueId}" Style="{StaticResource BodyText}" Margin="0,4,0,0"/>
+                                </StackPanel>
+                                <StackPanel Margin="8,0,0,8">
+                                    <TextBlock Text="PRICE" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBlock Style="{StaticResource BodyText}" Margin="0,4,0,0">
+                                        <Run Text="$ "/>
+                                        <Run Text="{Binding DetailsPrice}"/>
+                                    </TextBlock>
+                                </StackPanel>
+                                <StackPanel Margin="0,0,8,8">
+                                    <TextBlock Text="SECTION" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBlock Text="{Binding DetailsCategory}" Style="{StaticResource BodyText}" Margin="0,4,0,0"/>
+                                </StackPanel>
+                                <StackPanel Margin="8,0,0,8">
+                                    <TextBlock Text="TYPE" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBlock Text="{Binding DetailsSubCategory}" Style="{StaticResource BodyText}" Margin="0,4,0,0"/>
+                                </StackPanel>
+                            </UniformGrid>
+
+                            <TextBlock Text="DESCRIPTION" Style="{StaticResource HeadingSmall}" Margin="0,8,0,8"/>
+                            <Border Style="{StaticResource GlassCard}" Padding="10">
+                                <TextBlock Text="{Binding DetailsDescription}" TextWrapping="Wrap" Style="{StaticResource BodyText}"/>
+                            </Border>
+
+                            <TextBlock Text="COMPOSITION" Style="{StaticResource HeadingSmall}" Margin="0,12,0,8"/>
+                            <Border Style="{StaticResource GlassCard}" Padding="10">
+                                <TextBlock Text="{Binding DetailsComposition}" TextWrapping="Wrap" Style="{StaticResource BodyText}"/>
+                            </Border>
+
+                            <Expander Margin="0,12,0,0"
+                                      IsExpanded="False"
+                                      Foreground="{StaticResource TextPrimaryBrush}">
+                                <Expander.Header>
+                                    <TextBlock Text="Ingredients"
+                                               Foreground="{StaticResource TextMutedBrush}"
+                                               FontFamily="Segoe UI Variable Text, Segoe UI"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"/>
+                                </Expander.Header>
+                                <Border Style="{StaticResource GlassCard}" Padding="10" Margin="0,8,0,0">
+                                    <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl ItemsSource="{Binding ProductIngredientsSummary}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Foreground="{StaticResource TextMutedBrush}"
+                                                               FontSize="12"
+                                                               Margin="0,0,0,6"
+                                                               Text="{Binding .}"/>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </Border>
+                            </Expander>
+                        </StackPanel>
+
+                        <Grid Margin="0,24,0,0" Visibility="{Binding IsEditorDialogMode, Converter={StaticResource BoolToVisibilityConverter}}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="*"/>
@@ -311,6 +484,12 @@
                                     Command="{Binding SaveProductCommand}"
                                     Style="{StaticResource GoldPrimaryButton}"/>
                         </Grid>
+
+                        <Button Content="Close"
+                                Margin="0,24,0,0"
+                                Command="{Binding CancelDialogCommand}"
+                                Style="{StaticResource GhostButton}"
+                                Visibility="{Binding IsDetailsDialogMode, Converter={StaticResource BoolToVisibilityConverter}}"/>
                     </StackPanel>
                     </ScrollViewer>
                 </Border>

@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using EliteRestaurant.Core.Menu;
 
 namespace EliteRestaurant.Core.Utils;
 
@@ -29,6 +30,21 @@ public sealed class AppSettings
     public NavigationBackgroundSettings NavigationBackgrounds { get; set; } = new();
     public DatabaseSettings Database { get; set; } = new();
     public CloudApiSettings CloudApi { get; set; } = new();
+    /// <summary>Shift windows for attendance UI, payroll scheduled hours, and auto-absence logic.</summary>
+    public AttendanceSettings Attendance { get; set; } = new();
+
+    /// <summary>Admin-defined menu type → category (Product.Category) → subcategory (Product.SubCategory) structure.</summary>
+    public MenuTaxonomySettings? MenuTaxonomy { get; set; }
+}
+
+/// <summary>Restaurant shift boundaries (local time of day). Serialized to app-settings.json.</summary>
+public sealed class AttendanceSettings
+{
+    public TimeSpan MorningShiftStart { get; set; } = new(12, 0, 0);
+    public TimeSpan MorningShiftEnd { get; set; } = new(18, 0, 0);
+    public TimeSpan NightShiftStart { get; set; } = new(18, 0, 0);
+    public TimeSpan NightShiftEnd { get; set; } = new(23, 0, 0);
+    public int LateClockInGraceMinutes { get; set; } = 30;
 }
 
 public sealed class DatabaseSettings
@@ -86,6 +102,10 @@ public sealed class BusinessProfileSettings
     public string OnlinePromoImagePath { get; set; } = string.Empty;
     /// <summary>Optional table id for routing guest online orders in the POS (matches <see cref="PublicMenuSetting.OnlineOrdersTableId"/>).</summary>
     public int? OnlineOrdersTableId { get; set; }
+    /// <summary>Minimum calendar days from today required for public booking.</summary>
+    public int ReservationLeadDays { get; set; } = 2;
+    /// <summary>Maximum months ahead allowed for public booking.</summary>
+    public int ReservationMaxMonthsAhead { get; set; } = 6;
 }
 
 public sealed class CurrencyPricingSettings

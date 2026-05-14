@@ -1,3 +1,4 @@
+using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Utils;
 using Xunit;
 
@@ -14,8 +15,13 @@ public class OrderWorkflowTests
         Assert.Equal(expected, OrderWorkflow.IsPendingCashier(status));
 
     [Fact]
-    public void CanCashierComplete_OnlyWhenServed() =>
-        Assert.True(OrderWorkflow.CanCashierComplete(OrderWorkflow.Served));
+    public void CanCashierComplete_Online_AllowsReadyOrServed()
+    {
+        Assert.True(OrderWorkflow.CanCashierComplete("Ready", OrderOrigin.Online));
+        Assert.True(OrderWorkflow.CanCashierComplete(OrderWorkflow.Served, OrderOrigin.Online));
+        Assert.False(OrderWorkflow.CanCashierComplete("Waiting", OrderOrigin.Online));
+        Assert.False(OrderWorkflow.CanCashierComplete("Ready", OrderOrigin.InStore));
+    }
 
     [Fact]
     public void OccupiesTable_IncludesKitchenPipeline() =>

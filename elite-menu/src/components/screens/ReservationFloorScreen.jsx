@@ -157,8 +157,7 @@ export function ReservationFloorScreen() {
           <LogIn className="mx-auto h-10 w-10 text-gold" />
           <h1 className="mt-4 font-display text-2xl italic">Floor view</h1>
           <p className="mt-2 font-body text-sm text-champagne/65">
-            Sign in from the staff hub with your venue passcode. For this screen, include sign-in ID and PIN for an
-            Admin or Cashier account.
+            Sign in from the staff hub with your venue passcode.
           </p>
           <Link
             to="/staff"
@@ -178,8 +177,8 @@ export function ReservationFloorScreen() {
           <LogIn className="mx-auto h-10 w-10 text-amber-400" />
           <h1 className="mt-4 font-display text-2xl italic">Reservation floor</h1>
           <p className="mt-2 font-body text-sm text-champagne/65">
-            This workspace is limited to Admin and Cashier roles. Sign out and unlock the staff hub again with your venue
-            passcode plus your tablet sign-in ID and PIN (the same ID/PIN you use on the cashier or admin login).
+            This workspace is limited to Admin and Cashier roles. Sign out and unlock the staff hub again with a passcode
+            that has floor access.
           </p>
           <button
             type="button"

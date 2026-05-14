@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
-import { getMenuKind } from '../utils/menuKind'
+import { getMenuKindWithTaxonomy, parseMenuTaxonomy } from '../utils/menuTaxonomy'
 import { sameProductId } from '../utils/productId'
 import { estimateTicketPrepMinutes } from '../utils/estimatePrepMinutes'
 import { computeTotals } from '../utils/totals'
@@ -25,12 +25,14 @@ export function useCart(config) {
   const taxPct = config?.taxPercent ?? defaultConfig.taxPercent
   const servicePct = config?.servicePercent ?? defaultConfig.servicePercent
 
+  const taxonomy = useMemo(() => parseMenuTaxonomy(config), [config?.menuTaxonomyJson])
+
   const addItem = useCallback((product) => {
     if (!productIsAvailable(product)) return
     const prev = linesRef.current
     if (prev.length > 0) {
-      const incoming = getMenuKind(product)
-      const existing = getMenuKind(prev[0].product)
+      const incoming = getMenuKindWithTaxonomy(product, taxonomy)
+      const existing = getMenuKindWithTaxonomy(prev[0].product, taxonomy)
       if (incoming !== existing) {
         const cur = existing === 'drink' ? 'drinks' : 'food'
         const nxt = incoming === 'drink' ? 'drinks' : 'food'
@@ -44,8 +46,8 @@ export function useCart(config) {
     }
     setLines((p) => {
       if (p.length > 0) {
-        const inc = getMenuKind(product)
-        const ex = getMenuKind(p[0].product)
+        const inc = getMenuKindWithTaxonomy(product, taxonomy)
+        const ex = getMenuKindWithTaxonomy(p[0].product, taxonomy)
         if (inc !== ex) return p
       }
       const i = p.findIndex((l) => sameProductId(l.product.id, product.id))
@@ -54,15 +56,15 @@ export function useCart(config) {
       n[i] = { ...n[i], quantity: Math.min(20, n[i].quantity + 1) }
       return n
     })
-  }, [])
+  }, [taxonomy])
 
   const addProductBatch = useCallback((product, qtyToAdd) => {
     if (!productIsAvailable(product)) return
     const q = Math.max(1, Math.min(20, Math.floor(Number(qtyToAdd))))
     const prev = linesRef.current
     if (prev.length > 0) {
-      const incoming = getMenuKind(product)
-      const existing = getMenuKind(prev[0].product)
+      const incoming = getMenuKindWithTaxonomy(product, taxonomy)
+      const existing = getMenuKindWithTaxonomy(prev[0].product, taxonomy)
       if (incoming !== existing) {
         const cur = existing === 'drink' ? 'drinks' : 'food'
         const nxt = incoming === 'drink' ? 'drinks' : 'food'
@@ -77,7 +79,7 @@ export function useCart(config) {
     }
     setLines((p) => {
       if (p.length > 0) {
-        if (getMenuKind(product) !== getMenuKind(p[0].product)) return p
+        if (getMenuKindWithTaxonomy(product, taxonomy) !== getMenuKindWithTaxonomy(p[0].product, taxonomy)) return p
       }
       const i = p.findIndex((l) => sameProductId(l.product.id, product.id))
       if (i < 0) return [...p, { product, quantity: q }]
@@ -85,7 +87,7 @@ export function useCart(config) {
       n[i] = { ...n[i], quantity: Math.min(20, n[i].quantity + q) }
       return n
     })
-  }, [])
+  }, [taxonomy])
 
   const confirmSectionSwitch = useCallback(() => {
     if (!sectionConflict) return

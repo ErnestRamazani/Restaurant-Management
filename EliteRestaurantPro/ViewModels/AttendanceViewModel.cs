@@ -121,9 +121,31 @@ public sealed class AttendanceDayGroupViewModel
 
 public class AttendanceViewModel : AdminBaseViewModel
 {
+    private enum ShiftListFilter
+    {
+        All,
+        Morning,
+        Night
+    }
+
     private readonly AdminDataApiClient _data = new();
     private const string PendingSalaryReferencePrefix = "Pending salary accrual:";
-    private static readonly TimeSpan LateGraceWindow = TimeSpan.FromMinutes(30);
+
+    public string AttendanceShiftSummaryText
+    {
+        get => _attendanceShiftSummaryText;
+        private set => SetField(ref _attendanceShiftSummaryText, value);
+    }
+
+    public bool ShiftFilterAllSelected => _shiftListFilter == ShiftListFilter.All;
+
+    public bool ShiftFilterMorningSelected => _shiftListFilter == ShiftListFilter.Morning;
+
+    public bool ShiftFilterNightSelected => _shiftListFilter == ShiftListFilter.Night;
+
+    public ICommand SetShiftFilterAllCommand { get; }
+    public ICommand SetShiftFilterMorningCommand { get; }
+    public ICommand SetShiftFilterNightCommand { get; }
 
     public override string ActivePage => "Attendance";
 
@@ -131,6 +153,10 @@ public class AttendanceViewModel : AdminBaseViewModel
 
     private readonly List<AttendanceDayGroupViewModel> _attendanceSourceGroups = [];
     private string _searchText = string.Empty;
+    private ShiftListFilter _shiftListFilter = ShiftListFilter.All;
+    private AttendanceShiftSchedule _shiftSchedule = AttendanceShiftSchedule.Defaults;
+    private TimeSpan _lateGraceWindow = TimeSpan.FromMinutes(30);
+    private string _attendanceShiftSummaryText = string.Empty;
 
     public string SearchText
     {
@@ -140,7 +166,7 @@ public class AttendanceViewModel : AdminBaseViewModel
             if (!SetField(ref _searchText, value))
                 return;
             if (_attendanceSourceGroups.Count > 0)
-                ApplyAttendanceSearchFilter();
+                ApplyListFilter();
         }
     }
 
@@ -210,11 +236,16 @@ public class AttendanceViewModel : AdminBaseViewModel
         MarkAbsenceCommand = new RelayCommand(OpenMarkAbsenceDialog);
         SaveMarkAbsenceCommand = new RelayCommand(_ => _ = SaveMarkAbsenceAsync());
         CancelMarkAbsenceCommand = new RelayCommand(_ => CloseMarkAbsenceDialog());
+        SetShiftFilterAllCommand = new RelayCommand(_ => SetShiftListFilter(ShiftListFilter.All));
+        SetShiftFilterMorningCommand = new RelayCommand(_ => SetShiftListFilter(ShiftListFilter.Morning));
+        SetShiftFilterNightCommand = new RelayCommand(_ => SetShiftListFilter(ShiftListFilter.Night));
+        RefreshShiftSettingsFromDisk();
         _ = LoadAttendanceAsync();
     }
 
     private async Task LoadAttendanceAsync()
     {
+        RefreshShiftSettingsFromDisk();
         var today = DateTime.Today;
         var fromDate = today.AddDays(-13);
 
@@ -340,7 +371,7 @@ public class AttendanceViewModel : AdminBaseViewModel
             }
 
             SnapshotAttendanceSource();
-            ApplyAttendanceSearchFilter();
+            ApplyListFilter();
         }
         catch (Exception ex)
         {
@@ -370,15 +401,55 @@ public class AttendanceViewModel : AdminBaseViewModel
         }
     }
 
-    private void ApplyAttendanceSearchFilter()
+    private void RefreshShiftSettingsFromDisk()
+    {
+        var att = SettingsManager.Load().Attendance ?? new AttendanceSettings();
+        _shiftSchedule = AttendanceShiftSchedule.FromSettings(att);
+        var grace = att.LateClockInGraceMinutes;
+        if (grace < 0)
+            grace = 0;
+        if (grace > 240)
+            grace = 240;
+        _lateGraceWindow = TimeSpan.FromMinutes(grace);
+        var s = _shiftSchedule;
+        var morning = s.FormatMorningRange().Replace("-", " - ");
+        var night = s.FormatNightRange().Replace("-", " - ");
+        AttendanceShiftSummaryText =
+            $"Morning shift: {morning} | Night shift: {night} | Late window: {grace} min from shift start";
+    }
+
+    private void SetShiftListFilter(ShiftListFilter filter)
+    {
+        if (_shiftListFilter == filter)
+            return;
+        _shiftListFilter = filter;
+        OnPropertyChanged(nameof(ShiftFilterAllSelected));
+        OnPropertyChanged(nameof(ShiftFilterMorningSelected));
+        OnPropertyChanged(nameof(ShiftFilterNightSelected));
+        ApplyListFilter();
+    }
+
+    private void ApplyListFilter()
     {
         var q = (_searchText ?? string.Empty).Trim();
         AttendanceDayGroups.Clear();
         foreach (var source in _attendanceSourceGroups)
         {
+            IEnumerable<AttendanceRowViewModel> rows = source.Rows;
+            rows = _shiftListFilter switch
+            {
+                ShiftListFilter.Morning => rows.Where(r =>
+                    !r.IsScheduledOff &&
+                    r.ShiftName.Contains("Morning", StringComparison.OrdinalIgnoreCase)),
+                ShiftListFilter.Night => rows.Where(r =>
+                    !r.IsScheduledOff &&
+                    (r.ShiftName.Contains("Night", StringComparison.OrdinalIgnoreCase) ||
+                     r.ShiftName.Contains("Evening", StringComparison.OrdinalIgnoreCase))),
+                _ => rows
+            };
             var list = q.Length == 0
-                ? source.Rows.ToList()
-                : source.Rows.Where(r => AttendanceRowMatches(r, q)).ToList();
+                ? rows.ToList()
+                : rows.Where(r => AttendanceRowMatches(r, q)).ToList();
             if (list.Count == 0)
                 continue;
 
@@ -584,7 +655,7 @@ public class AttendanceViewModel : AdminBaseViewModel
         }
 
         var now = DateTime.Now;
-        var lateCutoff = row.ShiftStartTime + LateGraceWindow;
+        var lateCutoff = row.ShiftStartTime + _lateGraceWindow;
         if (now.TimeOfDay > lateCutoff)
         {
             _pendingLateEmployeeId = row.EmployeeId;
@@ -798,7 +869,7 @@ public class AttendanceViewModel : AdminBaseViewModel
 
     private AttendanceRowViewModel BuildAttendanceRow(Employee employee, EmployeeAttendance? attendance, DateTime day, bool isCurrentDay, decimal pendingSalary, bool dayValidated)
     {
-        var shiftDefinition = AttendanceScheduleHelper.ResolveShiftWindow(employee, day);
+        var shiftDefinition = AttendanceScheduleHelper.ResolveShiftWindow(employee, day, _shiftSchedule);
         var isAbsence = attendance?.IsAbsence == true;
         var status = string.IsNullOrWhiteSpace(attendance?.ClockInStatus) ? "Pending" : attendance!.ClockInStatus;
         if (shiftDefinition.IsOff && attendance?.ClockInTime is null)

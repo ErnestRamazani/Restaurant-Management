@@ -1,6 +1,7 @@
 using EliteRestaurant.Contracts.Admin;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Menu;
 using EliteRestaurant.Core.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -51,6 +52,13 @@ public sealed class AdminSettingsController(AppDbContext db) : ControllerBase
         row.OnlinePromoCtaLabel = string.IsNullOrWhiteSpace(request.OnlinePromoCtaLabel)
             ? null
             : request.OnlinePromoCtaLabel.Trim();
+        if (!string.IsNullOrWhiteSpace(request.MenuTaxonomyJson) &&
+            MenuTaxonomyHelper.TryDeserialize(request.MenuTaxonomyJson.Trim(), out var menuTaxonomy) &&
+            menuTaxonomy is not null)
+        {
+            row.MenuTaxonomyJson = MenuTaxonomyHelper.Serialize(menuTaxonomy);
+        }
+
         row.UpdatedAtUtc = DateTime.UtcNow;
         if (row.Id == 0)
             db.PublicMenuSettings.Add(row);
@@ -82,9 +90,14 @@ public sealed class AdminSettingsController(AppDbContext db) : ControllerBase
         settings.CurrencyPricing.ServicePercent = row.ServicePercent;
         settings.CurrencyPricing.ExchangeRateLastUpdatedUtc = DateTime.UtcNow;
         settings.BusinessProfile.OnlineOrdersTableId = row.OnlineOrdersTableId;
+        settings.BusinessProfile.ReservationLeadDays = Math.Clamp(request.ReservationLeadDays, 0, 30);
+        settings.BusinessProfile.ReservationMaxMonthsAhead = Math.Clamp(request.ReservationMaxMonthsAhead, 1, 24);
         settings.BusinessProfile.OnlinePromoTitle = row.OnlinePromoTitle;
         settings.BusinessProfile.OnlinePromoSubtitle = row.OnlinePromoSubtitle;
         settings.BusinessProfile.OnlinePromoCtaLabel = row.OnlinePromoCtaLabel;
+        if (!string.IsNullOrWhiteSpace(request.MenuTaxonomyJson) &&
+            MenuTaxonomyHelper.TryDeserialize(request.MenuTaxonomyJson.Trim(), out var pushedTaxonomy))
+            settings.MenuTaxonomy = pushedTaxonomy;
         SettingsManager.Save(settings);
         return Ok(new AdminCloudSettingsResponse(true, "/api/public/menu/assets/logo", "Cloud settings saved."));
     }

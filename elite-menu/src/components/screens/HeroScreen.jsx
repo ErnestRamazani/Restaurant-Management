@@ -140,7 +140,7 @@ export function HeroScreen({ config, onEnterMenu, onOrderOnline, onReservation, 
         <div className="min-h-[5rem] flex-1" aria-hidden />
 
         <motion.div
-          className="mb-4 flex w-full max-w-md flex-col items-stretch gap-3 self-center px-0 sm:max-w-lg"
+          className="mb-4 flex w-full max-w-md flex-col items-stretch self-center px-0 sm:max-w-lg"
           initial={false}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.65, duration: 0.4 }}
@@ -157,20 +157,29 @@ export function HeroScreen({ config, onEnterMenu, onOrderOnline, onReservation, 
             <span className="pointer-events-none absolute bottom-[-3px] right-[-3px] h-3 w-3 border-b border-r border-gold/70" />
             Explore our menu
           </button>
+
+          <motion.div
+            className="mt-10 w-full sm:mt-12"
+            initial={false}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.72, duration: 0.35 }}
+          >
+            <RoyalDivider />
+          </motion.div>
+
           <button
             type="button"
             onClick={() => setGatewayOpen(true)}
-            className="relative mx-auto min-h-[56px] w-full max-w-md rounded-2xl border border-champagne/28 bg-champagne/[0.06] px-6 py-3.5 text-center font-display text-[clamp(0.68rem,3vw,0.82rem)] font-semibold uppercase tracking-[0.16em] text-champagne/90 transition hover:border-gold/40 hover:text-gold active:scale-[0.98]"
+            className="relative mx-auto mt-16 min-h-[56px] w-full max-w-md rounded-2xl border border-champagne/28 bg-champagne/[0.06] px-6 py-3.5 text-center font-display text-[clamp(0.68rem,3vw,0.82rem)] font-semibold uppercase tracking-[0.16em] text-champagne/90 transition hover:border-gold/40 hover:text-gold active:scale-[0.98] sm:mt-20"
             style={{ fontFamily: '"Cinzel", "Playfair Display", serif' }}
           >
             Reservation / Order
           </button>
         </motion.div>
 
-        <div className="relative z-20 mt-12 pt-6 sm:mt-14 sm:pt-8">
-          <RoyalDivider className="mb-8 sm:mb-10" />
+        <div className="relative z-20 mt-16 pt-4 sm:mt-20 sm:pt-6">
           <nav
-            className="mt-20 flex flex-wrap items-center justify-center gap-x-8 gap-y-3"
+            className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3"
             aria-label="Footer"
           >
             <FooterLink href="#info-about" onSelect={() => setInfo('about')}>

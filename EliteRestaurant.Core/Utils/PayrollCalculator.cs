@@ -30,7 +30,10 @@ public static class PayrollCalculator
             if (d < join)
                 continue;
 
-            var shift = AttendanceScheduleHelper.ResolveShiftWindow(employee, d);
+            var shift = AttendanceScheduleHelper.ResolveShiftWindow(
+                employee,
+                d,
+                AttendanceShiftSchedule.FromSettings(SettingsManager.Load().Attendance));
             if (shift.IsOff)
                 continue;
 
@@ -70,7 +73,10 @@ public static class PayrollCalculator
             if (d < join)
                 continue;
 
-            var shift = AttendanceScheduleHelper.ResolveShiftWindow(employee, d);
+            var shift = AttendanceScheduleHelper.ResolveShiftWindow(
+                employee,
+                d,
+                AttendanceShiftSchedule.FromSettings(SettingsManager.Load().Attendance));
             if (shift.IsOff)
                 continue;
 

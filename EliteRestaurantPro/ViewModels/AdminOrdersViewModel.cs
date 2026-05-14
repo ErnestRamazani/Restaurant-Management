@@ -358,10 +358,12 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
         if (entry is null)
             return;
 
-        if (!OrderWorkflow.CanCashierComplete(entry.Status))
+        if (!OrderWorkflow.CanCashierComplete(entry.Status, entry.OrderOrigin))
         {
             MessageBox.Show(
-                "Complete is only available when the order is Served.\n\nFlow: kitchen marks Ready → server uses Pick up & serve (or admin uses Advance on Ready) → Served → then complete payment.",
+                OrderOrigin.IsOnline(entry.OrderOrigin)
+                    ? "Complete payment for guest online orders is available once the kitchen marks the ticket Ready.\n\nYou do not need to wait for a server to mark Served."
+                    : "Complete is only available when the order is Served.\n\nFlow: kitchen marks Ready → server uses Pick up & serve (or admin uses Advance on Ready) → Served → then complete payment.",
                 "Orders",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);

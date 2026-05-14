@@ -1,15 +1,23 @@
 using System.Security.Claims;
 using EliteRestaurant.Api.Security;
 using EliteRestaurant.Contracts.Auth;
+using EliteRestaurant.Core.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace EliteRestaurant.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
 [AllowAnonymous]
-public sealed class AuthController(TabletAuthService authService, JwtTokenService jwtTokenService) : ControllerBase
+public sealed class AuthController(
+    TabletAuthService authService,
+    JwtTokenService jwtTokenService,
+    AppDbContext db,
+    IHostEnvironment environment,
+    IOptions<AuthDevOptions> authDevOptions) : ControllerBase
 {
     [HttpGet("session")]
     [Authorize(Policy = "StaffAny")]
@@ -32,6 +40,20 @@ public sealed class AuthController(TabletAuthService authService, JwtTokenServic
     [HttpPost("login")]
     public ActionResult<CloudLoginResponse> Login([FromBody] CloudLoginRequest request)
     {
+        if (AdminDevLoginBypass.TryCreateSession(request, db, environment, authDevOptions) is { } devSession)
+        {
+            var devJwt = jwtTokenService.CreateToken(devSession, out var devExpiresAtUtc);
+            return Ok(new CloudLoginResponse(
+                AccessToken: devJwt,
+                ExpiresAtUtc: devExpiresAtUtc,
+                EmployeeId: devSession.EmployeeId,
+                EmployeeUniqueId: devSession.EmployeeUniqueId,
+                Name: devSession.Name,
+                Role: devSession.Role,
+                SignInId: devSession.SignInId,
+                Portal: request.Portal));
+        }
+
         var outcome = authService.Login(request.StaffId, request.Pin, request.Portal);
         if (outcome.Session is null)
             return Unauthorized(new { message = outcome.ErrorMessage ?? "Sign-in failed." });

@@ -43,6 +43,7 @@ try
 
     builder.Services.Configure<CurrencyPricingOptions>(builder.Configuration.GetSection("CurrencyPricing"));
     builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
+    builder.Services.Configure<AuthDevOptions>(builder.Configuration.GetSection("Auth"));
     builder.Services.Configure<ForwardedHeadersOptions>(options =>
     {
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
@@ -258,32 +259,51 @@ try
     app.UseAuthentication();
     app.UseMiddleware<EliteRestaurant.Api.Middleware.AdminWebReadOnlyApiMiddleware>();
     app.UseAuthorization();
+    static void ApplyHtmlNoStore(HttpResponse response)
+    {
+        response.Headers["Cache-Control"] = "no-store, no-cache, must-revalidate";
+        response.Headers["Pragma"] = "no-cache";
+        response.Headers["Expires"] = "0";
+    }
     app.UseDefaultFiles();
-    app.UseStaticFiles();
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        OnPrepareResponse = context =>
+        {
+            if (context.File.Name.EndsWith(".html", StringComparison.OrdinalIgnoreCase))
+            {
+                ApplyHtmlNoStore(context.Context.Response);
+            }
+        }
+    });
     app.MapGet("/server", () => Results.Redirect("/server/index.html"));
     app.MapGet("/cashier", () => Results.Redirect("/cashier/index.html"));
     app.MapGet("/server/", async (IWebHostEnvironment env, HttpContext context) =>
     {
         var serverPortal = Path.Combine(env.WebRootPath, "server", "index.html");
         context.Response.ContentType = "text/html; charset=utf-8";
+        ApplyHtmlNoStore(context.Response);
         await context.Response.SendFileAsync(serverPortal);
     });
     app.MapGet("/server/index.html", async (IWebHostEnvironment env, HttpContext context) =>
     {
         var serverPortal = Path.Combine(env.WebRootPath, "server", "index.html");
         context.Response.ContentType = "text/html; charset=utf-8";
+        ApplyHtmlNoStore(context.Response);
         await context.Response.SendFileAsync(serverPortal);
     });
     app.MapGet("/cashier/", async (IWebHostEnvironment env, HttpContext context) =>
     {
         var cashierPortal = Path.Combine(env.WebRootPath, "cashier", "index.html");
         context.Response.ContentType = "text/html; charset=utf-8";
+        ApplyHtmlNoStore(context.Response);
         await context.Response.SendFileAsync(cashierPortal);
     });
     app.MapGet("/cashier/index.html", async (IWebHostEnvironment env, HttpContext context) =>
     {
         var cashierPortal = Path.Combine(env.WebRootPath, "cashier", "index.html");
         context.Response.ContentType = "text/html; charset=utf-8";
+        ApplyHtmlNoStore(context.Response);
         await context.Response.SendFileAsync(cashierPortal);
     });
     app.MapGet("/kitchen", () => Results.Redirect("/kitchen/index.html"));
@@ -291,12 +311,14 @@ try
     {
         var path = Path.Combine(env.WebRootPath, "kitchen", "index.html");
         context.Response.ContentType = "text/html; charset=utf-8";
+        ApplyHtmlNoStore(context.Response);
         await context.Response.SendFileAsync(path);
     });
     app.MapGet("/kitchen/index.html", async (IWebHostEnvironment env, HttpContext context) =>
     {
         var path = Path.Combine(env.WebRootPath, "kitchen", "index.html");
         context.Response.ContentType = "text/html; charset=utf-8";
+        ApplyHtmlNoStore(context.Response);
         await context.Response.SendFileAsync(path);
     });
     app.MapGet("/admin", () => Results.Redirect("/admin/index.html"));
@@ -304,12 +326,14 @@ try
     {
         var path = Path.Combine(env.WebRootPath, "admin", "index.html");
         context.Response.ContentType = "text/html; charset=utf-8";
+        ApplyHtmlNoStore(context.Response);
         await context.Response.SendFileAsync(path);
     });
     app.MapGet("/admin/index.html", async (IWebHostEnvironment env, HttpContext context) =>
     {
         var path = Path.Combine(env.WebRootPath, "admin", "index.html");
         context.Response.ContentType = "text/html; charset=utf-8";
+        ApplyHtmlNoStore(context.Response);
         await context.Response.SendFileAsync(path);
     });
     app.MapControllers();
@@ -349,6 +373,7 @@ try
         }
 
         context.Response.ContentType = "text/html; charset=utf-8";
+        ApplyHtmlNoStore(context.Response);
         await context.Response.SendFileAsync(file);
     });
 

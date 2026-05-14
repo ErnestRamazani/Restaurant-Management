@@ -17,13 +17,19 @@ public sealed class TabletAuthService(AppDbContext db, JwtTokenService jwtTokenS
         if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(normalizedPin))
             return new TabletLoginOutcome(null, "Enter both sign-in ID and PIN.");
 
-        var idMatches = StaffPortalAuthentication
-            .QueryActiveEmployeesMatchingStaffId(db.Employees.AsNoTracking(), id)
-            .ToList();
+        // Admin / AdminWeb: allow match on sign-in ID, unique ID, or display name (desktop admin screen).
+        // Other portals: sign-in ID or unique ID only (tablets).
+        var idMatches = string.Equals(normalizedPortal, "Admin", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(normalizedPortal, "AdminWeb", StringComparison.OrdinalIgnoreCase)
+            ? StaffPortalAuthentication.QueryActiveAdminPortalCandidates(db.Employees.AsNoTracking(), id).ToList()
+            : StaffPortalAuthentication.QueryActiveEmployeesMatchingStaffId(db.Employees.AsNoTracking(), id).ToList();
         if (idMatches.Count == 0)
         {
             return new TabletLoginOutcome(null,
-                "No active employee matches that sign-in ID. For the default web admin account use er4124 after the API has applied database migrations and startup seeding, or ask an administrator to add an AdminWeb user.");
+                string.Equals(normalizedPortal, "Admin", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalizedPortal, "AdminWeb", StringComparison.OrdinalIgnoreCase)
+                    ? "No active Admin or Manager matches that ID, employee code, or name. For the seeded web admin use sign-in er4124 (after migrations), or ask an administrator to set your Admin account."
+                    : "No active employee matches that sign-in ID. For the default web admin account use er4124 after the API has applied database migrations and startup seeding, or ask an administrator to add an AdminWeb user.");
         }
 
         var candidates = StaffPortalAuthentication.FilterPinMatches(idMatches, normalizedPin);

@@ -17,6 +17,7 @@
   let orderHubConnection = null;
   let pollTimer = null;
   let hubDebounce = null;
+  let resDetailCache = null;
 
   function $(id) { return document.getElementById(id); }
 
@@ -829,24 +830,186 @@
       "Change allocation (USD eq): " + fmtUsd(alloc) + " · must match " + fmtUsd(chg);
   }
 
+  function engagementStatusLabel(st) {
+    const s = String(st || "");
+    if (/^checkedin$/i.test(s)) return "Checked in";
+    return s || "—";
+  }
+
+  function engagementPillClass(stRaw) {
+    const s = String(stRaw || "").toLowerCase();
+    if (s === "scheduled") return "res-pill--scheduled";
+    if (s === "checkedin") return "res-pill--in";
+    return "res-pill--muted";
+  }
+
+  function resEngagementRailClass(stRaw) {
+    const s = String(stRaw || "").toLowerCase();
+    return s === "checkedin" ? "res-eng-card__rail res-eng-card__rail--in" : "res-eng-card__rail";
+  }
+
+  function resKvHtml(label, val) {
+    return (
+      "<div class='res-kv'><span class='res-kv-lbl'>" + escapeHtml(label) + "</span>" +
+      "<span class='res-kv-val'>" + escapeHtml(val) + "</span></div>");
+  }
+
+  function resSectionHtml(title, pairs) {
+    const inner = pairs.map(p => resKvHtml(p[0], p[1])).join("");
+    return (
+      "<div class='res-detail-section'><p class='res-detail-section-title'>" + escapeHtml(title) + "</p>" +
+      "<div class='res-kv-grid'>" + inner + "</div></div>");
+  }
+
+  function buildReservationDetailBody(d) {
+    const startRaw = d.plannedStartUtc ?? d.PlannedStartUtc;
+    const endRaw = d.plannedEndUtc ?? d.PlannedEndUtc;
+    const actS = d.actualStartUtc ?? d.ActualStartUtc;
+    const actE = d.actualEndUtc ?? d.ActualEndUtc;
+    const stRaw = String(d.status ?? d.Status ?? "");
+    const visit = resSectionHtml("Visit", [
+      ["Arrival", startRaw ? new Date(startRaw).toLocaleString() : "—"],
+      ["End", endRaw ? new Date(endRaw).toLocaleString() : "—"],
+      ["Party size", String(d.partySize ?? d.PartySize ?? "—")],
+      ["Table", String(d.tableLabel ?? d.TableLabel ?? "—")],
+    ]);
+    const guest = resSectionHtml("Guest", [
+      ["Phone", String(d.guestPhone ?? d.GuestPhone ?? "—")],
+      ["Email", String(d.guestEmail ?? d.GuestEmail ?? "—")],
+      ["Notes", String(d.userNotes ?? d.UserNotes ?? "—")],
+    ]);
+    const floor = resSectionHtml("Floor & record", [
+      ["Status", engagementStatusLabel(stRaw)],
+      ["Table id", String(d.tableId ?? d.TableId ?? "—")],
+      ["Placement unit", String(d.placementUnitId ?? d.PlacementUnitId ?? "—")],
+      ["Actual arrival", actS ? new Date(actS).toLocaleString() : "—"],
+      ["Actual release", actE ? new Date(actE).toLocaleString() : "—"],
+      ["Created", (d.createdAtUtc ?? d.CreatedAtUtc) ? new Date(d.createdAtUtc ?? d.CreatedAtUtc).toLocaleString() : "—"],
+      ["Updated", (d.updatedAtUtc ?? d.UpdatedAtUtc) ? new Date(d.updatedAtUtc ?? d.UpdatedAtUtc).toLocaleString() : "—"],
+    ]);
+    return visit + guest + floor;
+  }
+
+  function closeResDetail() {
+    $("resDetailModal").classList.add("hidden");
+    $("reschedulePanel").classList.add("hidden");
+    resDetailCache = null;
+  }
+
+  function toLocalDatetimeLocalValue(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    const pad = n => String(n).padStart(2, "0");
+    return (
+      d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) +
+      "T" + pad(d.getHours()) + ":" + pad(d.getMinutes()));
+  }
+
+  async function openReservationDetail(id) {
+    const r = await api("/api/cashier/reservations/engagements/" + id, "GET");
+    if (!r.ok) { alert(r.body?.message || "Could not load reservation"); return; }
+    const d = r.body;
+    resDetailCache = d;
+    const stRaw = String(d.status ?? d.Status ?? "");
+    const code = "#" + id;
+    $("resDetailTitle").textContent = d.guestName || d.GuestName || "Guest";
+    $("resDetailMeta").innerHTML =
+      "<span class='res-ref'>" + escapeHtml(code) + "</span>" +
+      "<span class='res-pill " + engagementPillClass(stRaw) + "'>" + escapeHtml(engagementStatusLabel(stRaw)) + "</span>";
+    $("resDetailBody").innerHTML = buildReservationDetailBody(d);
+    const st = stRaw.toLowerCase();
+    const actions = $("resDetailActions");
+    actions.innerHTML = "";
+    if (st === "scheduled") {
+      actions.innerHTML =
+        "<button type='button' class='btn btn-primary btn-sm' data-res-arrived='" + id + "'>Arrived</button>" +
+        "<button type='button' class='btn btn-ghost btn-sm' data-res-sched='" + id + "'>Reschedule</button>" +
+        "<button type='button' class='btn btn-ghost btn-sm' data-res-noshow='" + id + "'>No show</button>" +
+        "<button type='button' class='btn btn-danger btn-sm' data-res-cancel='" + id + "'>Cancelled</button>";
+      actions.querySelector("[data-res-arrived]").onclick = () => resAction(id, "arrived");
+      actions.querySelector("[data-res-sched]").onclick = () => openReschedulePanel(id);
+      actions.querySelector("[data-res-noshow]").onclick = () => resAction(id, "no-show");
+      actions.querySelector("[data-res-cancel]").onclick = () => resAction(id, "cancel");
+    } else if (st === "checkedin") {
+      actions.innerHTML =
+        "<p class='muted' style='margin:0;line-height:1.5;'>Checked in — use <strong>Reservation floor</strong> for seating timeline and release.</p>";
+    } else {
+      actions.innerHTML = "<p class='muted' style='margin:0;'>No actions for this status.</p>";
+    }
+    $("reschedulePanel").classList.add("hidden");
+    $("resDetailModal").classList.remove("hidden");
+  }
+
+  async function resAction(id, kind) {
+    const path = kind === "arrived" ? "arrived" : kind === "cancel" ? "cancel" : "no-show";
+    const msg =
+      kind === "cancel"
+        ? "Cancel this reservation?"
+        : kind === "no-show"
+          ? "Mark as no-show?"
+          : "Mark guest as arrived (check-in)?";
+    if (!confirm(msg)) return;
+    const r = await api("/api/cashier/reservations/engagements/" + id + "/" + path, "POST", {});
+    if (!r.ok) { alert(r.body?.message || "Request failed"); return; }
+    closeResDetail();
+    await loadReservations();
+  }
+
+  function openReschedulePanel(id) {
+    if (!resDetailCache) return;
+    const start = resDetailCache.plannedStartUtc ?? resDetailCache.PlannedStartUtc;
+    $("resSchedLocal").value = toLocalDatetimeLocalValue(start);
+    $("reschedulePanel").classList.remove("hidden");
+    $("reschedulePanel").dataset.engagementId = String(id);
+  }
+
   async function loadReservations() {
     const el = $("reservationsList");
-    const r = await api("/api/reservations/arrived");
+    const r = await api("/api/cashier/reservations/engagements", "GET");
     if (!r.ok) { el.innerHTML = "<div class='danger' style='padding:12px;'>Could not load reservations.</div>"; return; }
     const rows = Array.isArray(r.body) ? r.body : [];
-    if (!rows.length) { el.innerHTML = "<div class='muted' style='padding:16px;'>No arrived reservations.</div>"; return; }
+    if (!rows.length) {
+      el.innerHTML =
+        "<div class='res-empty'>" +
+        "<p class='res-empty-title'>No upcoming reservations</p>" +
+        "<p class='res-empty-hint'>Scheduled and checked-in visits appear here. New guest bookings from the menu show up automatically.</p>" +
+        "</div>";
+      return;
+    }
     el.innerHTML = rows.map(x => {
-      const name = x.guestName ?? x.GuestName ?? x.reservationName ?? x.ReservationName ?? "Guest";
-      const uid = x.uniqueId ?? x.UniqueId ?? "";
-      const tl = x.tableLabel ?? x.TableLabel ?? "-";
+      const id = x.id ?? x.Id;
+      const stRaw = x.status ?? x.Status ?? "";
+      const st = engagementStatusLabel(stRaw);
+      const pill = engagementPillClass(stRaw);
+      const rail = resEngagementRailClass(stRaw);
+      const name = x.guestName ?? x.GuestName ?? "Guest";
+      const phone = x.guestPhone ?? x.GuestPhone ?? "";
+      const tbl = x.tableLabel ?? x.TableLabel ?? "-";
       const ps = x.partySize ?? x.PartySize ?? "";
-      const rf = x.reservedFor ?? x.ReservedFor;
-      const when = rf ? new Date(rf).toLocaleString() : "";
+      const start = x.plannedStartUtc ?? x.PlannedStartUtc;
+      const when = start ? new Date(start).toLocaleString() : "";
+      const sid = String(id);
       return (
-        "<div class='order-row'>" +
-        "<div><strong>" + escapeHtml(name) + "</strong> · " + escapeHtml(uid) + "</div>" +
-        "<div class='muted'>" + escapeHtml(tl) + " · party " + escapeHtml(String(ps)) + " · " + escapeHtml(when) + "</div></div>");
+        "<div class='res-eng-card'>" +
+        "<button type='button' class='res-eng-card__hit' data-res-open='" + sid + "'>" +
+        "<div class='" + rail + "' aria-hidden='true'></div>" +
+        "<div class='res-eng-card__body'>" +
+        "<div class='res-eng-card__top'>" +
+        "<span class='res-eng-card__name'>" + escapeHtml(name) + "</span>" +
+        "<span class='res-pill " + pill + "'>" + escapeHtml(st) + "</span>" +
+        "</div>" +
+        "<div class='res-eng-card__ref'>Ref · " + escapeHtml(sid) + "</div>" +
+        (when ? "<div class='res-eng-card__when'>" + escapeHtml(when) + "</div>" : "") +
+        "<div class='res-eng-card__chips'>" +
+        "<span class='res-chip'><strong>Table</strong> " + escapeHtml(tbl) + "</span>" +
+        "<span class='res-chip'><strong>Party</strong> " + escapeHtml(String(ps)) + "</span>" +
+        (phone ? "<span class='res-chip'><strong>Tel</strong> " + escapeHtml(phone) + "</span>" : "") +
+        "</div></div></button></div>");
     }).join("");
+    el.querySelectorAll("[data-res-open]").forEach(b => {
+      b.onclick = () => openReservationDetail(Number(b.getAttribute("data-res-open")));
+    });
   }
 
   function guestMenuUrlForTableId(tableId) {
@@ -1148,6 +1311,20 @@
   $("btnCheckOpen").onclick = checkOpenCheck;
   $("detailClose").onclick = closeOrderDetail;
   $("orderDetailModal").addEventListener("click", e => { if (e.target.id === "orderDetailModal") closeOrderDetail(); });
+
+  $("resDetailClose").onclick = closeResDetail;
+  $("resDetailModal").addEventListener("click", e => { if (e.target.id === "resDetailModal") closeResDetail(); });
+  $("resSchedCancel").onclick = () => { $("reschedulePanel").classList.add("hidden"); };
+  $("resSchedApply").onclick = async () => {
+    const id = Number($("reschedulePanel").dataset.engagementId);
+    const local = $("resSchedLocal").value;
+    if (!local || !id) { alert("Pick a new time."); return; }
+    const startIso = new Date(local).toISOString();
+    const r = await api("/api/cashier/reservations/engagements/" + id + "/reschedule", "POST", { plannedStartUtc: startIso });
+    if (!r.ok) { alert(r.body?.message || "Reschedule failed"); return; }
+    closeResDetail();
+    await loadReservations();
+  };
 
   ["payUsd", "payFc", "chgUsd", "chgFc"].forEach(id => $(id).addEventListener("input", updatePaymentSummary));
   $("payCancel").onclick = closePaymentModal;

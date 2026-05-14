@@ -17,12 +17,8 @@ public static class AdminOrdersViewMapper
         {
             Id = order.Id,
             OrderId = string.IsNullOrWhiteSpace(order.UniqueId) ? $"#{order.Id:000}" : order.UniqueId,
-            TableNumber = string.IsNullOrWhiteSpace(order.TableCode)
-                ? $"Table {order.Table?.TableNumber ?? 0}"
-                : $"{order.TableCode} · {order.TableName}",
-            ServerName = string.IsNullOrWhiteSpace(order.ServerName)
-                ? (order.Server?.Name ?? "Unassigned")
-                : order.ServerName,
+            TableNumber = OrderRecordUiLabels.TableCaption(order),
+            ServerName = OrderRecordUiLabels.ServerCaption(order),
             Items = items,
             CustomerNotes = order.CustomerNotes ?? string.Empty,
             AllergyNotes = order.AllergyNotes ?? string.Empty,
@@ -31,8 +27,9 @@ public static class AdminOrdersViewMapper
             Time = order.CreatedAt.ToString("HH:mm"),
             Total = total,
             StatusColor = GetStatusColor(order.Status),
+            OrderOrigin = string.IsNullOrWhiteSpace(order.OrderOrigin) ? OrderOrigin.InStore : order.OrderOrigin,
             ShowAdvanceInOrders = !isPast && showAdminAdvance && OrderWorkflow.CanAdminAdvanceOrderStatus(order.Status),
-            ShowCompleteInOrders = !isPast && OrderWorkflow.CanCashierComplete(order.Status),
+            ShowCompleteInOrders = !isPast && OrderWorkflow.CanCashierComplete(order.Status, order.OrderOrigin),
             ShowViewTicketInOrders = canViewTicket
         };
     }

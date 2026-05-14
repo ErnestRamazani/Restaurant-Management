@@ -717,6 +717,9 @@ namespace EliteRestaurant.Core.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("MenuTaxonomyJson")
+                        .HasColumnType("text");
+
                     b.Property<int?>("OnlineOrdersTableId")
                         .HasColumnType("integer");
 

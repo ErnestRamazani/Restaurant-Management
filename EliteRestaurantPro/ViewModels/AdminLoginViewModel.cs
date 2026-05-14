@@ -51,7 +51,6 @@ public class AdminLoginViewModel : BaseViewModel
     private async Task ExecuteLoginAsync()
     {
         AppSession.Clear();
-        // Demo credentials — any non-empty input proceeds
         if (string.IsNullOrWhiteSpace(AdminId) || string.IsNullOrWhiteSpace(Password))
         {
             ErrorMessage = "Please enter your ID and password.";
@@ -59,21 +58,19 @@ public class AdminLoginViewModel : BaseViewModel
             return;
         }
 
-        try
+        var auth = await _authApiClient.LoginAsync(AdminId.Trim(), Password.Trim(), "Admin");
+        if (auth.Response is null)
         {
-            var auth = await _authApiClient.LoginAsync(AdminId.Trim(), Password.Trim(), "Admin");
-            if (auth.Response is not null)
-                AppSession.SetAdminLoginProfile(auth.Response.Name, null);
-            else
-                AppSession.SetAdminLoginProfile(AdminId.Trim(), null);
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Cloud admin login skipped: {ex.GetBaseException().Message}");
-            AppSession.SetAdminLoginProfile(AdminId.Trim(), null);
+            ErrorMessage = !string.IsNullOrWhiteSpace(auth.ErrorMessage)
+                ? auth.ErrorMessage
+                : "Sign-in failed. Check your ID and password.";
+            HasError = true;
+            return;
         }
 
+        AppSession.SetAdminLoginProfile(auth.Response.Name, null);
         HasError = false;
+        ErrorMessage = string.Empty;
         _navigate(new AdminDashboardViewModel(_navigate));
     }
 }

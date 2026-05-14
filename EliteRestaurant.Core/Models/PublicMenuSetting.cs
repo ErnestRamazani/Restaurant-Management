@@ -25,5 +25,9 @@ public sealed class PublicMenuSetting
     public string? OnlinePromoTitle { get; set; }
     public string? OnlinePromoSubtitle { get; set; }
     public string? OnlinePromoCtaLabel { get; set; }
+
+    /// <summary>JSON for <see cref="Menu.MenuTaxonomySettings"/>; exposed on public menu config for PWAs.</summary>
+    public string? MenuTaxonomyJson { get; set; }
+
     public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
 }
