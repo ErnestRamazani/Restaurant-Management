@@ -1,13 +1,15 @@
+using EliteRestaurant.Core.Data;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace EliteRestaurant.Core.Migrations;
 
-/// <inheritdoc />
-public partial class AddCustomerMenuContentFields : Migration
+[DbContext(typeof(AppDbContext))]
+[Migration("20260516120000_AddCustomerMenuContentFields")]
+public class AddCustomerMenuContentFields : Migration
 {
-    /// <inheritdoc />
     protected override void Up(MigrationBuilder migrationBuilder)
     {
         migrationBuilder.AddColumn<string>(
@@ -29,7 +31,6 @@ public partial class AddCustomerMenuContentFields : Migration
             nullable: true);
     }
 
-    /// <inheritdoc />
     protected override void Down(MigrationBuilder migrationBuilder)
     {
         migrationBuilder.DropColumn(name: "CustomerMenuAboutText", table: "PublicMenuSettings");
