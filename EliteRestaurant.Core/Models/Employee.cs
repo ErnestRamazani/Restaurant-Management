@@ -1,4 +1,6 @@
+using System.Collections.ObjectModel;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace EliteRestaurant.Core.Models;
 
@@ -14,8 +16,11 @@ public class Employee
     public string PinCode { get; set; } = string.Empty;
     public string ProfileImagePath { get; set; } = string.Empty;
     public string PhoneNumber { get; set; } = string.Empty;
+    /// <summary>Hourly wage in USD — used for payroll when <see cref="MonthlySalaryUSD"/> is zero.</summary>
     public decimal HourlyRate { get; set; }
-    /// <summary>Optional reference amount in USD. Monthly payroll on the Salary screen uses <see cref="HourlyRate"/> × scheduled shift hours.</summary>
+    /// <summary>
+    /// Fixed monthly gross in USD. When greater than zero, Salary payroll uses this (calendar-prorated after <see cref="JoinDate"/>) as the base before attendance, bonus, and advances.
+    /// </summary>
     public decimal MonthlySalaryUSD { get; set; }
     public DateTime JoinDate { get; set; } = DateTime.Today;
     public string EmploymentStatus { get; set; } = "Active";
@@ -83,6 +88,47 @@ public class Employee
             AddShift(entries, "Sunday", SundayShift);
             return entries.Count == 0 ? "No schedule assigned." : string.Join(", ", entries);
         }
+    }
+
+    /// <summary>Mon–Sun display rows for UI; refresh with <see cref="RebuildScheduleDays"/> after shift fields change.</summary>
+    [NotMapped]
+    [JsonIgnore]
+    public ObservableCollection<EmployeeScheduleDayRow> ScheduleDays { get; } = new();
+
+    /// <summary>Rebuilds <see cref="ScheduleDays"/> from per-day shift fields (Mon–Sun).</summary>
+    public void RebuildScheduleDays()
+    {
+        ScheduleDays.Clear();
+        void Add(string dayShort, string? raw)
+        {
+            var (badgeText, variant) = MapShiftToBadge(raw);
+            ScheduleDays.Add(new EmployeeScheduleDayRow(dayShort, badgeText, variant));
+        }
+
+        Add("Mon", MondayShift);
+        Add("Tue", TuesdayShift);
+        Add("Wed", WednesdayShift);
+        Add("Thu", ThursdayShift);
+        Add("Fri", FridayShift);
+        Add("Sat", SaturdayShift);
+        Add("Sun", SundayShift);
+    }
+
+    private static (string BadgeText, string BadgeVariant) MapShiftToBadge(string? configured)
+    {
+        var n = (configured ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(n) || n.Equals("Off", StringComparison.OrdinalIgnoreCase))
+            return ("Off", "Off");
+
+        if (n.Contains("Night", StringComparison.OrdinalIgnoreCase) ||
+            n.Contains("Evening", StringComparison.OrdinalIgnoreCase))
+            return ("Evening", "Evening");
+
+        if (n.Contains("Morning", StringComparison.OrdinalIgnoreCase) ||
+            n.Contains("Afternoon", StringComparison.OrdinalIgnoreCase))
+            return ("Morning", "Morning");
+
+        return ("Morning", "Morning");
     }
 
     private static void AddShift(List<string> entries, string day, string shift)

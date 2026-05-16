@@ -22,6 +22,8 @@ public sealed class AdminSettingsApiClient(EliteApiClient? apiClient = null)
                 ? settings.CloudApi.BaseUrl
                 : settings.BusinessProfile.PublicMenuBaseUrl);
 
+        settings.Salary ??= new SalarySettings();
+
         var request = new AdminCloudSettingsRequest(
             settings.BusinessProfile.RestaurantName,
             settings.BusinessProfile.Phone,
@@ -54,7 +56,11 @@ public sealed class AdminSettingsApiClient(EliteApiClient? apiClient = null)
             promo.ContentType,
             promo.Base64,
             applyOnlinePromoImageChanges,
-            MenuTaxonomyHelper.Serialize(MenuTaxonomyHelper.Resolve(settings.MenuTaxonomy)));
+            MenuTaxonomyHelper.Serialize(MenuTaxonomyHelper.Resolve(settings.MenuTaxonomy)),
+            settings.Salary.LateDaysPerAttendanceUnit,
+            settings.Salary.AbsenceCountsAsAttendanceUnit,
+            settings.Salary.SalesBonusPercent,
+            settings.Salary.MaxSalaryAdvancePercentOfGross);
 
         await _apiClient.PostAsync<AdminCloudSettingsRequest, AdminCloudSettingsResponse>(
             "api/admin/settings/cloud-profile",

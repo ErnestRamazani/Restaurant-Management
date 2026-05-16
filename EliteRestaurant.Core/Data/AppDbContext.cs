@@ -163,6 +163,13 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Table>().HasIndex(t => t.UniqueId).IsUnique();
         modelBuilder.Entity<Table>().HasIndex(t => t.TableNumber).IsUnique();
         modelBuilder.Entity<OrderRecord>().HasIndex(o => o.UniqueId).IsUnique();
+        modelBuilder.Entity<OrderRecord>()
+            .Property(o => o.ConfirmationCode)
+            .HasMaxLength(6);
+        modelBuilder.Entity<OrderRecord>()
+            .HasIndex(o => o.ConfirmationCode)
+            .IsUnique()
+            .HasFilter("\"ConfirmationCode\" IS NOT NULL AND \"ConfirmationCode\" <> ''");
         modelBuilder.Entity<InventoryItem>().HasIndex(i => i.UniqueId).IsUnique();
         modelBuilder.Entity<CustomerProfile>().HasIndex(c => c.UniqueId).IsUnique();
         modelBuilder.Entity<CustomerProfile>().HasIndex(c => c.PrimaryPhone);

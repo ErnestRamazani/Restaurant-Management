@@ -33,4 +33,19 @@ public class PricingPrecedenceTests
         Assert.Equal(10m, PricingResolver.ResolveServicePercent(0m, 10m));
         Assert.Throws<InvalidOperationException>(() => PricingResolver.ResolveServicePercent(0m, 0m));
     }
+
+    [Fact]
+    public void ResolveRestaurantServicePercent_PrefersCloud_OverFile_IgnoresAppsettingsPattern()
+    {
+        Assert.Equal(12m, PricingResolver.ResolveRestaurantServicePercent(12m, 10m));
+        Assert.Equal(10m, PricingResolver.ResolveRestaurantServicePercent(null, 10m));
+        Assert.Equal(10m, PricingResolver.ResolveRestaurantServicePercent(0m, 10m));
+    }
+
+    [Fact]
+    public void ResolveRestaurantTaxPercent_PrefersCloud_OverFile()
+    {
+        Assert.Equal(8m, PricingResolver.ResolveRestaurantTaxPercent(8m, 7m));
+        Assert.Equal(7m, PricingResolver.ResolveRestaurantTaxPercent(null, 7m));
+    }
 }

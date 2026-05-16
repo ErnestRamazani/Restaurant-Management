@@ -79,7 +79,7 @@
                         <Run Text="General" Foreground="{StaticResource TextPrimaryBrush}"/>
                         <Run Text=" Reports" Foreground="{StaticResource GoldAccentBrush}"/>
                     </TextBlock>
-                    <TextBlock Text="Day-grouped reporting: Daily, Orders, Employees, Tables, Inventory, and Menu."
+                    <TextBlock Text="Day-grouped reporting: Daily (with payroll &amp; salary), Orders, Employees, Tables, Inventory, and Menu."
                                Style="{StaticResource BodyText}"
                                FontSize="13"
                                Margin="0,5,0,0"/>

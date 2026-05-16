@@ -43,7 +43,7 @@
                                        Foreground="{StaticResource GoldAccentBrush}"
                                        FontSize="20"
                                        FontWeight="SemiBold"/>
-                            <TextBlock Text="Restaurant info for receipts and ticket footer."
+                            <TextBlock Text="Restaurant identity, public menu URL, online promo, and staff access."
                                        Style="{StaticResource BodyText}"
                                        Margin="0,4,0,12"/>
 
@@ -53,6 +53,7 @@
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
@@ -74,17 +75,17 @@
                                     <TextBox Text="{Binding RestaurantAddress, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
                                 </StackPanel>
 
-                                <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,0,10,10">
+                                <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Margin="0,0,0,10">
                                     <TextBlock Text="Website domain" Style="{StaticResource HeadingSmall}"/>
                                     <TextBox Text="{Binding RestaurantWebsiteDomain, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
                                 </StackPanel>
 
-                                <StackPanel Grid.Row="2" Grid.Column="1" Margin="10,0,0,10">
-                                    <TextBlock Text="Social media" Style="{StaticResource HeadingSmall}"/>
+                                <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Margin="0,0,0,10">
+                                    <TextBlock Text="Other social (optional)" Style="{StaticResource HeadingSmall}"/>
                                     <TextBox Text="{Binding RestaurantSocialMedia, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
                                 </StackPanel>
 
-                                <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Margin="0,0,0,10">
+                                <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Margin="0,0,0,10">
                                     <TextBlock Text="Logo path" Style="{StaticResource HeadingSmall}"/>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
@@ -96,7 +97,7 @@
                                     </Grid>
                                 </StackPanel>
 
-                                <StackPanel Grid.Row="4" Grid.ColumnSpan="2">
+                                <StackPanel Grid.Row="5" Grid.ColumnSpan="2">
                                     <TextBlock Text="Homepage background image" Style="{StaticResource HeadingSmall}"/>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
@@ -114,16 +115,6 @@
                                     </Grid>
                                 </StackPanel>
                             </Grid>
-
-                            <StackPanel Margin="0,10,0,0">
-                                <TextBlock Text="Footer text for tickets" Style="{StaticResource HeadingSmall}"/>
-                                <TextBox Text="{Binding TicketFooterText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                            </StackPanel>
-
-                            <StackPanel Margin="0,10,0,0">
-                                <TextBlock Text="Tax ID / legal info for receipts" Style="{StaticResource HeadingSmall}"/>
-                                <TextBox Text="{Binding TaxIdLegalInfo, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                            </StackPanel>
 
                             <StackPanel Margin="0,10,0,0">
                                 <TextBlock Text="Public menu base URL (QR codes for customers’ phones)" Style="{StaticResource HeadingSmall}"/>
@@ -189,6 +180,90 @@
                             <Button Content="Save Business Profile"
                                     Margin="0,14,0,0"
                                     Command="{Binding SaveBusinessProfileCommand}"
+                                    Style="{StaticResource GoldPrimaryButton}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource GlassCard}" Margin="0,16,0,0" Padding="18"
+                            Visibility="{Binding ShowTicketsReceiptSection, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <StackPanel>
+                            <TextBlock Text="Tickets &amp; receipts"
+                                       Foreground="{StaticResource GoldAccentBrush}"
+                                       FontSize="20"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Text="Printed and PDF tickets: optional header image above the restaurant name, footer and tax lines, and custom social rows (your label, text, and icon file per line). Phone is taken from Business Profile."
+                                       Style="{StaticResource BodyText}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,4,0,12"/>
+
+                            <TextBlock Text="Ticket header logo path (not the main restaurant logo)" Style="{StaticResource HeadingSmall}"/>
+                            <TextBlock Text="Shown centered above the restaurant name on tickets only. Leave blank to skip."
+                                       Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="120"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox Grid.Column="0" Text="{Binding TicketHeaderLogoPath, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
+                                <Button Grid.Column="1" Margin="8,0,0,0" Content="Browse" Command="{Binding BrowseTicketHeaderLogoCommand}" Style="{StaticResource GhostButton}"/>
+                            </Grid>
+
+                            <TextBlock Text="Footer text for tickets" Style="{StaticResource HeadingSmall}"/>
+                            <TextBox Text="{Binding TicketFooterText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"
+                                     Margin="0,0,0,10"/>
+
+                            <TextBlock Text="Tax ID / legal info for receipts" Style="{StaticResource HeadingSmall}"/>
+                            <TextBox Text="{Binding TaxIdLegalInfo, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"
+                                     Margin="0,0,0,12"/>
+
+                            <TextBlock Text="Social lines on tickets" Style="{StaticResource HeadingSmall}"/>
+                            <TextBlock Text="Add a row for each item: type the platform name, the username or URL to show, and pick a small icon image from disk."
+                                       Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+
+                            <ItemsControl ItemsSource="{Binding TicketSocialMediaRows}" Margin="0,0,0,8">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type vm:TicketSocialMediaRowViewModel}">
+                                        <Border Margin="0,0,0,10" Padding="10" CornerRadius="6"
+                                                BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1" Background="#12000000">
+                                            <StackPanel>
+                                                <Grid Margin="0,0,0,8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                                        <TextBlock Text="Name (e.g. Instagram)" Style="{StaticResource HeadingSmall}"/>
+                                                        <TextBox Text="{Binding PlatformName, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                                        <TextBlock Text="Username / URL / text" Style="{StaticResource HeadingSmall}"/>
+                                                        <TextBox Text="{Binding UserText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
+                                                    </StackPanel>
+                                                </Grid>
+                                                <TextBlock Text="Icon image path" Style="{StaticResource HeadingSmall}"/>
+                                                <Grid Margin="0,0,0,8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="120"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBox Grid.Column="0" Text="{Binding IconPath, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
+                                                    <Button Grid.Column="1" Margin="8,0,0,0" Content="Browse"
+                                                            Command="{Binding DataContext.BrowseTicketSocialIconCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}" Style="{StaticResource GhostButton}"/>
+                                                </Grid>
+                                                <Button HorizontalAlignment="Right" Content="Remove row"
+                                                        Command="{Binding DataContext.RemoveTicketSocialRowCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}" Style="{StaticResource GhostButton}"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <Button Content="Add social row" Command="{Binding AddTicketSocialRowCommand}" HorizontalAlignment="Left" Style="{StaticResource GhostButton}" Margin="0,0,0,12"/>
+
+                            <Button Content="Save tickets &amp; receipts"
+                                    Command="{Binding SaveTicketReceiptLayoutCommand}"
                                     Style="{StaticResource GoldPrimaryButton}"/>
                         </StackPanel>
                     </Border>
@@ -452,6 +527,34 @@
                             <Button Content="Save attendance shift settings"
                                     Margin="0,14,0,0"
                                     Command="{Binding SaveAttendanceShiftsCommand}"
+                                    Style="{StaticResource GoldPrimaryButton}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource GlassCard}" Margin="0,16,0,0" Padding="18"
+                            Visibility="{Binding ShowSalarySection, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <StackPanel>
+                            <TextBlock Text="Salary"
+                                       Foreground="{StaticResource GoldAccentBrush}"
+                                       FontSize="20"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Text="Payroll uses scheduled workdays, attendance absences/lates, merchandise sales bonus, and advance caps. These values sync to the cloud profile so API-side payroll matches this PC."
+                                       Style="{StaticResource BodyText}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,4,0,12"/>
+                            <TextBlock Text="Late days per attendance deduction unit (e.g. 4 means four late days = one unit)" Style="{StaticResource HeadingSmall}"/>
+                            <TextBox Text="{Binding SalaryLateDaysPerAttendanceUnitText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
+                            <CheckBox Margin="0,12,0,0"
+                                      Content="Each absence day counts as one deduction unit"
+                                      IsChecked="{Binding SalaryAbsenceCountsAsAttendanceUnit, Mode=TwoWay}"
+                                      Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <TextBlock Text="Sales bonus (% of server merchandise for the month)" Style="{StaticResource HeadingSmall}" Margin="0,12,0,0"/>
+                            <TextBox Text="{Binding SalarySalesBonusPercentText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
+                            <TextBlock Text="Max salary advance (% of scheduled gross for that payroll month)" Style="{StaticResource HeadingSmall}" Margin="0,10,0,0"/>
+                            <TextBox Text="{Binding SalaryMaxAdvancePercentOfGrossText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
+                            <Button Content="Save Salary settings"
+                                    Margin="0,14,0,0"
+                                    Command="{Binding SaveSalarySettingsCommand}"
                                     Style="{StaticResource GoldPrimaryButton}"/>
                         </StackPanel>
                     </Border>

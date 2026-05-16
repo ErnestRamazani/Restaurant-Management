@@ -1,3 +1,4 @@
+using System.Linq;
 using EliteRestaurant.Core.Models;
 
 namespace EliteRestaurant.Core.Utils;
@@ -75,6 +76,17 @@ public static class OrderTotalsHelper
         var service = ApplyRounding(taxable * serviceRate, roundingLine);
         var grand = ApplyRounding(taxable + tax + service, roundingGrandTotal);
         return (discountApplied, taxable, tax, service, grand);
+    }
+
+    /// <summary>Grand total for an order row, including delivery fee when applicable (matches payment completion validation).</summary>
+    public static decimal ComputeOrderGrandTotalUsd(OrderRecord order)
+    {
+        var lineSubtotal = order.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
+        return ComputeTotalsWithDeliveryFee(
+            lineSubtotal,
+            order.DiscountMode,
+            order.DiscountValue,
+            order.DeliveryFeeUsd).GrandTotal;
     }
 
     /// <summary>Merchandise totals plus a separate delivery fee line (USD), not included in tax/service base unless you change callers.</summary>

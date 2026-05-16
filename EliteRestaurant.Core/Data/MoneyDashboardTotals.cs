@@ -1,4 +1,5 @@
 using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Reporting;
 using EliteRestaurant.Core.Utils;
 
 namespace EliteRestaurant.Core.Data;
@@ -24,18 +25,8 @@ public static class MoneyDashboardTotals
 
     public static decimal SumRevenueByCurrency(IEnumerable<MoneyTransaction> rows, string currencyCode)
     {
-        var want = NormalizeCurrency(currencyCode);
-        decimal t = 0m;
-        foreach (var row in rows)
-        {
-            if (!string.Equals(row.Type, RevenueType, StringComparison.OrdinalIgnoreCase))
-                continue;
-            if (!string.Equals(NormalizeCurrency(row.CurrencyCode), want, StringComparison.OrdinalIgnoreCase))
-                continue;
-            t += row.Amount;
-        }
-
-        return t;
+        var revenue = rows.Where(r => string.Equals(r.Type, RevenueType, StringComparison.OrdinalIgnoreCase));
+        return MoneyReportingHelpers.SumByCurrency(revenue, currencyCode);
     }
 
     /// <summary>All expenses in USD: prefers AmountUsd; FC rows with zero AmountUsd convert Amount from FC.</summary>

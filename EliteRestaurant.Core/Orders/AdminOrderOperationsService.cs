@@ -1,5 +1,6 @@
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Reporting;
 using EliteRestaurant.Core.Utils;
 using Microsoft.EntityFrameworkCore;
 
@@ -401,13 +402,19 @@ public sealed class AdminOrderOperationsService(AppDbContext db)
                 ? (string.IsNullOrWhiteSpace(order.PaymentCurrencyCode) ? CurrencyHelper.Usd : order.PaymentCurrencyCode)
                 : paymentCurrencyOverride;
 
+            var netPaymentUsd = Math.Round(Math.Max(0m, paidUsdRounded - changeUsdRounded), 2);
+            var netPaymentFc = Math.Round(Math.Max(0m, paidFcRounded - changeFcRounded), 2);
+
             order.PaymentCurrencyCode = paymentCurrency;
             order.ExchangeRateUsed = CurrencyHelper.FcPerUsd;
-            order.PaymentAmount = paymentCurrency == CurrencyHelper.CongoleseFranc
-                ? CurrencyHelper.ConvertUsdToFc(grandTotalUsd)
-                : Math.Round(grandTotalUsd, 2);
-            order.PaymentAmountUsd = Math.Round(grandTotalUsd, 2);
-            order.PaymentAmountFc = CurrencyHelper.ConvertUsdToFc(grandTotalUsd);
+            // Revenue split for the ledger uses PaymentAmountUsd/Fc as net cash retained per currency (tender − change).
+            order.PaymentAmountUsd = netPaymentUsd;
+            order.PaymentAmountFc = netPaymentFc;
+            order.PaymentAmount = MoneyReportingHelpers.IsMixedCurrency(paymentCurrency)
+                ? netPaymentUsd
+                : string.Equals(paymentCurrency, CurrencyHelper.CongoleseFranc, StringComparison.OrdinalIgnoreCase)
+                    ? (netPaymentFc > 0m ? netPaymentFc : netPaymentUsd)
+                    : (netPaymentUsd > 0m ? netPaymentUsd : netPaymentFc);
             order.CustomerPaidUsd = paidUsdRounded;
             order.CustomerPaidFc = paidFcRounded;
             order.ChangeGivenUsd = changeUsdRounded;
@@ -460,6 +467,18 @@ public sealed class AdminOrderOperationsService(AppDbContext db)
         return chef is null ? (null, "Chef", "Unassigned Chef") : (chef.Id, "Chef", chef.Name);
     }
 
+    private static bool HasPostedSaleChangeExpense(AppDbContext db, int orderId, string currencyCode) =>
+        db.Transactions.Local.Any(t =>
+            t.RelatedOrderId == orderId &&
+            t.Type == "Expense" &&
+            t.Category == "Sale Change" &&
+            t.CurrencyCode == currencyCode)
+        || db.Transactions.AsNoTracking().Any(t =>
+            t.RelatedOrderId == orderId &&
+            t.Type == "Expense" &&
+            t.Category == "Sale Change" &&
+            t.CurrencyCode == currencyCode);
+
     private static void RecordChangeExpense(AppDbContext db, OrderRecord order)
     {
         var usd = Math.Round(Math.Max(0m, order.ChangeGivenUsd), 2);
@@ -471,10 +490,11 @@ public sealed class AdminOrderOperationsService(AppDbContext db)
         var usdMarker = $"| CHANGE_ORDER:{order.Id}:USD|";
         var fcMarker = $"| CHANGE_ORDER:{order.Id}:FC|";
 
-        if (usd > 0m && !db.Transactions.Any(t => t.Justification.Contains(usdMarker)))
+        if (usd > 0m && !HasPostedSaleChangeExpense(db, order.Id, CurrencyHelper.Usd))
         {
             db.Transactions.Add(new MoneyTransaction
             {
+                RelatedOrderId = order.Id,
                 Amount = usd,
                 AmountUsd = usd,
                 AmountFc = CurrencyHelper.ConvertUsdToFc(usd),
@@ -488,10 +508,11 @@ public sealed class AdminOrderOperationsService(AppDbContext db)
             });
         }
 
-        if (fc > 0m && !db.Transactions.Any(t => t.Justification.Contains(fcMarker)))
+        if (fc > 0m && !HasPostedSaleChangeExpense(db, order.Id, CurrencyHelper.CongoleseFranc))
         {
             db.Transactions.Add(new MoneyTransaction
             {
+                RelatedOrderId = order.Id,
                 Amount = fc,
                 AmountUsd = CurrencyHelper.ConvertFcToUsd(fc),
                 AmountFc = fc,

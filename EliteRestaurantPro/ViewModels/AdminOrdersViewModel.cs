@@ -152,6 +152,7 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
         var needle = filter.Trim().ToLowerInvariant();
         var hay = string.Join(" ",
             o.OrderId,
+            o.ConfirmationCode,
             o.TableNumber,
             o.ServerName,
             o.Items,
@@ -499,16 +500,22 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
         }
 
         TicketOrderId = string.IsNullOrWhiteSpace(order.UniqueId) ? $"#{order.Id:000}" : order.UniqueId;
+        TicketConfirmationCode = (order.ConfirmationCode ?? string.Empty).Trim();
         TicketStatus = order.Status;
-        TicketTable = string.IsNullOrWhiteSpace(order.TableCode)
-            ? $"Table {order.Table?.TableNumber ?? 0}"
-            : $"{order.TableCode} · {order.TableName}";
-        TicketServer = string.IsNullOrWhiteSpace(order.ServerName)
-            ? (order.Server?.Name ?? "Unassigned")
-            : order.ServerName;
+        TicketLocationLine = OrderRecordUiLabels.TicketLocationLine(order);
+        TicketTable = OrderRecordUiLabels.TableCaption(order);
+        ApplyTicketDeliveryInfo(
+            OrderRecordUiLabels.TryGetOnlineGuestTicketInfo(order),
+            OrderRecordUiLabels.IsDeliveryOrder(order));
+        TicketShowServer = OrderRecordUiLabels.ShowServerOnTicket(order);
+        TicketServer = OrderRecordUiLabels.ServerCaption(order);
         TicketDateTime = order.CreatedAt;
         var lineSum = TicketLines.Sum(l => l.LineTotal);
-        var totals = OrderTotalsHelper.ComputeTotals(lineSum, order.DiscountMode, order.DiscountValue);
+        var totals = OrderTotalsHelper.ComputeTotalsWithDeliveryFee(
+            lineSum,
+            order.DiscountMode,
+            order.DiscountValue,
+            order.DeliveryFeeUsd);
         TicketSubtotal = lineSum;
         TicketDiscountAmount = totals.DiscountApplied;
         TicketDiscountLineText = totals.DiscountApplied > 0m
@@ -517,6 +524,7 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
         TicketShowDiscount = totals.DiscountApplied > 0m;
         TicketTaxAmount = totals.Tax;
         TicketServiceAmount = totals.Service;
+        TicketDeliveryFeeUsd = Math.Round(Math.Max(0m, order.DeliveryFeeUsd), 2);
         TicketGrandTotal = totals.GrandTotal;
         TicketEquivalentFcText = CurrencyHelper.FormatAmount(
             order.PaymentCurrencyCode == CurrencyHelper.CongoleseFranc && order.PaymentAmount > 0m
@@ -540,21 +548,84 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
         TicketServiceLabel = $"Service ({settings.CurrencyPricing.ServicePercent:0.##}%)";
 
         OnPropertyChanged(nameof(TicketOrderId));
+        OnPropertyChanged(nameof(TicketConfirmationCode));
         OnPropertyChanged(nameof(TicketStatus));
         IsTicketPreviewOpen = true;
+    }
+
+    private void ApplyTicketDeliveryInfo(DeliveryTicketInfo? delivery, bool isDelivery)
+    {
+        TicketIsDeliveryFulfillment = isDelivery;
+        if (delivery is null)
+        {
+            TicketShowDeliverySection = false;
+            TicketDeliveryCustomerName = string.Empty;
+            TicketDeliveryPhone = string.Empty;
+            TicketDeliveryAddress = string.Empty;
+            TicketDeliveryInstructions = string.Empty;
+            return;
+        }
+
+        TicketShowDeliverySection = true;
+        TicketDeliveryCustomerName = delivery.CustomerName;
+        TicketDeliveryPhone = delivery.Phone;
+        TicketDeliveryAddress = delivery.Address;
+        TicketDeliveryInstructions = delivery.Instructions;
+    }
+
+    private DeliveryTicketInfo? BuildTicketDeliveryInfoForPdf()
+    {
+        if (!TicketShowDeliverySection)
+            return null;
+        return new DeliveryTicketInfo(
+            TicketDeliveryCustomerName,
+            TicketDeliveryPhone,
+            TicketDeliveryAddress,
+            TicketDeliveryInstructions);
+    }
+
+    private static string FormatReceiptWebsiteLine(string? domain)
+    {
+        var d = (domain ?? "").Trim();
+        if (string.IsNullOrEmpty(d))
+            return string.Empty;
+        if (d.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            d.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            return d;
+        return $"https://{d}";
     }
 
     private TicketReceiptPdfModel BuildTicketReceiptPdfModel()
     {
         var settings = SettingsManager.Load();
         var business = settings.BusinessProfile;
+        var ticketReceipt = settings.TicketReceipt ?? new TicketReceiptSettings();
         var pricing = settings.CurrencyPricing;
+
+        var socialRows = new List<TicketSocialMediaPdfRow>();
+        foreach (var row in ticketReceipt.SocialMediaRows)
+        {
+            var plat = (row.PlatformName ?? string.Empty).Trim();
+            var user = (row.UserText ?? string.Empty).Trim();
+            if (plat.Length == 0 && user.Length == 0)
+                continue;
+            var iconBytes = TicketReceiptPdfImageHelper.TryLoadRasterImage(row.IconPath);
+            socialRows.Add(new TicketSocialMediaPdfRow(plat, user, iconBytes));
+        }
+
+        var headerBytes = TicketReceiptPdfImageHelper.TryLoadRasterImage(ticketReceipt.HeaderLogoPath);
+
         return new TicketReceiptPdfModel
         {
             Lines = TicketLines.Select(l => new TicketPdfLine(l.Quantity, l.Name, l.UnitPrice, l.LineTotal)).ToList(),
             TicketOrderId = TicketOrderId,
+            TicketConfirmationCode = TicketConfirmationCode,
             TicketStatus = TicketStatus,
             TicketTable = TicketTable,
+            TicketLocationLine = TicketLocationLine,
+            DeliveryInfo = BuildTicketDeliveryInfoForPdf(),
+            TicketIsDeliveryFulfillment = TicketIsDeliveryFulfillment,
+            ShowServerOnTicket = TicketShowServer,
             TicketServer = TicketServer,
             TicketDateTime = TicketDateTime,
             TicketSubtotal = TicketSubtotal,
@@ -562,6 +633,7 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
             TicketDiscountLineText = TicketDiscountLineText,
             TicketTaxAmount = TicketTaxAmount,
             TicketServiceAmount = TicketServiceAmount,
+            TicketDeliveryFeeUsd = TicketDeliveryFeeUsd,
             TicketGrandTotal = TicketGrandTotal,
             TicketEquivalentFcText = TicketEquivalentFcText,
             TicketPaymentText = TicketPaymentText,
@@ -570,10 +642,15 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
             TicketVerification = TicketVerification,
             TaxPercent = pricing.TaxPercent,
             ServicePercent = pricing.ServicePercent,
+            HeaderLogoBytes = headerBytes,
             RestaurantTitle = string.IsNullOrWhiteSpace(business.RestaurantName)
                 ? "ELITE RESTAURANT PRO"
                 : business.RestaurantName.ToUpperInvariant(),
-            FooterText = string.IsNullOrWhiteSpace(business.TicketFooterText) ? "MERCI / THANK YOU" : business.TicketFooterText,
+            RestaurantPhone = (business.Phone ?? string.Empty).Trim(),
+            FooterText = string.IsNullOrWhiteSpace(business.TicketFooterText) ? "MERCI / THANK YOU" : business.TicketFooterText.Trim(),
+            ReceiptAddress = (business.Address ?? string.Empty).Trim(),
+            ReceiptWebsiteLine = FormatReceiptWebsiteLine(business.WebsiteDomain),
+            SocialFooterRows = socialRows,
             LegalInfo = business.TaxIdLegalInfo
         };
     }

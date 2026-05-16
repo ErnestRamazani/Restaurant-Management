@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using EliteRestaurant.Core.Models;
 
 namespace EliteRestaurant.Core.Utils;
@@ -22,8 +23,44 @@ public static class OrderWorkflow
         return string.Equals(status.Trim(), PendingApproval, StringComparison.OrdinalIgnoreCase);
     }
 
-    public static bool AwaitsCashierOrApprovalBeforeKitchen(string? status) =>
-        IsPendingCashier(status) || IsPendingApproval(status);
+    public static bool AwaitsCashierOrApprovalBeforeKitchen(string? status)
+    {
+        var k = KitchenStatusKey(status);
+        return k is "pendingApproval" or "pendingCashier";
+    }
+
+    /// <summary>Normalized kitchen status key (matches web KDS <c>kitchenStatusKey</c>).</summary>
+    public static string KitchenStatusKey(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+            return "other";
+
+        var spaced = Regex.Replace(status.Trim(), "([a-z])([A-Z])", "$1 $2");
+        var n = Regex.Replace(spaced, @"\s+", " ").Trim().ToLowerInvariant();
+        return n switch
+        {
+            "waiting" => "waiting",
+            "pending approval" => "pendingApproval",
+            "pending cashier" => "pendingCashier",
+            "in kitchen" => "inKitchen",
+            "ready" => "ready",
+            "served" => "served",
+            _ => "other"
+        };
+    }
+
+    /// <summary>Incoming kitchen column: Waiting plus tickets still with cashier or awaiting online approval (web KDS parity).</summary>
+    public static bool IsKitchenIncomingColumn(string? status)
+    {
+        var k = KitchenStatusKey(status);
+        return k is "waiting" or "pendingApproval" or "pendingCashier";
+    }
+
+    public static bool IsKitchenPreparingColumn(string? status) =>
+        KitchenStatusKey(status) == "inKitchen";
+
+    public static bool IsKitchenReadyColumn(string? status) =>
+        KitchenStatusKey(status) == "ready";
 
     /// <summary>
     /// Active line after cashier release: <c>Waiting</c> (kitchen should receive),

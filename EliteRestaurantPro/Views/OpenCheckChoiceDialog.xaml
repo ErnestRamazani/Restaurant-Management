@@ -8,80 +8,95 @@
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         ShowInTaskbar="False"
-        Background="{StaticResource BackgroundDarkBrush}">
-    <Border Style="{StaticResource GlassCard}" Margin="20" Padding="28,24">
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent">
+    <Border CornerRadius="14"
+            Background="{StaticResource BackgroundDarkBrush}"
+            BorderBrush="{StaticResource BorderSubtleBrush}"
+            BorderThickness="1"
+            ClipToBounds="True">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="28" ShadowDepth="6" Direction="270" Color="#99000000" Opacity="0.8"/>
+        </Border.Effect>
+        <Border Style="{StaticResource GlassCard}" Margin="20" Padding="28,24">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-            <TextBlock Grid.Row="0"
-                       Style="{StaticResource HeadingMedium}"
-                       Text="Open check on this table"
-                       Margin="0,0,0,4"/>
+                <Border Grid.Row="0"
+                        Background="Transparent"
+                        Padding="0,0,0,4"
+                        Cursor="Hand"
+                        MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                    <TextBlock Style="{StaticResource HeadingMedium}"
+                               Text="Open check on this table"/>
+                </Border>
 
-            <TextBlock x:Name="SummaryText"
-                       Grid.Row="1"
-                       Style="{StaticResource BodyText}"
-                       TextWrapping="Wrap"
-                       LineHeight="20"
-                       Foreground="{StaticResource TextSecondaryBrush}"
-                       Margin="0,0,0,16"/>
+                <TextBlock x:Name="SummaryText"
+                           Grid.Row="1"
+                           Style="{StaticResource BodyText}"
+                           TextWrapping="Wrap"
+                           LineHeight="20"
+                           Foreground="{StaticResource TextSecondaryBrush}"
+                           Margin="0,0,0,16"/>
 
-            <Border Grid.Row="2"
-                    CornerRadius="10"
-                    Padding="14,12"
-                    Margin="0,0,0,16"
-                    BorderBrush="{StaticResource BorderSubtleBrush}"
-                    BorderThickness="1"
-                    Background="#22000000">
-                <StackPanel>
-                    <TextBlock x:Name="PromptText"
-                               Style="{StaticResource BodyText}"
-                               TextWrapping="Wrap"
-                               LineHeight="20"
-                               Foreground="{StaticResource TextPrimaryBrush}"
-                               FontWeight="SemiBold"/>
-                    <TextBlock x:Name="SubtotalText"
-                               Style="{StaticResource BodyText}"
-                               Margin="0,8,0,0"
-                               Foreground="{StaticResource GoldAccentBrush}"
-                               FontSize="15"
-                               FontWeight="SemiBold"/>
+                <Border Grid.Row="2"
+                        CornerRadius="10"
+                        Padding="14,12"
+                        Margin="0,0,0,16"
+                        BorderBrush="{StaticResource BorderSubtleBrush}"
+                        BorderThickness="1"
+                        Background="#22000000">
+                    <StackPanel>
+                        <TextBlock x:Name="PromptText"
+                                   Style="{StaticResource BodyText}"
+                                   TextWrapping="Wrap"
+                                   LineHeight="20"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock x:Name="SubtotalText"
+                                   Style="{StaticResource BodyText}"
+                                   Margin="0,8,0,0"
+                                   Foreground="{StaticResource GoldAccentBrush}"
+                                   FontSize="15"
+                                   FontWeight="SemiBold"/>
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Grid.Row="3"
+                           Style="{StaticResource HeadingSmall}"
+                           Text="Choose how to send these items"
+                           Margin="0,0,0,12"/>
+
+                <StackPanel Grid.Row="4" Orientation="Vertical">
+                    <Button x:Name="AppendButton"
+                            Content="Add to this ticket"
+                            Style="{StaticResource GoldPrimaryButton}"
+                            MinWidth="280"
+                            HorizontalAlignment="Stretch"
+                            Margin="0,0,0,10"
+                            IsDefault="True"
+                            Click="Append_Click"/>
+                    <Button Content="New separate ticket"
+                            Style="{StaticResource GhostButton}"
+                            MinWidth="280"
+                            HorizontalAlignment="Stretch"
+                            Margin="0,0,0,10"
+                            Click="NewTicket_Click"/>
+                    <Button Content="Back"
+                            Style="{StaticResource GhostButton}"
+                            MinWidth="280"
+                            HorizontalAlignment="Stretch"
+                            IsCancel="True"
+                            Click="Back_Click"/>
                 </StackPanel>
-            </Border>
-
-            <TextBlock Grid.Row="3"
-                       Style="{StaticResource HeadingSmall}"
-                       Text="Choose how to send these items"
-                       Margin="0,0,0,12"/>
-
-            <StackPanel Grid.Row="4" Orientation="Vertical">
-                <Button x:Name="AppendButton"
-                        Content="Add to this ticket"
-                        Style="{StaticResource GoldPrimaryButton}"
-                        MinWidth="280"
-                        HorizontalAlignment="Stretch"
-                        Margin="0,0,0,10"
-                        IsDefault="True"
-                        Click="Append_Click"/>
-                <Button Content="New separate ticket"
-                        Style="{StaticResource GhostButton}"
-                        MinWidth="280"
-                        HorizontalAlignment="Stretch"
-                        Margin="0,0,0,10"
-                        Click="NewTicket_Click"/>
-                <Button Content="Back"
-                        Style="{StaticResource GhostButton}"
-                        MinWidth="280"
-                        HorizontalAlignment="Stretch"
-                        IsCancel="True"
-                        Click="Back_Click"/>
-            </StackPanel>
-        </Grid>
+            </Grid>
+        </Border>
     </Border>
 </Window>

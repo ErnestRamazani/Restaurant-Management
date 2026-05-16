@@ -45,6 +45,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     private string _restaurantAddress = string.Empty;
     private string _restaurantWebsiteDomain = string.Empty;
     private string _restaurantSocialMedia = string.Empty;
+    private string _ticketHeaderLogoPath = string.Empty;
     private string _restaurantLogoPath = string.Empty;
     private string _homepageBackgroundImagePath = string.Empty;
     private string _ticketFooterText = string.Empty;
@@ -79,6 +80,10 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     private string _attendanceNightStartText = "18:00";
     private string _attendanceNightEndText = "23:00";
     private string _attendanceLateGraceMinutesText = "30";
+    private string _salaryLateDaysPerAttendanceUnitText = "4";
+    private bool _salaryAbsenceCountsAsAttendanceUnit = true;
+    private string _salarySalesBonusPercentText = "5";
+    private string _salaryMaxAdvancePercentOfGrossText = "30";
 
     public override string ActivePage => "AppearanceSettings";
 
@@ -148,17 +153,24 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         set => SetField(ref _statusMessage, value);
     }
 
-    public ObservableCollection<string> SettingsSections { get; } = new(["All", "Business Profile", "Reservations", "Menu categories", "Currency & Pricing", "Attendance & shifts", "Menu Backgrounds", "Menu QR Codes", "Database", "Appearance"]);
+    public ObservableCollection<string> SettingsSections { get; } = new(["All", "Business Profile", "Tickets & receipts", "Reservations", "Menu categories", "Currency & Pricing", "Attendance & shifts", "Salary", "Menu Backgrounds", "Menu QR Codes", "Database", "Appearance"]);
     public ObservableCollection<string> BackgroundMenuKeys { get; } = new(["Dashboard", "Employees", "Menu", "Inventory", "Attendance", "Tables", "Reservations", "Orders", "CreateOrder", "Money", "Salary", "Reports", "KitchenQueue", "ServerPickup"]);
     public ObservableCollection<string> DatabaseProviders { get; } = new(["PostgreSql"]);
+
+    public ObservableCollection<TicketSocialMediaRowViewModel> TicketSocialMediaRows { get; } = new();
 
     public string SelectedSettingsSection
     {
         get => _selectedSettingsSection;
         set
         {
+            var salaryWasVisible = _selectedSettingsSection == "All" || _selectedSettingsSection == "Salary";
             if (!SetField(ref _selectedSettingsSection, value))
                 return;
+            var salaryNowVisible = _selectedSettingsSection == "All" || _selectedSettingsSection == "Salary";
+            if (salaryNowVisible && !salaryWasVisible)
+                RefreshSalaryFromDiskIntoViewModel();
+
             OnPropertyChanged(nameof(ShowBusinessSection));
             OnPropertyChanged(nameof(ShowCurrencySection));
             OnPropertyChanged(nameof(ShowMenuBackgroundSection));
@@ -168,12 +180,16 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
             OnPropertyChanged(nameof(ShowAttendanceSection));
             OnPropertyChanged(nameof(ShowReservationsSection));
             OnPropertyChanged(nameof(ShowMenuTaxonomySection));
+            OnPropertyChanged(nameof(ShowTicketsReceiptSection));
+            OnPropertyChanged(nameof(ShowSalarySection));
             if (ShowMenuQrSection)
                 _ = RefreshMenuQrRowsAsync();
         }
     }
 
     public bool ShowAttendanceSection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Attendance & shifts";
+
+    public bool ShowSalarySection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Salary";
 
     public bool ShowReservationsSection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Reservations";
 
@@ -185,6 +201,8 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     public bool ShowMenuQrSection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Menu QR Codes";
     public bool ShowDatabaseSection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Database";
     public bool ShowAppearanceSection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Appearance";
+
+    public bool ShowTicketsReceiptSection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Tickets & receipts";
 
     private string _selectedBackgroundMenu = "Dashboard";
     private string _selectedMenuBackgroundPath = string.Empty;
@@ -250,6 +268,12 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     {
         get => _restaurantSocialMedia;
         set => SetField(ref _restaurantSocialMedia, value);
+    }
+
+    public string TicketHeaderLogoPath
+    {
+        get => _ticketHeaderLogoPath;
+        set => SetField(ref _ticketHeaderLogoPath, value);
     }
 
     public string RestaurantLogoPath
@@ -369,6 +393,30 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     {
         get => _attendanceLateGraceMinutesText;
         set => SetField(ref _attendanceLateGraceMinutesText, value);
+    }
+
+    public string SalaryLateDaysPerAttendanceUnitText
+    {
+        get => _salaryLateDaysPerAttendanceUnitText;
+        set => SetField(ref _salaryLateDaysPerAttendanceUnitText, value);
+    }
+
+    public bool SalaryAbsenceCountsAsAttendanceUnit
+    {
+        get => _salaryAbsenceCountsAsAttendanceUnit;
+        set => SetField(ref _salaryAbsenceCountsAsAttendanceUnit, value);
+    }
+
+    public string SalarySalesBonusPercentText
+    {
+        get => _salarySalesBonusPercentText;
+        set => SetField(ref _salarySalesBonusPercentText, value);
+    }
+
+    public string SalaryMaxAdvancePercentOfGrossText
+    {
+        get => _salaryMaxAdvancePercentOfGrossText;
+        set => SetField(ref _salaryMaxAdvancePercentOfGrossText, value);
     }
 
     public ObservableCollection<MenuQrTableRow> MenuQrRows { get; } = new();
@@ -532,6 +580,11 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     public ICommand ReloadSavedThemeCommand { get; }
     public ICommand ApplyPickerToTokenCommand { get; }
     public ICommand SaveBusinessProfileCommand { get; }
+    public ICommand SaveTicketReceiptLayoutCommand { get; }
+    public ICommand BrowseTicketHeaderLogoCommand { get; }
+    public ICommand BrowseTicketSocialIconCommand { get; }
+    public ICommand AddTicketSocialRowCommand { get; }
+    public ICommand RemoveTicketSocialRowCommand { get; }
     public ICommand SaveCurrencyPricingCommand { get; }
     public ICommand BrowseLogoCommand { get; }
     public ICommand BrowseOnlinePromoImageCommand { get; }
@@ -545,6 +598,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     public ICommand PrintAllMenuQrCommand { get; }
     public ICommand ApplyPhoneFriendlyMenuUrlCommand { get; }
     public ICommand SaveAttendanceShiftsCommand { get; }
+    public ICommand SaveSalarySettingsCommand { get; }
     public ICommand SaveReservationSettingsCommand { get; }
     public ICommand SaveMenuTaxonomyCommand { get; }
     public ICommand ResetMenuTaxonomyCommand { get; }
@@ -561,6 +615,11 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         ReloadSavedThemeCommand = new RelayCommand(_ => LoadFromCurrentTheme());
         ApplyPickerToTokenCommand = new RelayCommand(_ => ApplyPickerToToken());
         SaveBusinessProfileCommand = new RelayCommand(_ => SaveBusinessProfile());
+        SaveTicketReceiptLayoutCommand = new RelayCommand(_ => SaveTicketReceiptLayout());
+        BrowseTicketHeaderLogoCommand = new RelayCommand(_ => BrowseTicketHeaderLogo());
+        BrowseTicketSocialIconCommand = new RelayCommand(o => BrowseTicketSocialIcon(o));
+        AddTicketSocialRowCommand = new RelayCommand(_ => TicketSocialMediaRows.Add(new TicketSocialMediaRowViewModel()));
+        RemoveTicketSocialRowCommand = new RelayCommand(o => RemoveTicketSocialRow(o));
         SaveCurrencyPricingCommand = new RelayCommand(_ => SaveCurrencyPricing());
         BrowseLogoCommand = new RelayCommand(_ => BrowseLogo());
         BrowseOnlinePromoImageCommand = new RelayCommand(_ => BrowseOnlinePromoImage());
@@ -574,6 +633,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         PrintAllMenuQrCommand = new RelayCommand(_ => _ = PrintAllMenuQrToPdfAsync());
         ApplyPhoneFriendlyMenuUrlCommand = new RelayCommand(_ => ApplyPhoneFriendlyMenuUrl());
         SaveAttendanceShiftsCommand = new RelayCommand(_ => SaveAttendanceShifts());
+        SaveSalarySettingsCommand = new RelayCommand(_ => SaveSalarySettings());
         SaveReservationSettingsCommand = new RelayCommand(_ => SaveReservationSettings());
         SaveMenuTaxonomyCommand = new RelayCommand(_ => SaveMenuTaxonomy());
         ResetMenuTaxonomyCommand = new RelayCommand(_ => ResetMenuTaxonomyUi());
@@ -766,6 +826,17 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         TaxPercent = pricing.TaxPercent.ToString("0.##");
         ServicePercent = pricing.ServicePercent.ToString("0.##");
         LoadAttendanceSettings();
+        LoadSalarySettings();
+        LoadTicketReceiptLayout();
+    }
+
+    private void LoadTicketReceiptLayout()
+    {
+        _settings.TicketReceipt ??= new TicketReceiptSettings();
+        TicketHeaderLogoPath = _settings.TicketReceipt.HeaderLogoPath ?? string.Empty;
+        TicketSocialMediaRows.Clear();
+        foreach (var r in _settings.TicketReceipt.SocialMediaRows)
+            TicketSocialMediaRows.Add(new TicketSocialMediaRowViewModel(r.PlatformName, r.UserText, r.IconPath));
     }
 
     private void LoadAttendanceSettings()
@@ -777,6 +848,33 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         AttendanceNightStartText = FormatTimeForSettings(a.NightShiftStart);
         AttendanceNightEndText = FormatTimeForSettings(a.NightShiftEnd);
         AttendanceLateGraceMinutesText = a.LateClockInGraceMinutes.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private void LoadSalarySettings()
+    {
+        _settings.Salary ??= new SalarySettings();
+        var s = _settings.Salary;
+        var late = s.LateDaysPerAttendanceUnit < 1 ? 4 : s.LateDaysPerAttendanceUnit;
+        SalaryLateDaysPerAttendanceUnitText = late.ToString(CultureInfo.InvariantCulture);
+        SalaryAbsenceCountsAsAttendanceUnit = s.AbsenceCountsAsAttendanceUnit;
+        SalarySalesBonusPercentText = s.SalesBonusPercent.ToString("0.##", CultureInfo.InvariantCulture);
+        SalaryMaxAdvancePercentOfGrossText = s.MaxSalaryAdvancePercentOfGross.ToString("0.##", CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
+    /// When the Salary card was hidden and is shown again, re-bind from <see cref="SettingsManager"/> so the UI
+    /// matches persisted JSON (and any co-hosted API rewrite) instead of stale in-memory <see cref="AppSettings"/>.
+    /// </summary>
+    private void RefreshSalaryFromDiskIntoViewModel()
+    {
+        var disk = SettingsManager.Load();
+        disk.Salary ??= new SalarySettings();
+        _settings.Salary ??= new SalarySettings();
+        _settings.Salary.LateDaysPerAttendanceUnit = disk.Salary.LateDaysPerAttendanceUnit;
+        _settings.Salary.AbsenceCountsAsAttendanceUnit = disk.Salary.AbsenceCountsAsAttendanceUnit;
+        _settings.Salary.SalesBonusPercent = disk.Salary.SalesBonusPercent;
+        _settings.Salary.MaxSalaryAdvancePercentOfGross = disk.Salary.MaxSalaryAdvancePercentOfGross;
+        LoadSalarySettings();
     }
 
     private static string FormatTimeForSettings(TimeSpan t)
@@ -821,6 +919,56 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         _settings.Attendance.LateClockInGraceMinutes = grace;
         SettingsManager.Save(_settings);
         StatusMessage = "Attendance shift settings saved.";
+    }
+
+    private void SaveSalarySettings()
+    {
+        if (!int.TryParse((SalaryLateDaysPerAttendanceUnitText ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var lateDays) ||
+            lateDays < 1)
+        {
+            StatusMessage = "Late days per attendance unit must be a whole number ≥ 1 (default 4).";
+            return;
+        }
+
+        if (!TryParseDecimalInput(SalarySalesBonusPercentText, out var bonusPct) || bonusPct < 0m || bonusPct > 100m)
+        {
+            StatusMessage = "Sales bonus percent must be between 0 and 100.";
+            return;
+        }
+
+        if (!TryParseDecimalInput(SalaryMaxAdvancePercentOfGrossText, out var advancePct) || advancePct < 0m || advancePct > 100m)
+        {
+            StatusMessage = "Max advance percent of gross must be between 0 and 100.";
+            return;
+        }
+
+        _settings.Salary ??= new SalarySettings();
+        _settings.Salary.LateDaysPerAttendanceUnit = lateDays;
+        _settings.Salary.AbsenceCountsAsAttendanceUnit = SalaryAbsenceCountsAsAttendanceUnit;
+        _settings.Salary.SalesBonusPercent = Math.Round(bonusPct, 2);
+        _settings.Salary.MaxSalaryAdvancePercentOfGross = Math.Round(advancePct, 2);
+
+        SettingsManager.Save(_settings);
+        _adminData.ReloadFromSettings();
+        LoadSalarySettings();
+        _ = PushSalarySettingsToCloudAndResyncFromDiskAsync();
+        StatusMessage = "Salary payroll settings saved. Syncing with API…";
+    }
+
+    private async Task PushSalarySettingsToCloudAndResyncFromDiskAsync()
+    {
+        try
+        {
+            await new AdminSettingsApiClient().PushSettingsAsync(_settings, applyLogoChanges: false, applyOnlinePromoImageChanges: false)
+                .ConfigureAwait(true);
+            RefreshSalaryFromDiskIntoViewModel();
+            StatusMessage = "Salary payroll settings saved and pushed to the API.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage =
+                $"Salary saved on this PC. Cloud push failed: {ex.GetBaseException().Message}. Fix API URL/token and use Save again to push.";
+        }
     }
 
     private void SaveReservationSettings()
@@ -995,8 +1143,6 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         _settings.BusinessProfile.SocialMedia = RestaurantSocialMedia.Trim();
         _settings.BusinessProfile.LogoPath = RestaurantLogoPath.Trim();
         _settings.BusinessProfile.HomepageBackgroundImagePath = HomepageBackgroundImagePath.Trim();
-        _settings.BusinessProfile.TicketFooterText = TicketFooterText.Trim();
-        _settings.BusinessProfile.TaxIdLegalInfo = TaxIdLegalInfo.Trim();
         _settings.BusinessProfile.PublicMenuBaseUrl = (PublicMenuBaseUrl ?? string.Empty).Trim();
         if (string.IsNullOrWhiteSpace(_settings.BusinessProfile.PublicMenuBaseUrl))
             _settings.BusinessProfile.PublicMenuBaseUrl = CloudEndpoints.ProductionApiBaseUrl;
@@ -1031,7 +1177,10 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
 
         _settings.CloudApi.BaseUrl = CloudEndpoints.NormalizeApiBaseUrl(_settings.BusinessProfile.PublicMenuBaseUrl);
 
+        PersistTicketReceiptLayout();
+
         SettingsManager.Save(_settings);
+        ReloadTicketReceiptSettingsFromDisk();
         _adminData.ReloadFromSettings();
         _ = new AdminSettingsApiClient().PushSettingsAsync(_settings, applyLogoChanges: true, applyOnlinePromoImageChanges: true);
         RefreshBusinessProfileBindings();
@@ -1098,6 +1247,76 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
 
         if (dialog.ShowDialog() == true)
             RestaurantLogoPath = dialog.FileName;
+    }
+
+    private void PersistTicketReceiptLayout()
+    {
+        _settings.TicketReceipt ??= new TicketReceiptSettings();
+        _settings.TicketReceipt.HeaderLogoPath = (TicketHeaderLogoPath ?? string.Empty).Trim();
+        _settings.TicketReceipt.SocialMediaRows = TicketSocialMediaRows
+            .Select(vm => new TicketSocialMediaRowSettings
+            {
+                PlatformName = (vm.PlatformName ?? string.Empty).Trim(),
+                UserText = (vm.UserText ?? string.Empty).Trim(),
+                IconPath = (vm.IconPath ?? string.Empty).Trim()
+            })
+            .ToList();
+    }
+
+    private void SaveTicketReceiptLayout()
+    {
+        _settings.BusinessProfile.TicketFooterText = (TicketFooterText ?? string.Empty).Trim();
+        _settings.BusinessProfile.TaxIdLegalInfo = (TaxIdLegalInfo ?? string.Empty).Trim();
+        PersistTicketReceiptLayout();
+        _settings.CloudApi.BaseUrl = CloudEndpoints.NormalizeApiBaseUrl(_settings.BusinessProfile.PublicMenuBaseUrl);
+        SettingsManager.Save(_settings);
+        ReloadTicketReceiptSettingsFromDisk();
+        _adminData.ReloadFromSettings();
+        _ = new AdminSettingsApiClient().PushSettingsAsync(_settings, applyLogoChanges: false, applyOnlinePromoImageChanges: false);
+        RefreshBusinessProfileBindings();
+        StatusMessage = "Tickets & receipts settings saved.";
+    }
+
+    private void ReloadTicketReceiptSettingsFromDisk()
+    {
+        var disk = SettingsManager.Load();
+        _settings.BusinessProfile.TicketFooterText = disk.BusinessProfile.TicketFooterText;
+        _settings.BusinessProfile.TaxIdLegalInfo = disk.BusinessProfile.TaxIdLegalInfo;
+        _settings.TicketReceipt = disk.TicketReceipt ?? new TicketReceiptSettings();
+        TicketFooterText = _settings.BusinessProfile.TicketFooterText;
+        TaxIdLegalInfo = _settings.BusinessProfile.TaxIdLegalInfo;
+        LoadTicketReceiptLayout();
+    }
+
+    private void BrowseTicketHeaderLogo()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Ticket header logo (above restaurant name on printed/PDF tickets)",
+            Filter = "Image files (*.png;*.jpg;*.jpeg;*.webp;*.bmp)|*.png;*.jpg;*.jpeg;*.webp;*.bmp|All files (*.*)|*.*"
+        };
+
+        if (dialog.ShowDialog() == true)
+            TicketHeaderLogoPath = dialog.FileName;
+    }
+
+    private void BrowseTicketSocialIcon(object? parameter)
+    {
+        if (parameter is not TicketSocialMediaRowViewModel row)
+            return;
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Icon image for this social line on tickets",
+            Filter = "Image files (*.png;*.jpg;*.jpeg;*.webp;*.bmp)|*.png;*.jpg;*.jpeg;*.webp;*.bmp|All files (*.*)|*.*"
+        };
+        if (dialog.ShowDialog() == true)
+            row.IconPath = dialog.FileName;
+    }
+
+    private void RemoveTicketSocialRow(object? parameter)
+    {
+        if (parameter is TicketSocialMediaRowViewModel row)
+            TicketSocialMediaRows.Remove(row);
     }
 
     private void BrowseOnlinePromoImage()

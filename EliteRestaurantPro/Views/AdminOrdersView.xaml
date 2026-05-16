@@ -13,11 +13,20 @@
 
         <Grid Grid.Column="1" Background="{StaticResource BackgroundMediumBrush}">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
+
+            <ScrollViewer Grid.Row="0"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Style="{StaticResource EliteScrollViewer}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
             <StackPanel Grid.Row="0" Margin="32,24,32,12">
                 <TextBlock Style="{StaticResource HeadingLarge}" FontSize="26">
@@ -94,7 +103,7 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
                         <Border Grid.Row="0" CornerRadius="15,15,0,0" Padding="18,14">
@@ -129,8 +138,7 @@
                                  Style="{StaticResource EliteTextBox}"
                                  ToolTip="Search by order #, table, server, items, or status"/>
 
-                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
-                                      Style="{StaticResource EliteScrollViewer}" Padding="12,8">
+                        <Border Grid.Row="2" Padding="12,8">
                             <ItemsControl ItemsSource="{Binding ActiveOrders}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -138,10 +146,18 @@
                                                 Background="{StaticResource CardBaseBrush}">
                                             <StackPanel>
                                                 <Grid>
-                                                    <TextBlock Text="{Binding OrderId}"
-                                                               Foreground="{StaticResource GoldAccentBrush}"
-                                                               FontFamily="Segoe UI Variable Text, Segoe UI"
-                                                               FontSize="14" FontWeight="SemiBold"/>
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding OrderId}"
+                                                                   Foreground="{StaticResource GoldAccentBrush}"
+                                                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                                                   FontSize="14" FontWeight="SemiBold"/>
+                                                        <TextBlock Foreground="{StaticResource TextSecondaryBrush}"
+                                                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                                                   FontSize="12" Margin="0,2,0,0"
+                                                                   Visibility="{Binding ShowConfirmationCode, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                            <Run Text="Code: "/><Run Text="{Binding ConfirmationCode, Mode=OneWay}" FontWeight="SemiBold" Foreground="{StaticResource GoldAccentBrush}"/>
+                                                        </TextBlock>
+                                                    </StackPanel>
                                                     <Border HorizontalAlignment="Right" VerticalAlignment="Center"
                                                             Background="{Binding StatusColor}"
                                                             CornerRadius="6" Padding="7,3" Opacity="0.9">
@@ -207,7 +223,7 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                        </ScrollViewer>
+                        </Border>
                     </Grid>
                 </Border>
 
@@ -216,7 +232,7 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
                         <Border Grid.Row="0" CornerRadius="15,15,0,0" Padding="18,14">
@@ -251,8 +267,7 @@
                                  Style="{StaticResource EliteTextBox}"
                                  ToolTip="Search by order #, table, server, items, or status"/>
 
-                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
-                                      Style="{StaticResource EliteScrollViewer}" Padding="12,8">
+                        <Border Grid.Row="2" Padding="12,8">
                             <ItemsControl ItemsSource="{Binding PastOrderDayGroups}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
@@ -331,17 +346,20 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                        </ScrollViewer>
+                        </Border>
                     </Grid>
                 </Border>
 
             </Grid>
 
-            <components:OrderDetailPanelView Grid.Row="0" Grid.RowSpan="4"
+                </Grid>
+            </ScrollViewer>
+
+            <components:OrderDetailPanelView Grid.Row="0" Grid.RowSpan="1"
                                              Panel.ZIndex="5"
                                              DataContext="{Binding OrderDetail}"/>
 
-            <Grid Grid.Row="0" Grid.RowSpan="4"
+            <Grid Grid.Row="0" Grid.RowSpan="1"
                   Panel.ZIndex="4"
                   Background="#AA05070F"
                   Visibility="{Binding IsTicketPreviewOpen, Converter={StaticResource BoolToVisibilityConverter}}">
@@ -366,6 +384,21 @@
                                        FontFamily="Segoe UI Variable Display, Segoe UI"
                                        FontSize="20"
                                        FontWeight="SemiBold"/>
+                            <StackPanel Margin="0,8,0,0"
+                                        Visibility="{Binding TicketShowConfirmationCode, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <TextBlock Text="{Binding TicketConfirmationCode, Mode=OneWay}"
+                                           HorizontalAlignment="Center"
+                                           FontFamily="Consolas, Courier New"
+                                           FontSize="32"
+                                           FontWeight="Bold"
+                                           Foreground="{StaticResource GoldAccentBrush}"/>
+                                <TextBlock Text="CONFIRMATION CODE"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,4,0,0"
+                                           FontSize="10"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextMutedBrush}"/>
+                            </StackPanel>
                             <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,0">
                                 <Run Text="Date: "/><Run Text="{Binding TicketDateTime, StringFormat={}{0:dd MMM yyyy}}"/>
                                 <Run Text="    Time: "/><Run Text="{Binding TicketDateTime, StringFormat={}{0:HH:mm}}"/>
@@ -374,10 +407,30 @@
                                 <Run Text="Order: "/><Run Text="{Binding TicketOrderId}"/>
                                 <Run Text="    Status: "/><Run Text="{Binding TicketStatus}"/>
                             </TextBlock>
-                            <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0">
-                                <Run Text="Table: "/><Run Text="{Binding TicketTable}"/>
-                            </TextBlock>
-                            <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,8">
+                            <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"
+                                       Text="{Binding TicketLocationLine}"/>
+                            <StackPanel Margin="0,6,0,0"
+                                        Visibility="{Binding TicketShowDeliverySection, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                                <TextBlock Text="{Binding TicketFulfillmentSectionTitle, Mode=OneWay}" Foreground="{StaticResource GoldAccentBrush}" FontWeight="SemiBold" FontSize="11"/>
+                                <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"
+                                           Visibility="{Binding TicketShowDeliveryCustomerName, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <Run Text="Customer: "/><Run Text="{Binding TicketDeliveryCustomerName, Mode=OneWay}"/>
+                                </TextBlock>
+                                <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0">
+                                    <Run Text="Phone: "/><Run Text="{Binding TicketDeliveryPhone, Mode=OneWay}"/>
+                                </TextBlock>
+                                <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"
+                                           Visibility="{Binding TicketShowDeliveryAddress, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <Run Text="Address: "/><Run Text="{Binding TicketDeliveryAddress, Mode=OneWay}"/>
+                                </TextBlock>
+                                <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"
+                                           TextWrapping="Wrap"
+                                           Visibility="{Binding TicketShowDeliveryInstructions, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <Run Text="Notes: "/><Run Text="{Binding TicketDeliveryInstructions, Mode=OneWay}"/>
+                                </TextBlock>
+                            </StackPanel>
+                            <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,8"
+                                       Visibility="{Binding TicketShowServer, Converter={StaticResource BoolToVisibilityConverter}}">
                                 <Run Text="Server: "/><Run Text="{Binding TicketServer}"/>
                             </TextBlock>
                             <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,2">
@@ -448,6 +501,10 @@
                                 <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource TextSecondaryBrush}">
                                     <Run Text="{Binding TicketServiceLabel}"/><Run Text=": $ "/><Run Text="{Binding TicketServiceAmount, StringFormat={}{0:N2}}"/>
                                 </TextBlock>
+                                <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource TextSecondaryBrush}"
+                                           Visibility="{Binding TicketShowDeliveryFee, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <Run Text="Delivery: $ "/><Run Text="{Binding TicketDeliveryFeeUsd, StringFormat={}{0:N2}}"/>
+                                </TextBlock>
                                 <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource GoldAccentBrush}" FontSize="20" FontWeight="SemiBold" Margin="0,4,0,0">
                                     <Run Text="GRAND TOTAL USD: $ "/><Run Text="{Binding TicketGrandTotal, StringFormat={}{0:N2}}"/>
                                 </TextBlock>
@@ -492,7 +549,7 @@
                 </Border>
             </Grid>
 
-            <Grid Grid.Row="0" Grid.RowSpan="4"
+            <Grid Grid.Row="0" Grid.RowSpan="1"
                   Panel.ZIndex="6"
                   Background="#AA05070F"
                   Visibility="{Binding IsPaymentModalOpen, Converter={StaticResource BoolToVisibilityConverter}}">
@@ -629,7 +686,7 @@
                 </Border>
             </Grid>
 
-            <Grid Grid.Row="0" Grid.RowSpan="4"
+            <Grid Grid.Row="0" Grid.RowSpan="1"
                   Panel.ZIndex="7"
                   Background="#AA05070F"
                   Visibility="{Binding IsChangeModalOpen, Converter={StaticResource BoolToVisibilityConverter}}">

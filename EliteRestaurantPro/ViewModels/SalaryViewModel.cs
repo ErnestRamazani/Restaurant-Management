@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Utils;
@@ -24,12 +25,27 @@ public sealed class SalaryEmployeeRowVm
 {
     public int EmployeeId { get; init; }
     public string EmployeeName { get; init; } = string.Empty;
+    public string EmployeeInitials { get; init; } = "?";
     public string UniqueId { get; init; } = string.Empty;
-    public decimal HourlyRateUsd { get; init; }
+    /// <summary>True when <see cref="ContractMonthlyUsd"/> drives payroll gross for the month.</summary>
+    public bool UsesMonthlySalary { get; init; }
+    /// <summary>Employee contract monthly amount (not prorated).</summary>
+    public decimal ContractMonthlyUsd { get; init; }
     public decimal ScheduledHoursMonth { get; init; }
     public int ScheduledWorkdays { get; init; }
-    /// <summary>Hourly rate × scheduled hours for the month (payroll base).</summary>
+    /// <summary>Gross payroll base stored or computed for the month (prorated monthly salary, or legacy hourly path until migrated).</summary>
     public decimal BaseGrossUsd { get; init; }
+    public ImageSource? HeaderProfileImage { get; init; }
+    public bool HeaderHasProfilePhoto => HeaderProfileImage is not null;
+
+    public string RateColumnText => UsesMonthlySalary
+        ? $"{ContractMonthlyUsd:N2}/mo"
+        : "Set monthly";
+
+    /// <summary>Primary rate line for the payroll card chips (monthly-only UX; legacy hourly is not shown).</summary>
+    public string PayrollPrimaryRateChipText => UsesMonthlySalary
+        ? $"Monthly ${ContractMonthlyUsd:N2}/mo"
+        : "Set monthly salary (Employees)";
     public int AbsenceDays { get; init; }
     public int LateDays { get; init; }
     public int LatePenaltyAbsences { get; init; }
@@ -68,7 +84,7 @@ public sealed class SalaryEmployeeRowVm
     public bool CanConfirmPayroll =>
         !AlreadyPaid
         && NetPay > 0.005m
-        && (HasPayrollRecord || (BaseGrossUsd > 0m && ScheduledWorkdays > 0 && HourlyRateUsd > 0m));
+        && (HasPayrollRecord || BaseGrossUsd > 0.005m);
 }
 
 public sealed class SalaryAdvanceEmployeePickVm
@@ -99,6 +115,11 @@ public sealed class SalaryViewModel : AdminBaseViewModel
     private string _payrollPaymentAmountText = string.Empty;
     private string _payrollPaymentRemainingHint = string.Empty;
     private SalaryEmployeeRowVm? _payrollPaymentDialogRow;
+
+    private bool _isShiftHistoryOpen;
+    private string _shiftHistoryTitle = "Shift history";
+    private string _shiftHistorySubtitle = string.Empty;
+    private string _shiftHistoryBanner = string.Empty;
 
     public override string ActivePage => "Salary";
 
@@ -246,6 +267,41 @@ public sealed class SalaryViewModel : AdminBaseViewModel
     public ICommand RecordSalaryAdvanceCommand { get; }
     public ICommand SubmitPayrollPaymentDialogCommand { get; }
     public ICommand CancelPayrollPaymentDialogCommand { get; }
+    public ICommand ShowShiftHistoryCommand { get; }
+    public ICommand CloseShiftHistoryCommand { get; }
+
+    public bool IsShiftHistoryOpen
+    {
+        get => _isShiftHistoryOpen;
+        set => SetField(ref _isShiftHistoryOpen, value);
+    }
+
+    public string ShiftHistoryTitle
+    {
+        get => _shiftHistoryTitle;
+        set => SetField(ref _shiftHistoryTitle, value);
+    }
+
+    public string ShiftHistorySubtitle
+    {
+        get => _shiftHistorySubtitle;
+        set => SetField(ref _shiftHistorySubtitle, value);
+    }
+
+    public string ShiftHistoryBanner
+    {
+        get => _shiftHistoryBanner;
+        set
+        {
+            if (!SetField(ref _shiftHistoryBanner, value))
+                return;
+            OnPropertyChanged(nameof(ShiftHistoryBannerVisible));
+        }
+    }
+
+    public bool ShiftHistoryBannerVisible => !string.IsNullOrWhiteSpace(ShiftHistoryBanner);
+
+    public ObservableCollection<ShiftHistoryRowViewModel> ShiftHistoryRows { get; } = [];
 
     public SalaryViewModel(Action<BaseViewModel> navigate) : base(navigate)
     {
@@ -265,6 +321,8 @@ public sealed class SalaryViewModel : AdminBaseViewModel
         RecordSalaryAdvanceCommand = new RelayCommand(_ => _ = RecordSalaryAdvanceAsync());
         SubmitPayrollPaymentDialogCommand = new RelayCommand(_ => _ = SubmitPayrollPaymentDialogAsync());
         CancelPayrollPaymentDialogCommand = new RelayCommand(_ => ClosePayrollPaymentDialog());
+        ShowShiftHistoryCommand = new RelayCommand(p => _ = ShowShiftHistoryAsync(p as SalaryEmployeeRowVm));
+        CloseShiftHistoryCommand = new RelayCommand(_ => CloseShiftHistory());
         _ = ReloadRowsAsync();
     }
 
@@ -297,6 +355,85 @@ public sealed class SalaryViewModel : AdminBaseViewModel
         private set => SetField(ref _payrollPaymentRemainingHint, value);
     }
 
+    private void CloseShiftHistory()
+    {
+        IsShiftHistoryOpen = false;
+        ShiftHistoryBanner = string.Empty;
+        ShiftHistoryRows.Clear();
+    }
+
+    private async Task ShowShiftHistoryAsync(SalaryEmployeeRowVm? row)
+    {
+        if (row is null)
+            return;
+
+        ShiftHistoryTitle = $"Shift history — {row.EmployeeName}";
+        ShiftHistoryBanner = "Loading…";
+        ShiftHistorySubtitle = string.Empty;
+        ShiftHistoryRows.Clear();
+        IsShiftHistoryOpen = true;
+
+        try
+        {
+            var employees = (await _data.GetEmployeesAsync().ConfigureAwait(true)).ToList();
+            var employee = employees.FirstOrDefault(e => e.Id == row.EmployeeId);
+            if (employee is null)
+            {
+                ShiftHistoryRows.Clear();
+                ShiftHistorySubtitle = string.Empty;
+                ShiftHistoryBanner = "Employee not found.";
+                return;
+            }
+
+            var attendanceRows = await _data.GetAttendanceAsync().ConfigureAwait(true);
+            var att = SettingsManager.Load().Attendance ?? new AttendanceSettings();
+            var shiftSchedule = AttendanceShiftSchedule.FromSettings(att);
+
+            var history = attendanceRows
+                .Where(a => a.EmployeeId == employee.Id)
+                .OrderByDescending(a => a.WorkDate)
+                .ToList();
+
+            ShiftHistoryRows.Clear();
+            foreach (var a in history)
+            {
+                var localDay = a.WorkDate.Date;
+                var shiftDefinition = AttendanceScheduleHelper.ResolveShiftWindow(employee, localDay, shiftSchedule);
+                var isAbsence = a.IsAbsence;
+                var status = string.IsNullOrWhiteSpace(a.ClockInStatus) ? "Pending" : a.ClockInStatus;
+                if (shiftDefinition.IsOff && a.ClockInTime is null)
+                    status = "Off Shift";
+                else if (isAbsence)
+                    status = "Absent";
+
+                var lateJust = (a.Justification ?? string.Empty).Trim();
+                var absenceNote = (a.AbsenceJustification ?? string.Empty).Trim();
+
+                ShiftHistoryRows.Add(new ShiftHistoryRowViewModel
+                {
+                    WorkDateDisplay = a.WorkDate.ToString("ddd yyyy-MM-dd", CultureInfo.CurrentCulture),
+                    ShiftType = shiftDefinition.Name,
+                    ClockIn = a.ClockInTime?.ToString("HH:mm", CultureInfo.CurrentCulture) ?? "—",
+                    ClockOut = a.ClockOutTime?.ToString("HH:mm", CultureInfo.CurrentCulture) ?? "—",
+                    Status = status,
+                    Justification = string.IsNullOrEmpty(lateJust) ? "—" : lateJust,
+                    Notes = string.IsNullOrEmpty(absenceNote) ? "—" : absenceNote
+                });
+            }
+
+            ShiftHistorySubtitle = history.Count == 1 ? "1 row" : $"{history.Count} rows";
+            ShiftHistoryBanner = history.Count == 0
+                ? "No attendance rows stored for this employee yet."
+                : string.Empty;
+        }
+        catch (Exception ex)
+        {
+            ShiftHistoryRows.Clear();
+            ShiftHistorySubtitle = string.Empty;
+            ShiftHistoryBanner = ex.GetBaseException().Message;
+        }
+    }
+
     private void ApplyEmployeeFilter()
     {
         Rows.Clear();
@@ -327,6 +464,7 @@ public sealed class SalaryViewModel : AdminBaseViewModel
 
         try
         {
+            var payrollRules = PayrollCalculator.ResolveSalaryPayrollRulesForLocalFile();
             var employeesTask = _data.GetEmployeesAsync();
             var attendanceTask = _data.GetAttendanceAsync();
             var payrollTask = _data.GetPayrollAsync();
@@ -376,13 +514,15 @@ public sealed class SalaryViewModel : AdminBaseViewModel
                 attendancesByEmployee.TryGetValue(emp.Id, out var attRows);
                 var rows = attRows ?? Enumerable.Empty<EmployeeAttendance>();
                 var (absLive, lateLive, penLive, totalLive) =
-                    PayrollCalculator.CountAttendanceUnitsForPayroll(emp, SelectedPayrollYear, SelectedPayrollMonth, rows);
+                    PayrollCalculator.CountAttendanceUnitsForPayroll(emp, SelectedPayrollYear, SelectedPayrollMonth, rows, payrollRules);
 
-                var (schedHours, workdays, grossLive) =
-                    PayrollCalculator.GetHourlyGrossForPayrollMonth(emp, SelectedPayrollYear, SelectedPayrollMonth);
+                var monthBase = PayrollCalculator.ResolvePayrollMonthBase(emp, SelectedPayrollYear, SelectedPayrollMonth);
+                var schedHours = monthBase.ScheduledHours;
+                var workdays = monthBase.ScheduledWorkdays;
+                var grossLive = monthBase.GrossPayUsd;
 
                 var moneyLive = PayrollSupport.SumServerCompletedOrderMerchandiseUsd(orders, productPriceById, emp.Id, start, endExclusive);
-                var bonusLive = PayrollCalculator.ComputeBonusUsd(moneyLive);
+                var bonusLive = PayrollCalculator.ComputeBonusUsd(moneyLive, payrollRules);
                 var advancesPending = PayrollSupport.SumPendingAdvancesForPayrollMonth(
                     advances,
                     emp.Id,
@@ -415,7 +555,7 @@ public sealed class SalaryViewModel : AdminBaseViewModel
                 money = payRec.MoneyGeneratedUsd;
                 bonus = payRec.BonusFivePercentUsd;
                 advancesApplied = payRec.AdvancesDeductedUsd;
-                baseAfter = PayrollCalculator.ComputeBaseAfterAttendanceUsd(baseGrossUsd, workdays, total);
+                baseAfter = PayrollCalculator.ComputeBaseAfterAttendanceUsd(baseGrossUsd, monthBase.AttendanceDenominatorWorkdays, total);
                 totalNet = payRec.NetPayUsd;
                 paidToDate = payRec.PaidToDateUsd;
             }
@@ -429,13 +569,14 @@ public sealed class SalaryViewModel : AdminBaseViewModel
                 money = moneyLive;
                 bonus = bonusLive;
                 advancesApplied = advancesPending;
-                baseAfter = PayrollCalculator.ComputeBaseAfterAttendanceUsd(grossLive, workdays, totalLive);
+                baseAfter = PayrollCalculator.ComputeBaseAfterAttendanceUsd(grossLive, monthBase.AttendanceDenominatorWorkdays, totalLive);
                 totalNet = PayrollCalculator.ComputeFinalNetPayUsd(
                     grossLive,
-                    workdays,
+                    monthBase.AttendanceDenominatorWorkdays,
                     totalLive,
                     moneyLive,
-                    advancesPending);
+                    advancesPending,
+                    payrollRules);
                 paidToDate = 0m;
             }
 
@@ -492,13 +633,15 @@ public sealed class SalaryViewModel : AdminBaseViewModel
                 status =
                     $"Partially paid ${payRec.PaidToDateUsd:N2} of ${payRec.NetPayUsd:N2} USD — still owe ${remaining:N2}. Last payment {localPaid:MMM d, yyyy}.";
             }
-            else if (emp.HourlyRate <= 0m)
+            else if (emp.MonthlySalaryUSD <= 0m && emp.HourlyRate <= 0m)
             {
-                status = "Set hourly rate (USD) in Employees — required for payroll";
+                status = "Set monthly salary (USD) in Employees — required for payroll";
             }
-            else if (workdays == 0)
+            else if (monthBase.GrossPayUsd <= 0m)
             {
-                status = "No scheduled work this month (all Off) — adjust weekly shifts in Employees";
+                status = monthBase.UsesMonthlySalary
+                    ? "No payroll gross this month — check join date or monthly salary in Employees"
+                    : "No payroll gross this month — set a positive monthly salary in Employees (or check join date and schedule)";
             }
             else if (daysLate > 0)
             {
@@ -513,8 +656,11 @@ public sealed class SalaryViewModel : AdminBaseViewModel
             {
                 EmployeeId = emp.Id,
                 EmployeeName = emp.Name,
+                EmployeeInitials = emp.Initials,
                 UniqueId = emp.UniqueId,
-                HourlyRateUsd = emp.HourlyRate,
+                UsesMonthlySalary = monthBase.UsesMonthlySalary,
+                ContractMonthlyUsd = monthBase.ContractMonthlySalaryUsd,
+                HeaderProfileImage = TryLoadBitmapFromFilePath(emp.ProfileImagePath),
                 ScheduledHoursMonth = schedHours,
                 ScheduledWorkdays = workdays,
                 BaseGrossUsd = baseGrossUsd,
@@ -572,7 +718,7 @@ public sealed class SalaryViewModel : AdminBaseViewModel
         if (pending.Count == 0)
         {
             MessageBox.Show(
-                "No payroll payments to record for this month. Each new employee needs an hourly rate (USD) and at least one scheduled workday (not Off), or an existing partial payroll row with a balance due.",
+                "No payroll payments to record for this month. Each employee needs a positive monthly salary (or an existing partial payroll row with a balance due).",
                 "Salary",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
@@ -834,13 +980,14 @@ public sealed class SalaryViewModel : AdminBaseViewModel
                 return;
             }
 
-            var (_, workdays, scheduledGrossUsd) =
-                PayrollCalculator.GetHourlyGrossForPayrollMonth(emp, SelectedPayrollYear, SelectedPayrollMonth);
+            var monthBase = PayrollCalculator.ResolvePayrollMonthBase(emp, SelectedPayrollYear, SelectedPayrollMonth);
+            var scheduledGrossUsd = monthBase.GrossPayUsd;
+            var payrollRules = PayrollCalculator.ResolveSalaryPayrollRulesForLocalFile();
 
-            if (emp.HourlyRate <= 0m || workdays == 0)
+            if ((emp.MonthlySalaryUSD <= 0m && emp.HourlyRate <= 0m) || scheduledGrossUsd <= 0m)
             {
                 MessageBox.Show(
-                    "Advances are limited to 30% of scheduled gross pay for the month. This employee has no scheduled gross for the selected period — set a positive hourly rate (USD) and at least one scheduled workday (not Off) in Employees, then try again.",
+                    $"Advances are limited to {payrollRules.MaxSalaryAdvancePercentOfGross:0.##}% of payroll gross for the month. This employee has no payroll base for the selected period — set a positive monthly salary (USD) in Employees, then try again.",
                     "Salary advance",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
@@ -848,7 +995,7 @@ public sealed class SalaryViewModel : AdminBaseViewModel
             }
 
             var advances = (await _data.GetSalaryAdvancesAsync().ConfigureAwait(true)).ToList();
-            var advanceCapUsd = Math.Round(PayrollCalculator.MaxAdvanceFractionOfScheduledGross * scheduledGrossUsd, 2);
+            var advanceCapUsd = Math.Round(PayrollCalculator.MaxAdvanceFractionOfScheduledGross(payrollRules) * scheduledGrossUsd, 2);
             var existingPendingUsd = PayrollSupport.SumPendingAdvancesForPayrollMonth(
                 advances,
                 SelectedAdvanceEmployee.Id,
@@ -861,9 +1008,9 @@ public sealed class SalaryViewModel : AdminBaseViewModel
             if (amt > remainingUsd)
             {
                 MessageBox.Show(
-                    $"Each employee’s advances for this payroll month cannot exceed 30% of scheduled gross pay (hourly wage × scheduled shift hours on working days).{Environment.NewLine}{Environment.NewLine}" +
-                    $"Scheduled gross for {PayrollPeriodLabel}: ${scheduledGrossUsd:N2}{Environment.NewLine}" +
-                    $"30% cap: ${advanceCapUsd:N2}{Environment.NewLine}" +
+                    $"Each employee’s advances for this payroll month cannot exceed {payrollRules.MaxSalaryAdvancePercentOfGross:0.##}% of that month’s payroll gross (prorated monthly salary).{Environment.NewLine}{Environment.NewLine}" +
+                    $"Payroll gross for {PayrollPeriodLabel}: ${scheduledGrossUsd:N2}{Environment.NewLine}" +
+                    $"{payrollRules.MaxSalaryAdvancePercentOfGross:0.##}% cap: ${advanceCapUsd:N2}{Environment.NewLine}" +
                     $"Pending advances already recorded for this month: ${existingPendingUsd:N2}{Environment.NewLine}" +
                     $"You can add at most ${remainingUsd:N2} now (requested ${amt:N2}).",
                     "Salary advance",

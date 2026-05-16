@@ -12,7 +12,6 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.Extensions.Options;
 using Npgsql;
 using Serilog;
 using EliteRestaurant.Core.Data;
@@ -30,7 +29,6 @@ namespace EliteRestaurant.Api.Controllers;
 public sealed class PublicMenuController(
     AppDbContext db,
     IWebHostEnvironment environment,
-    IOptions<CurrencyPricingOptions> currencyPricingOptions,
     IHubContext<OrderHub> hubContext,
     JwtTokenService jwtTokenService) : ControllerBase
 {
@@ -51,9 +49,8 @@ public sealed class PublicMenuController(
         var business = all.BusinessProfile;
         var pricing = all.CurrencyPricing;
         var cloudSettings = db.PublicMenuSettings.AsNoTracking().FirstOrDefault(s => s.Key == "default");
-        var apiPricing = currencyPricingOptions.Value;
-        var tax = PricingResolver.ResolveTaxRate(apiPricing.TaxPercent, cloudSettings?.TaxPercent ?? pricing.TaxPercent);
-        var service = PricingResolver.ResolveServicePercent(apiPricing.ServicePercent, cloudSettings?.ServicePercent ?? pricing.ServicePercent);
+        var tax = PricingResolver.ResolveRestaurantTaxPercent(cloudSettings?.TaxPercent, pricing.TaxPercent);
+        var service = PricingResolver.ResolveRestaurantServicePercent(cloudSettings?.ServicePercent, pricing.ServicePercent);
         var name = PublicMenuBrandingMerge.RestaurantDisplayName(cloudSettings, business);
         var mode = string.IsNullOrWhiteSpace(cloudSettings?.DefaultCurrencyDisplayMode)
             ? (string.IsNullOrWhiteSpace(pricing.DefaultCurrencyDisplayMode) ? "Dual" : pricing.DefaultCurrencyDisplayMode.Trim())
@@ -443,7 +440,7 @@ public sealed class PublicMenuController(
             return BadRequest(new PublicMenuDraftErrorDto { Errors = DeduplicateErrors(errors) });
 
         // Availability (ingredient stock)
-        var inStock = await GetAvailabilityMapAsync(productIds);
+        var inStock = await OrderInventoryAvailability.GetProductAvailabilityMapAsync(db, productIds);
         foreach (var line in body.Items!)
         {
             if (!inStock.TryGetValue(line.ProductId, out var ok) || !ok)
@@ -575,7 +572,7 @@ public sealed class PublicMenuController(
         if (errors.Count > 0)
             return BadRequest(new PublicMenuDraftErrorDto { Errors = DeduplicateErrors(errors) });
 
-        var inStock = await GetAvailabilityMapAsync(productIds);
+        var inStock = await OrderInventoryAvailability.GetProductAvailabilityMapAsync(db, productIds);
         foreach (var line in body.Items!)
         {
             if (!inStock.TryGetValue(line.ProductId, out var ok) || !ok)
@@ -696,6 +693,10 @@ public sealed class PublicMenuController(
         if (!isDelivery && !isPickup)
             errors.Add("Fulfillment mode must be Pickup or Delivery.");
 
+        var phone = (body.CustomerPhone ?? string.Empty).Trim();
+        if (phone.Length is < 5 or > 40)
+            errors.Add("Phone number is required (5–40 characters).");
+
         if (isDelivery)
         {
             var addr = (body.DeliveryAddress ?? string.Empty).Trim();
@@ -728,20 +729,14 @@ public sealed class PublicMenuController(
 
         foreach (var line in body.Items!)
         {
-            if (!dbProducts.TryGetValue(line.ProductId, out var p))
-            {
+            if (!dbProducts.TryGetValue(line.ProductId, out _))
                 errors.Add($"Product {line.ProductId} was not found.");
-                continue;
-            }
-
-            if (Math.Abs(line.UnitPrice - p.Price) > 0.02m)
-                errors.Add($"Unit price for \"{p.Name}\" does not match the current menu price.");
         }
 
         if (errors.Count > 0)
             return BadRequest(new PublicMenuDraftErrorDto { Errors = DeduplicateErrors(errors) });
 
-        var inStock = await GetAvailabilityMapAsync(productIds);
+        var inStock = await OrderInventoryAvailability.GetProductAvailabilityMapAsync(db, productIds);
         foreach (var line in body.Items!)
         {
             if (!inStock.TryGetValue(line.ProductId, out var ok) || !ok)
@@ -790,11 +785,11 @@ public sealed class PublicMenuController(
         var deliveryFee = isDelivery ? Math.Round(merchSubtotal * 0.20m, 2) : 0m;
         var orderSource = isDelivery ? "Delivery" : "TakeOut";
 
-        var notesParts = new List<string> { $"Guest: {name}", $"Online · {(isDelivery ? "Delivery" : "Pickup")}" };
+        var notesParts = new List<string> { $"Guest: {name}", $"Online · {(isDelivery ? "Delivery" : "Pickup")}", $"Phone: {phone}" };
         if (isDelivery)
         {
-            notesParts.Add($"Address: {(body.DeliveryAddress ?? string.Empty).Trim()}");
-            var instr = (body.DeliveryInstructions ?? string.Empty).Trim();
+            notesParts.Add($"Address: {OnlineOrderCustomerNotes.EscapeField(body.DeliveryAddress)}");
+            var instr = OnlineOrderCustomerNotes.EscapeField(body.DeliveryInstructions);
             if (instr.Length > 0)
                 notesParts.Add($"Instructions: {instr}");
         }
@@ -815,9 +810,29 @@ public sealed class PublicMenuController(
         var customerNotes = string.Join(" · ", notesParts.Where(s => s.Length > 0));
         var allergyNotes = (body.AllergyNotes ?? string.Empty).Trim();
 
+        string confirmationCode;
+        try
+        {
+            confirmationCode = await OrderConfirmationCodeGenerator.AllocateUniqueAsync(db);
+        }
+        catch (Exception ex) when (IsMissingConfirmationCodeColumn(ex))
+        {
+            Log.Error(ex, "Orders.ConfirmationCode column is missing; restart the API after migrations apply.");
+            return StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
+                new PublicMenuDraftErrorDto
+                {
+                    Errors = new[]
+                    {
+                        "Online ordering is updating. Restart EliteRestaurant.Api, then try again. If this persists, run database migrations."
+                    }
+                });
+        }
+
         var order = new OrderRecord
         {
             UniqueId = UniqueIdGenerator.NewId("ORD"),
+            ConfirmationCode = confirmationCode,
             TableId = orderTable.Id,
             TableCode = $"Table {orderTable.TableNumber}",
             TableName = string.IsNullOrWhiteSpace(orderTable.Name) ? $"Table {orderTable.TableNumber}" : orderTable.Name,
@@ -834,7 +849,8 @@ public sealed class PublicMenuController(
             OrderOrigin = OrderOrigin.Online,
             DeliveryFeeUsd = deliveryFee,
             PaymentTiming = paymentTiming,
-            GuestPaymentMethod = payLabel
+            GuestPaymentMethod = payLabel,
+            ReservationGuestName = name
         };
 
         foreach (var line in normalized)
@@ -869,7 +885,8 @@ public sealed class PublicMenuController(
             order.UniqueId,
             order.Id,
             order.Status,
-            order.OrderOrigin));
+            order.OrderOrigin,
+            order.ConfirmationCode));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -945,36 +962,6 @@ public sealed class PublicMenuController(
         return s;
     }
 
-    private async Task<Dictionary<int, bool>> GetAvailabilityMapAsync(IReadOnlyList<int> productIds)
-    {
-        if (productIds.Count == 0)
-            return new Dictionary<int, bool>();
-
-        var lines = await db.ProductIngredients.AsNoTracking()
-            .Where(pi => productIds.Contains(pi.ProductId))
-            .Select(pi => new { pi.ProductId, pi.Quantity, Stock = pi.InventoryItem!.StockQuantity })
-            .ToListAsync();
-
-        var map = new Dictionary<int, bool>();
-        foreach (var id in productIds)
-            map[id] = true;
-
-        foreach (var g in lines.GroupBy(x => x.ProductId))
-        {
-            map[g.Key] = g.All(x => x.Stock >= x.Quantity);
-        }
-
-        // Products with no recipe lines: available
-        foreach (var id in productIds)
-        {
-            if (!lines.Any(l => l.ProductId == id))
-                map[id] = true;
-        }
-
-        return map;
-    }
-
-    /// <summary>🍽️ food / 🥤 drink — matches <see cref="CustomerDraftRequest.OrderKind"/> or first item category.</summary>
     private static string GetOrderKindEmojiForLabel(
         string? orderKind,
         List<CustomerDraftItemRequest> items,
@@ -1029,6 +1016,19 @@ public sealed class PublicMenuController(
                 "The order could not be saved due to a database connection issue. Please try again in a moment.",
             _ => null
         };
+    }
+
+    private static bool IsMissingConfirmationCodeColumn(Exception ex)
+    {
+        for (var cur = ex; cur is not null; cur = cur.InnerException)
+        {
+            if (cur is PostgresException pg
+                && (pg.SqlState == PostgresErrorCodes.UndefinedColumn
+                    || pg.MessageText.Contains("ConfirmationCode", StringComparison.OrdinalIgnoreCase)))
+                return true;
+        }
+
+        return false;
     }
 
     private static PostgresException? FindPostgresException(Exception? ex)

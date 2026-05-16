@@ -2,6 +2,35 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:components="clr-namespace:EliteRestaurantPro.Views.Components">
+    <UserControl.Resources>
+        <!-- Hit target for product row: toggles selection; +/- live in a separate column. -->
+        <Style x:Key="CreateOrderProductRowToggleButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="Transparent" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#12FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#1A4A3F1D"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="230"/>
@@ -93,59 +122,18 @@
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="12"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="12"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="12"/>
+                                    <ColumnDefinition Width="16"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
 
                                 <StackPanel Grid.Column="0">
-                                    <TextBlock Text="ORDER SOURCE" Style="{StaticResource HeadingSmall}" Margin="0,0,0,8"/>
-                                    <ComboBox ItemsSource="{Binding OrderSources}"
-                                              SelectedItem="{Binding SelectedOrderSource}"
-                                              Style="{StaticResource EliteComboBox}"
-                                              ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
-                                </StackPanel>
-
-                                <StackPanel Grid.Column="2">
-                                    <TextBlock Text="REFERENCE" Style="{StaticResource HeadingSmall}" Margin="0,0,0,8"/>
-                                    <ComboBox ItemsSource="{Binding ArrivedReservations}"
-                                              SelectedItem="{Binding SelectedArrivedReservation, Mode=TwoWay}"
-                                              DisplayMemberPath="Label"
-                                              Style="{StaticResource EliteComboBox}"
-                                              ItemContainerStyle="{StaticResource ComboBoxItemStyle}"
-                                              Visibility="{Binding IsReservationSource, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                                    <ComboBox ItemsSource="{Binding DeliveryReferences}"
-                                              Text="{Binding SelectedDeliveryReference, UpdateSourceTrigger=PropertyChanged}"
-                                              IsEditable="True"
-                                              Style="{StaticResource EliteComboBox}"
-                                              ItemContainerStyle="{StaticResource ComboBoxItemStyle}"
-                                              Visibility="{Binding IsDeliverySource, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                                    <TextBox Text="None"
-                                             IsReadOnly="True"
-                                             Style="{StaticResource EliteTextBox}"
-                                             Visibility="{Binding IsWalkInSource, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                                </StackPanel>
-
-                                <StackPanel Grid.Column="4">
                                     <TextBlock Text="TABLE" Style="{StaticResource HeadingSmall}" Margin="0,0,0,8"/>
                                     <ComboBox ItemsSource="{Binding AvailableTables}"
                                               SelectedValue="{Binding SelectedTableId}"
                                               SelectedValuePath="Id"
                                               IsEnabled="{Binding CanEditTableForCurrentSource}"
+                                              Style="{StaticResource EliteComboBox}"
                                               ItemContainerStyle="{StaticResource ComboBoxItemStyle}">
-                                        <ComboBox.Style>
-                                            <Style TargetType="ComboBox" BasedOn="{StaticResource EliteComboBox}">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsDeliverySource}" Value="True">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </ComboBox.Style>
                                         <ComboBox.ItemTemplate>
                                             <DataTemplate>
                                                 <TextBlock Foreground="{StaticResource TextPrimaryBrush}" TextWrapping="Wrap">
@@ -159,13 +147,9 @@
                                             </DataTemplate>
                                         </ComboBox.ItemTemplate>
                                     </ComboBox>
-                                    <TextBox Text="None / N-A"
-                                             IsReadOnly="True"
-                                             Style="{StaticResource EliteTextBox}"
-                                             Visibility="{Binding IsDeliverySource, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                 </StackPanel>
 
-                                <StackPanel Grid.Column="6">
+                                <StackPanel Grid.Column="2">
                                     <TextBlock Text="MENU TYPE" Style="{StaticResource HeadingSmall}" Margin="0,0,0,8"/>
                                     <ComboBox ItemsSource="{Binding OrderCategories}"
                                               SelectedItem="{Binding SelectedOrderCategory}"
@@ -204,21 +188,6 @@
                                          Style="{StaticResource EliteTextBox}"/>
                             </Grid>
 
-                            <Grid Margin="0,12,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="260"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0"
-                                           Text="PAYMENT CURRENCY"
-                                           Style="{StaticResource HeadingSmall}"
-                                           VerticalAlignment="Center"/>
-                                <ComboBox Grid.Column="1"
-                                          ItemsSource="{Binding PaymentCurrencies}"
-                                          SelectedItem="{Binding SelectedPaymentCurrency}"
-                                          Style="{StaticResource EliteComboBox}"
-                                          ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
-                            </Grid>
                         </StackPanel>
 
                         <ScrollViewer Grid.Row="1"
@@ -228,30 +197,58 @@
                             <ItemsControl ItemsSource="{Binding FilteredProductSelections}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Background="{StaticResource CardBaseBrush}" CornerRadius="10" Padding="12,10" Margin="0,0,0,8">
+                                        <Border CornerRadius="10" Padding="12,10" Margin="0,0,0,8"
+                                                BorderBrush="{StaticResource BorderSubtleBrush}"
+                                                BorderThickness="1"
+                                                Background="{StaticResource CardBaseBrush}">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Style.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter Property="Background" Value="#15FFFFFF"/>
+                                                        </Trigger>
+                                                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                            <Setter Property="BorderBrush" Value="{StaticResource GoldAccentBrush}"/>
+                                                            <Setter Property="BorderThickness" Value="2"/>
+                                                            <Setter Property="Background" Value="#284A3F1D"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsAvailable}" Value="False">
+                                                            <Setter Property="Opacity" Value="0.5"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="120"/>
                                                 </Grid.ColumnDefinitions>
 
-                                                <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                                <Button Grid.Column="0"
+                                                        IsEnabled="{Binding CanToggleProductRow}"
+                                                        Style="{StaticResource CreateOrderProductRowToggleButton}"
+                                                        Command="{Binding DataContext.ToggleProductSelectionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}">
+                                                    <StackPanel>
+                                                        <TextBlock Foreground="{StaticResource TextPrimaryBrush}" FontSize="13" FontWeight="SemiBold">
+                                                            <Run Text="{Binding Name, Mode=OneWay}"/>
+                                                            <Run Text=" "/>
+                                                            <Run Text="{Binding Price, Mode=OneWay, StringFormat=($ {0:N2})}" Foreground="{StaticResource GoldAccentBrush}"/>
+                                                        </TextBlock>
+                                                        <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="11">
+                                                            <Run Text="{Binding Category, Mode=OneWay}"/>
+                                                            <Run Text=" / "/>
+                                                            <Run Text="{Binding SubCategory, Mode=OneWay}"/>
+                                                        </TextBlock>
+                                                        <TextBlock Text="{Binding AvailabilityHint, Mode=OneWay}"
+                                                                   Foreground="#FFB06060"
+                                                                   FontSize="10"
+                                                                   TextWrapping="Wrap"
+                                                                   Margin="0,2,0,0"/>
+                                                    </StackPanel>
+                                                </Button>
 
-                                                <StackPanel Grid.Column="1">
-                                                    <TextBlock Foreground="{StaticResource TextPrimaryBrush}" FontSize="13" FontWeight="SemiBold">
-                                                        <Run Text="{Binding Name, Mode=OneWay}"/>
-                                                        <Run Text=" "/>
-                                                        <Run Text="{Binding Price, Mode=OneWay, StringFormat=($ {0:N2})}" Foreground="{StaticResource GoldAccentBrush}"/>
-                                                    </TextBlock>
-                                                    <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="11">
-                                                        <Run Text="{Binding Category, Mode=OneWay}"/>
-                                                        <Run Text=" / "/>
-                                                        <Run Text="{Binding SubCategory, Mode=OneWay}"/>
-                                                    </TextBlock>
-                                                </StackPanel>
-
-                                                <Grid Grid.Column="2">
+                                                <Grid Grid.Column="1">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="32"/>
                                                         <ColumnDefinition Width="*"/>
@@ -259,6 +256,7 @@
                                                     </Grid.ColumnDefinitions>
                                                     <Button Grid.Column="0"
                                                             Content="-"
+                                                            IsEnabled="{Binding IsSelected}"
                                                             Command="{Binding DataContext.DecreaseQuantityCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                             CommandParameter="{Binding}"
                                                             Style="{StaticResource GhostButton}"/>
@@ -267,6 +265,7 @@
                                                     </Border>
                                                     <Button Grid.Column="2"
                                                             Content="+"
+                                                            IsEnabled="{Binding IsAvailable}"
                                                             Command="{Binding DataContext.IncreaseQuantityCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                             CommandParameter="{Binding}"
                                                             Style="{StaticResource SapphireButton}"/>
@@ -354,20 +353,60 @@
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <Border Background="#18000000" CornerRadius="8" Padding="10" Margin="0,0,0,8">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsAvailable}" Value="False">
+                                                            <Setter Property="Opacity" Value="0.55"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <StackPanel>
+                                                <StackPanel Grid.Column="0">
                                                     <TextBlock Text="{Binding Name, Mode=OneWay}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold"/>
                                                     <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="11">
                                                         <Run Text="{Binding UniqueId, Mode=OneWay}"/><Run Text=" | Qty "/><Run Text="{Binding Quantity, Mode=OneWay}"/><Run Text=" x $ "/><Run Text="{Binding Price, Mode=OneWay, StringFormat={}{0:N2}}"/>
                                                     </TextBlock>
                                                 </StackPanel>
-                                                <TextBlock Grid.Column="1" Foreground="{StaticResource GoldAccentBrush}" FontWeight="SemiBold">
-                                                    <Run Text="$ "/><Run Text="{Binding LineTotal, Mode=OneWay, StringFormat={}{0:N2}}"/>
-                                                </TextBlock>
+                                                <Grid Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="32"/>
+                                                        <ColumnDefinition Width="44"/>
+                                                        <ColumnDefinition Width="32"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Button Grid.Column="0"
+                                                            Content="-"
+                                                            Command="{Binding DataContext.DecreaseQuantityCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}"
+                                                            Style="{StaticResource GhostButton}"/>
+                                                    <Border Grid.Column="1" Margin="4,0" CornerRadius="8" BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1">
+                                                        <TextBlock Text="{Binding Quantity, Mode=OneWay}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                                    </Border>
+                                                    <Button Grid.Column="2"
+                                                            Content="+"
+                                                            IsEnabled="{Binding CanIncreaseQuantity}"
+                                                            Command="{Binding DataContext.IncreaseQuantityCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}"
+                                                            Style="{StaticResource SapphireButton}"/>
+                                                </Grid>
+                                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                                    <Button Content="X"
+                                                            Width="36"
+                                                            Margin="0,0,8,0"
+                                                            ToolTip="Remove from ticket"
+                                                            Command="{Binding DataContext.RemoveSelectedLineCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}"
+                                                            Style="{StaticResource DangerButton}"/>
+                                                    <TextBlock VerticalAlignment="Center" Foreground="{StaticResource GoldAccentBrush}" FontWeight="SemiBold">
+                                                        <Run Text="$ "/><Run Text="{Binding LineTotal, Mode=OneWay, StringFormat={}{0:N2}}"/>
+                                                    </TextBlock>
+                                                </StackPanel>
                                             </Grid>
                                         </Border>
                                     </DataTemplate>
@@ -395,7 +434,7 @@
                                 <Run Text="Amount To Collect: "/><Run Text="{Binding ChosenPaymentAmountText, Mode=OneWay}"/>
                             </TextBlock>
 
-                            <!-- Focusable=false: after Win32 MessageBox closes, Enter can otherwise re-fire this Command from focus snap-back. -->
+                            <!-- Focusable=false: after a modal dialog closes, Enter can otherwise re-fire this Command from focus snap-back. -->
                             <Button Margin="0,14,0,0"
                                     Focusable="False"
                                     Content="{Binding PrimaryActionLabel}"

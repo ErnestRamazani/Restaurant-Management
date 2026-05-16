@@ -8,7 +8,7 @@ public class PayrollPaymentRecord
     public Employee? Employee { get; set; }
     public int Year { get; set; }
     public int Month { get; set; }
-    /// <summary>Payroll base gross for the month (hourly rate × scheduled hours).</summary>
+    /// <summary>Payroll base gross for the month (prorated monthly salary or legacy hourly × scheduled hours).</summary>
     public decimal MonthlySalaryUsd { get; set; }
     public int AbsenceDays { get; set; }
     public int LateDays { get; set; }

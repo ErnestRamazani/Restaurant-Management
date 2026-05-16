@@ -91,7 +91,11 @@ public static class AdminOrdersSnapshotLoader
         foreach (var o in pendingOrders)
         {
             var subtotal = o.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
-            var totals = OrderTotalsHelper.ComputeTotals(subtotal, o.DiscountMode, o.DiscountValue);
+            var totals = OrderTotalsHelper.ComputeTotalsWithDeliveryFee(
+                subtotal,
+                o.DiscountMode,
+                o.DiscountValue,
+                o.DeliveryFeeUsd);
             var lines = string.Join(", ",
                 o.Items.Select(i =>
                     $"{i.Product?.Name ?? "Item"} x{i.Quantity}"));

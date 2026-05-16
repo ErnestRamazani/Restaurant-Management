@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Input;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Orders;
+using EliteRestaurant.Core.Reporting;
 using EliteRestaurant.Core.Utils;
 using EliteRestaurantPro.Services;
 using Microsoft.Win32;
@@ -188,7 +189,11 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
 
     private async Task ConfirmChangeAndCompleteAsync(OrderEntry entry)
     {
-        var paymentCurrencyCode = "MIXED";
+        var paymentCurrencyCode = PaidUsd > 0m && PaidFc > 0m
+            ? MoneyReportingHelpers.MixedCurrency
+            : PaidFc > 0m
+                ? CurrencyHelper.CongoleseFranc
+                : CurrencyHelper.Usd;
 
         await UpdateOrderStatusAsync(
             entry,

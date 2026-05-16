@@ -59,6 +59,11 @@ public sealed class AdminSettingsController(AppDbContext db) : ControllerBase
             row.MenuTaxonomyJson = MenuTaxonomyHelper.Serialize(menuTaxonomy);
         }
 
+        row.PayrollLateDaysPerAttendanceUnit = Math.Max(1, request.PayrollLateDaysPerAttendanceUnit);
+        row.PayrollAbsenceCountsAsAttendanceUnit = request.PayrollAbsenceCountsAsAttendanceUnit;
+        row.PayrollSalesBonusPercent = Math.Clamp(request.PayrollSalesBonusPercent, 0m, 100m);
+        row.PayrollMaxSalaryAdvancePercentOfGross = Math.Clamp(request.PayrollMaxSalaryAdvancePercentOfGross, 0m, 100m);
+
         row.UpdatedAtUtc = DateTime.UtcNow;
         if (row.Id == 0)
             db.PublicMenuSettings.Add(row);
@@ -69,6 +74,7 @@ public sealed class AdminSettingsController(AppDbContext db) : ControllerBase
 
         // Keep the existing file-based settings as a local fallback for older deployments.
         var settings = SettingsManager.Load();
+        var preservedTicketReceipt = settings.TicketReceipt ?? new TicketReceiptSettings();
         settings.BusinessProfile.RestaurantName = row.RestaurantName;
         settings.BusinessProfile.Phone = row.Phone;
         settings.BusinessProfile.Address = row.Address;
@@ -98,6 +104,12 @@ public sealed class AdminSettingsController(AppDbContext db) : ControllerBase
         if (!string.IsNullOrWhiteSpace(request.MenuTaxonomyJson) &&
             MenuTaxonomyHelper.TryDeserialize(request.MenuTaxonomyJson.Trim(), out var pushedTaxonomy))
             settings.MenuTaxonomy = pushedTaxonomy;
+        settings.Salary ??= new SalarySettings();
+        settings.Salary.LateDaysPerAttendanceUnit = Math.Max(1, request.PayrollLateDaysPerAttendanceUnit);
+        settings.Salary.AbsenceCountsAsAttendanceUnit = request.PayrollAbsenceCountsAsAttendanceUnit;
+        settings.Salary.SalesBonusPercent = Math.Clamp(request.PayrollSalesBonusPercent, 0m, 100m);
+        settings.Salary.MaxSalaryAdvancePercentOfGross = Math.Clamp(request.PayrollMaxSalaryAdvancePercentOfGross, 0m, 100m);
+        settings.TicketReceipt = preservedTicketReceipt;
         SettingsManager.Save(settings);
         return Ok(new AdminCloudSettingsResponse(true, "/api/public/menu/assets/logo", "Cloud settings saved."));
     }

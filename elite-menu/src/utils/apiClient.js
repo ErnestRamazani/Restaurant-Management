@@ -92,7 +92,16 @@ export async function apiFetch(path, options = {}) {
     const response = await fetch(url, { ...rest, headers, signal })
     const data = await response.json().catch(() => null)
     if (!response.ok) {
-      const errs = Array.isArray(data?.errors) ? data.errors.filter(Boolean).join(' ') : ''
+      let errs = ''
+      if (Array.isArray(data?.errors)) {
+        errs = data.errors.filter(Boolean).join(' ')
+      } else if (data?.errors && typeof data.errors === 'object') {
+        errs = Object.values(data.errors)
+          .flat()
+          .filter(Boolean)
+          .map(String)
+          .join(' ')
+      }
       const message =
         errs || data?.message || data?.title || data?.detail || `Request failed (${response.status})`
       throw new Error(message)

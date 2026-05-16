@@ -112,6 +112,7 @@
                                Style="{StaticResource BodyText}"
                                VerticalAlignment="Center"/>
                     <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <Button Content="Today" Width="70" Margin="0,0,8,0" Command="{Binding SelectPeriodCommand}" CommandParameter="Today" Style="{StaticResource GhostButton}"/>
                         <Button Content="Week" Width="70" Margin="0,0,8,0" Command="{Binding SelectPeriodCommand}" CommandParameter="Week" Style="{StaticResource GhostButton}"/>
                         <Button Content="Month" Width="70" Margin="0,0,8,0" Command="{Binding SelectPeriodCommand}" CommandParameter="Month" Style="{StaticResource GhostButton}"/>
                         <Button Content="Year" Width="70" Margin="0,0,8,0" Command="{Binding SelectPeriodCommand}" CommandParameter="Year" Style="{StaticResource GhostButton}"/>

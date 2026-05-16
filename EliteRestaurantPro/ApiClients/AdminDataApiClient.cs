@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http;
 using System.Text.Json;
 using EliteRestaurant.Contracts.Admin;
@@ -27,6 +28,17 @@ public sealed class AdminDataApiClient(EliteApiClient? apiClient = null)
     public Task<IReadOnlyList<ReservationBooking>> GetReservationsAsync(CancellationToken cancellationToken = default) =>
         GetListAsync<ReservationBooking>("reservations", cancellationToken);
 
+    /// <summary>Server filters by date (not the 1000-row snapshot cap). Matches reservation slot or last update in range.</summary>
+    public Task<IReadOnlyList<ReservationBooking>> GetReservationsForReportRangeAsync(
+        DateTime startInclusiveLocalDate,
+        DateTime endInclusiveLocalDate,
+        CancellationToken cancellationToken = default)
+    {
+        var s = startInclusiveLocalDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var e = endInclusiveLocalDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        return GetListAsync<ReservationBooking>("reservations", cancellationToken, $"start={Uri.EscapeDataString(s)}&end={Uri.EscapeDataString(e)}");
+    }
+
     public Task<IReadOnlyList<CustomerProfile>> GetCustomerProfilesAsync(CancellationToken cancellationToken = default) =>
         GetListAsync<CustomerProfile>("customerprofiles", cancellationToken);
 
@@ -44,6 +56,17 @@ public sealed class AdminDataApiClient(EliteApiClient? apiClient = null)
 
     public Task<IReadOnlyList<OrderRecord>> GetOrdersAsync(CancellationToken cancellationToken = default) =>
         GetListAsync<OrderRecord>("orders", cancellationToken);
+
+    /// <summary>Server filters by Money-aligned anchor (<c>PaymentConfirmedAt ?? CompletedAt ?? CreatedAt</c>), not the 1000 newest snapshot.</summary>
+    public Task<IReadOnlyList<OrderRecord>> GetOrdersForReportRangeAsync(
+        DateTime startInclusiveLocalDate,
+        DateTime endInclusiveLocalDate,
+        CancellationToken cancellationToken = default)
+    {
+        var s = startInclusiveLocalDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var e = endInclusiveLocalDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        return GetListAsync<OrderRecord>("orders", cancellationToken, $"start={Uri.EscapeDataString(s)}&end={Uri.EscapeDataString(e)}");
+    }
 
     /// <summary>
     /// Older API deployments may not expose this entity yet. Tries alternate routes, then returns an empty list on 404 so Attendance still loads.
@@ -96,17 +119,50 @@ public sealed class AdminDataApiClient(EliteApiClient? apiClient = null)
         var ordersTask = GetOrdersAsync(cancellationToken);
         await Task.WhenAll(tablesTask, productsTask, reservationsTask, ordersTask).ConfigureAwait(false);
 
+        var productsList = (await productsTask.ConfigureAwait(false)).ToList();
+        await EnrichProductsWithMenuAvailabilityAsync(productsList, cancellationToken).ConfigureAwait(false);
+
         return (
             await tablesTask.ConfigureAwait(false),
-            await productsTask.ConfigureAwait(false),
+            productsList,
             await reservationsTask.ConfigureAwait(false),
             await ordersTask.ConfigureAwait(false));
     }
 
-    private async Task<IReadOnlyList<T>> GetListAsync<T>(string entityName, CancellationToken cancellationToken)
+    private async Task EnrichProductsWithMenuAvailabilityAsync(
+        List<Product> products,
+        CancellationToken cancellationToken)
     {
+        if (products.Count == 0)
+            return;
+        try
+        {
+            var map = await _apiClient.PostAsync<AdminProductIdsRequest, Dictionary<int, bool>>(
+                    "api/admin/data/inventory/menu-product-availability",
+                    new AdminProductIdsRequest(products.Select(p => p.Id).ToArray()),
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (map is null)
+                return;
+            foreach (var p in products)
+            {
+                if (map.TryGetValue(p.Id, out var ok))
+                    p.IsAvailable = ok;
+            }
+        }
+        catch (HttpRequestException)
+        {
+            // Older API hosts without this route — leave IsAvailable at default true.
+        }
+    }
+
+    private async Task<IReadOnlyList<T>> GetListAsync<T>(string entityName, CancellationToken cancellationToken, string? query = null)
+    {
+        var path = string.IsNullOrEmpty(query)
+            ? $"api/admin/data/{entityName}"
+            : $"api/admin/data/{entityName}?{query}";
         var response = await _apiClient.GetAsync<AdminEntityListResponse>(
-            $"api/admin/data/{entityName}",
+            path,
             cancellationToken);
 
         return response?.Items

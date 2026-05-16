@@ -798,7 +798,11 @@ public class AttendanceViewModel : AdminBaseViewModel
             {
                 var workedDuration = toSave.ClockOutTime.Value - toSave.ClockInTime.Value;
                 var workedHours = Math.Max(0m, (decimal)workedDuration.TotalHours);
-                var pendingSalaryAmount = Math.Round(employee.HourlyRate * workedHours, 2);
+                var (monthSchedHours, _, _) =
+                    PayrollCalculator.GetHourlyGrossForPayrollMonth(employee, today.Year, today.Month);
+                var pendingSalaryAmount = monthSchedHours > 0.0001m && employee.MonthlySalaryUSD > 0m
+                    ? Math.Round(employee.MonthlySalaryUSD * (workedHours / monthSchedHours), 2)
+                    : 0m;
                 var pendingSalaryReference = BuildPendingSalaryReference(employee, today);
 
                 var transactions = await _data.GetMoneyTransactionsAsync().ConfigureAwait(true);

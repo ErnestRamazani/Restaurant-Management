@@ -10,7 +10,9 @@ import { ConfirmScreen } from './components/screens/ConfirmScreen'
 import { HeroScreen } from './components/screens/HeroScreen'
 import { MenuScreen } from './components/screens/MenuScreen'
 import { ProductSheet } from './components/screens/ProductSheet'
-import { OnlineOrderApp } from './components/online/OnlineOrderApp'
+import { OnlineOrderMenuScreen } from './components/online/OnlineOrderApp'
+import { OnlineOrderCheckoutScreen } from './components/online/OnlineOrderCheckoutScreen'
+import { OnlineOrderLayout } from './components/online/OnlineOrderLayout'
 import { ReservationFloorScreen } from './components/screens/ReservationFloorScreen'
 import { ReservationScreen } from './components/screens/ReservationScreen'
 import { ConfirmDialog } from './components/ui/ConfirmDialog'
@@ -447,7 +449,10 @@ export default function App() {
         <Route path="/" element={<CustomerMenuApp />} />
         <Route path="/menu/*" element={<CustomerMenuApp />} />
         <Route path="/order/*" element={<CustomerMenuApp />} />
-        <Route path="/order-online" element={<OnlineOrderApp />} />
+        <Route path="/order-online" element={<OnlineOrderLayout />}>
+          <Route index element={<OnlineOrderMenuScreen />} />
+          <Route path="checkout" element={<OnlineOrderCheckoutScreen />} />
+        </Route>
         <Route path="/staff" element={<HubHome />} />
         <Route path="/staff/server" element={<PortalRedirect path="/server/index.html" />} />
         <Route path="/staff/cashier" element={<PortalRedirect path="/cashier/index.html" />} />

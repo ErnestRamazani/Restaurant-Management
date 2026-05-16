@@ -7,9 +7,7 @@ public static class AdminOrdersViewMapper
 {
     public static OrderEntry MapOrder(OrderRecord order, bool isPast, bool showAdminAdvance, bool canViewTicket)
     {
-        var lineSubtotal = order.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
-        var totals = OrderTotalsHelper.ComputeTotals(lineSubtotal, order.DiscountMode, order.DiscountValue);
-        var total = totals.GrandTotal;
+        var total = OrderTotalsHelper.ComputeOrderGrandTotalUsd(order);
         var items = string.Join(", ",
             order.Items.Select(i => $"{i.Product?.Name ?? "Unknown"} x{i.Quantity}"));
 
@@ -17,6 +15,7 @@ public static class AdminOrdersViewMapper
         {
             Id = order.Id,
             OrderId = string.IsNullOrWhiteSpace(order.UniqueId) ? $"#{order.Id:000}" : order.UniqueId,
+            ConfirmationCode = (order.ConfirmationCode ?? string.Empty).Trim(),
             TableNumber = OrderRecordUiLabels.TableCaption(order),
             ServerName = OrderRecordUiLabels.ServerCaption(order),
             Items = items,

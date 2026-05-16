@@ -37,6 +37,8 @@ function Particles() {
  * @param {string} [props.secondaryCtaLabel]
  * @param {'emerald' | 'gold'} [props.accent]
  * @param {{ label: string; value: string }[]} [props.details]
+ * @param {string} [props.confirmationCode]
+ * @param {import('react').ReactNode} [props.receipt]
  */
 export function ConfirmScreen({
   label,
@@ -49,6 +51,8 @@ export function ConfirmScreen({
   secondaryCtaLabel,
   accent = 'emerald',
   details,
+  confirmationCode,
+  receipt,
 }) {
   const headingText = heading ?? 'We received it'
   const primaryLabel = primaryCtaLabel ?? 'Order more'
@@ -61,7 +65,7 @@ export function ConfirmScreen({
 
   return (
     <motion.div
-      className="relative flex min-h-[100svh] flex-col overflow-hidden bg-midnight"
+      className="relative flex min-h-[100svh] flex-col overflow-x-hidden bg-midnight"
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, y: -16 }}
@@ -71,7 +75,7 @@ export function ConfirmScreen({
       <div className="pointer-events-none absolute -right-1/4 bottom-0 h-[35vw] w-[35vw] rounded-full bg-[rgba(16,185,129,0.04)] blur-3xl" />
       <Particles />
 
-      <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-8 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[12vh]">
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col items-center overflow-y-auto overscroll-y-contain px-8 pb-[max(2rem,env(safe-area-inset-bottom))] pt-10">
         <motion.div
           initial={{ scale: 0.6, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -85,6 +89,20 @@ export function ConfirmScreen({
         <p className="mt-2 max-w-[300px] text-center font-body text-sm leading-relaxed text-[var(--text-muted)]">
           {message || 'The kitchen and your server can see this order as a request.'}
         </p>
+        {confirmationCode ? (
+          <div className="mt-6 w-full max-w-[320px] rounded-2xl border border-gold/30 bg-[var(--gold-dim)] px-6 py-5 text-center shadow-[0_12px_40px_rgba(0,0,0,0.2)]">
+            <p className="font-body text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-gold/85">
+              Your confirmation code
+            </p>
+            <p className="mt-3 font-mono text-[2.5rem] font-bold leading-none tracking-[0.2em] text-champagne">
+              {confirmationCode}
+            </p>
+            <p className="mt-3 font-body text-xs leading-relaxed text-champagne/55">
+              Save or screenshot this code. You will need it at pickup or for delivery.
+            </p>
+          </div>
+        ) : null}
+        {receipt ? <div className="mt-6 flex w-full justify-center">{receipt}</div> : null}
         {details != null && details.length > 0 ? (
           <div className="mt-6 w-full max-w-[320px] space-y-3">
             {details.map((row) => (

@@ -6,7 +6,7 @@ public sealed class MoneyDashboardSnapshotData
     public string TodayExpensesText { get; init; } = "$ 0.00 | FC 0";
     public string TodayNetProfitText { get; init; } = "$ 0.00 | FC 0";
     public string TodayNetProfitColor { get; init; } = "#2ECC71";
-    public string SelectedPeriodLabel { get; init; } = "This Week";
+    public string SelectedPeriodLabel { get; init; } = "This Day";
     public DateTime ReportStartDate { get; init; } = DateTime.Today;
     public DateTime ReportEndDate { get; init; } = DateTime.Today;
     public List<MoneyLedgerRowData> LedgerItems { get; init; } = [];

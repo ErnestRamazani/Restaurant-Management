@@ -19,8 +19,14 @@ export function useOnlineOrderCart(config) {
     linesRef.current = lines
   }, [lines])
 
-  const taxPct = config?.taxPercent ?? defaultConfig.taxPercent
-  const servicePct = config?.servicePercent ?? defaultConfig.servicePercent
+  const taxPct =
+    Number(config?.taxPercent ?? config?.TaxPercent) > 0
+      ? Number(config?.taxPercent ?? config?.TaxPercent)
+      : defaultConfig.taxPercent
+  const servicePct =
+    Number(config?.servicePercent ?? config?.ServicePercent) > 0
+      ? Number(config?.servicePercent ?? config?.ServicePercent)
+      : defaultConfig.servicePercent
 
   const addItem = useCallback((product) => {
     if (!productIsAvailable(product)) return

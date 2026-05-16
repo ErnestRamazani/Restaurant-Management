@@ -135,6 +135,45 @@ public sealed class EliteApiClient
     }
 
     /// <summary>
+    /// POST where <c>400 Bad Request</c> may return the same JSON shape as success (e.g. validation / insufficient inventory).
+    /// Other non-success responses use <see cref="EnsureSuccessAsync"/> (clears token on 401, throws with body text).
+    /// </summary>
+    public async Task<TResponse?> PostAsyncOrBadRequestAsync<TRequest, TResponse>(
+        string path,
+        TRequest payload,
+        CancellationToken cancellationToken = default)
+    {
+        using var response = await SendWithRetryAsync(
+                () =>
+                {
+                    var r = new HttpRequestMessage(HttpMethod.Post, BuildRequestUri(path))
+                    {
+                        Content = JsonContent.Create(payload, options: JsonOptions)
+                    };
+                    ApplyBearer(r, _bearerToken);
+                    return r;
+                },
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (response.StatusCode == HttpStatusCode.BadRequest)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                return JsonSerializer.Deserialize<TResponse>(body, JsonOptions);
+            }
+            catch (JsonException)
+            {
+                throw new HttpRequestException($"API request failed ({(int)response.StatusCode}): {body}");
+            }
+        }
+
+        await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+        return await response.Content.ReadFromJsonAsync<TResponse>(JsonOptions, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// POST without <c>Authorization</c>. Required for <c>api/auth/login</c>: a stale Bearer from a prior admin session
     /// can make JWT middleware reject the request before it reaches <c>[AllowAnonymous]</c>, so staff sign-in would fail while web works.
     /// </summary>

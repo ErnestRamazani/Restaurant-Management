@@ -27,8 +27,11 @@
                         <Run Text=" / Bar" Foreground="{StaticResource GoldAccentBrush}"/>
                         <Run Text=" Queue" Foreground="{StaticResource TextPrimaryBrush}"/>
                     </TextBlock>
-                    <TextBlock Text="Confirm Waiting tickets into In Kitchen, mark Ready for pickup, then track Picked up (ready for servers). Select any ticket to review lines, notes, and station."
+                    <TextBlock Text="Incoming shows Waiting plus online/cashier pending tickets. Release pending orders to prep, receive Waiting into In Kitchen, then mark Ready. Select any ticket for full detail."
                                Style="{StaticResource BodyText}" FontSize="13" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                    <TextBlock Text="{Binding LoadStatusMessage, Mode=OneWay}"
+                               Foreground="#FFB74D" FontSize="12" Margin="0,8,0,0" TextWrapping="Wrap"
+                               Visibility="{Binding HasLoadStatusMessage, Converter={StaticResource BoolToVisibilityConverter}, Mode=OneWay}"/>
                 </StackPanel>
                 <Button Grid.Column="1" VerticalAlignment="Top" Content="Refresh"
                         Command="{Binding RefreshCommand}" Style="{StaticResource SapphireButton}" Width="100"/>
@@ -63,7 +66,7 @@
                                 </LinearGradientBrush>
                             </Border.Background>
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Waiting (from cashier)" Foreground="{StaticResource TextPrimaryBrush}"
+                                <TextBlock Text="Incoming" Foreground="{StaticResource TextPrimaryBrush}"
                                            FontWeight="SemiBold" FontSize="14"/>
                                 <Border Margin="10,0,0,0" Background="{StaticResource StatBlueBrush}" CornerRadius="8" Padding="8,2">
                                     <TextBlock Text="{Binding IncomingOrders.Count}" Foreground="White" FontSize="12" FontWeight="SemiBold"/>
@@ -105,6 +108,10 @@
                                 <DataTemplate>
                                     <Border CornerRadius="10" Padding="12,10" Background="#FF1A1A2E">
                                         <StackPanel>
+                                            <Border CornerRadius="8" Padding="6,4" Margin="0,0,0,8" HorizontalAlignment="Left" Background="#332196F3">
+                                                <TextBlock Text="{Binding FulfillmentHeadline}" Foreground="{StaticResource StatBlueBrush}"
+                                                           FontSize="10" FontWeight="Bold"/>
+                                            </Border>
                                             <TextBlock Text="{Binding OrderId}" Foreground="{StaticResource GoldAccentBrush}" FontWeight="SemiBold"/>
                                             <TextBlock Text="{Binding TableNumber}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,4,0,0"/>
                                             <TextBlock Text="{Binding ServerName, StringFormat=Server: {0}}" Foreground="{StaticResource StatBlueBrush}" FontSize="11" Margin="0,2,0,0"/>
@@ -114,10 +121,34 @@
                                                     Command="{Binding DataContext.ViewFullOrderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
                                                     Style="{StaticResource SapphireButton}"/>
+                                            <Button Content="Release to kitchen"
+                                                    Command="{Binding DataContext.ReleaseToKitchenCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}">
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource GoldPrimaryButton}">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding ShowReleaseToKitchen}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
                                             <Button Content="Receive → In Kitchen"
                                                     Command="{Binding DataContext.StartPreparingCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                    CommandParameter="{Binding}"
-                                                    Style="{StaticResource GoldPrimaryButton}"/>
+                                                    CommandParameter="{Binding}">
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource GoldPrimaryButton}">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding ShowReceiveInKitchen}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
                                         </StackPanel>
                                     </Border>
                                 </DataTemplate>
@@ -193,8 +224,18 @@
                                                     Style="{StaticResource SapphireButton}"/>
                                             <Button Content="Ready for pickup"
                                                     Command="{Binding DataContext.MarkReadyForPickupCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                    CommandParameter="{Binding}"
-                                                    Style="{StaticResource GoldPrimaryButton}"/>
+                                                    CommandParameter="{Binding}">
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource GoldPrimaryButton}">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding ShowMarkReadyForPickup}" Value="True">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
                                         </StackPanel>
                                     </Border>
                                 </DataTemplate>
@@ -288,6 +329,36 @@
                                 <TextBlock Text="{Binding DetailServer, StringFormat=Server: {0}}" Foreground="{StaticResource StatBlueBrush}" FontSize="12" Margin="0,4,0,0"/>
                                 <TextBlock Text="{Binding DetailTime}" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,2,0,0"/>
                                 <TextBlock Text="{Binding DetailStatus, StringFormat=Status: {0}}" Foreground="{StaticResource StatOrangeBrush}" FontSize="12" Margin="0,8,0,0"/>
+                                <TextBlock Text="{Binding DetailTotal, StringFormat=Total: {0}}" Foreground="{StaticResource GoldAccentBrush}" FontSize="13" Margin="0,4,0,0"/>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                                    <Button Content="Release to kitchen"
+                                            Command="{Binding DetailReleaseToKitchenCommand}"
+                                            Margin="0,0,8,0"
+                                            Visibility="{Binding ShowDetailReleaseToKitchen, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource GoldPrimaryButton}"/>
+                                        </Button.Style>
+                                    </Button>
+                                    <Button Content="Receive → In Kitchen"
+                                            Command="{Binding DetailReceiveInKitchenCommand}"
+                                            Margin="0,0,8,0"
+                                            Visibility="{Binding ShowDetailReceiveInKitchen, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource GoldPrimaryButton}"/>
+                                        </Button.Style>
+                                    </Button>
+                                    <Button Content="Ready for pickup"
+                                            Command="{Binding DetailMarkReadyCommand}"
+                                            Visibility="{Binding ShowDetailMarkReady, Converter={StaticResource BoolToVisibilityConverter}}">
+                                        <Button.Style>
+                                            <Style TargetType="Button" BasedOn="{StaticResource GoldPrimaryButton}"/>
+                                        </Button.Style>
+                                    </Button>
+                                </StackPanel>
+                                <TextBlock Text="{Binding DetailActionHint}"
+                                           Foreground="{StaticResource TextMutedBrush}" FontSize="11" TextWrapping="Wrap" Margin="0,10,0,0"
+                                           Visibility="{Binding HasDetailActionHint, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
                                 <TextBlock Text="CUSTOMER NOTES" Style="{StaticResource HeadingSmall}" Margin="0,16,0,6"/>
                                 <TextBlock Text="{Binding DetailCustomerNotes}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap"/>

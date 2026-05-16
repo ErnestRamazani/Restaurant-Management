@@ -66,6 +66,8 @@ public static class MoneyDashboardSnapshotBuilder
                 t.Type,
                 t.Category,
                 t.Amount,
+                t.AmountUsd,
+                t.AmountFc,
                 t.CurrencyCode,
                 t.Justification,
                 t.IsFixed
@@ -91,8 +93,12 @@ public static class MoneyDashboardSnapshotBuilder
                 Justification = string.IsNullOrWhiteSpace(row.Justification)
                     ? (row.IsFixed ? "Fixed scheduled transaction" : "No justification")
                     : row.Justification,
-                AmountText =
-                    $"{(isRevenue ? "+" : "-")}{CurrencyHelper.FormatAmount(row.Amount, MoneyReportingHelpers.NormalizeCurrencyCode(row.CurrencyCode))}",
+                AmountText = MoneyReportingHelpers.FormatLedgerAmount(
+                    row.Amount,
+                    row.AmountUsd,
+                    row.AmountFc,
+                    row.CurrencyCode,
+                    isRevenue),
                 AmountColor = isRevenue ? "#2ECC71" : "#DC143C"
             };
         }).ToList();
@@ -213,7 +219,7 @@ public static class MoneyDashboardSnapshotBuilder
     private static (DateTime FromDate, DateTime ToDate, DateTime ToExclusive, string Label) ResolveTodayRange(DateTime today)
     {
         var d = today.Date;
-        return (d, d, d.AddDays(1), "Today");
+        return (d, d, d.AddDays(1), "This Day");
     }
 
     private static (DateTime FromDate, DateTime ToDate, DateTime ToExclusive, string Label) ResolveWeekRange(DateTime today)

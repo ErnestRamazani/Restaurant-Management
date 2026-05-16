@@ -1,3 +1,4 @@
+using EliteRestaurant.Contracts.Admin;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Orders;
 using EliteRestaurant.Core.Utils;
@@ -58,14 +59,17 @@ public sealed class OrderSubmissionService
             new CreateOrderOpenCheckInfo(open?.Id, code, open?.Status ?? string.Empty));
     }
 
-    public CreateOrderAppendResult AppendToExisting(CreateOrderSubmitSnapshot snap, int openOrderId)
+    public async Task<CreateOrderAppendResult> AppendToExistingAsync(
+        CreateOrderSubmitSnapshot snap,
+        int openOrderId,
+        CancellationToken cancellationToken = default)
     {
         try
         {
-            var response = _cloudOrders.CreateOrderAsync(snap, appendToOpenCheck: true, openOrderId)
-                .GetAwaiter()
-                .GetResult();
-            return new CreateOrderAppendResult(response.Success, response.Title, response.Message);
+            var response = await _cloudOrders
+                .CreateOrderAsync(snap, appendToOpenCheck: true, openOrderId, cancellationToken)
+                .ConfigureAwait(false);
+            return MapCreateOrderResponseToAppendResult(response);
         }
         catch (Exception ex)
         {
@@ -73,18 +77,52 @@ public sealed class OrderSubmissionService
         }
     }
 
-    public CreateOrderSaveResult SaveNew(CreateOrderSubmitSnapshot snap)
+    public async Task<CreateOrderSaveResult> SaveNewAsync(
+        CreateOrderSubmitSnapshot snap,
+        CancellationToken cancellationToken = default)
     {
         try
         {
-            var response = _cloudOrders.CreateOrderAsync(snap, appendToOpenCheck: false, openOrderId: null)
-                .GetAwaiter()
-                .GetResult();
-            return new CreateOrderSaveResult(response.Success, response.Title, response.Message);
+            var response = await _cloudOrders
+                .CreateOrderAsync(snap, appendToOpenCheck: false, openOrderId: null, cancellationToken)
+                .ConfigureAwait(false);
+            return MapCreateOrderResponseToSaveResult(response);
         }
         catch (Exception ex)
         {
             return new CreateOrderSaveResult(false, "Cloud API", ex.GetBaseException().Message);
         }
+    }
+
+    private static CreateOrderAppendResult MapCreateOrderResponseToAppendResult(AdminCreateOrderResponse response)
+    {
+        if (response.Success)
+            return new CreateOrderAppendResult(true, response.Title, response.Message);
+
+        var (caption, message) = FriendlyCreateOrderFailure(response);
+        return new CreateOrderAppendResult(false, caption, message);
+    }
+
+    private static CreateOrderSaveResult MapCreateOrderResponseToSaveResult(AdminCreateOrderResponse response)
+    {
+        if (response.Success)
+            return new CreateOrderSaveResult(true, response.Title, response.Message);
+
+        var (caption, message) = FriendlyCreateOrderFailure(response);
+        return new CreateOrderSaveResult(false, caption, message);
+    }
+
+    /// <summary>Turns API titles/messages into short dialog captions and readable body text (no raw JSON).</summary>
+    private static (string Caption, string Message) FriendlyCreateOrderFailure(AdminCreateOrderResponse response)
+    {
+        if (string.Equals(response.Title, "Insufficient Inventory", StringComparison.OrdinalIgnoreCase))
+        {
+            var body = (response.Message ?? string.Empty).Trim();
+            var intro = "This order cannot be created until inventory is updated or the order is changed.";
+            var message = string.IsNullOrEmpty(body) ? intro : $"{intro}\n\n{body}";
+            return ("Not enough inventory", message);
+        }
+
+        return (response.Title, response.Message);
     }
 }

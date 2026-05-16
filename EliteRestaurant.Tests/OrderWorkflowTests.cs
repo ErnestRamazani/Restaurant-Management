@@ -49,4 +49,22 @@ public class OrderWorkflowTests
     [Fact]
     public void OccupiesTable_IncludesPendingApproval() =>
         Assert.True(OrderWorkflow.OccupiesTable(OrderWorkflow.PendingApproval));
+
+    [Theory]
+    [InlineData("Waiting", true)]
+    [InlineData("Pending approval", true)]
+    [InlineData("PendingApproval", true)]
+    [InlineData("Pending cashier", true)]
+    [InlineData("In Kitchen", false)]
+    [InlineData("Ready", false)]
+    public void IsKitchenIncomingColumn_MatchesWebKds(string status, bool expected) =>
+        Assert.Equal(expected, OrderWorkflow.IsKitchenIncomingColumn(status));
+
+    [Theory]
+    [InlineData("In Kitchen", true)]
+    [InlineData("InKitchen", true)]
+    [InlineData("Waiting", false)]
+    [InlineData("Ready", false)]
+    public void IsKitchenPreparingColumn_Normalizes(string status, bool expected) =>
+        Assert.Equal(expected, OrderWorkflow.IsKitchenPreparingColumn(status));
 }

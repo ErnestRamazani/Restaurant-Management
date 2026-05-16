@@ -95,7 +95,8 @@ public abstract class AdminBaseViewModel : BaseViewModel
 
     public bool SidebarAvatarHasPhoto => _sidebarAvatarImage is not null;
 
-    private static ImageSource? TryLoadProfileImage(string? path)
+    /// <summary>Loads a bitmap from a local file path (absolute or relative to the process directory).</summary>
+    protected static ImageSource? TryLoadBitmapFromFilePath(string? path)
     {
         if (string.IsNullOrWhiteSpace(path))
             return null;
@@ -143,8 +144,8 @@ public abstract class AdminBaseViewModel : BaseViewModel
     protected AdminBaseViewModel(Action<BaseViewModel> navigate)
     {
         LoadBusinessProfileSettings();
-        _sidebarAvatarImage = TryLoadProfileImage(AppSession.StaffEmployeeProfileImagePath)
-            ?? TryLoadProfileImage(AppSession.AdminLoginProfileImagePath);
+        _sidebarAvatarImage = TryLoadBitmapFromFilePath(AppSession.StaffEmployeeProfileImagePath)
+            ?? TryLoadBitmapFromFilePath(AppSession.AdminLoginProfileImagePath);
         NavigateAction = navigate;
         NavigateToDashboardCommand = new RelayCommand(_ => navigate(new AdminDashboardViewModel(navigate)));
         NavigateToEmployeesCommand = new RelayCommand(_ => navigate(new EmployeesViewModel(navigate)));
@@ -188,6 +189,6 @@ public abstract class AdminBaseViewModel : BaseViewModel
         var settings = SettingsManager.Load().BusinessProfile;
         _businessName = string.IsNullOrWhiteSpace(settings.RestaurantName) ? "EliteResto" : settings.RestaurantName.Trim();
         _businessTagline = "PRO";
-        _businessLogoImage = TryLoadProfileImage(settings.LogoPath);
+        _businessLogoImage = TryLoadBitmapFromFilePath(settings.LogoPath);
     }
 }

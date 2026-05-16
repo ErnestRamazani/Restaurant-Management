@@ -3,6 +3,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Input;
 using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Orders;
 using EliteRestaurant.Core.Utils;
 using EliteRestaurantPro.ApiClients;
 using EliteRestaurantPro.Services;
@@ -20,12 +21,19 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
 {
     private readonly AdminDataApiClient _data = new();
     private readonly AdminOrderCloudOperations _cloudOps = new();
+    private readonly KitchenQueueHubClient _kitchenHub = new();
     private readonly List<OrderRecord> _ordersCache = [];
     private OrderEntry? _selectedIncoming;
     private OrderEntry? _selectedPreparing;
     private OrderEntry? _selectedReady;
     private bool _isLoading;
     private bool _hasDetail;
+    private string _loadStatusMessage = string.Empty;
+    private OrderEntry? _selectedKitchenEntry;
+    private bool _showDetailReleaseToKitchen;
+    private bool _showDetailReceiveInKitchen;
+    private bool _showDetailMarkReady;
+    private string _detailActionHint = string.Empty;
 
     public override string ActivePage => "KitchenQueue";
 
@@ -112,16 +120,64 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
         private set => SetField(ref _isLoading, value);
     }
 
+    public string LoadStatusMessage
+    {
+        get => _loadStatusMessage;
+        private set
+        {
+            if (!SetField(ref _loadStatusMessage, value))
+                return;
+            OnPropertyChanged(nameof(HasLoadStatusMessage));
+        }
+    }
+
+    public bool HasLoadStatusMessage => !string.IsNullOrWhiteSpace(LoadStatusMessage);
+
+    public bool ShowDetailReleaseToKitchen
+    {
+        get => _showDetailReleaseToKitchen;
+        private set => SetField(ref _showDetailReleaseToKitchen, value);
+    }
+
+    public bool ShowDetailReceiveInKitchen
+    {
+        get => _showDetailReceiveInKitchen;
+        private set => SetField(ref _showDetailReceiveInKitchen, value);
+    }
+
+    public bool ShowDetailMarkReady
+    {
+        get => _showDetailMarkReady;
+        private set => SetField(ref _showDetailMarkReady, value);
+    }
+
+    public string DetailActionHint
+    {
+        get => _detailActionHint;
+        private set => SetField(ref _detailActionHint, value);
+    }
+
+    public bool HasDetailActionHint => !string.IsNullOrWhiteSpace(DetailActionHint);
+
     public OrderDetailPanelViewModel OrderDetail { get; } = new();
 
     public ICommand RefreshCommand { get; }
+    public ICommand ReleaseToKitchenCommand { get; }
     public ICommand StartPreparingCommand { get; }
     public ICommand MarkReadyForPickupCommand { get; }
+    public ICommand DetailReleaseToKitchenCommand { get; }
+    public ICommand DetailReceiveInKitchenCommand { get; }
+    public ICommand DetailMarkReadyCommand { get; }
     public ICommand ViewFullOrderCommand { get; }
 
     public KitchenOrdersViewModel(Action<BaseViewModel> navigate) : base(navigate)
     {
         RefreshCommand = new RelayCommand(_ => _ = LoadAsync());
+        ReleaseToKitchenCommand = new RelayCommand(p =>
+        {
+            if (p is OrderEntry e)
+                _ = ReleaseToKitchenAsync(e);
+        });
         StartPreparingCommand = new RelayCommand(p =>
         {
             if (p is OrderEntry e)
@@ -132,12 +188,47 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
             if (p is OrderEntry e)
                 _ = MarkReadyForPickupAsync(e);
         });
+        DetailReleaseToKitchenCommand = new RelayCommand(_ =>
+        {
+            if (_selectedKitchenEntry is not null)
+                _ = ReleaseToKitchenAsync(_selectedKitchenEntry);
+        }, _ => _selectedKitchenEntry?.ShowReleaseToKitchen == true);
+        DetailReceiveInKitchenCommand = new RelayCommand(_ =>
+        {
+            if (_selectedKitchenEntry is not null)
+                _ = StartPreparingAsync(_selectedKitchenEntry);
+        }, _ => _selectedKitchenEntry?.ShowReceiveInKitchen == true);
+        DetailMarkReadyCommand = new RelayCommand(_ =>
+        {
+            if (_selectedKitchenEntry is not null)
+                _ = MarkReadyForPickupAsync(_selectedKitchenEntry);
+        }, _ => _selectedKitchenEntry?.ShowMarkReadyForPickup == true);
         ViewFullOrderCommand = new RelayCommand(p =>
         {
             if (p is OrderEntry e)
                 OrderDetail.Load(e.Id, showPricing: false);
         });
-        _ = LoadAsync();
+        _kitchenHub.QueueChanged += OnKitchenHubQueueChanged;
+        _ = StartKitchenHubAndLoadAsync();
+    }
+
+    private void OnKitchenHubQueueChanged()
+    {
+        Application.Current?.Dispatcher.BeginInvoke(() => _ = LoadAsync());
+    }
+
+    private async Task StartKitchenHubAndLoadAsync()
+    {
+        try
+        {
+            await _kitchenHub.StartAsync().ConfigureAwait(false);
+        }
+        catch
+        {
+            /* Live refresh is optional when hub is unreachable. */
+        }
+
+        await Application.Current.Dispatcher.InvokeAsync(() => _ = LoadAsync());
     }
 
     private async Task LoadAsync()
@@ -145,9 +236,15 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
         if (IsLoading)
             return;
 
-        IsLoading = true;
+        await Application.Current.Dispatcher.InvokeAsync(() =>
+        {
+            IsLoading = true;
+            LoadStatusMessage = string.Empty;
+        });
+
         try
         {
+            _data.ReloadFromSettings();
             var ordersTask = _data.GetOrdersAsync();
             var productsTask = _data.GetProductsAsync();
             var tablesTask = _data.GetTablesAsync();
@@ -164,76 +261,93 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
                     o.Table = tbl;
                 if (o.Server is null && o.ServerId is int sid && empById.TryGetValue(sid, out var emp))
                     o.Server = emp;
-                foreach (var i in o.Items)
+                foreach (var i in o.Items ?? [])
                 {
                     if (i.Product is null && productById.TryGetValue(i.ProductId, out var p))
                         i.Product = p;
                 }
             }
 
-            _ordersCache.Clear();
-            _ordersCache.AddRange(orders);
-
             var incoming = orders
-                .Where(o => o.Status == "Waiting")
+                .Where(o => OrderWorkflow.IsKitchenIncomingColumn(o.Status))
                 .OrderBy(o => o.CreatedAt)
                 .Select(MapKitchenOrder)
                 .ToList();
 
             var preparing = orders
-                .Where(o => o.Status == "In Kitchen")
+                .Where(o => OrderWorkflow.IsKitchenPreparingColumn(o.Status))
                 .OrderBy(o => o.CreatedAt)
                 .Select(MapKitchenOrder)
                 .ToList();
 
             var pickedUp = orders
-                .Where(o => o.Status == "Ready")
+                .Where(o => OrderWorkflow.IsKitchenReadyColumn(o.Status))
                 .OrderBy(o => o.CreatedAt)
                 .Select(MapKitchenOrder)
                 .ToList();
 
-            IncomingOrders.Clear();
-            foreach (var o in incoming)
-                IncomingOrders.Add(o);
-
-            PreparingOrders.Clear();
-            foreach (var o in preparing)
-                PreparingOrders.Add(o);
-
-            ReadyPickupOrders.Clear();
-            foreach (var o in pickedUp)
-                ReadyPickupOrders.Add(o);
-
-            var keepIn = _selectedIncoming is { Id: var inId } &&
-                         incoming.Any(x => x.Id == inId);
-            var keepPr = _selectedPreparing is { Id: var prId } &&
-                         preparing.Any(x => x.Id == prId);
-            var keepRd = _selectedReady is { Id: var rdId } &&
-                         pickedUp.Any(x => x.Id == rdId);
-            if (!keepIn)
+            await Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                _selectedIncoming = null;
-                OnPropertyChanged(nameof(SelectedIncoming));
-            }
+                _ordersCache.Clear();
+                _ordersCache.AddRange(orders);
 
-            if (!keepPr)
+                IncomingOrders.Clear();
+                foreach (var o in incoming)
+                    IncomingOrders.Add(o);
+
+                PreparingOrders.Clear();
+                foreach (var o in preparing)
+                    PreparingOrders.Add(o);
+
+                ReadyPickupOrders.Clear();
+                foreach (var o in pickedUp)
+                    ReadyPickupOrders.Add(o);
+
+                var keepIn = _selectedIncoming is { Id: var inId } &&
+                             incoming.Any(x => x.Id == inId);
+                var keepPr = _selectedPreparing is { Id: var prId } &&
+                             preparing.Any(x => x.Id == prId);
+                var keepRd = _selectedReady is { Id: var rdId } &&
+                             pickedUp.Any(x => x.Id == rdId);
+                if (!keepIn)
+                {
+                    _selectedIncoming = null;
+                    OnPropertyChanged(nameof(SelectedIncoming));
+                }
+
+                if (!keepPr)
+                {
+                    _selectedPreparing = null;
+                    OnPropertyChanged(nameof(SelectedPreparing));
+                }
+
+                if (!keepRd)
+                {
+                    _selectedReady = null;
+                    OnPropertyChanged(nameof(SelectedReady));
+                }
+
+                LoadStatusMessage =
+                    orders.Count == 0
+                        ? "No orders returned from the cloud API. Check cloud URL and sign-in, then tap Refresh."
+                        : incoming.Count + preparing.Count + pickedUp.Count == 0
+                            ? $"Loaded {orders.Count} order(s) from cloud — none are in the kitchen queue yet."
+                            : string.Empty;
+
+                LoadDetailForSelection();
+                RefreshReadyPickupBanner();
+            });
+        }
+        catch (Exception ex)
+        {
+            await Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                _selectedPreparing = null;
-                OnPropertyChanged(nameof(SelectedPreparing));
-            }
-
-            if (!keepRd)
-            {
-                _selectedReady = null;
-                OnPropertyChanged(nameof(SelectedReady));
-            }
-
-            LoadDetailForSelection();
-            RefreshReadyPickupBanner();
+                LoadStatusMessage = $"Could not load kitchen tickets: {ex.Message}";
+            });
         }
         finally
         {
-            IsLoading = false;
+            await Application.Current.Dispatcher.InvokeAsync(() => IsLoading = false);
         }
     }
 
@@ -254,10 +368,8 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
         }
 
         DetailOrderCode = string.IsNullOrWhiteSpace(order.UniqueId) ? $"#{order.Id:000}" : order.UniqueId;
-        DetailTable = string.IsNullOrWhiteSpace(order.TableCode)
-            ? $"Table {order.Table?.TableNumber ?? 0}"
-            : $"{order.TableCode} · {order.TableName}";
-        DetailServer = string.IsNullOrWhiteSpace(order.ServerName) ? "—" : order.ServerName;
+        DetailTable = OrderRecordUiLabels.TableCaption(order);
+        DetailServer = OrderRecordUiLabels.ServerCaption(order);
         DetailStatus = order.Status;
         DetailTime = order.CreatedAt.ToString("MMM d, yyyy · HH:mm");
         var lineSubtotal = order.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
@@ -277,6 +389,9 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
             });
         }
 
+        _selectedKitchenEntry = entry;
+        ApplyDetailKitchenActions(entry, order.Status);
+
         HasDetail = true;
         OnPropertyChanged(nameof(DetailOrderCode));
         OnPropertyChanged(nameof(DetailTable));
@@ -288,8 +403,38 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
         OnPropertyChanged(nameof(DetailAllergyNotes));
     }
 
+    private void ApplyDetailKitchenActions(OrderEntry entry, string status)
+    {
+        var key = OrderWorkflow.KitchenStatusKey(status);
+        ShowDetailReleaseToKitchen = entry.ShowReleaseToKitchen;
+        ShowDetailReceiveInKitchen = entry.ShowReceiveInKitchen;
+        ShowDetailMarkReady = entry.ShowMarkReadyForPickup;
+
+        DetailActionHint = key switch
+        {
+            "pendingCashier" =>
+                "Ticket is still with cashier: release to send to prep (inventory deducted, status becomes Waiting).",
+            "pendingApproval" =>
+                "Guest online order: release to kitchen to start prep (inventory deducted, status becomes Waiting).",
+            "ready" =>
+                "This ticket is ready for pickup. Servers or cashier can complete it from their screens.",
+            "served" or "other" =>
+                "No kitchen action for this status. Refresh if the ticket changed.",
+            _ => string.Empty
+        };
+
+        OnPropertyChanged(nameof(HasDetailActionHint));
+    }
+
     private void ClearDetail()
     {
+        _selectedKitchenEntry = null;
+        ShowDetailReleaseToKitchen = false;
+        ShowDetailReceiveInKitchen = false;
+        ShowDetailMarkReady = false;
+        DetailActionHint = string.Empty;
+        OnPropertyChanged(nameof(HasDetailActionHint));
+
         DetailLines.Clear();
         DetailOrderCode = string.Empty;
         DetailTable = string.Empty;
@@ -310,6 +455,37 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
         OnPropertyChanged(nameof(DetailAllergyNotes));
     }
 
+    private async Task ReleaseToKitchenAsync(OrderEntry entry)
+    {
+        var order = _ordersCache.FirstOrDefault(o => o.Id == entry.Id);
+        if (order is null || !OrderWorkflow.AwaitsCashierOrApprovalBeforeKitchen(order.Status))
+        {
+            MessageBox.Show("Order is no longer pending release (refresh the list).", "Kitchen", MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            await LoadAsync();
+            return;
+        }
+
+        var confirm = MessageBox.Show(
+            $"Approve and release order {entry.OrderId} to the kitchen?\n\nInventory will be deducted and the ticket moves to Waiting.",
+            "Release to kitchen",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+        if (confirm != MessageBoxResult.Yes)
+            return;
+
+        var result = await _cloudOps.TryReleasePendingToKitchenAsync(entry.Id).ConfigureAwait(false);
+        if (!result.Ok)
+        {
+            MessageBox.Show(result.ErrorMessage ?? "Release failed.", "Kitchen", MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        RefreshReadyPickupBanner();
+        await LoadAsync();
+    }
+
     private async Task StartPreparingAsync(OrderEntry entry)
     {
         var confirm = MessageBox.Show(
@@ -321,7 +497,7 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
             return;
 
         var status = _ordersCache.FirstOrDefault(o => o.Id == entry.Id)?.Status;
-        if (status != "Waiting")
+        if (OrderWorkflow.KitchenStatusKey(status) != "waiting")
         {
             MessageBox.Show("Order is no longer waiting (refresh the list).", "Kitchen", MessageBoxButton.OK,
                 MessageBoxImage.Information);
@@ -359,7 +535,7 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
             return;
 
         var status = _ordersCache.FirstOrDefault(o => o.Id == entry.Id)?.Status;
-        if (status != "In Kitchen")
+        if (!OrderWorkflow.IsKitchenPreparingColumn(status))
         {
             MessageBox.Show("Order is no longer in kitchen (refresh the list).", "Kitchen", MessageBoxButton.OK,
                 MessageBoxImage.Information);
@@ -388,21 +564,19 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
 
     private static OrderEntry MapKitchenOrder(OrderRecord order)
     {
-        var lineSubtotal = order.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
+        var lines = order.Items ?? [];
+        var lineSubtotal = lines.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
         var totals = OrderTotalsHelper.ComputeTotals(lineSubtotal, order.DiscountMode, order.DiscountValue);
         var items = string.Join(", ",
-            order.Items.Select(i => $"{i.Product?.Name ?? "Unknown"} x{i.Quantity}"));
+            lines.Select(i => $"{i.Product?.Name ?? "Unknown"} x{i.Quantity}"));
 
+        var awaitsRelease = OrderWorkflow.AwaitsCashierOrApprovalBeforeKitchen(order.Status);
         return new OrderEntry
         {
             Id = order.Id,
             OrderId = string.IsNullOrWhiteSpace(order.UniqueId) ? $"#{order.Id:000}" : order.UniqueId,
-            TableNumber = string.IsNullOrWhiteSpace(order.TableCode)
-                ? $"Table {order.Table?.TableNumber ?? 0}"
-                : $"{order.TableCode} · {order.TableName}",
-            ServerName = string.IsNullOrWhiteSpace(order.ServerName)
-                ? (order.Server?.Name ?? "Unassigned")
-                : order.ServerName,
+            TableNumber = OrderRecordUiLabels.TableCaption(order),
+            ServerName = OrderRecordUiLabels.ServerCaption(order),
             Items = items,
             CustomerNotes = order.CustomerNotes ?? string.Empty,
             AllergyNotes = order.AllergyNotes ?? string.Empty,
@@ -410,15 +584,25 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
             CreatedAt = order.CreatedAt,
             Time = order.CreatedAt.ToString("HH:mm"),
             Total = totals.GrandTotal,
-            StatusColor = StatusColorFor(order.Status)
+            StatusColor = StatusColorFor(order.Status),
+            OrderOrigin = order.OrderOrigin,
+            FulfillmentHeadline = OrderRecordUiLabels.KitchenFulfillmentHeadline(order),
+            ShowReleaseToKitchen = awaitsRelease,
+            ShowReceiveInKitchen = OrderWorkflow.KitchenStatusKey(order.Status) == "waiting",
+            ShowMarkReadyForPickup = OrderWorkflow.IsKitchenPreparingColumn(order.Status)
         };
     }
 
-    private static string StatusColorFor(string status) => status switch
+    private static string StatusColorFor(string status)
     {
-        "Waiting" => "#2196F3",
-        "In Kitchen" => "#FF9800",
-        "Ready" => "#4CAF50",
-        _ => "#D4AF37"
-    };
+        if (OrderWorkflow.IsPendingApproval(status) || OrderWorkflow.IsPendingCashier(status))
+            return "#B39DDB";
+        return status switch
+        {
+            "Waiting" => "#2196F3",
+            "In Kitchen" => "#FF9800",
+            "Ready" => "#4CAF50",
+            _ => "#D4AF37"
+        };
+    }
 }

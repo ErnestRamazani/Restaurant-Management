@@ -29,5 +29,17 @@ public sealed class PublicMenuSetting
     /// <summary>JSON for <see cref="Menu.MenuTaxonomySettings"/>; exposed on public menu config for PWAs.</summary>
     public string? MenuTaxonomyJson { get; set; }
 
+    /// <summary>Late days per payroll attendance deduction unit (legacy default 4).</summary>
+    public int PayrollLateDaysPerAttendanceUnit { get; set; } = 4;
+
+    /// <summary>Whether each absence counts as one deduction unit.</summary>
+    public bool PayrollAbsenceCountsAsAttendanceUnit { get; set; } = true;
+
+    /// <summary>Sales bonus percent on server merchandise totals (legacy default 5).</summary>
+    public decimal PayrollSalesBonusPercent { get; set; } = 5m;
+
+    /// <summary>Salary advance cap as percent of scheduled gross for the month (legacy default 30).</summary>
+    public decimal PayrollMaxSalaryAdvancePercentOfGross { get; set; } = 30m;
+
     public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
 }

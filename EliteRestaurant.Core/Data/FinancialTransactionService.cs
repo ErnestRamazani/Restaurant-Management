@@ -1,5 +1,6 @@
 using System.Globalization;
 using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Reporting;
 using EliteRestaurant.Core.Utils;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,6 +8,10 @@ namespace EliteRestaurant.Core.Data;
 
 public static class FinancialTransactionService
 {
+    private static SalaryPayrollRules SalaryRulesFromDefaultMenuRow(AppDbContext db) =>
+        SalaryPayrollRules.FromPublicMenuRow(
+            db.PublicMenuSettings.AsNoTracking().FirstOrDefault(s => s.Key == "default"));
+
     public static void EnsureCompletedOrderRevenues(AppDbContext db)
     {
         var completedOrders = db.Orders
@@ -158,17 +163,12 @@ public static class FinancialTransactionService
 
     private static bool HasPostedDeliveryFeeSale(AppDbContext db, int orderId)
     {
-        var marker = DeliveryMarker(orderId);
         if (db.Transactions.Local.Any(t =>
                 t.RelatedOrderId == orderId && t.Type == "Revenue" && t.Category == "Delivery Fee"))
             return true;
-        if (db.Transactions.AsNoTracking().Any(t =>
-                t.RelatedOrderId == orderId && t.Type == "Revenue" && t.Category == "Delivery Fee"))
-            return true;
+
         return db.Transactions.AsNoTracking().Any(t =>
-            t.Type == "Revenue" &&
-            t.Category == "Delivery Fee" &&
-            (t.Justification ?? string.Empty).Contains(marker, StringComparison.Ordinal));
+            t.RelatedOrderId == orderId && t.Type == "Revenue" && t.Category == "Delivery Fee");
     }
 
     /// <summary>Split stored payment across merchandise vs delivery fee by USD grand sub-parts.</summary>
@@ -179,6 +179,7 @@ public static class FinancialTransactionService
         string paymentCurrency,
         decimal exchangeRate)
     {
+        _ = exchangeRate;
         componentUsd = Math.Round(componentUsd, 2);
         if (componentUsd <= 0m)
             return (0m, 0m, 0m);
@@ -187,23 +188,22 @@ public static class FinancialTransactionService
             totalPartsUsd = componentUsd;
         var share = Math.Min(1m, Math.Max(0m, componentUsd / totalPartsUsd));
 
-        if (order.PaymentAmountUsd > 0m)
+        if (order.PaymentAmountUsd > 0m || order.PaymentAmountFc > 0m)
         {
             var usd = Math.Round(order.PaymentAmountUsd * share, 2);
             var fc = Math.Round(order.PaymentAmountFc * share, 2);
-            var amt = paymentCurrency == CurrencyHelper.CongoleseFranc
-                ? fc
-                : usd;
+            var amt = MoneyReportingHelpers.IsMixedCurrency(paymentCurrency)
+                ? usd
+                : paymentCurrency == CurrencyHelper.CongoleseFranc
+                    ? fc
+                    : usd;
             return (amt, usd, fc);
         }
 
-        // Fallback: priced purely from computed merchandise / fee
+        // No per-currency tender on the order: book USD revenue only (do not infer FC from the menu total).
         var fallbackUsd = componentUsd;
-        var fallbackFc = CurrencyHelper.ConvertUsdToFc(fallbackUsd);
-        var amount = paymentCurrency == CurrencyHelper.CongoleseFranc
-            ? fallbackFc
-            : fallbackUsd;
-        return (Math.Round(amount, 2), fallbackUsd, fallbackFc);
+        var amountLegacy = Math.Round(fallbackUsd, 2);
+        return (amountLegacy, fallbackUsd, 0m);
     }
 
     /// <summary>Legacy no-op: payroll is posted from the Salary module via <see cref="TryRecordMonthlySalaryPayment"/>.</summary>
@@ -260,8 +260,8 @@ public static class FinancialTransactionService
         return db.Transactions.AsNoTracking().Any(t =>
             t.Type == "Expense" &&
             t.Category == "Salary" &&
-            (t.Justification ?? string.Empty).StartsWith(prefix, StringComparison.Ordinal) &&
-            (t.Justification ?? string.Empty).Contains(marker, StringComparison.Ordinal));
+            (t.Justification ?? string.Empty).StartsWith(prefix) &&
+            (t.Justification ?? string.Empty).Contains(marker));
     }
 
     /// <summary>HTTP/sync clients: payroll completeness without <see cref="AppDbContext"/>.</summary>
@@ -364,13 +364,15 @@ public static class FinancialTransactionService
         }
 
         var employee = db.Employees.SingleOrDefault(e => e.Id == employeeId);
-        if (employee is null || employee.HourlyRate <= 0m)
-            return "Employee not found or hourly rate is not set.";
+        if (employee is null)
+            return "Employee not found.";
 
-        var (_, scheduledWorkdays, grossPayUsd) =
-            PayrollCalculator.GetHourlyGrossForPayrollMonth(employee, year, month);
-        if (scheduledWorkdays == 0 || grossPayUsd <= 0m)
-            return "No scheduled gross pay for this month — check shifts and hourly rate in Employees.";
+        if (employee.MonthlySalaryUSD <= 0m)
+            return "Employee not found or monthly salary is not set.";
+
+        var monthBase = PayrollCalculator.ResolvePayrollMonthBase(employee, year, month);
+        if (monthBase.GrossPayUsd <= 0m)
+            return "No payroll gross for this month — check join date, monthly salary, and weekly shifts in Employees.";
 
         var start = new DateTime(year, month, 1).Date;
         var endExclusive = start.AddMonths(1);
@@ -381,18 +383,20 @@ public static class FinancialTransactionService
             .Where(a => a.EmployeeId == employeeId && a.WorkDate >= monthStartUtc && a.WorkDate < monthEndExclusiveUtc)
             .ToList();
 
+        var rules = SalaryRulesFromDefaultMenuRow(db);
         var (absenceDays, lateDays, latePenaltyUnits, totalUnits) =
-            PayrollCalculator.CountAttendanceUnitsForPayroll(employee, year, month, monthRows);
+            PayrollCalculator.CountAttendanceUnitsForPayroll(employee, year, month, monthRows, rules);
 
         var moneyGenerated = PayrollSupport.SumServerCompletedOrderMerchandiseUsd(db, employeeId, start, endExclusive);
         var advancesDeducted = ApplySalaryAdvancesForPayroll(db, employeeId, year, month);
-        var bonus = PayrollCalculator.ComputeBonusUsd(moneyGenerated);
+        var bonus = PayrollCalculator.ComputeBonusUsd(moneyGenerated, rules);
         var netRounded = PayrollCalculator.ComputeFinalNetPayUsd(
-            grossPayUsd,
-            scheduledWorkdays,
+            monthBase.GrossPayUsd,
+            monthBase.AttendanceDenominatorWorkdays,
             totalUnits,
             moneyGenerated,
-            advancesDeducted);
+            advancesDeducted,
+            rules);
 
         if (paymentUsd > netRounded + 0.01m)
             return $"Payment ({paymentUsd:N2} USD) is greater than net pay ({netRounded:N2} USD).";
@@ -405,7 +409,7 @@ public static class FinancialTransactionService
             EmployeeId = employeeId,
             Year = year,
             Month = month,
-            MonthlySalaryUsd = grossPayUsd,
+            MonthlySalaryUsd = monthBase.GrossPayUsd,
             AbsenceDays = absenceDays,
             LateDays = lateDays,
             LatePenaltyUnits = latePenaltyUnits,
@@ -525,16 +529,15 @@ public static class FinancialTransactionService
             return null;
         }
 
-        if (employee.HourlyRate <= 0m)
-            return "Employee not found or hourly rate is not set.";
+        var monthBase = PayrollCalculator.ResolvePayrollMonthBase(employee, year, month);
+        if (employee.MonthlySalaryUSD <= 0m && employee.HourlyRate <= 0m)
+            return "Set monthly salary or hourly rate (USD) in Employees — required for payroll.";
+        if (monthBase.GrossPayUsd <= 0m)
+            return "No payroll gross for this month — check join date, monthly amount, or scheduled shifts in Employees.";
 
-        var (_, scheduledWorkdays, grossPayUsd) =
-            PayrollCalculator.GetHourlyGrossForPayrollMonth(employee, year, month);
-        if (scheduledWorkdays == 0 || grossPayUsd <= 0m)
-            return "No scheduled gross pay for this month — check shifts and hourly rate in Employees.";
-
+        var rules = PayrollCalculator.ResolveSalaryPayrollRulesForLocalFile();
         var (absenceDays, lateDays, latePenaltyUnits, totalUnits) =
-            PayrollCalculator.CountAttendanceUnitsForPayroll(employee, year, month, monthAttendancesForEmployee);
+            PayrollCalculator.CountAttendanceUnitsForPayroll(employee, year, month, monthAttendancesForEmployee, rules);
 
         var advancesDeducted = ApplySalaryAdvancesForPayrollMemory(advances, employee.Id, year, month);
         foreach (var a in advances.Where(x =>
@@ -543,13 +546,14 @@ public static class FinancialTransactionService
                      x.AppliedPayrollMonth == month))
             upserts.Add(a);
 
-        var bonus = PayrollCalculator.ComputeBonusUsd(moneyGeneratedUsd);
+        var bonus = PayrollCalculator.ComputeBonusUsd(moneyGeneratedUsd, rules);
         var netRounded = PayrollCalculator.ComputeFinalNetPayUsd(
-            grossPayUsd,
-            scheduledWorkdays,
+            monthBase.GrossPayUsd,
+            monthBase.AttendanceDenominatorWorkdays,
             totalUnits,
             moneyGeneratedUsd,
-            advancesDeducted);
+            advancesDeducted,
+            rules);
 
         if (paymentUsd > netRounded + 0.01m)
             return $"Payment ({paymentUsd:N2} USD) is greater than net pay ({netRounded:N2} USD).";
@@ -562,7 +566,7 @@ public static class FinancialTransactionService
             EmployeeId = employee.Id,
             Year = year,
             Month = month,
-            MonthlySalaryUsd = grossPayUsd,
+            MonthlySalaryUsd = monthBase.GrossPayUsd,
             AbsenceDays = absenceDays,
             LateDays = lateDays,
             LatePenaltyUnits = latePenaltyUnits,
@@ -704,11 +708,11 @@ public static class FinancialTransactionService
         });
     }
 
-    /// <summary>True if any active employee with hourly pay and scheduled days still lacks payroll for the prior calendar month.</summary>
+    /// <summary>True if any active employee with payroll gross for the prior calendar month still lacks a full Salary posting.</summary>
     public static (bool ShowWarning, string Message, int DaysPastPayDay) GetSalaryOverdueState(AppDbContext db, DateTime now)
     {
         var employees = db.Employees.AsNoTracking()
-            .Where(e => e.EmploymentStatus == "Active" && e.HourlyRate > 0m)
+            .Where(e => e.EmploymentStatus == "Active" && e.MonthlySalaryUSD > 0m)
             .ToList();
         var payroll = db.PayrollPaymentRecords.AsNoTracking().ToList();
         var transactions = db.Transactions.AsNoTracking().ToList();
@@ -728,17 +732,18 @@ public static class FinancialTransactionService
         var dueYear = lastDayPrevMonth.Year;
         var dueMonth = lastDayPrevMonth.Month;
 
-        var hourlyEmployees = employees
-            .Where(e => string.Equals(e.EmploymentStatus, "Active", StringComparison.OrdinalIgnoreCase) && e.HourlyRate > 0m)
+        var payrollCandidates = employees
+            .Where(e => string.Equals(e.EmploymentStatus, "Active", StringComparison.OrdinalIgnoreCase) &&
+                        e.MonthlySalaryUSD > 0m)
             .ToList();
-        if (hourlyEmployees.Count == 0)
+        if (payrollCandidates.Count == 0)
             return (false, string.Empty, 0);
 
         var monthLabel = new DateTime(dueYear, dueMonth, 1).ToString("MMMM yyyy", CultureInfo.InvariantCulture);
-        foreach (var e in hourlyEmployees)
+        foreach (var e in payrollCandidates)
         {
-            var (_, workdays, gross) = PayrollCalculator.GetHourlyGrossForPayrollMonth(e, dueYear, dueMonth);
-            if (workdays == 0 || gross <= 0m)
+            var monthBase = PayrollCalculator.ResolvePayrollMonthBase(e, dueYear, dueMonth);
+            if (monthBase.GrossPayUsd <= 0m)
                 continue;
 
             if (IsPayrollFullyPaid(payrollRecords, transactions, e.Id, dueYear, dueMonth))
@@ -766,7 +771,11 @@ public static class FinancialTransactionService
             return;
 
         var marker = $"| ADVANCE:{salaryAdvanceId}|";
-        if (db.Transactions.AsNoTracking().Any(t => t.Justification.Contains(marker)))
+        if (db.Transactions.AsNoTracking()
+            .Where(t => t.Type == "Expense" && t.Category == "Salary")
+            .Select(t => t.Justification)
+            .AsEnumerable()
+            .Any(j => (j ?? string.Empty).Contains(marker, StringComparison.Ordinal)))
             return;
 
         var name = string.IsNullOrWhiteSpace(employeeName) ? $"Employee #{employeeId}" : employeeName.Trim();

@@ -60,8 +60,8 @@ public class MoneyViewModel : AdminBaseViewModel
     private string _deliveryFeesSummaryText = "$ 0.00 | FC 0";
     private string _payrollSummaryText = "$ 0.00 | FC 0";
     private string _selectedReportType = "Transactions";
-    private string _selectedPeriod = "Week";
-    private string _selectedPeriodLabel = "This Week";
+    private string _selectedPeriod = "Today";
+    private string _selectedPeriodLabel = "This Day";
     private string _todayRevenueText = "$ 0.00 | FC 0";
     private string _todayExpensesText = "$ 0.00 | FC 0";
     private string _todayNetProfitText = "$ 0.00 | FC 0";
@@ -76,7 +76,7 @@ public class MoneyViewModel : AdminBaseViewModel
     public ObservableCollection<string> Categories { get; } = new(["Sale", "Salary", "Fixed Cost", "Tip", "Gift", "Variable", "Other"]);
     public ObservableCollection<string> EntryCurrencies { get; } = new([CurrencyHelper.Usd, CurrencyHelper.CongoleseFranc]);
     public ObservableCollection<string> ReportTypes { get; } = new(["Transactions", "Orders", "Inventory", "Attendance", "All Reports"]);
-    public ObservableCollection<string> PeriodOptions { get; } = new(["Week", "Month", "Year", "All"]);
+    public ObservableCollection<string> PeriodOptions { get; } = new(["Today", "Week", "Month", "Year", "All"]);
 
     public string AmountInput
     {
@@ -206,6 +206,7 @@ public class MoneyViewModel : AdminBaseViewModel
             if (!SetField(ref _selectedPeriod, value))
                 return;
 
+            OnPropertyChanged(nameof(IsTodaySelected));
             OnPropertyChanged(nameof(IsWeekSelected));
             OnPropertyChanged(nameof(IsMonthSelected));
             OnPropertyChanged(nameof(IsYearSelected));
@@ -244,6 +245,7 @@ public class MoneyViewModel : AdminBaseViewModel
         private set => SetField(ref _todayNetProfitColor, value);
     }
 
+    public bool IsTodaySelected => SelectedPeriod == "Today";
     public bool IsWeekSelected => SelectedPeriod == "Week";
     public bool IsMonthSelected => SelectedPeriod == "Month";
     public bool IsYearSelected => SelectedPeriod == "Year";

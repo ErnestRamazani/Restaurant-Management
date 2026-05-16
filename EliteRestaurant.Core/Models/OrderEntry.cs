@@ -4,6 +4,8 @@ public class OrderEntry
 {
     public int Id { get; set; }
     public string OrderId { get; set; } = string.Empty;
+    public string ConfirmationCode { get; set; } = string.Empty;
+    public bool ShowConfirmationCode => !string.IsNullOrWhiteSpace(ConfirmationCode);
     public string TableNumber { get; set; } = string.Empty;
     public string ServerName { get; set; } = string.Empty;
     public string Items { get; set; } = string.Empty;
@@ -32,4 +34,16 @@ public class OrderEntry
 
     /// <summary>Cashier and full admin may open ticket preview.</summary>
     public bool ShowViewTicketInOrders { get; set; }
+
+    /// <summary>Kitchen queue: approve/release pending ticket to Waiting.</summary>
+    public bool ShowReleaseToKitchen { get; set; }
+
+    /// <summary>Kitchen queue: receive Waiting ticket into In Kitchen.</summary>
+    public bool ShowReceiveInKitchen { get; set; }
+
+    /// <summary>Kitchen queue: mark In Kitchen ticket Ready.</summary>
+    public bool ShowMarkReadyForPickup { get; set; }
+
+    /// <summary>KDS origin badge (DELIVERY / TO GO / PLATED).</summary>
+    public string FulfillmentHeadline { get; set; } = string.Empty;
 }

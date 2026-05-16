@@ -11,7 +11,8 @@ public sealed record CreateOrderCatalogProduct(
     string Name,
     string Category,
     string SubCategory,
-    decimal Price);
+    decimal Price,
+    bool IsAvailable);
 
 public sealed record CreateOrderArrivedReservationRow(
     int Id,
@@ -56,7 +57,8 @@ public sealed class TableLoadingService
                 p.Name,
                 p.Category,
                 string.IsNullOrWhiteSpace(p.SubCategory) ? "General" : p.SubCategory!,
-                p.Price))
+                p.Price,
+                p.IsAvailable))
             .ToList();
 
         var tableNames = tables.ToDictionary(t => t.Id, t => string.IsNullOrWhiteSpace(t.Name) ? $"Table #{t.Id}" : t.Name);

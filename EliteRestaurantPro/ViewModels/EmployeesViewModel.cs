@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Linq;
 using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
@@ -25,7 +26,6 @@ public class EmployeesViewModel : AdminBaseViewModel
     private string _pinCode = string.Empty;
     private string _signInId = string.Empty;
     private string _phoneNumber = string.Empty;
-    private string _hourlyRateText = string.Empty;
     private string _monthlySalaryUsdText = string.Empty;
     private string _joinDateText = string.Empty;
     private string _selectedEmploymentStatus = "Active";
@@ -41,6 +41,10 @@ public class EmployeesViewModel : AdminBaseViewModel
     private string _searchText = string.Empty;
     private bool _pinStoredForEdit;
     private readonly List<Employee> _allEmployees = [];
+    private bool _isShiftHistoryOpen;
+    private string _shiftHistoryTitle = "Shift history";
+    private string _shiftHistorySubtitle = string.Empty;
+    private string _shiftHistoryBanner = string.Empty;
 
     public override string ActivePage => "Employees";
 
@@ -126,12 +130,6 @@ public class EmployeesViewModel : AdminBaseViewModel
         set => SetField(ref _phoneNumber, value);
     }
 
-    public string HourlyRateText
-    {
-        get => _hourlyRateText;
-        set => SetField(ref _hourlyRateText, value);
-    }
-
     public string MonthlySalaryUsdText
     {
         get => _monthlySalaryUsdText;
@@ -212,6 +210,39 @@ public class EmployeesViewModel : AdminBaseViewModel
     public string SelectedImageFileName =>
         string.IsNullOrWhiteSpace(ProfileImagePath) ? "No image selected" : Path.GetFileName(ProfileImagePath);
 
+    public bool IsShiftHistoryOpen
+    {
+        get => _isShiftHistoryOpen;
+        set => SetField(ref _isShiftHistoryOpen, value);
+    }
+
+    public string ShiftHistoryTitle
+    {
+        get => _shiftHistoryTitle;
+        set => SetField(ref _shiftHistoryTitle, value);
+    }
+
+    public string ShiftHistorySubtitle
+    {
+        get => _shiftHistorySubtitle;
+        set => SetField(ref _shiftHistorySubtitle, value);
+    }
+
+    public string ShiftHistoryBanner
+    {
+        get => _shiftHistoryBanner;
+        set
+        {
+            if (!SetField(ref _shiftHistoryBanner, value))
+                return;
+            OnPropertyChanged(nameof(ShiftHistoryBannerVisible));
+        }
+    }
+
+    public bool ShiftHistoryBannerVisible => !string.IsNullOrWhiteSpace(ShiftHistoryBanner);
+
+    public ObservableCollection<ShiftHistoryRowViewModel> ShiftHistoryRows { get; } = [];
+
     public ICommand OpenAddDialogCommand { get; }
     public ICommand EditEmployeeCommand { get; }
     public ICommand DeleteEmployeeCommand { get; }
@@ -219,6 +250,7 @@ public class EmployeesViewModel : AdminBaseViewModel
     public ICommand CancelDialogCommand { get; }
     public ICommand BrowseProfileImageCommand { get; }
     public ICommand ShowShiftHistoryCommand { get; }
+    public ICommand CloseShiftHistoryCommand { get; }
 
     public EmployeesViewModel(Action<BaseViewModel> navigate) : base(navigate)
     {
@@ -229,6 +261,7 @@ public class EmployeesViewModel : AdminBaseViewModel
         CancelDialogCommand = new RelayCommand(_ => CloseDialog());
         BrowseProfileImageCommand = new RelayCommand(_ => BrowseProfileImage());
         ShowShiftHistoryCommand = new RelayCommand(employee => _ = ShowShiftHistoryAsync(employee as Employee));
+        CloseShiftHistoryCommand = new RelayCommand(_ => CloseShiftHistory());
 
         _ = LoadEmployeesAsync();
     }
@@ -311,6 +344,7 @@ public class EmployeesViewModel : AdminBaseViewModel
                 else
                     employee.PendingSalaryToday = 0m;
 
+                employee.RebuildScheduleDays();
                 _allEmployees.Add(employee);
             }
         }
@@ -359,7 +393,6 @@ public class EmployeesViewModel : AdminBaseViewModel
         PinCode = string.Empty;
         SignInId = string.Empty;
         PhoneNumber = string.Empty;
-        HourlyRateText = string.Empty;
         MonthlySalaryUsdText = string.Empty;
         JoinDateText = DateTime.Today.ToString("yyyy-MM-dd");
         SelectedEmploymentStatus = EmploymentStatuses.First();
@@ -387,7 +420,6 @@ public class EmployeesViewModel : AdminBaseViewModel
         PinCode = string.Empty;
         SignInId = employee.SignInId;
         PhoneNumber = employee.PhoneNumber;
-        HourlyRateText = employee.HourlyRate.ToString("0.##", CultureInfo.InvariantCulture);
         MonthlySalaryUsdText = employee.MonthlySalaryUSD.ToString("0.##", CultureInfo.InvariantCulture);
         JoinDateText = employee.JoinDate.ToString("yyyy-MM-dd");
         SelectedEmploymentStatus = string.IsNullOrWhiteSpace(employee.EmploymentStatus) ? "Active" : employee.EmploymentStatus;
@@ -426,14 +458,27 @@ public class EmployeesViewModel : AdminBaseViewModel
         if (string.IsNullOrWhiteSpace(normalizedName) ||
             string.IsNullOrWhiteSpace(normalizedRole) ||
             (pinRequired && string.IsNullOrWhiteSpace(normalizedPin)) ||
-            !decimal.TryParse(HourlyRateText, NumberStyles.Number, CultureInfo.InvariantCulture, out var hourlyRate) ||
             !DateTime.TryParse(JoinDateText, out var joinDate) ||
             string.IsNullOrWhiteSpace(normalizedStatus))
         {
             MessageBox.Show(
                 pinRequired
-                    ? "Name, role, PIN, hourly rate, join date, and status are required."
-                    : "Name, role, hourly rate, join date, and status are required. Enter a new PIN only if you want to change it.",
+                    ? "Name, role, PIN, join date, and status are required."
+                    : "Name, role, join date, and status are required. Enter a new PIN only if you want to change it.",
+                "Validation",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        if (!decimal.TryParse(MonthlySalaryUsdText.Trim(), NumberStyles.Number, CultureInfo.InvariantCulture, out var monthlySalaryUsd))
+            monthlySalaryUsd = 0m;
+        monthlySalaryUsd = Math.Round(Math.Max(0m, monthlySalaryUsd), 2);
+
+        if (monthlySalaryUsd <= 0m)
+        {
+            MessageBox.Show(
+                "Enter a positive monthly salary (USD) — required for payroll.",
                 "Validation",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
@@ -481,18 +526,6 @@ public class EmployeesViewModel : AdminBaseViewModel
                     return;
                 }
             }
-        }
-
-        var monthlySalaryUsd = 0m;
-        if (!string.IsNullOrWhiteSpace(MonthlySalaryUsdText) &&
-            !decimal.TryParse(MonthlySalaryUsdText, NumberStyles.Number, CultureInfo.InvariantCulture, out monthlySalaryUsd))
-        {
-            MessageBox.Show(
-                "Monthly salary (USD) must be a valid number or left blank for zero.",
-                "Validation",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
-            return;
         }
 
         var allEmployees = await _data.GetEmployeesAsync().ConfigureAwait(true);
@@ -557,8 +590,8 @@ public class EmployeesViewModel : AdminBaseViewModel
                         : shell.PinCode,
                     SignInId = isStaffPortalRole ? normalizedSignIn : string.Empty,
                     PhoneNumber = normalizedPhone,
-                    HourlyRate = hourlyRate,
-                    MonthlySalaryUSD = Math.Round(Math.Max(0m, monthlySalaryUsd), 2),
+                    HourlyRate = 0m,
+                    MonthlySalaryUSD = monthlySalaryUsd,
                     JoinDate = joinDate.Date,
                     EmploymentStatus = normalizedStatus,
                     ProfileImagePath = normalizedImage,
@@ -593,8 +626,8 @@ public class EmployeesViewModel : AdminBaseViewModel
                     Role = normalizedRole,
                     PinCode = EmployeePinHasher.HashForStorage(normalizedPin),
                     PhoneNumber = normalizedPhone,
-                    HourlyRate = hourlyRate,
-                    MonthlySalaryUSD = Math.Round(Math.Max(0m, monthlySalaryUsd), 2),
+                    HourlyRate = 0m,
+                    MonthlySalaryUSD = monthlySalaryUsd,
                     JoinDate = joinDate.Date,
                     EmploymentStatus = normalizedStatus,
                     ProfileImagePath = normalizedImage,
@@ -674,49 +707,72 @@ public class EmployeesViewModel : AdminBaseViewModel
         }
     }
 
+    private void CloseShiftHistory()
+    {
+        IsShiftHistoryOpen = false;
+        ShiftHistoryBanner = string.Empty;
+        ShiftHistoryRows.Clear();
+    }
+
     private async Task ShowShiftHistoryAsync(Employee? employee)
     {
         if (employee is null)
             return;
 
+        ShiftHistoryTitle = $"Shift history — {employee.Name}";
+        ShiftHistoryBanner = "Loading…";
+        ShiftHistorySubtitle = string.Empty;
+        ShiftHistoryRows.Clear();
+        IsShiftHistoryOpen = true;
+
         try
         {
             var attendanceRows = await _data.GetAttendanceAsync().ConfigureAwait(true);
-            var fromDate = DateTime.Today.AddDays(-6);
-            var historyStartUtc = AttendanceCalendar.DayAnchorUtc(fromDate);
-            var historyEndExclusiveUtc = AttendanceCalendar.DayAnchorUtc(DateTime.Today).AddDays(1);
+            var att = SettingsManager.Load().Attendance ?? new AttendanceSettings();
+            var shiftSchedule = AttendanceShiftSchedule.FromSettings(att);
+
             var history = attendanceRows
-                .Where(a => a.EmployeeId == employee.Id && a.WorkDate >= historyStartUtc && a.WorkDate < historyEndExclusiveUtc)
+                .Where(a => a.EmployeeId == employee.Id)
                 .OrderByDescending(a => a.WorkDate)
                 .ToList();
 
-            if (history.Count == 0)
+            ShiftHistoryRows.Clear();
+            foreach (var a in history)
             {
-                MessageBox.Show("No attendance records in the last 7 days.", "Shift History", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
+                var localDay = a.WorkDate.Date;
+                var shiftDefinition = AttendanceScheduleHelper.ResolveShiftWindow(employee, localDay, shiftSchedule);
+                var isAbsence = a.IsAbsence;
+                var status = string.IsNullOrWhiteSpace(a.ClockInStatus) ? "Pending" : a.ClockInStatus;
+                if (shiftDefinition.IsOff && a.ClockInTime is null)
+                    status = "Off Shift";
+                else if (isAbsence)
+                    status = "Absent";
+
+                var lateJust = (a.Justification ?? string.Empty).Trim();
+                var absenceNote = (a.AbsenceJustification ?? string.Empty).Trim();
+
+                ShiftHistoryRows.Add(new ShiftHistoryRowViewModel
+                {
+                    WorkDateDisplay = a.WorkDate.ToString("ddd yyyy-MM-dd", CultureInfo.CurrentCulture),
+                    ShiftType = shiftDefinition.Name,
+                    ClockIn = a.ClockInTime?.ToString("HH:mm", CultureInfo.CurrentCulture) ?? "—",
+                    ClockOut = a.ClockOutTime?.ToString("HH:mm", CultureInfo.CurrentCulture) ?? "—",
+                    Status = status,
+                    Justification = string.IsNullOrEmpty(lateJust) ? "—" : lateJust,
+                    Notes = string.IsNullOrEmpty(absenceNote) ? "—" : absenceNote
+                });
             }
 
-            var lines = history.Select(a =>
-            {
-                var inText = a.ClockInTime?.ToString("HH:mm") ?? "--:--";
-                var outText = a.ClockOutTime?.ToString("HH:mm") ?? "--:--";
-                var statusText = string.IsNullOrWhiteSpace(a.ClockInStatus) ? "Pending" : a.ClockInStatus;
-                return $"{a.WorkDate:ddd yyyy-MM-dd} | In {inText} | Out {outText} | {statusText}";
-            });
-
-            MessageBox.Show(
-                string.Join(Environment.NewLine, lines),
-                $"Shift History - {employee.Name}",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+            ShiftHistorySubtitle = history.Count == 1 ? "1 row" : $"{history.Count} rows";
+            ShiftHistoryBanner = history.Count == 0
+                ? "No attendance rows stored for this employee yet."
+                : string.Empty;
         }
         catch (Exception ex)
         {
-            MessageBox.Show(
-                ex.GetBaseException().Message,
-                "Shift history failed",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+            ShiftHistoryRows.Clear();
+            ShiftHistorySubtitle = string.Empty;
+            ShiftHistoryBanner = ex.GetBaseException().Message;
         }
     }
 

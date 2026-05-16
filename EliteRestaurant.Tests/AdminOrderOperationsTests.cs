@@ -148,4 +148,32 @@ public class AdminOrderOperationsTests
         Assert.True(again.Ok);
         Assert.True(again.SuppressBroadcast);
     }
+
+    [Fact]
+    public void UpdateOrderStatus_Completed_AcceptsChange_WhenDeliveryFeeIncludedInGrandTotal()
+    {
+        using var db = SeedPendingOnlineOrder($"chg-{Guid.NewGuid():N}").db;
+        var order = db.Orders.Include(o => o.Items).ThenInclude(i => i.Product).Single();
+        order.Status = "Ready";
+        order.OrderSource = "Delivery";
+        order.DeliveryFeeUsd = 2.60m;
+        db.SaveChanges();
+
+        var lineSubtotal = order.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
+        var grandTotal = OrderTotalsHelper.ComputeTotalsWithDeliveryFee(
+            lineSubtotal,
+            order.DiscountMode,
+            order.DiscountValue,
+            order.DeliveryFeeUsd).GrandTotal;
+        var paidUsd = Math.Round(grandTotal + 5m, 2);
+        var changeUsd = 5m;
+
+        var ops = new AdminOrderOperationsService(db);
+        ops.UpdateOrderStatus(order.Id, "Completed", paidUsd: paidUsd, changeGivenUsd: changeUsd);
+
+        db.ChangeTracker.Clear();
+        var completed = db.Orders.AsNoTracking().Single(o => o.Id == order.Id);
+        Assert.Equal("Completed", completed.Status);
+        Assert.Equal(changeUsd, completed.ChangeGivenUsd);
+    }
 }

@@ -4,6 +4,8 @@ public class OrderRecord
 {
     public int Id { get; set; }
     public string UniqueId { get; set; } = string.Empty;
+    /// <summary>Guest-facing 6-digit proof code for online pickup/delivery orders.</summary>
+    public string? ConfirmationCode { get; set; }
     public int? TableId { get; set; }
     public Table? Table { get; set; }
     public string TableCode { get; set; } = string.Empty;

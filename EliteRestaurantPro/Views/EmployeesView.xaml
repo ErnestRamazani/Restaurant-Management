@@ -171,13 +171,19 @@
                                                     <TextBlock Text="{Binding PhoneNumber, StringFormat=Phone {0}, TargetNullValue=Phone N/A}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
                                                 </Border>
                                                 <Border Background="#22FFFFFF" CornerRadius="10" Padding="12,8" Margin="0,0,8,8">
-                                                    <TextBlock Text="{Binding HourlyRate, StringFormat=Rate $ {0:N2}/h}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
+                                                    <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="12">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Text" Value="{Binding MonthlySalaryUSD, StringFormat=Monthly $ {0:N2}}"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding MonthlySalaryUSD}" Value="0">
+                                                                        <Setter Property="Text" Value="Monthly — set salary in Edit"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
                                                 </Border>
-                                                <Button Content="Open in Money"
-                                                        Margin="0,0,8,8"
-                                                        Padding="10,6"
-                                                        Command="{Binding DataContext.NavigateToMoneyCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                        Style="{StaticResource SapphireButton}"/>
                                                 <Border Background="#22FFFFFF" CornerRadius="10" Padding="12,8" Margin="0,0,8,8">
                                                     <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="12">
                                                         <Run Text="System ID "/>
@@ -222,8 +228,70 @@
                                             </WrapPanel>
 
                                             <TextBlock Text="Work Schedule" Foreground="{StaticResource GoldAccentBrush}" FontSize="18" FontWeight="SemiBold" Margin="0,10,0,8"/>
-                                            <Border Background="#22FFFFFF" CornerRadius="10" Padding="12,8" Margin="0,0,8,8">
-                                                <TextBlock Text="{Binding WorkScheduleSummary}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap"/>
+                                            <Border Style="{StaticResource GlassCard}"
+                                                    Padding="10,10"
+                                                    Margin="0,0,0,8"
+                                                    BorderBrush="#33FFFFFF"
+                                                    BorderThickness="1">
+                                                <ItemsControl ItemsSource="{Binding ScheduleDays}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <UniformGrid Rows="1" Columns="7"/>
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border Background="#18000000"
+                                                                    CornerRadius="10"
+                                                                    Padding="6,8"
+                                                                    Margin="3,0">
+                                                                <StackPanel>
+                                                                    <TextBlock Text="{Binding DayShortName}"
+                                                                               HorizontalAlignment="Center"
+                                                                               Foreground="{StaticResource TextMutedBrush}"
+                                                                               FontSize="10"
+                                                                               FontWeight="SemiBold"
+                                                                               Margin="0,0,0,6"/>
+                                                                    <Border CornerRadius="8"
+                                                                            Padding="6,4"
+                                                                            HorizontalAlignment="Center">
+                                                                        <Border.Style>
+                                                                            <Style TargetType="Border">
+                                                                                <Setter Property="Background" Value="#22FFFFFF"/>
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding BadgeVariant}" Value="Morning">
+                                                                                        <Setter Property="Background" Value="#22D4AF37"/>
+                                                                                    </DataTrigger>
+                                                                                    <DataTrigger Binding="{Binding BadgeVariant}" Value="Evening">
+                                                                                        <Setter Property="Background" Value="#152196F3"/>
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </Border.Style>
+                                                                        <TextBlock Text="{Binding BadgeText}"
+                                                                                   FontSize="10"
+                                                                                   FontWeight="SemiBold"
+                                                                                   HorizontalAlignment="Center">
+                                                                            <TextBlock.Style>
+                                                                                <Style TargetType="TextBlock">
+                                                                                    <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+                                                                                    <Style.Triggers>
+                                                                                        <DataTrigger Binding="{Binding BadgeVariant}" Value="Morning">
+                                                                                            <Setter Property="Foreground" Value="{StaticResource GoldAccentBrush}"/>
+                                                                                        </DataTrigger>
+                                                                                        <DataTrigger Binding="{Binding BadgeVariant}" Value="Evening">
+                                                                                            <Setter Property="Foreground" Value="{StaticResource StatBlueBrush}"/>
+                                                                                        </DataTrigger>
+                                                                                    </Style.Triggers>
+                                                                                </Style>
+                                                                            </TextBlock.Style>
+                                                                        </TextBlock>
+                                                                    </Border>
+                                                                </StackPanel>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
                                             </Border>
 
                                             <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
@@ -358,14 +426,10 @@
                                 <TextBox Text="{Binding PhoneNumber, UpdateSourceTrigger=PropertyChanged}"
                                          Style="{StaticResource EliteTextBox}"/>
 
-                                <TextBlock Text="HOURLY RATE (USD)" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
-                                <TextBox Text="{Binding HourlyRateText, UpdateSourceTrigger=PropertyChanged}"
-                                         Style="{StaticResource EliteTextBox}"/>
-
                                 <TextBlock Text="MONTHLY SALARY (USD) — PAYROLL" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
                                 <TextBox Text="{Binding MonthlySalaryUsdText, UpdateSourceTrigger=PropertyChanged}"
                                          Style="{StaticResource EliteTextBox}"
-                                         ToolTip="Fixed monthly salary used for attendance-based net pay. Leave 0 if not on monthly payroll."/>
+                                         ToolTip="Required for payroll. Gross monthly amount in USD (calendar-prorated after join date)."/>
 
                                 <TextBlock Text="JOIN DATE (YYYY-MM-DD)" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
                                 <TextBox Text="{Binding JoinDateText, UpdateSourceTrigger=PropertyChanged}"
@@ -474,6 +538,13 @@
                     </Grid>
                 </Border>
             </Grid>
+
+            <components:ShiftHistoryOverlayView Grid.Column="1"
+                                              Grid.Row="0"
+                                              Grid.RowSpan="2"
+                                              Panel.ZIndex="30"
+                                              VerticalAlignment="Stretch"
+                                              HorizontalAlignment="Stretch"/>
         </Grid>
     </Grid>
 </UserControl>

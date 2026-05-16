@@ -24,6 +24,9 @@ public sealed class AdminDataController(AppDbContext db) : ControllerBase
         ReferenceHandler = ReferenceHandler.IgnoreCycles
     };
 
+    private const int SnapshotDefaultCap = 1000;
+    private const int SnapshotReportRangeCap = 15_000;
+
     [HttpGet("employees-web/{id:int}/photo")]
     public async Task<IActionResult> GetEmployeeWebPhoto(int id, CancellationToken cancellationToken)
     {
@@ -82,7 +85,11 @@ public sealed class AdminDataController(AppDbContext db) : ControllerBase
     };
 
     [HttpGet("{entityName}")]
-    public async Task<IActionResult> List(string entityName, CancellationToken cancellationToken)
+    public async Task<IActionResult> List(
+        string entityName,
+        [FromQuery] DateTime? start,
+        [FromQuery] DateTime? end,
+        CancellationToken cancellationToken)
     {
         var key = entityName.ToLowerInvariant();
         if (IsAdminWebPortal() && AdminWebBlockedEntityKeys.Contains(key))
@@ -103,24 +110,29 @@ public sealed class AdminDataController(AppDbContext db) : ControllerBase
             return Ok(new { entityName, items = rows, snapshotAtUtc = snapshotAt });
         }
 
+        if (key is "orders" or "orderrecord")
+        {
+            var orderItems = await ListOrdersJsonAsync(start, end, cancellationToken);
+            return Ok(new AdminEntityListResponse(entityName, orderItems, snapshotAt));
+        }
+
+        if (key is "reservations" or "reservationbooking")
+        {
+            var resItems = await ListReservationsJsonAsync(start, end, cancellationToken);
+            return Ok(new AdminEntityListResponse(entityName, resItems, snapshotAt));
+        }
+
         var items = key switch
         {
             "products" or "product" => await SnapshotProductsFlat(cancellationToken),
             "productingredients" or "productingredient" => await Snapshot(db.ProductIngredients.AsNoTracking(), cancellationToken),
             "employees" or "employee" => await Snapshot(db.Employees.AsNoTracking().OrderBy(e => e.Name), cancellationToken),
             "tables" or "table" => await SnapshotTablesFlat(cancellationToken),
-            "reservations" or "reservationbooking" => await Snapshot(db.Reservations.AsNoTracking().OrderByDescending(r => r.ReservedFor), cancellationToken),
             "customerprofiles" or "customerprofile" => await Snapshot(db.CustomerProfiles.AsNoTracking().OrderBy(c => c.FullName), cancellationToken),
             "inventory" or "inventoryitems" or "inventoryitem" => await SnapshotInventoryFlat(cancellationToken),
-            "attendance" or "employeeattendances" or "employeeattendance" => await Snapshot(db.EmployeeAttendances.AsNoTracking().OrderByDescending(a => a.WorkDate), cancellationToken),
+            "attendance" or "employeeattendances" or "employeeattendance" => await SnapshotAttendanceFullAsync(cancellationToken),
             "salaryadvances" or "salaryadvance" => await Snapshot(db.SalaryAdvances.AsNoTracking().OrderByDescending(a => a.GivenAt), cancellationToken),
             "payroll" or "payrollpaymentrecords" or "payrollpaymentrecord" => await Snapshot(db.PayrollPaymentRecords.AsNoTracking().OrderByDescending(p => p.PaidAtUtc), cancellationToken),
-            "orders" or "orderrecord" => await Snapshot(
-                db.Orders.AsNoTracking()
-                    .Include(o => o.Items)
-                    .AsSplitQuery()
-                    .OrderByDescending(o => o.CreatedAt),
-                cancellationToken),
             "orderitems" or "orderitem" => await Snapshot(db.OrderItems.AsNoTracking(), cancellationToken),
             "money" or "transactions" or "moneytransaction" => await Snapshot(db.Transactions.AsNoTracking().OrderByDescending(t => t.Date), cancellationToken),
             "attendancedayvalidations" or "attendancevalidations" or "attendancedayvalidation" => await Snapshot(db.AttendanceDayValidations.AsNoTracking().OrderByDescending(v => v.WorkDate), cancellationToken),
@@ -146,9 +158,20 @@ public sealed class AdminDataController(AppDbContext db) : ControllerBase
                 .AsSplitQuery()
                 .OrderBy(t => t.TableNumber),
             cancellationToken);
-        var products = await Snapshot(
-            db.Products.AsNoTracking().OrderBy(p => p.Category).ThenBy(p => p.Name),
+        var productList = await db.Products.AsNoTracking()
+            .OrderBy(p => p.Category).ThenBy(p => p.Name)
+            .ToListAsync(cancellationToken);
+        var availability = await OrderInventoryAvailability.GetProductAvailabilityMapAsync(
+            db,
+            productList.Select(p => p.Id).ToList(),
             cancellationToken);
+        foreach (var p in productList)
+        {
+            if (availability.TryGetValue(p.Id, out var ok))
+                p.IsAvailable = ok;
+        }
+
+        var products = productList.Select(ToJsonElement).ToList();
         var reservations = await Snapshot(
             db.Reservations.AsNoTracking()
                 .Where(r => r.Status == "Arrived")
@@ -164,6 +187,23 @@ public sealed class AdminDataController(AppDbContext db) : ControllerBase
             reservations,
             orders,
             snapshotAt));
+    }
+
+    /// <summary>Ingredient-based availability for menu products (same rule as public menu). Used when desktop loads catalog without the create-order bundle.</summary>
+    [HttpPost("inventory/menu-product-availability")]
+    public async Task<ActionResult<Dictionary<int, bool>>> MenuProductAvailability(
+        [FromBody] AdminProductIdsRequest? body,
+        CancellationToken cancellationToken)
+    {
+        if (IsAdminWebPortal())
+            return Forbid();
+
+        var ids = body?.ProductIds ?? Array.Empty<int>();
+        if (ids.Length > 8000)
+            return BadRequest(new { message = "Too many product ids." });
+
+        var map = await OrderInventoryAvailability.GetProductAvailabilityMapAsync(db, ids, cancellationToken);
+        return Ok(map);
     }
 
     private async Task<IReadOnlyList<JsonElement>> CreateOrderBundleOrdersAsync(CancellationToken cancellationToken)
@@ -263,9 +303,88 @@ public sealed class AdminDataController(AppDbContext db) : ControllerBase
         return rows.Select(ToJsonElement).ToList();
     }
 
+    /// <summary>
+    /// Desktop reports need rows in a calendar range; the generic snapshot cap (1000 newest) hid older online orders and past reservations.
+    /// Optional <paramref name="start"/> / <paramref name="end"/> (inclusive calendar end) filter server-side with a higher cap.
+    /// Orders use the same anchor as Money: <c>PaymentConfirmedAt ?? CompletedAt ?? CreatedAt</c>.
+    /// </summary>
+    private async Task<IReadOnlyList<JsonElement>> ListOrdersJsonAsync(
+        DateTime? start,
+        DateTime? end,
+        CancellationToken cancellationToken)
+    {
+        var q = db.Orders.AsNoTracking().Include(o => o.Items).AsSplitQuery();
+        if (start is not null && end is not null)
+        {
+            var startDay = start.Value.Date;
+            var endDay = end.Value.Date;
+            if (endDay < startDay)
+                return [];
+
+            var endExclusive = endDay.AddDays(1);
+            var filtered = q.Where(o =>
+                (o.PaymentConfirmedAt ?? o.CompletedAt ?? o.CreatedAt) >= startDay
+                && (o.PaymentConfirmedAt ?? o.CompletedAt ?? o.CreatedAt) < endExclusive);
+            var list = await filtered
+                .OrderByDescending(o => o.CreatedAt)
+                .Take(SnapshotReportRangeCap)
+                .ToListAsync(cancellationToken);
+            return list.Select(ToJsonElement).ToList();
+        }
+
+        var capped = await q
+            .OrderByDescending(o => o.CreatedAt)
+            .Take(SnapshotDefaultCap)
+            .ToListAsync(cancellationToken);
+        return capped.Select(ToJsonElement).ToList();
+    }
+
+    /// <summary>Reservations: by default last 1000 by <see cref="ReservationBooking.ReservedFor"/>; with range, include updates or reserved slot in range.</summary>
+    private async Task<IReadOnlyList<JsonElement>> ListReservationsJsonAsync(
+        DateTime? start,
+        DateTime? end,
+        CancellationToken cancellationToken)
+    {
+        var q = db.Reservations.AsNoTracking();
+        if (start is not null && end is not null)
+        {
+            var startDay = start.Value.Date;
+            var endDay = end.Value.Date;
+            if (endDay < startDay)
+                return [];
+
+            var endExclusive = endDay.AddDays(1);
+            var filtered = q.Where(r =>
+                (r.UpdatedAt >= startDay && r.UpdatedAt < endExclusive)
+                || (r.ReservedFor >= startDay && r.ReservedFor < endExclusive));
+            var list = await filtered
+                .OrderByDescending(r => r.ReservedFor)
+                .Take(SnapshotReportRangeCap)
+                .ToListAsync(cancellationToken);
+            return list.Select(ToJsonElement).ToList();
+        }
+
+        var capped = await q
+            .OrderByDescending(r => r.ReservedFor)
+            .Take(SnapshotDefaultCap)
+            .ToListAsync(cancellationToken);
+        return capped.Select(ToJsonElement).ToList();
+    }
+
     private static async Task<IReadOnlyList<JsonElement>> Snapshot<T>(IQueryable<T> query, CancellationToken cancellationToken)
     {
-        var rows = await query.Take(1000).ToListAsync(cancellationToken);
+        var rows = await query.Take(SnapshotDefaultCap).ToListAsync(cancellationToken);
+        return rows.Select(ToJsonElement).ToList();
+    }
+
+    /// <summary>
+    /// Full attendance history for desktop admin (per-employee shift history, payroll, reports). Not subject to the generic 1000-row snapshot cap.
+    /// </summary>
+    private async Task<IReadOnlyList<JsonElement>> SnapshotAttendanceFullAsync(CancellationToken cancellationToken)
+    {
+        var rows = await db.EmployeeAttendances.AsNoTracking()
+            .OrderByDescending(a => a.WorkDate)
+            .ToListAsync(cancellationToken);
         return rows.Select(ToJsonElement).ToList();
     }
 

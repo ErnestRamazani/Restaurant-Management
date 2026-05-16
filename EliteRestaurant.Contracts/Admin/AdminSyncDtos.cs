@@ -38,6 +38,9 @@ public sealed record AdminCreateOrderCatalogBundleResponse(
     IReadOnlyList<JsonElement> Orders,
     DateTime SnapshotAtUtc);
 
+/// <summary>Request body for <c>POST .../inventory/menu-product-availability</c> (legacy create-order catalog path).</summary>
+public sealed record AdminProductIdsRequest(int[] ProductIds);
+
 public sealed record AdminCloudSettingsRequest(
     string RestaurantName,
     string Phone,
@@ -70,6 +73,10 @@ public sealed record AdminCloudSettingsRequest(
     string? OnlinePromoImageContentType = null,
     string? OnlinePromoImageBase64 = null,
     bool ApplyOnlinePromoImageChanges = false,
-    string? MenuTaxonomyJson = null);
+    string? MenuTaxonomyJson = null,
+    int PayrollLateDaysPerAttendanceUnit = 4,
+    bool PayrollAbsenceCountsAsAttendanceUnit = true,
+    decimal PayrollSalesBonusPercent = 5m,
+    decimal PayrollMaxSalaryAdvancePercentOfGross = 30m);
 
 public sealed record AdminCloudSettingsResponse(bool Success, string? LogoUrl, string Message);

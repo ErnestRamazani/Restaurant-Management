@@ -70,6 +70,67 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
             return BadRequest(new AdminCreateOrderResponse(false, "Create Order", "Open check was closed or moved. Refresh and try again.", null));
 
         var newItems = BuildOrderItems(lines, productById, activeStaff);
+
+        if (!request.IsTabletStaffOrderFlow)
+        {
+            var newLineTuples = lines.Select(l => (l.ProductId, l.Quantity)).ToList();
+            var inventoryPrecheck = OrderInventoryDeduction.TryValidateInventoryForProductQuantities(
+                db,
+                newLineTuples,
+                OrderInventoryDeduction.InventoryValidationKind.AdditionalLinesOnly);
+            if (inventoryPrecheck is not null)
+                return BadRequest(new AdminCreateOrderResponse(false, "Insufficient Inventory", inventoryPrecheck, null));
+        }
+
+        if (request.IsTabletStaffOrderFlow)
+        {
+            ApplyOpenCheckAppendMutations(existing, newItems, request, table);
+            db.SaveChanges();
+            return OkAppendResponse(existing, newItems.Count);
+        }
+
+        return DatabaseResilientTransaction.Execute<ActionResult<AdminCreateOrderResponse>>(db, () =>
+        {
+            if (IsInMemoryDatabase(db))
+            {
+                var invErrMem = OrderInventoryDeduction.TryApplyForAdditionalItems(db, existing, newItems);
+                if (invErrMem is not null)
+                    return BadRequest(new AdminCreateOrderResponse(false, "Insufficient Inventory", invErrMem, null));
+
+                ApplyOpenCheckAppendMutations(existing, newItems, request, table);
+                db.SaveChanges();
+                return OkAppendResponse(existing, newItems.Count);
+            }
+
+            using var tx = db.Database.BeginTransaction();
+            try
+            {
+                var invErr = OrderInventoryDeduction.TryApplyForAdditionalItems(db, existing, newItems);
+                if (invErr is not null)
+                {
+                    tx.Rollback();
+                    return BadRequest(new AdminCreateOrderResponse(false, "Insufficient Inventory", invErr, null));
+                }
+
+                ApplyOpenCheckAppendMutations(existing, newItems, request, table);
+                db.SaveChanges();
+                tx.Commit();
+                return OkAppendResponse(existing, newItems.Count);
+            }
+            catch
+            {
+                tx.Rollback();
+                throw;
+            }
+        });
+    }
+
+    private void ApplyOpenCheckAppendMutations(
+        OrderRecord existing,
+        IReadOnlyList<OrderItem> newItems,
+        AdminCreateOrderRequest request,
+        ModelTable table)
+    {
         foreach (var item in newItems)
             existing.Items.Add(item);
 
@@ -109,10 +170,12 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
             request.ReservationGuestName);
         table.Status = "Occupied";
         DataReconciler.ReconcileTableStatusesWithOrders(db);
-        db.SaveChanges();
+    }
 
+    private ActionResult<AdminCreateOrderResponse> OkAppendResponse(OrderRecord existing, int linesAdded)
+    {
         var code = string.IsNullOrWhiteSpace(existing.UniqueId) ? $"#{existing.Id:000}" : existing.UniqueId;
-        return Ok(new AdminCreateOrderResponse(true, "Create Order", $"Added {newItems.Count} line(s) to check {code}.", code));
+        return Ok(new AdminCreateOrderResponse(true, "Create Order", $"Added {linesAdded} line(s) to check {code}.", code));
     }
 
     private ActionResult<AdminCreateOrderResponse> CreateNew(
@@ -175,30 +238,88 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
         order.DeliveryFeeUsd = deliveryFee;
         OrderSubmissionHelper.SyncPaymentFields(order, productById);
 
-        if (!request.IsTabletStaffOrderFlow)
+        if (request.IsTabletStaffOrderFlow)
         {
-            var invErr = OrderInventoryDeduction.TryApplyForPlacedOrder(db, order);
-            if (invErr is not null)
-                return BadRequest(new AdminCreateOrderResponse(false, "Insufficient Inventory", invErr, null));
+            OrderSubmissionHelper.ApplyReservationLink(
+                order,
+                db,
+                request.SelectedOrderSource,
+                request.SourceReference,
+                request.ReservationCode,
+                request.ReservationGuestName);
+            db.Orders.Add(order);
+            if (table is not null)
+                table.Status = "Occupied";
+            DataReconciler.ReconcileTableStatusesWithOrders(db);
+            db.SaveChanges();
+
+            return Ok(new AdminCreateOrderResponse(
+                true,
+                "Sent to cashier",
+                $"Ticket {order.UniqueId} sent to the cashier.",
+                order.UniqueId));
         }
 
-        OrderSubmissionHelper.ApplyReservationLink(
-            order,
-            db,
-            request.SelectedOrderSource,
-            request.SourceReference,
-            request.ReservationCode,
-            request.ReservationGuestName);
-        db.Orders.Add(order);
-        if (table is not null)
-            table.Status = "Occupied";
-        DataReconciler.ReconcileTableStatusesWithOrders(db);
-        db.SaveChanges();
+        return DatabaseResilientTransaction.Execute<ActionResult<AdminCreateOrderResponse>>(db, () =>
+        {
+            if (IsInMemoryDatabase(db))
+            {
+                var invErrMem = OrderInventoryDeduction.TryApplyForPlacedOrder(db, order);
+                if (invErrMem is not null)
+                    return BadRequest(new AdminCreateOrderResponse(false, "Insufficient Inventory", invErrMem, null));
 
-        return Ok(request.IsTabletStaffOrderFlow
-            ? new AdminCreateOrderResponse(true, "Sent to cashier", $"Ticket {order.UniqueId} sent to the cashier.", order.UniqueId)
-            : new AdminCreateOrderResponse(true, "Create Order", $"Order {order.UniqueId} created.", order.UniqueId));
+                OrderSubmissionHelper.ApplyReservationLink(
+                    order,
+                    db,
+                    request.SelectedOrderSource,
+                    request.SourceReference,
+                    request.ReservationCode,
+                    request.ReservationGuestName);
+                db.Orders.Add(order);
+                if (table is not null)
+                    table.Status = "Occupied";
+                DataReconciler.ReconcileTableStatusesWithOrders(db);
+                db.SaveChanges();
+
+                return Ok(new AdminCreateOrderResponse(true, "Create Order", $"Order {order.UniqueId} created.", order.UniqueId));
+            }
+
+            using var tx = db.Database.BeginTransaction();
+            try
+            {
+                var invErr = OrderInventoryDeduction.TryApplyForPlacedOrder(db, order);
+                if (invErr is not null)
+                {
+                    tx.Rollback();
+                    return BadRequest(new AdminCreateOrderResponse(false, "Insufficient Inventory", invErr, null));
+                }
+
+                OrderSubmissionHelper.ApplyReservationLink(
+                    order,
+                    db,
+                    request.SelectedOrderSource,
+                    request.SourceReference,
+                    request.ReservationCode,
+                    request.ReservationGuestName);
+                db.Orders.Add(order);
+                if (table is not null)
+                    table.Status = "Occupied";
+                DataReconciler.ReconcileTableStatusesWithOrders(db);
+                db.SaveChanges();
+                tx.Commit();
+
+                return Ok(new AdminCreateOrderResponse(true, "Create Order", $"Order {order.UniqueId} created.", order.UniqueId));
+            }
+            catch
+            {
+                tx.Rollback();
+                throw;
+            }
+        });
     }
+
+    private static bool IsInMemoryDatabase(AppDbContext context) =>
+        context.Database.ProviderName?.Contains("InMemory", StringComparison.OrdinalIgnoreCase) == true;
 
     [HttpPost("pending/{orderId:int}/release-to-kitchen")]
     public async Task<ActionResult<AdminOrderReleasePendingResponse>> ReleasePendingToKitchen(int orderId)

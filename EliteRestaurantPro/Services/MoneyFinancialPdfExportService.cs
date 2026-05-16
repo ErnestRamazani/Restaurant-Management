@@ -125,8 +125,12 @@ public static class MoneyFinancialPdfExportService
                             table.Cell().PaddingVertical(3).Text(transaction.Category);
                             table.Cell().PaddingVertical(3).Text(string.IsNullOrWhiteSpace(transaction.Justification) ? "-" : transaction.Justification);
                             table.Cell().PaddingVertical(3).AlignRight()
-                                .Text(
-                                    $"{(isRevenue ? "+" : "-")}{CurrencyHelper.FormatAmount(transaction.Amount, MoneyReportingHelpers.NormalizeCurrencyCode(transaction.CurrencyCode))}")
+                                .Text(MoneyReportingHelpers.FormatLedgerAmount(
+                                    transaction.Amount,
+                                    transaction.AmountUsd,
+                                    transaction.AmountFc,
+                                    transaction.CurrencyCode,
+                                    isRevenue))
                                 .FontColor(isRevenue ? "#2ECC71" : "#DC143C");
                         }
                     });

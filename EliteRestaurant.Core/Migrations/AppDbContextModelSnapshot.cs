@@ -382,6 +382,10 @@ namespace EliteRestaurant.Core.Migrations
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("ConfirmationCode")
+                        .HasMaxLength(6)
+                        .HasColumnType("character varying(6)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -487,6 +491,10 @@ namespace EliteRestaurant.Core.Migrations
                     b.HasIndex("ServerId");
 
                     b.HasIndex("TableId");
+
+                    b.HasIndex("ConfirmationCode")
+                        .IsUnique()
+                        .HasFilter("\"ConfirmationCode\" IS NOT NULL AND \"ConfirmationCode\" <> ''");
 
                     b.HasIndex("UniqueId")
                         .IsUnique();
@@ -731,6 +739,18 @@ namespace EliteRestaurant.Core.Migrations
 
                     b.Property<string>("OnlinePromoTitle")
                         .HasColumnType("text");
+
+                    b.Property<bool>("PayrollAbsenceCountsAsAttendanceUnit")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("PayrollLateDaysPerAttendanceUnit")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("PayrollMaxSalaryAdvancePercentOfGross")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("PayrollSalesBonusPercent")
+                        .HasColumnType("numeric");
 
                     b.Property<string>("Phone")
                         .IsRequired()

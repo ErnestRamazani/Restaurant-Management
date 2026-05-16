@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace EliteRestaurant.Core.Utils;
 
 public static class CurrencyHelper
@@ -41,6 +43,10 @@ public static class CurrencyHelper
         => NormalizeCurrencyCode(currencyCode) == CongoleseFranc
             ? $"FC {amount:N0}"
             : $"$ {amount:N2}";
+
+    /// <summary>USD amount with two decimals and no currency symbol (compact copy in dialogs).</summary>
+    public static string FormatUsdAmountDigits(decimal amount)
+        => amount.ToString("N2", CultureInfo.InvariantCulture);
 
     public static string FormatDualCurrency(decimal usdAmount, decimal fcAmount)
     {

@@ -1,4 +1,6 @@
 using System.Windows;
+using System.Windows.Input;
+using EliteRestaurant.Core.Utils;
 
 namespace EliteRestaurantPro.Views;
 
@@ -19,7 +21,7 @@ public partial class OpenCheckChoiceDialog : Window
         string checkCode,
         string status,
         int newLineCount,
-        string newLinesSubtotalText)
+        decimal newLinesSubtotalUsd)
     {
         InitializeComponent();
 
@@ -31,7 +33,23 @@ public partial class OpenCheckChoiceDialog : Window
             ? "You are sending 1 new line on this order."
             : $"You are sending {newLineCount} new lines on this order.";
 
-        SubtotalText.Text = $"Subtotal for new lines: {newLinesSubtotalText}";
+        SubtotalText.Text =
+            $"Subtotal for new lines: {CurrencyHelper.FormatUsdAmountDigits(newLinesSubtotalUsd)}";
+    }
+
+    private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.LeftButton == MouseButtonState.Pressed)
+        {
+            try
+            {
+                DragMove();
+            }
+            catch
+            {
+                // HWND not ready — ignore.
+            }
+        }
     }
 
     private void Append_Click(object sender, RoutedEventArgs e)

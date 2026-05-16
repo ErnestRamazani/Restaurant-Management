@@ -37,13 +37,21 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
     private string _selectedOrderStatus = "Waiting";
     private bool _isTicketPreviewOpen;
     private string _ticketOrderId = string.Empty;
+    private string _ticketConfirmationCode = string.Empty;
     private string _ticketStatus = string.Empty;
     private string _ticketTable = string.Empty;
+    private string _ticketLocationLine = string.Empty;
+    private string _ticketDeliveryCustomerName = string.Empty;
+    private string _ticketDeliveryPhone = string.Empty;
+    private string _ticketDeliveryAddress = string.Empty;
+    private string _ticketDeliveryInstructions = string.Empty;
+    private bool _ticketShowServer = true;
     private string _ticketServer = string.Empty;
     private DateTime _ticketDateTime = DateTime.Now;
     private decimal _ticketSubtotal;
     private decimal _ticketTaxAmount;
     private decimal _ticketServiceAmount;
+    private decimal _ticketDeliveryFeeUsd;
     private decimal _ticketGrandTotal;
     private decimal _ticketDiscountAmount;
     private string _ticketDiscountLineText = string.Empty;
@@ -146,6 +154,19 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
         set => SetField(ref _ticketOrderId, value);
     }
 
+    public string TicketConfirmationCode
+    {
+        get => _ticketConfirmationCode;
+        set
+        {
+            if (!SetField(ref _ticketConfirmationCode, value))
+                return;
+            OnPropertyChanged(nameof(TicketShowConfirmationCode));
+        }
+    }
+
+    public bool TicketShowConfirmationCode => !string.IsNullOrWhiteSpace(TicketConfirmationCode);
+
     public string TicketStatus
     {
         get => _ticketStatus;
@@ -156,6 +177,89 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
     {
         get => _ticketTable;
         set => SetField(ref _ticketTable, value);
+    }
+
+    public string TicketLocationLine
+    {
+        get => _ticketLocationLine;
+        set => SetField(ref _ticketLocationLine, value);
+    }
+
+    private bool _ticketShowDeliverySection;
+    private bool _ticketIsDeliveryFulfillment;
+
+    public bool TicketShowDeliverySection
+    {
+        get => _ticketShowDeliverySection;
+        set => SetField(ref _ticketShowDeliverySection, value);
+    }
+
+    public bool TicketIsDeliveryFulfillment
+    {
+        get => _ticketIsDeliveryFulfillment;
+        private set
+        {
+            if (!SetField(ref _ticketIsDeliveryFulfillment, value))
+                return;
+            OnPropertyChanged(nameof(TicketFulfillmentSectionTitle));
+        }
+    }
+
+    public string TicketFulfillmentSectionTitle => TicketIsDeliveryFulfillment ? "DELIVERY" : "PICKUP";
+
+    public string TicketDeliveryCustomerName
+    {
+        get => _ticketDeliveryCustomerName;
+        set
+        {
+            if (!SetField(ref _ticketDeliveryCustomerName, value))
+                return;
+            OnPropertyChanged(nameof(TicketShowDeliveryCustomerName));
+        }
+    }
+
+    public string TicketDeliveryPhone
+    {
+        get => _ticketDeliveryPhone;
+        set
+        {
+            if (!SetField(ref _ticketDeliveryPhone, value))
+                return;
+            OnPropertyChanged(nameof(TicketShowDeliveryPhone));
+        }
+    }
+
+    public string TicketDeliveryAddress
+    {
+        get => _ticketDeliveryAddress;
+        set
+        {
+            if (!SetField(ref _ticketDeliveryAddress, value))
+                return;
+            OnPropertyChanged(nameof(TicketShowDeliveryAddress));
+        }
+    }
+
+    public string TicketDeliveryInstructions
+    {
+        get => _ticketDeliveryInstructions;
+        set
+        {
+            if (!SetField(ref _ticketDeliveryInstructions, value))
+                return;
+            OnPropertyChanged(nameof(TicketShowDeliveryInstructions));
+        }
+    }
+
+    public bool TicketShowDeliveryCustomerName => !string.IsNullOrWhiteSpace(TicketDeliveryCustomerName);
+    public bool TicketShowDeliveryPhone => !string.IsNullOrWhiteSpace(TicketDeliveryPhone);
+    public bool TicketShowDeliveryAddress => !string.IsNullOrWhiteSpace(TicketDeliveryAddress);
+    public bool TicketShowDeliveryInstructions => !string.IsNullOrWhiteSpace(TicketDeliveryInstructions);
+
+    public bool TicketShowServer
+    {
+        get => _ticketShowServer;
+        set => SetField(ref _ticketShowServer, value);
     }
 
     public string TicketServer
@@ -187,6 +291,19 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
         get => _ticketServiceAmount;
         set => SetField(ref _ticketServiceAmount, value);
     }
+
+    public decimal TicketDeliveryFeeUsd
+    {
+        get => _ticketDeliveryFeeUsd;
+        set
+        {
+            if (!SetField(ref _ticketDeliveryFeeUsd, value))
+                return;
+            OnPropertyChanged(nameof(TicketShowDeliveryFee));
+        }
+    }
+
+    public bool TicketShowDeliveryFee => TicketDeliveryFeeUsd > 0m;
 
     public decimal TicketGrandTotal
     {

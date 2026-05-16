@@ -28,35 +28,9 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         public override string ToString() => DisplayName;
     }
 
-    public sealed class ArrivedReservationOption
-    {
-        public int Id { get; init; }
-        public string UniqueId { get; init; } = string.Empty;
-        public string ReservationName { get; init; } = string.Empty;
-        public string GuestName { get; init; } = string.Empty;
-        public DateTime ReservedFor { get; init; }
-        public int? TableId { get; init; }
-        public string TableLabel { get; init; } = "-";
-        public string Label =>
-            $"{(string.IsNullOrWhiteSpace(ReservationName) ? GuestName : ReservationName)} • {ReservedFor:dd MMM HH:mm} • {TableLabel} • {UniqueId}";
-
-        public override string ToString() => Label;
-    }
-
-    private static ArrivedReservationOption NoneReservationOption => new()
-    {
-        Id = 0,
-        UniqueId = string.Empty,
-        GuestName = "None (Walk-in order)",
-        ReservedFor = DateTime.MinValue,
-        TableId = null,
-        TableLabel = "-"
-    };
-
     private static DraftEntry EmptyDraftOption => new() { FilePath = string.Empty, DisplayName = "None (empty slot)" };
 
     private int _selectedTableId;
-    private string _selectedOrderSource = "WalkIn";
     private string _selectedOrderStatus = "Waiting";
     private string _selectedOrderCategory = "All";
     private string _selectedOrderSubCategory = "All";
@@ -64,7 +38,6 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
     private DraftEntry? _selectedDraft;
     private string _customerNotes = string.Empty;
     private string _allergyNotes = string.Empty;
-    private string _selectedPaymentCurrency = CurrencyHelper.Usd;
     private bool _isLoading;
     private bool _isSubmitting;
     private decimal _liveSubtotal;
@@ -86,8 +59,6 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
     private bool _suppressSelectionChanged;
     /// <summary>When true, live totals exclude the persisted open-check subtotal (e.g. user chose "separate ticket" while a check exists).</summary>
     private bool _skipPersistedSubtotalInTotals;
-    private ArrivedReservationOption? _selectedArrivedReservation;
-    private string _selectedDeliveryReference = string.Empty;
     /// <summary>Resolved via cloud API during load for admin draft ownership (never block UI synchronously).</summary>
     private int? _resolvedDraftOwnerEmployeeId;
     /// <summary>Subtotal for the open check's existing lines; refreshed with open-check banner.</summary>
@@ -102,47 +73,24 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
 
     public bool IsTabletStaffOrderFlow => AppSession.IsServerTablet || AppSession.IsCashierTablet;
     public bool CanEditTablePicker => !AppSession.IsServerTablet || AvailableTables.Count > 1;
-    public bool CanEditTableForCurrentSource => !IsDeliverySource && CanEditTablePicker;
-    public bool IsWalkInSource => string.Equals(SelectedOrderSource, "WalkIn", StringComparison.OrdinalIgnoreCase);
-    public bool IsReservationSource => string.Equals(SelectedOrderSource, "Reservation", StringComparison.OrdinalIgnoreCase);
-    public bool IsDeliverySource => string.Equals(SelectedOrderSource, "Delivery", StringComparison.OrdinalIgnoreCase);
+    public bool CanEditTableForCurrentSource => CanEditTablePicker;
     public bool CanEditOrderStatusPicker => !AppSession.IsStaffTablet;
     public bool HasOpenCheckForTable => _openCheckOrderId.HasValue;
     public string OpenCheckBannerText =>
         HasOpenCheckForTable
             ? $"Open check {_openCheckCode} ({_openCheckStatus}) exists for this table. Submit will ask to append or create a separate ticket."
             : string.Empty;
-    public string PrimaryActionLabel => IsTabletStaffOrderFlow ? "Send to cashier" : "Create Real Order";
+    public string PrimaryActionLabel => IsTabletStaffOrderFlow ? "Send to cashier" : "Create Order";
 
     public ObservableCollection<ModelTable> AvailableTables { get; } = new();
-    public ObservableCollection<string> OrderSources { get; } = new(["WalkIn", "Reservation", "Delivery"]);
     public ObservableCollection<string> OrderStatuses { get; } = new(["Waiting", "In Kitchen", "Ready"]);
     public ObservableCollection<string> OrderCategories { get; } = new();
     public ObservableCollection<string> OrderSubCategories { get; } = new();
-    public ObservableCollection<string> PaymentCurrencies { get; } = new([CurrencyHelper.Usd, CurrencyHelper.CongoleseFranc]);
     public ObservableCollection<string> DiscountModes { get; } = new(["None", "Percent", "Usd"]);
     public ObservableCollection<ProductSelectionItemViewModel> ProductSelections { get; } = new();
     public ObservableCollection<ProductSelectionItemViewModel> FilteredProductSelections { get; } = new();
     public ObservableCollection<ProductSelectionItemViewModel> SelectedProductSelections { get; } = new();
     public ObservableCollection<DraftEntry> SavedDrafts { get; } = new();
-    public ObservableCollection<ArrivedReservationOption> ArrivedReservations { get; } = new();
-    public ObservableCollection<string> DeliveryReferences { get; } = new();
-
-    public string SelectedOrderSource
-    {
-        get => _selectedOrderSource;
-        set
-        {
-            if (!SetField(ref _selectedOrderSource, value))
-                return;
-
-            HandleOrderSourceChanged();
-            OnPropertyChanged(nameof(IsWalkInSource));
-            OnPropertyChanged(nameof(IsReservationSource));
-            OnPropertyChanged(nameof(IsDeliverySource));
-            OnPropertyChanged(nameof(CanEditTableForCurrentSource));
-        }
-    }
 
     public int SelectedTableId
     {
@@ -205,23 +153,6 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         set => SetField(ref _selectedDraft, value);
     }
 
-    public ArrivedReservationOption? SelectedArrivedReservation
-    {
-        get => _selectedArrivedReservation;
-        set
-        {
-            if (!SetField(ref _selectedArrivedReservation, value))
-                return;
-            ApplyArrivedReservationSelection(value);
-        }
-    }
-
-    public string SelectedDeliveryReference
-    {
-        get => _selectedDeliveryReference;
-        set => SetField(ref _selectedDeliveryReference, value);
-    }
-
     public string CustomerNotes
     {
         get => _customerNotes;
@@ -232,17 +163,6 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
     {
         get => _allergyNotes;
         set => SetField(ref _allergyNotes, value);
-    }
-
-    public string SelectedPaymentCurrency
-    {
-        get => _selectedPaymentCurrency;
-        set
-        {
-            if (!SetField(ref _selectedPaymentCurrency, value))
-                return;
-            OnPropertyChanged(nameof(ChosenPaymentAmountText));
-        }
     }
 
     public bool IsLoading
@@ -370,14 +290,14 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
     public string EstimatedPrepText => EstimatedPrepMinutes <= 0 ? "-" : $"{EstimatedPrepMinutes} min";
 
     public string ChosenPaymentAmountText =>
-        string.Equals(SelectedPaymentCurrency, CurrencyHelper.CongoleseFranc, StringComparison.OrdinalIgnoreCase)
-            ? CurrencyHelper.FormatAmount(LiveGrandTotalFc, CurrencyHelper.CongoleseFranc)
-            : CurrencyHelper.FormatAmount(LiveGrandTotal, CurrencyHelper.Usd);
+        CurrencyHelper.FormatAmount(LiveGrandTotal, CurrencyHelper.Usd);
 
     public ICommand CreateOrderCommand { get; }
     public ICommand ClearSelectionCommand { get; }
+    public ICommand ToggleProductSelectionCommand { get; }
     public ICommand IncreaseQuantityCommand { get; }
     public ICommand DecreaseQuantityCommand { get; }
+    public ICommand RemoveSelectedLineCommand { get; }
     public ICommand SaveDraftCommand { get; }
     public ICommand LoadDraftCommand { get; }
     public ICommand DeleteDraftCommand { get; }
@@ -394,8 +314,10 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
 
         CreateOrderCommand = new RelayCommand(_ => CreateOrder(), _ => CanSubmitCreateOrder);
         ClearSelectionCommand = new RelayCommand(_ => ClearSelection());
+        ToggleProductSelectionCommand = new RelayCommand(item => ToggleProductSelection(item as ProductSelectionItemViewModel));
         IncreaseQuantityCommand = new RelayCommand(item => IncreaseQuantity(item as ProductSelectionItemViewModel));
         DecreaseQuantityCommand = new RelayCommand(item => DecreaseQuantity(item as ProductSelectionItemViewModel));
+        RemoveSelectedLineCommand = new RelayCommand(item => RemoveSelectedLine(item as ProductSelectionItemViewModel));
         SaveDraftCommand = new RelayCommand(_ => SaveDraft());
         LoadDraftCommand = new RelayCommand(_ => LoadSelectedDraft());
         DeleteDraftCommand = new RelayCommand(_ => DeleteSelectedDraft());
@@ -518,31 +440,12 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
                         Category = p.Category,
                         SubCategory = p.SubCategory,
                         Price = p.Price,
-                        Quantity = 1
+                        Quantity = 1,
+                        IsAvailable = p.IsAvailable
                     };
                     vm.PropertyChanged += OnSelectionChanged;
                     ProductSelections.Add(vm);
                 }
-
-                ArrivedReservations.Clear();
-                ArrivedReservations.Add(NoneReservationOption);
-                foreach (var r in catalog.ArrivedReservations)
-                {
-                    ArrivedReservations.Add(new ArrivedReservationOption
-                    {
-                        Id = r.Id,
-                        UniqueId = r.UniqueId,
-                        ReservationName = r.ReservationName,
-                        GuestName = r.GuestName,
-                        ReservedFor = r.ReservedFor,
-                        TableId = r.TableId,
-                        TableLabel = r.TableLabel
-                    });
-                }
-
-                DeliveryReferences.Clear();
-                foreach (var d in catalog.DeliveryReferences)
-                    DeliveryReferences.Add(d);
 
                 _suppressOpenCheckRefresh = true;
                 try
@@ -554,10 +457,6 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
                     _suppressOpenCheckRefresh = false;
                 }
 
-                SelectedArrivedReservation = ArrivedReservations.FirstOrDefault();
-                SelectedDeliveryReference = string.Empty;
-                SelectedOrderSource = "WalkIn";
-
                 if (IsTabletStaffOrderFlow)
                 {
                     OrderStatuses.Clear();
@@ -568,8 +467,6 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
                 {
                     SelectedOrderStatus = OrderStatuses.First();
                 }
-
-                SelectedPaymentCurrency = CurrencyHelper.Usd;
 
                 RebuildCategoryFilter();
                 RebuildSubCategoryFilter();
@@ -832,7 +729,8 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
 
     private void IncreaseQuantity(ProductSelectionItemViewModel? item)
     {
-        if (item is null) return;
+        if (item is null || !item.IsAvailable)
+            return;
         item.Quantity += 1;
         item.IsSelected = true;
     }
@@ -841,6 +739,23 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
     {
         if (item is null) return;
         item.Quantity = Math.Max(1, item.Quantity - 1);
+    }
+
+    private void RemoveSelectedLine(ProductSelectionItemViewModel? item)
+    {
+        if (item is null)
+            return;
+        item.Quantity = 1;
+        item.IsSelected = false;
+    }
+
+    private void ToggleProductSelection(ProductSelectionItemViewModel? item)
+    {
+        if (item is null)
+            return;
+        if (!item.IsAvailable && !item.IsSelected)
+            return;
+        item.IsSelected = !item.IsSelected;
     }
 
     private CreateOrderSubmitSnapshot BuildSubmitSnapshot(List<ProductSelectionItemViewModel> selected) =>
@@ -858,83 +773,18 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
             LiveDiscountLabel,
             LiveGrandTotalUsdText,
             LiveGrandTotalFcText,
-            SelectedPaymentCurrency,
+            CurrencyHelper.Usd,
             ChosenPaymentAmountText,
             EstimatedPrepText,
             SelectedOrderStatus,
-            SelectedOrderSource,
-            IsDeliverySource ? (SelectedDeliveryReference ?? string.Empty).Trim() : string.Empty,
+            "WalkIn",
+            string.Empty,
             IsTabletStaffOrderFlow,
             _serverEmployeeId,
             _serverEmployeeName,
-            SelectedArrivedReservation?.UniqueId ?? string.Empty,
-            SelectedArrivedReservation?.GuestName ?? string.Empty,
+            string.Empty,
+            string.Empty,
             null);
-
-    private void ApplyArrivedReservationSelection(ArrivedReservationOption? selected)
-    {
-        if (!IsReservationSource)
-        {
-            RemoveReservationMarkerFromNotes();
-            return;
-        }
-
-        if (selected is null || string.IsNullOrWhiteSpace(selected.UniqueId))
-        {
-            RemoveReservationMarkerFromNotes();
-            return;
-        }
-
-        if (selected.TableId is int tableId && tableId != 0)
-            SelectedTableId = tableId;
-
-        var marker = $"Reservation {selected.UniqueId}";
-        if (string.IsNullOrWhiteSpace(CustomerNotes))
-        {
-            CustomerNotes = marker;
-            return;
-        }
-
-        if (!CustomerNotes.Contains(marker, StringComparison.OrdinalIgnoreCase))
-            CustomerNotes = $"{marker}\n{CustomerNotes}";
-    }
-
-    private void HandleOrderSourceChanged()
-    {
-        if (IsWalkInSource)
-        {
-            SelectedArrivedReservation = ArrivedReservations.FirstOrDefault();
-            SelectedDeliveryReference = string.Empty;
-            if (SelectedTableId == 0)
-                SelectedTableId = AvailableTables.FirstOrDefault()?.Id ?? 0;
-            return;
-        }
-
-        if (IsReservationSource)
-        {
-            var firstActualReservation = ArrivedReservations.FirstOrDefault(r => !string.IsNullOrWhiteSpace(r.UniqueId));
-            SelectedArrivedReservation = firstActualReservation ?? ArrivedReservations.FirstOrDefault();
-            SelectedDeliveryReference = string.Empty;
-            return;
-        }
-
-        // Delivery
-        SelectedArrivedReservation = ArrivedReservations.FirstOrDefault();
-        SelectedTableId = 0;
-        RemoveReservationMarkerFromNotes();
-    }
-
-    private void RemoveReservationMarkerFromNotes()
-    {
-        if (string.IsNullOrWhiteSpace(CustomerNotes))
-            return;
-
-        var lines = CustomerNotes
-            .Split('\n')
-            .Where(l => !l.TrimStart().StartsWith("Reservation RSV-", StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        CustomerNotes = string.Join(Environment.NewLine, lines).Trim();
-    }
 
     private void CreateOrder()
     {
@@ -952,19 +802,9 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
             ShowDialog("Select at least one menu item.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
-        if (!IsDeliverySource && SelectedTableId == 0)
+        if (SelectedTableId == 0)
         {
-            ShowDialog("Select a table for this order source.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-        if (IsReservationSource && (SelectedArrivedReservation is null || string.IsNullOrWhiteSpace(SelectedArrivedReservation.UniqueId)))
-        {
-            ShowDialog("Select a reservation for reservation mode.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-        if (IsDeliverySource && string.IsNullOrWhiteSpace(SelectedDeliveryReference))
-        {
-            ShowDialog("Enter a delivery name/reference for delivery mode.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
+            ShowDialog("Select a table for this order.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
@@ -979,7 +819,7 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
                 return;
             }
 
-            if (!IsDeliverySource && phase.OpenCheck.OrderId is int openOrderId)
+            if (phase.OpenCheck.OrderId is int openOrderId)
             {
                 var newLinesSubtotal = selected.Sum(s => s.LineTotal);
                 var openDlg = new OpenCheckChoiceDialog(
@@ -988,7 +828,7 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
                     phase.OpenCheck.Code,
                     phase.OpenCheck.Status,
                     snap.SelectedLines.Count,
-                    CurrencyHelper.FormatAmount(newLinesSubtotal, CurrencyHelper.Usd))
+                    newLinesSubtotal)
                 {
                     Owner = DialogOwner(),
                 };
@@ -998,10 +838,13 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
                     return;
                 if (openDlg.Choice == OpenCheckChoice.AppendToSameTicket)
                 {
-                    var append = _orderSubmission.AppendToExisting(snap, openOrderId);
+                    var append = await _orderSubmission.AppendToExistingAsync(snap, openOrderId).ConfigureAwait(true);
                     if (!append.Ok)
                     {
-                        ShowDialog(append.Message, append.Caption, MessageBoxButton.OK, MessageBoxImage.Warning);
+                        var appendImage = string.Equals(append.Caption, "Cloud API", StringComparison.OrdinalIgnoreCase)
+                            ? MessageBoxImage.Error
+                            : MessageBoxImage.Warning;
+                        ShowDialog(append.Message, append.Caption, MessageBoxButton.OK, appendImage);
                         RefreshOpenCheckBanner();
                         return;
                     }
@@ -1037,31 +880,31 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
                 ? $"\n{snap.LiveDiscountLabel}: -{CurrencyHelper.FormatAmount(snap.LiveDiscountAmount, CurrencyHelper.Usd)}"
                 : string.Empty;
 
-            var sourceLine = IsDeliverySource
-                ? $"Create delivery order ({(string.IsNullOrWhiteSpace(SelectedDeliveryReference) ? "No reference" : SelectedDeliveryReference)})"
-                : IsReservationSource
-                    ? $"Create reservation order for {SelectedArrivedReservation?.Label ?? "selected reservation"}"
-                    : $"Create walk-in order for Table {phase.TableNumber} ({phase.TableName})";
+            var sourceLine = $"Create walk-in order for Table {phase.TableNumber} ({phase.TableName})";
 
-            var confirm = ShowDialog(
-                $"{sourceLine} with {snap.SelectedLines.Count} selected item(s)?\n\n" +
+            var detailsBlock =
                 $"Subtotal: {CurrencyHelper.FormatAmount(snap.LiveSubtotal, CurrencyHelper.Usd)}{discountLine}\n" +
                 $"Grand Total: {snap.LiveGrandTotalUsdText}\n" +
                 $"Equivalent FC: {snap.LiveGrandTotalFcText}\n" +
-                $"Payment Currency: {snap.SelectedPaymentCurrency}\n" +
                 $"Amount To Collect: {snap.ChosenPaymentAmountText}\n" +
-                $"Estimated Prep: {snap.EstimatedPrepText}",
-                snap.IsTabletStaffOrderFlow ? "Send to cashier" : "Confirm Create Order",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
+                $"Estimated Prep: {snap.EstimatedPrepText}";
 
-            if (confirm != MessageBoxResult.Yes)
+            var confirmDlg = new ConfirmCreateOrderDialog(
+                    snap.IsTabletStaffOrderFlow,
+                    $"{sourceLine} with {snap.SelectedLines.Count} selected item(s)?",
+                    detailsBlock)
+                { Owner = DialogOwner() };
+
+            if (confirmDlg.ShowDialog() != true)
                 return;
 
-            var save = _orderSubmission.SaveNew(snap);
+            var save = await _orderSubmission.SaveNewAsync(snap).ConfigureAwait(true);
             if (!save.Ok)
             {
-                ShowDialog(save.Message, save.Caption, MessageBoxButton.OK, MessageBoxImage.Warning);
+                var saveImage = string.Equals(save.Caption, "Cloud API", StringComparison.OrdinalIgnoreCase)
+                    ? MessageBoxImage.Error
+                    : MessageBoxImage.Warning;
+                ShowDialog(save.Message, save.Caption, MessageBoxButton.OK, saveImage);
                 return;
             }
 
@@ -1104,7 +947,6 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         ProductSearchText = string.Empty;
         CustomerNotes = string.Empty;
         AllergyNotes = string.Empty;
-        SelectedPaymentCurrency = CurrencyHelper.Usd;
         RefreshOpenCheckBanner();
         RecalculateTotals();
         OnPropertyChanged(nameof(SubtotalCaption));
@@ -1128,16 +970,16 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         {
             DraftLabel = $"{DateTime.Now:dd MMM HH:mm:ss} | {tableLabel} | {selectedCount} items | {SelectedOrderStatus}",
             SelectedTableId = SelectedTableId,
-            SelectedOrderSource = SelectedOrderSource,
-            SelectedDeliveryReference = SelectedDeliveryReference,
-            SelectedReservationCode = SelectedArrivedReservation?.UniqueId ?? string.Empty,
+            SelectedOrderSource = "WalkIn",
+            SelectedDeliveryReference = string.Empty,
+            SelectedReservationCode = string.Empty,
             SelectedOrderStatus = SelectedOrderStatus,
             SelectedOrderCategory = SelectedOrderCategory,
             SelectedOrderSubCategory = SelectedOrderSubCategory,
             ProductSearchText = ProductSearchText,
             CustomerNotes = CustomerNotes,
             AllergyNotes = AllergyNotes,
-            SelectedPaymentCurrency = SelectedPaymentCurrency,
+            SelectedPaymentCurrency = CurrencyHelper.Usd,
             DiscountMode = SelectedDiscountMode,
             DiscountInput = DiscountInput,
             Items = ProductSelections.Where(p => p.IsSelected)
@@ -1173,7 +1015,6 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         if (draft is null)
             return false;
 
-        SelectedOrderSource = string.IsNullOrWhiteSpace(draft.SelectedOrderSource) ? "WalkIn" : draft.SelectedOrderSource;
         SelectedTableId = draft.SelectedTableId;
         SelectedOrderStatus = string.IsNullOrWhiteSpace(draft.SelectedOrderStatus) ? "Waiting" : draft.SelectedOrderStatus;
         // Keep full menu visible after loading a draft.
@@ -1182,17 +1023,8 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         ProductSearchText = string.Empty;
         CustomerNotes = draft.CustomerNotes ?? string.Empty;
         AllergyNotes = draft.AllergyNotes ?? string.Empty;
-        SelectedPaymentCurrency = string.IsNullOrWhiteSpace(draft.SelectedPaymentCurrency) ? CurrencyHelper.Usd : draft.SelectedPaymentCurrency;
         SelectedDiscountMode = string.IsNullOrWhiteSpace(draft.DiscountMode) ? "None" : draft.DiscountMode;
         DiscountInput = draft.DiscountInput ?? string.Empty;
-        SelectedDeliveryReference = draft.SelectedDeliveryReference ?? string.Empty;
-
-        if (!string.IsNullOrWhiteSpace(draft.SelectedReservationCode))
-        {
-            SelectedArrivedReservation = ArrivedReservations.FirstOrDefault(r =>
-                                           string.Equals(r.UniqueId, draft.SelectedReservationCode, StringComparison.OrdinalIgnoreCase))
-                                       ?? ArrivedReservations.FirstOrDefault();
-        }
 
         var qtyByProduct = draft.Items.ToDictionary(i => i.ProductId, i => Math.Max(1, i.Quantity));
         _suppressSelectionChanged = true;
@@ -1202,8 +1034,16 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
             {
                 if (qtyByProduct.TryGetValue(item.ProductId, out var qty))
                 {
-                    item.IsSelected = true;
-                    item.Quantity = qty;
+                    if (item.IsAvailable)
+                    {
+                        item.IsSelected = true;
+                        item.Quantity = qty;
+                    }
+                    else
+                    {
+                        item.IsSelected = false;
+                        item.Quantity = 1;
+                    }
                 }
                 else
                 {

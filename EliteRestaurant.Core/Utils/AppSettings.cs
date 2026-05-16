@@ -26,12 +26,17 @@ public static class CloudEndpoints
 public sealed class AppSettings
 {
     public BusinessProfileSettings BusinessProfile { get; set; } = new();
+    /// <summary>Printed/PDF ticket layout (local paths; not synced to cloud).</summary>
+    public TicketReceiptSettings TicketReceipt { get; set; } = new();
     public CurrencyPricingSettings CurrencyPricing { get; set; } = new();
     public NavigationBackgroundSettings NavigationBackgrounds { get; set; } = new();
     public DatabaseSettings Database { get; set; } = new();
     public CloudApiSettings CloudApi { get; set; } = new();
     /// <summary>Shift windows for attendance UI, payroll scheduled hours, and auto-absence logic.</summary>
     public AttendanceSettings Attendance { get; set; } = new();
+
+    /// <summary>Payroll attendance units, sales bonus %, and advance caps (synced with cloud profile / DB).</summary>
+    public SalarySettings Salary { get; set; } = new();
 
     /// <summary>Admin-defined menu type → category (Product.Category) → subcategory (Product.SubCategory) structure.</summary>
     public MenuTaxonomySettings? MenuTaxonomy { get; set; }
@@ -45,6 +50,22 @@ public sealed class AttendanceSettings
     public TimeSpan NightShiftStart { get; set; } = new(18, 0, 0);
     public TimeSpan NightShiftEnd { get; set; } = new(23, 0, 0);
     public int LateClockInGraceMinutes { get; set; } = 30;
+}
+
+/// <summary>Salary and payroll calculation parameters (stored in <c>app-settings.json</c> and <see cref="Models.PublicMenuSetting"/>).</summary>
+public sealed class SalarySettings
+{
+    /// <summary>Late clock-in days that combine into one absence-equivalent payroll deduction unit (minimum 1).</summary>
+    public int LateDaysPerAttendanceUnit { get; set; } = 4;
+
+    /// <summary>When true, each scheduled absence day counts as one deduction unit (in addition to units from lates).</summary>
+    public bool AbsenceCountsAsAttendanceUnit { get; set; } = true;
+
+    /// <summary>Bonus on server merchandise sales, as a percent (0–100), same basis as the legacy 5% rule.</summary>
+    public decimal SalesBonusPercent { get; set; } = 5m;
+
+    /// <summary>Maximum salary advances for a payroll month as a percent of that month’s scheduled gross (0–100).</summary>
+    public decimal MaxSalaryAdvancePercentOfGross { get; set; } = 30m;
 }
 
 public sealed class DatabaseSettings
@@ -106,6 +127,22 @@ public sealed class BusinessProfileSettings
     public int ReservationLeadDays { get; set; } = 2;
     /// <summary>Maximum months ahead allowed for public booking.</summary>
     public int ReservationMaxMonthsAhead { get; set; } = 6;
+}
+
+/// <summary>Local ticket/PDF receipt branding (paths on this machine).</summary>
+public sealed class TicketReceiptSettings
+{
+    /// <summary>Optional logo image shown above the restaurant name on printed/PDF tickets only.</summary>
+    public string HeaderLogoPath { get; set; } = string.Empty;
+
+    public List<TicketSocialMediaRowSettings> SocialMediaRows { get; set; } = [];
+}
+
+public sealed class TicketSocialMediaRowSettings
+{
+    public string PlatformName { get; set; } = string.Empty;
+    public string UserText { get; set; } = string.Empty;
+    public string IconPath { get; set; } = string.Empty;
 }
 
 public sealed class CurrencyPricingSettings

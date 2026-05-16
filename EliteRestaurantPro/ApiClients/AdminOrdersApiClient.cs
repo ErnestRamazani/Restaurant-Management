@@ -38,7 +38,7 @@ public sealed class AdminOrdersApiClient(EliteApiClient? apiClient = null)
                 .Select(line => new AdminOrderLineRequest(line.ProductId, line.Quantity))
                 .ToList());
 
-        return await _apiClient.PostAsync<AdminCreateOrderRequest, AdminCreateOrderResponse>(
+        return await _apiClient.PostAsyncOrBadRequestAsync<AdminCreateOrderRequest, AdminCreateOrderResponse>(
                    "api/admin/orders/create",
                    request,
                    cancellationToken)

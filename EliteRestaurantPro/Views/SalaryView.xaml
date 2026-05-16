@@ -243,10 +243,54 @@
                                         <Expander.Header>
                                             <Grid Margin="18,16">
                                                 <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <StackPanel>
+                                                <Border Grid.Column="0"
+                                                        Width="72"
+                                                        Height="72"
+                                                        Margin="0,0,16,0"
+                                                        CornerRadius="36"
+                                                        Background="#2A3048"
+                                                        BorderBrush="#55D4AF37"
+                                                        BorderThickness="1"
+                                                        ClipToBounds="True"
+                                                        VerticalAlignment="Center">
+                                                    <Grid>
+                                                        <Image Stretch="UniformToFill"
+                                                               Source="{Binding HeaderProfileImage}">
+                                                            <Image.Style>
+                                                                <Style TargetType="Image">
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding HeaderHasProfilePhoto}" Value="False">
+                                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Image.Style>
+                                                        </Image>
+                                                        <TextBlock Text="{Binding EmployeeInitials}"
+                                                                   HorizontalAlignment="Center"
+                                                                   VerticalAlignment="Center"
+                                                                   FontSize="22"
+                                                                   FontWeight="Bold"
+                                                                   Foreground="{StaticResource GoldAccentBrush}">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding HeaderHasProfilePhoto}" Value="False">
+                                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+                                                    </Grid>
+                                                </Border>
+                                                <StackPanel Grid.Column="1">
                                                     <TextBlock Text="{Binding EmployeeName}"
                                                                Foreground="{StaticResource TextPrimaryBrush}"
                                                                FontFamily="Segoe UI Variable Display, Segoe UI"
@@ -303,7 +347,7 @@
                                                         </Border>
                                                     </StackPanel>
                                                 </StackPanel>
-                                                <TextBlock Grid.Column="1"
+                                                <TextBlock Grid.Column="2"
                                                            Text="▼"
                                                            Foreground="{StaticResource GoldAccentBrush}"
                                                            FontFamily="Segoe UI"
@@ -314,12 +358,22 @@
                                         </Expander.Header>
 
                                         <StackPanel Margin="18,0,18,22">
-                                            <TextBlock Text="Schedule &amp; base" Foreground="{StaticResource GoldAccentBrush}" FontSize="19" FontWeight="SemiBold" Margin="0,0,0,12"/>
+                                            <TextBlock Text="Schedule &amp; payroll base" Foreground="{StaticResource GoldAccentBrush}" FontSize="19" FontWeight="SemiBold" Margin="0,0,0,12"/>
                                             <WrapPanel>
                                                 <Border Style="{StaticResource SalaryPayrollChip}">
-                                                    <TextBlock Text="{Binding HourlyRateUsd, StringFormat=Hourly $ {0:N2}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
+                                                    <TextBlock Text="{Binding PayrollPrimaryRateChipText}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
                                                 </Border>
-                                                <Border Style="{StaticResource SalaryPayrollChip}">
+                                                <Border>
+                                                    <Border.Style>
+                                                        <Style TargetType="Border" BasedOn="{StaticResource SalaryPayrollChip}">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding UsesMonthlySalary}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
                                                     <TextBlock Text="{Binding ScheduledHoursMonth, StringFormat=Scheduled hours {0:0.#}}"
                                                                Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
                                                 </Border>
@@ -331,24 +385,37 @@
                                                 </Border>
                                             </WrapPanel>
 
-                                            <TextBlock Text="Attendance" Foreground="{StaticResource GoldAccentBrush}" FontSize="19" FontWeight="SemiBold" Margin="0,16,0,12"/>
-                                            <WrapPanel>
-                                                <Border Style="{StaticResource SalaryPayrollChip}">
-                                                    <TextBlock Text="{Binding AbsenceDays, StringFormat=Absences {0}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
-                                                </Border>
-                                                <Border Style="{StaticResource SalaryPayrollChip}">
-                                                    <TextBlock Text="{Binding LateDays, StringFormat=Lates {0}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
-                                                </Border>
-                                                <Border Style="{StaticResource SalaryPayrollChip}">
-                                                    <TextBlock Text="{Binding LatePenaltyAbsences, StringFormat=Late → units {0}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
-                                                </Border>
-                                                <Border Style="{StaticResource SalaryPayrollChip}">
-                                                    <TextBlock Text="{Binding TotalDeductionUnits, StringFormat=Total units {0}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
-                                                </Border>
-                                                <Border Background="#152196F3" CornerRadius="10" Padding="14,10" Margin="0,0,10,10">
-                                                    <TextBlock Text="{Binding BaseAfterAttendanceUsd, StringFormat=After attendance $ {0:N2}}" Foreground="{StaticResource StatBlueBrush}" FontSize="14"/>
-                                                </Border>
-                                            </WrapPanel>
+                                            <StackPanel Margin="0,16,0,12">
+                                                <TextBlock Text="Attendance"
+                                                           Foreground="{StaticResource GoldAccentBrush}"
+                                                           FontSize="19"
+                                                           FontWeight="SemiBold"/>
+                                                <WrapPanel Margin="0,12,0,0">
+                                                    <Border Style="{StaticResource SalaryPayrollChip}">
+                                                        <TextBlock Text="{Binding AbsenceDays, StringFormat=Absences {0}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
+                                                    </Border>
+                                                    <Border Style="{StaticResource SalaryPayrollChip}">
+                                                        <TextBlock Text="{Binding LateDays, StringFormat=Lates {0}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
+                                                    </Border>
+                                                    <Border Style="{StaticResource SalaryPayrollChip}">
+                                                        <TextBlock Text="{Binding LatePenaltyAbsences, StringFormat=Late → units {0}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
+                                                    </Border>
+                                                    <Border Style="{StaticResource SalaryPayrollChip}">
+                                                        <TextBlock Text="{Binding TotalDeductionUnits, StringFormat=Total units {0}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
+                                                    </Border>
+                                                    <Border Background="#152196F3" CornerRadius="10" Padding="14,10" Margin="0,0,10,10">
+                                                        <TextBlock Text="{Binding BaseAfterAttendanceUsd, StringFormat=After attendance $ {0:N2}}" Foreground="{StaticResource StatBlueBrush}" FontSize="14"/>
+                                                    </Border>
+                                                </WrapPanel>
+                                                <Button Content="Shift history"
+                                                        HorizontalAlignment="Left"
+                                                        Margin="0,10,0,0"
+                                                        Padding="14,8"
+                                                        FontSize="13"
+                                                        Command="{Binding DataContext.ShowShiftHistoryCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                        CommandParameter="{Binding}"
+                                                        Style="{StaticResource GhostButton}"/>
+                                            </StackPanel>
 
                                             <TextBlock Text="Sales &amp; bonus" Foreground="{StaticResource GoldAccentBrush}" FontSize="19" FontWeight="SemiBold" Margin="0,16,0,12"/>
                                             <WrapPanel>
@@ -356,7 +423,7 @@
                                                     <TextBlock Text="{Binding MoneyGeneratedUsd, StringFormat=Sales served $ {0:N2}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
                                                 </Border>
                                                 <Border Style="{StaticResource SalaryPayrollChip}">
-                                                    <TextBlock Text="{Binding BonusFivePercentUsd, StringFormat=5% bonus $ {0:N2}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
+                                                    <TextBlock Text="{Binding BonusFivePercentUsd, StringFormat=Sales bonus $ {0:N2}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
                                                 </Border>
                                             </WrapPanel>
 
@@ -464,7 +531,7 @@
                                 <Style TargetType="TextBlock" BasedOn="{StaticResource SalaryDataGridCellTextWrap}"/>
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
-                        <DataGridTextColumn Header="Hourly" Binding="{Binding HourlyRateUsd, StringFormat=$ {0:N2}}" Width="78" MinWidth="64"/>
+                        <DataGridTextColumn Header="Monthly" Binding="{Binding RateColumnText}" Width="100" MinWidth="88"/>
                         <DataGridTextColumn Header="Hrs" Binding="{Binding ScheduledHoursMonth, StringFormat=F1}" Width="56" MinWidth="48"/>
                         <DataGridTextColumn Header="Days" Binding="{Binding ScheduledWorkdays}" Width="52" MinWidth="44"/>
                         <DataGridTextColumn Header="Base" Binding="{Binding BaseGrossUsd, StringFormat=$ {0:N2}}" Width="88" MinWidth="72"/>
@@ -472,6 +539,19 @@
                         <DataGridTextColumn Header="Late" Binding="{Binding LateDays}" Width="44" MinWidth="40"/>
                         <DataGridTextColumn Header="L→U" Binding="{Binding LatePenaltyAbsences}" Width="48" MinWidth="40"/>
                         <DataGridTextColumn Header="Units" Binding="{Binding TotalDeductionUnits}" Width="52" MinWidth="44"/>
+                        <DataGridTemplateColumn Header="Shift history" Width="108" MinWidth="96">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Content="Shift history"
+                                            Margin="4,2"
+                                            Padding="8,4"
+                                            FontSize="12"
+                                            Command="{Binding DataContext.ShowShiftHistoryCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                            CommandParameter="{Binding}"
+                                            Style="{StaticResource GhostButton}"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
                         <DataGridTextColumn Header="After att." Binding="{Binding BaseAfterAttendanceUsd, StringFormat=$ {0:N2}}" Width="92" MinWidth="78"/>
                         <DataGridTextColumn Header="Sales" Binding="{Binding MoneyGeneratedUsd, StringFormat=$ {0:N2}}" Width="88" MinWidth="72"/>
                         <DataGridTextColumn Header="Bonus" Binding="{Binding BonusFivePercentUsd, StringFormat=$ {0:N2}}" Width="78" MinWidth="64"/>
@@ -523,6 +603,12 @@
                     </DataGrid.Columns>
                 </DataGrid>
             </Grid>
+
+            <components:ShiftHistoryOverlayView Grid.Row="0"
+                                                Grid.RowSpan="5"
+                                                Panel.ZIndex="40"
+                                                VerticalAlignment="Stretch"
+                                                HorizontalAlignment="Stretch"/>
 
             <Border Grid.Row="0" Grid.RowSpan="5"
                     Background="#CC0A0A12"

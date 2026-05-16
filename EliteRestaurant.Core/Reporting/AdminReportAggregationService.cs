@@ -2,6 +2,7 @@ using System.Globalization;
 using EliteRestaurant.Contracts.Admin;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Orders;
 using EliteRestaurant.Core.Utils;
 using Microsoft.EntityFrameworkCore;
 
@@ -60,12 +61,12 @@ public sealed class AdminReportAggregationService(AppDbContext db)
         var endExclusive = endDay.AddDays(1);
         var entries = await BuildDailyEntriesAsync(startDay, endExclusive, cancellationToken);
         var days = PadDaysDescending(
-            ApplyDayGroups(entries),
+            ApplyDayGroups(entries, dailyPayrollPinnedDaySort: true),
             startDay,
             endDay,
             "0 events | 0 orders | 0 items | 0 units");
         var summary =
-            $"Daily timeline {startDay:yyyy-MM-dd} → {endDay:yyyy-MM-dd}: {entries.Count} events (attendance, orders, reservations, menu, inventory activity, salary/Money).";
+            $"Daily timeline {startDay:yyyy-MM-dd} → {endDay:yyyy-MM-dd}: {entries.Count} events (attendance, orders, reservations, menu, inventory, payroll records, salary advances, Money salary ledger).";
         return new AdminReportRangeSummaryResponse(summary, days);
     }
 
@@ -79,10 +80,12 @@ public sealed class AdminReportAggregationService(AppDbContext db)
         var endExclusive = endDay.AddDays(1);
         var productsById = await LoadProductsByIdAsync(cancellationToken);
         var orders = await db.Orders.AsNoTracking()
-            .Where(o => o.CreatedAt >= startDay && o.CreatedAt < endExclusive)
+            .Where(o =>
+                (o.PaymentConfirmedAt ?? o.CompletedAt ?? o.CreatedAt) >= startDay
+                && (o.PaymentConfirmedAt ?? o.CompletedAt ?? o.CreatedAt) < endExclusive)
             .Include(o => o.Items)
             .ThenInclude(i => i.Product)
-            .OrderBy(o => o.CreatedAt)
+            .OrderBy(o => OrderReportAnchor.Anchor(o))
             .ToListAsync(cancellationToken);
 
         HydrateOrderItems(orders, productsById);
@@ -96,15 +99,18 @@ public sealed class AdminReportAggregationService(AppDbContext db)
             var subtotal = order.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
             var totals = OrderTotalsHelper.ComputeTotals(subtotal, "None", 0m);
             var grandUsd = totals.GrandTotal;
-            var payUsd = order.PaymentAmountUsd > 0m ? order.PaymentAmountUsd : grandUsd;
-            var payFc = order.PaymentAmountFc > 0m ? order.PaymentAmountFc : CurrencyHelper.ConvertUsdToFc(payUsd);
+            var payUsd = order.PaymentAmountUsd > 0m
+                ? order.PaymentAmountUsd
+                : (order.PaymentAmountFc <= 0m ? grandUsd : 0m);
+            var payFc = order.PaymentAmountFc;
             var paymentText = CurrencyHelper.FormatDualCurrency(payUsd, payFc);
+            var anchor = OrderReportAnchor.Anchor(order);
 
             entries.Add(new AdminReportTimeEntryDto(
-                order.CreatedAt,
+                anchor,
                 string.IsNullOrWhiteSpace(order.Status) ? "Order" : order.Status,
                 $"Order {DisplayOrFallback(order.UniqueId, $"#{order.Id}")} · {totalQty} item(s)",
-                $"Server: {DisplayOrFallback(order.ServerName, "Unassigned")} | Table: {DisplayOrFallback(order.TableCode, "?")} · {DisplayOrFallback(order.TableName, "-")} | {DisplayOrFallback(menu, "No line items")}",
+                $"{OrderRecordUiLabels.ServerCaption(order)} | {OrderRecordUiLabels.TableCaption(order)} | {DisplayOrFallback(menu, "No line items")}",
                 paymentText,
                 1,
                 totalQty,
@@ -147,7 +153,7 @@ public sealed class AdminReportAggregationService(AppDbContext db)
                             ? $"Paid in full ${p.NetPayUsd:N2} USD"
                             : $"Partial: ${p.PaidToDateUsd:N2} of ${p.NetPayUsd:N2} USD net";
                         return
-                            $"{PayrollCalculator.FormatPayrollMonthLabel(p.Year, p.Month)}: {paidLine} (base gross ${p.MonthlySalaryUsd:N2}, sales ${p.MoneyGeneratedUsd:N2}, 5% bonus ${p.BonusFivePercentUsd:N2}, advances -${p.AdvancesDeductedUsd:N2}) — last posting {p.PaidAtUtc.ToLocalTime():yyyy-MM-dd}";
+                            $"{PayrollCalculator.FormatPayrollMonthLabel(p.Year, p.Month)}: {paidLine} (base gross ${p.MonthlySalaryUsd:N2}, sales ${p.MoneyGeneratedUsd:N2}, sales bonus ${p.BonusFivePercentUsd:N2}, advances -${p.AdvancesDeductedUsd:N2}) — last posting {p.PaidAtUtc.ToLocalTime():yyyy-MM-dd}";
                     }));
 
         var entries = new List<AdminReportTimeEntryDto>();
@@ -180,7 +186,7 @@ public sealed class AdminReportAggregationService(AppDbContext db)
             .Where(o => o.ServerId == employee.Id)
             .Include(o => o.Items)
             .ThenInclude(i => i.Product)
-            .OrderByDescending(o => o.CreatedAt)
+            .OrderByDescending(o => OrderReportAnchor.Anchor(o))
             .Take(180)
             .ToListAsync(cancellationToken);
         HydrateOrderItems(servedOrders, productsById);
@@ -189,11 +195,12 @@ public sealed class AdminReportAggregationService(AppDbContext db)
         {
             var totalItems = order.Items.Sum(i => i.Quantity);
             var items = string.Join(", ", order.Items.Select(i => $"{i.Product?.Name ?? "Unknown"} x{i.Quantity}"));
+            var anchor = OrderReportAnchor.Anchor(order);
             entries.Add(new AdminReportTimeEntryDto(
-                order.CreatedAt,
+                anchor,
                 "Served Order",
                 $"Order {order.UniqueId} ({order.Status})",
-                $"{order.TableCode} ({order.TableName}) | {DisplayOrFallback(items, "No order items.")}",
+                $"{OrderRecordUiLabels.TableCaption(order)} | {DisplayOrFallback(items, "No order items.")}",
                 employee.Name,
                 1,
                 totalItems,
@@ -203,21 +210,18 @@ public sealed class AdminReportAggregationService(AppDbContext db)
         var empMarker = $"| EMP:{employee.Id}|";
         var salaryMoneyRows = await db.Transactions.AsNoTracking()
             .Where(t =>
-                t.Type == "Expense" &&
-                t.Category == "Salary" &&
+                MoneyTransactionReportHelper.IsSalaryExpense(t) &&
                 t.Justification != null &&
                 t.Justification.Contains(empMarker, StringComparison.Ordinal))
-            .OrderByDescending(t => t.Date)
+            .OrderByDescending(t => MoneyTransactionReportHelper.ToLocalInstant(t.Date))
             .Take(48)
             .ToListAsync(cancellationToken);
 
         foreach (var t in salaryMoneyRows)
         {
             entries.Add(new AdminReportTimeEntryDto(
-                t.Date,
-                t.Justification?.Contains("| ADVANCE:", StringComparison.Ordinal) == true
-                    ? "Salary advance (Money)"
-                    : "Salary payment (Money)",
+                MoneyTransactionReportHelper.ToLocalInstant(t.Date),
+                MoneyTransactionReportHelper.LedgerEventType(t),
                 t.Justification ?? string.Empty,
                 $"USD $ {t.AmountUsd:0.00}",
                 employee.Name,
@@ -241,7 +245,7 @@ public sealed class AdminReportAggregationService(AppDbContext db)
                 ? $"Applied to {PayrollCalculator.FormatPayrollMonthLabel(adv.AppliedPayrollYear.Value, adv.AppliedPayrollMonth.Value)}"
                 : "Pending deduction on payroll confirm";
             entries.Add(new AdminReportTimeEntryDto(
-                adv.GivenAt,
+                MoneyTransactionReportHelper.ToLocalInstant(adv.GivenAt),
                 "Salary advance (record)",
                 $"${adv.AmountUsd:0.00} for payroll {period} — {applied}",
                 DisplayOrFallback(adv.Note, "—"),
@@ -278,7 +282,7 @@ public sealed class AdminReportAggregationService(AppDbContext db)
             .Where(o => o.TableId == table.Id)
             .Include(o => o.Items)
             .ThenInclude(i => i.Product)
-            .OrderByDescending(o => o.CreatedAt)
+            .OrderByDescending(o => OrderReportAnchor.Anchor(o))
             .Take(220)
             .ToListAsync(cancellationToken);
         HydrateOrderItems(relatedOrders, productsById);
@@ -287,11 +291,12 @@ public sealed class AdminReportAggregationService(AppDbContext db)
         {
             var totalItems = order.Items.Sum(i => i.Quantity);
             var items = string.Join(", ", order.Items.Select(i => $"{i.Product?.Name ?? "Unknown"} x{i.Quantity}"));
+            var anchor = OrderReportAnchor.Anchor(order);
             entries.Add(new AdminReportTimeEntryDto(
-                order.CreatedAt,
+                anchor,
                 "Table Order",
                 $"Order {order.UniqueId} ({order.Status})",
-                $"Server: {DisplayOrFallback(order.ServerName, "Unassigned")} | {DisplayOrFallback(items, "No order items.")}",
+                $"Server: {OrderRecordUiLabels.ServerCaption(order)} | {DisplayOrFallback(items, "No order items.")}",
                 $"Table {table.TableNumber}",
                 1,
                 totalItems,
@@ -382,14 +387,14 @@ public sealed class AdminReportAggregationService(AppDbContext db)
         var allOrders = await db.Orders.AsNoTracking()
             .Include(o => o.Items)
             .ThenInclude(i => i.Product)
-            .OrderByDescending(o => o.CreatedAt)
+            .OrderByDescending(o => OrderReportAnchor.Anchor(o))
             .Take(800)
             .ToListAsync(cancellationToken);
         HydrateOrderItems(allOrders, productsById);
 
         var servedLines = allOrders
             .SelectMany(o => o.Items.Where(i => i.ProductId == product.Id).Select(i => (Order: o, Item: i)))
-            .OrderByDescending(x => x.Order.CreatedAt)
+            .OrderByDescending(x => OrderReportAnchor.Anchor(x.Order))
             .Take(300)
             .ToList();
 
@@ -397,11 +402,12 @@ public sealed class AdminReportAggregationService(AppDbContext db)
         foreach (var line in servedLines)
         {
             var order = line.Order;
+            var anchor = OrderReportAnchor.Anchor(order);
             entries.Add(new AdminReportTimeEntryDto(
-                order.CreatedAt,
+                anchor,
                 "Menu Ordered",
                 $"{product.Name} x{line.Item.Quantity} in order {order.UniqueId}",
-                $"{order.TableCode} ({order.TableName}) | Server: {DisplayOrFallback(order.ServerName, "Unassigned")} | Status: {order.Status}",
+                $"{OrderRecordUiLabels.TableCaption(order)} | Server: {OrderRecordUiLabels.ServerCaption(order)} | Status: {order.Status}",
                 product.Name,
                 1,
                 line.Item.Quantity,
@@ -491,22 +497,25 @@ public sealed class AdminReportAggregationService(AppDbContext db)
 
         var productsById = await LoadProductsByIdAsync(cancellationToken);
         var orders = await db.Orders.AsNoTracking()
-            .Where(o => o.CreatedAt >= start && o.CreatedAt < endExclusive)
+            .Where(o =>
+                (o.PaymentConfirmedAt ?? o.CompletedAt ?? o.CreatedAt) >= start
+                && (o.PaymentConfirmedAt ?? o.CompletedAt ?? o.CreatedAt) < endExclusive)
             .Include(o => o.Items)
             .ThenInclude(i => i.Product)
-            .OrderByDescending(o => o.CreatedAt)
+            .OrderByDescending(o => o.PaymentConfirmedAt ?? o.CompletedAt ?? o.CreatedAt)
             .ToListAsync(cancellationToken);
         HydrateOrderItems(orders, productsById);
 
         foreach (var order in orders)
         {
             var itemQty = order.Items.Sum(i => i.Quantity);
+            var anchor = OrderReportAnchor.Anchor(order);
             entries.Add(new AdminReportTimeEntryDto(
-                order.CreatedAt,
-                "Table Service",
+                anchor,
+                OrderOrigin.IsOnline(order.OrderOrigin) ? "Online order" : "Table Service",
                 $"Order {order.UniqueId} ({order.Status})",
-                $"{order.TableCode} ({order.TableName}) | Server: {DisplayOrFallback(order.ServerName, "Unassigned")} | Items: {itemQty}",
-                $"Table: {order.TableCode}",
+                $"{OrderRecordUiLabels.TableCaption(order)} | Server: {OrderRecordUiLabels.ServerCaption(order)} | Items: {itemQty}",
+                $"Table: {OrderRecordUiLabels.TableCaption(order)}",
                 1,
                 itemQty,
                 0m));
@@ -516,8 +525,10 @@ public sealed class AdminReportAggregationService(AppDbContext db)
         var tablesById = tableRows.GroupBy(t => t.Id).ToDictionary(g => g.Key, g => g.First());
 
         var reservations = await db.Reservations.AsNoTracking()
-            .Where(r => r.UpdatedAt >= start && r.UpdatedAt < endExclusive)
-            .OrderByDescending(r => r.UpdatedAt)
+            .Where(r =>
+                (r.UpdatedAt >= start && r.UpdatedAt < endExclusive)
+                || (r.ReservedFor >= start && r.ReservedFor < endExclusive))
+            .OrderByDescending(r => r.ReservedFor)
             .ToListAsync(cancellationToken);
 
         foreach (var reservation in reservations)
@@ -532,8 +543,9 @@ public sealed class AdminReportAggregationService(AppDbContext db)
             var tableLabel = tbl is not null
                 ? $"{tbl.TableNumber} ({DisplayOrFallback(tbl.Name, "-")})"
                 : "-";
+            var resEvent = ReservationReportTime.DisplayEventTime(reservation, start, endExclusive);
             entries.Add(new AdminReportTimeEntryDto(
-                reservation.UpdatedAt,
+                resEvent,
                 "Reservation",
                 $"Reservation {reservation.UniqueId} · {displayName} · {reservation.Status}",
                 $"Reserved for {reservation.ReservedFor:yyyy-MM-dd HH:mm} | Party: {reservation.PartySize} | Table: {tableLabel}",
@@ -545,13 +557,14 @@ public sealed class AdminReportAggregationService(AppDbContext db)
 
         foreach (var order in orders)
         {
+            var anchor = OrderReportAnchor.Anchor(order);
             foreach (var line in order.Items)
             {
                 entries.Add(new AdminReportTimeEntryDto(
-                    order.CreatedAt,
+                    anchor,
                     "Menu Activity",
                     $"{line.Product?.Name ?? "Unknown"} x{line.Quantity}",
-                    $"Order {order.UniqueId} | {order.TableCode} ({order.TableName})",
+                    $"Order {order.UniqueId} | {OrderRecordUiLabels.TableCaption(order)}",
                     $"Menu: {line.Product?.Name ?? "Unknown"}",
                     1,
                     line.Quantity,
@@ -566,21 +579,85 @@ public sealed class AdminReportAggregationService(AppDbContext db)
         AppendInventoryActivityFromNotes(entries, start, endExclusive, inventoryNoteRows);
 
         var salaryTx = await db.Transactions.AsNoTracking()
-            .Where(t =>
-                t.Type == "Expense" &&
-                t.Category == "Salary" &&
-                t.Date >= start &&
-                t.Date < endExclusive)
-            .OrderByDescending(t => t.Date)
+            .Where(t => t.Type == "Expense" && t.Category == "Salary")
             .ToListAsync(cancellationToken);
+
+        var payrollRows = await db.PayrollPaymentRecords.AsNoTracking()
+            .Include(p => p.Employee)
+            .ToListAsync(cancellationToken);
+
+        foreach (var p in payrollRows)
+        {
+            var paidLocal = p.PaidAtUtc.ToLocalTime();
+            if (paidLocal < start || paidLocal >= endExclusive)
+                continue;
+
+            employeesById.TryGetValue(p.EmployeeId, out var empFromDict);
+            var name = p.Employee?.Name ?? empFromDict?.Name ?? $"Employee #{p.EmployeeId}";
+            var monthLabel = PayrollCalculator.FormatPayrollMonthLabel(p.Year, p.Month);
+            var paidLine = p.PaidToDateUsd >= p.NetPayUsd - 0.005m
+                ? $"Paid in full ${p.NetPayUsd:N2} USD net"
+                : $"Paid to date ${p.PaidToDateUsd:N2} of ${p.NetPayUsd:N2} USD net";
+            entries.Add(new AdminReportTimeEntryDto(
+                paidLocal,
+                "Payroll month (record)",
+                $"{name} · {monthLabel} · {paidLine}",
+                $"Base gross ${p.MonthlySalaryUsd:N2} · Sales ${p.MoneyGeneratedUsd:N2} · Bonus ${p.BonusFivePercentUsd:N2} · Advances deducted ${p.AdvancesDeductedUsd:N2}",
+                "Payroll",
+                0,
+                0,
+                0m));
+        }
+
+        var advanceRows = await db.SalaryAdvances.AsNoTracking()
+            .Include(a => a.Employee)
+            .ToListAsync(cancellationToken);
+
+        foreach (var adv in advanceRows)
+        {
+            var givenLocal = MoneyTransactionReportHelper.ToLocalInstant(adv.GivenAt);
+            if (givenLocal < start || givenLocal >= endExclusive)
+                continue;
+
+            employeesById.TryGetValue(adv.EmployeeId, out var empFromDict);
+            var advName = adv.Employee?.Name ?? empFromDict?.Name ?? $"Employee #{adv.EmployeeId}";
+            var period = adv.ForPayrollYear.HasValue && adv.ForPayrollMonth.HasValue
+                ? PayrollCalculator.FormatPayrollMonthLabel(adv.ForPayrollYear.Value, adv.ForPayrollMonth.Value)
+                : "(by date)";
+            var applied = adv.AppliedPayrollYear.HasValue && adv.AppliedPayrollMonth.HasValue
+                ? $"Applied to {PayrollCalculator.FormatPayrollMonthLabel(adv.AppliedPayrollYear.Value, adv.AppliedPayrollMonth.Value)}"
+                : "Pending deduction on payroll confirm";
+            entries.Add(new AdminReportTimeEntryDto(
+                givenLocal,
+                "Salary advance (record)",
+                $"{advName} · ${adv.AmountUsd:0.00} USD for payroll {period} — {applied}",
+                DisplayOrFallback(adv.Note, "—"),
+                "Salary advances",
+                0,
+                0,
+                0m));
+        }
 
         foreach (var t in salaryTx)
         {
+            if (!MoneyTransactionReportHelper.IsSalaryExpense(t))
+                continue;
+            var local = MoneyTransactionReportHelper.ToLocalInstant(t.Date);
+            if (local < start || local >= endExclusive)
+                continue;
+
+            _ = MoneyTransactionReportHelper.TryParseEmployeeIdFromSalaryJustification(t.Justification ?? string.Empty, out var eid);
+            employeesById.TryGetValue(eid, out var empMoney);
+            var who = empMoney?.Name ?? string.Empty;
+            var label = MoneyTransactionReportHelper.LedgerEventType(t);
+            var summaryText = string.IsNullOrWhiteSpace(who)
+                ? (t.Justification ?? string.Empty)
+                : $"{who} · {t.Justification}";
             entries.Add(new AdminReportTimeEntryDto(
-                t.Date,
-                "Salary / Money",
-                t.Justification ?? string.Empty,
-                $"USD $ {t.AmountUsd:0.00} (same as Money ledger)",
+                local,
+                label,
+                summaryText,
+                $"USD $ {t.AmountUsd:0.00} (Money ledger)",
                 "Money",
                 0,
                 0,
@@ -608,14 +685,6 @@ public sealed class AdminReportAggregationService(AppDbContext db)
             }
         }
     }
-
-    private static DateTime LocalCalendarDay(DateTime t) =>
-        t.Kind switch
-        {
-            DateTimeKind.Utc => t.ToLocalTime().Date,
-            DateTimeKind.Local => t.Date,
-            _ => t.Date,
-        };
 
     private static List<AdminReportDayGroupDto> PadDaysDescending(
         IReadOnlyList<AdminReportDayGroupDto> filled,
@@ -645,15 +714,43 @@ public sealed class AdminReportAggregationService(AppDbContext db)
         return list;
     }
 
-    private static List<AdminReportDayGroupDto> ApplyDayGroups(IReadOnlyList<AdminReportTimeEntryDto> entries)
+    private static List<AdminReportDayGroupDto> ApplyDayGroups(
+        IReadOnlyList<AdminReportTimeEntryDto> entries,
+        bool dailyPayrollPinnedDaySort = false)
     {
+        if (dailyPayrollPinnedDaySort)
+        {
+            var listPinned = new List<AdminReportDayGroupDto>();
+            foreach (var dayGroup in entries
+                .GroupBy(e => OrderReportAnchor.LocalCalendarDay(e.EventTime))
+                .OrderByDescending(g => g.Key))
+            {
+                var rows = dayGroup.ToList();
+                rows.Sort((a, b) => ReportDailyTimelineSort.CompareWithinDayPayrollFirstNewestFirst(
+                    a.EventTime,
+                    a.EventType,
+                    b.EventTime,
+                    b.EventType));
+                var key = dayGroup.Key;
+                listPinned.Add(new AdminReportDayGroupDto(
+                    key,
+                    key.ToString("dddd, MMM dd yyyy", CultureInfo.InvariantCulture),
+                    $"{rows.Count} events | {rows.Sum(r => r.OrdersCount)} orders | {rows.Sum(r => r.ItemCount)} items | {rows.Sum(r => r.UnitUsage):0.##} units",
+                    rows));
+            }
+
+            return listPinned;
+        }
+
         var normalized = entries
             .OrderByDescending(e => e.EventTime)
             .ThenBy(e => e.EventType)
             .ToList();
 
         var list = new List<AdminReportDayGroupDto>();
-        foreach (var dayGroup in normalized.GroupBy(e => LocalCalendarDay(e.EventTime)))
+        foreach (var dayGroup in normalized
+            .GroupBy(e => OrderReportAnchor.LocalCalendarDay(e.EventTime))
+            .OrderByDescending(g => g.Key))
         {
             var rows = dayGroup.ToList();
             var key = dayGroup.Key;
@@ -670,7 +767,7 @@ public sealed class AdminReportAggregationService(AppDbContext db)
     private static List<AdminReportDayGroupDto> ApplyOrderDayGroups(List<AdminReportTimeEntryDto> entries)
     {
         var list = new List<AdminReportDayGroupDto>();
-        foreach (var dayGroup in entries.GroupBy(e => LocalCalendarDay(e.EventTime)).OrderByDescending(g => g.Key))
+        foreach (var dayGroup in entries.GroupBy(e => OrderReportAnchor.LocalCalendarDay(e.EventTime)).OrderByDescending(g => g.Key))
         {
             var rows = dayGroup.OrderBy(e => e.EventTime).ThenBy(e => e.Summary).ToList();
             var orderCount = rows.Sum(r => r.OrdersCount);
@@ -772,10 +869,12 @@ public sealed class AdminReportAggregationService(AppDbContext db)
         {
             var productsById = await LoadProductsByIdAsync(cancellationToken);
             var orders = await db.Orders.AsNoTracking()
-                .Where(o => o.CreatedAt >= start && o.CreatedAt < endExclusive)
+                .Where(o =>
+                    (o.PaymentConfirmedAt ?? o.CompletedAt ?? o.CreatedAt) >= start
+                    && (o.PaymentConfirmedAt ?? o.CompletedAt ?? o.CreatedAt) < endExclusive)
                 .Include(o => o.Items)
                 .ThenInclude(i => i.Product)
-                .OrderBy(o => o.CreatedAt)
+                .OrderBy(o => OrderReportAnchor.Anchor(o))
                 .ToListAsync(cancellationToken);
             HydrateOrderItems(orders, productsById);
             return BuildOrderExportRows(orders);
@@ -818,32 +917,78 @@ public sealed class AdminReportAggregationService(AppDbContext db)
         if (includeSalaryLedger)
         {
             var salaryTx = await db.Transactions.AsNoTracking()
-                .Where(t =>
-                    t.Type == "Expense" &&
-                    t.Category == "Salary" &&
-                    t.Date >= start &&
-                    t.Date < endExclusive)
-                .OrderBy(t => t.Date)
-                .ThenBy(t => t.Id)
+                .Where(t => t.Type == "Expense" && t.Category == "Salary")
                 .ToListAsync(cancellationToken);
 
             foreach (var t in salaryTx)
             {
-                _ = TryParseEmployeeIdFromSalaryJustification(t.Justification ?? string.Empty, out var eid);
+                if (!MoneyTransactionReportHelper.IsSalaryExpense(t))
+                    continue;
+                var local = MoneyTransactionReportHelper.ToLocalInstant(t.Date);
+                if (local < start || local >= endExclusive)
+                    continue;
+
+                _ = MoneyTransactionReportHelper.TryParseEmployeeIdFromSalaryJustification(t.Justification ?? string.Empty, out var eid);
                 employeesById.TryGetValue(eid, out var empRef);
                 var j = t.Justification ?? string.Empty;
                 if (j.Length > 120)
                     j = j[..120] + "…";
 
                 rows.Add(BuildAnalyticalRow(
-                    eventTime: t.Date,
-                    eventType: j.Contains("| ADVANCE:", StringComparison.Ordinal)
-                        ? "Salary advance (Money)"
-                        : "Salary payment (Money)",
+                    eventTime: local,
+                    eventType: MoneyTransactionReportHelper.LedgerEventType(t),
                     employeeId: empRef?.UniqueId ?? string.Empty,
                     employeeName: empRef?.Name ?? string.Empty,
                     orderId: j,
                     costOrPrice: t.AmountUsd.ToString("0.00", CultureInfo.InvariantCulture)));
+            }
+
+            var payrollRows = await db.PayrollPaymentRecords.AsNoTracking()
+                .Include(p => p.Employee)
+                .ToListAsync(cancellationToken);
+
+            foreach (var p in payrollRows)
+            {
+                var paidLocal = p.PaidAtUtc.ToLocalTime();
+                if (paidLocal < start || paidLocal >= endExclusive)
+                    continue;
+
+                employeesById.TryGetValue(p.EmployeeId, out var empRef);
+                var monthLabel = PayrollCalculator.FormatPayrollMonthLabel(p.Year, p.Month);
+                var detail =
+                    $"{monthLabel} · paid ${p.PaidToDateUsd:0.00} / net ${p.NetPayUsd:0.00} · base ${p.MonthlySalaryUsd:0.00} · sales ${p.MoneyGeneratedUsd:0.00} · bonus ${p.BonusFivePercentUsd:0.00} · adv -${p.AdvancesDeductedUsd:0.00}";
+                rows.Add(BuildAnalyticalRow(
+                    eventTime: paidLocal,
+                    eventType: "Payroll month (record)",
+                    employeeId: empRef?.UniqueId ?? string.Empty,
+                    employeeName: empRef?.Name ?? p.Employee?.Name ?? string.Empty,
+                    orderId: detail));
+            }
+
+            var advanceRows = await db.SalaryAdvances.AsNoTracking()
+                .Include(a => a.Employee)
+                .ToListAsync(cancellationToken);
+
+            foreach (var adv in advanceRows)
+            {
+                var givenLocal = MoneyTransactionReportHelper.ToLocalInstant(adv.GivenAt);
+                if (givenLocal < start || givenLocal >= endExclusive)
+                    continue;
+
+                employeesById.TryGetValue(adv.EmployeeId, out var empRef);
+                var period = adv.ForPayrollYear.HasValue && adv.ForPayrollMonth.HasValue
+                    ? PayrollCalculator.FormatPayrollMonthLabel(adv.ForPayrollYear.Value, adv.ForPayrollMonth.Value)
+                    : "(by date)";
+                var applied = adv.AppliedPayrollYear.HasValue && adv.AppliedPayrollMonth.HasValue
+                    ? $"Applied to {PayrollCalculator.FormatPayrollMonthLabel(adv.AppliedPayrollYear.Value, adv.AppliedPayrollMonth.Value)}"
+                    : "Pending deduction on payroll confirm";
+                var note = string.IsNullOrWhiteSpace(adv.Note) ? "—" : adv.Note.Trim();
+                rows.Add(BuildAnalyticalRow(
+                    eventTime: givenLocal,
+                    eventType: "Salary advance (record)",
+                    employeeId: empRef?.UniqueId ?? string.Empty,
+                    employeeName: empRef?.Name ?? adv.Employee?.Name ?? string.Empty,
+                    orderId: $"${adv.AmountUsd:0.00} for {period} — {applied} — {note}"));
             }
         }
 
@@ -851,15 +996,17 @@ public sealed class AdminReportAggregationService(AppDbContext db)
         {
             var productsById = await LoadProductsByIdAsync(cancellationToken);
             var ordersForLines = await db.Orders.AsNoTracking()
-                .Where(o => o.CreatedAt >= start && o.CreatedAt < endExclusive)
+                .Where(o =>
+                    (o.PaymentConfirmedAt ?? o.CompletedAt ?? o.CreatedAt) >= start
+                    && (o.PaymentConfirmedAt ?? o.CompletedAt ?? o.CreatedAt) < endExclusive)
                 .Include(o => o.Items)
                 .ThenInclude(i => i.Product)
-                .OrderBy(o => o.CreatedAt)
+                .OrderBy(o => OrderReportAnchor.Anchor(o))
                 .ToListAsync(cancellationToken);
             HydrateOrderItems(ordersForLines, productsById);
             var orderItems = ordersForLines
                 .SelectMany(o => o.Items)
-                .OrderBy(i => i.OrderRecord?.CreatedAt)
+                .OrderBy(i => i.OrderRecord is null ? DateTime.MinValue : OrderReportAnchor.Anchor(i.OrderRecord))
                 .ThenBy(i => i.Id)
                 .ToList();
 
@@ -872,17 +1019,18 @@ public sealed class AdminReportAggregationService(AppDbContext db)
                 employeesById.TryGetValue(line.PreparedByEmployeeId ?? 0, out var preparedByEmployee);
                 employeesById.TryGetValue(order.ServerId ?? 0, out var serverEmployee);
                 tablesById.TryGetValue(order.TableId ?? 0, out var table);
+                var anchor = OrderReportAnchor.Anchor(order);
 
                 rows.Add(BuildAnalyticalRow(
-                    eventTime: order.CreatedAt,
+                    eventTime: anchor,
                     eventType: "Order",
                     employeeId: preparedByEmployee?.UniqueId ?? string.Empty,
                     employeeName: line.PreparedByName,
                     serverId: serverEmployee?.UniqueId ?? string.Empty,
-                    serverName: order.ServerName,
+                    serverName: OrderRecordUiLabels.ServerCaption(order),
                     orderId: order.UniqueId,
                     tableId: table?.UniqueId ?? string.Empty,
-                    tableName: order.TableName,
+                    tableName: OrderRecordUiLabels.TableCaption(order),
                     productId: line.Product?.UniqueId ?? string.Empty,
                     productName: line.Product?.Name ?? string.Empty,
                     quantity: line.Quantity.ToString(CultureInfo.InvariantCulture),
@@ -926,8 +1074,10 @@ public sealed class AdminReportAggregationService(AppDbContext db)
         if (includeReservations)
         {
             var reservationRows = await db.Reservations.AsNoTracking()
-                .Where(r => r.UpdatedAt >= start && r.UpdatedAt < endExclusive)
-                .OrderBy(r => r.UpdatedAt)
+                .Where(r =>
+                    (r.UpdatedAt >= start && r.UpdatedAt < endExclusive)
+                    || (r.ReservedFor >= start && r.ReservedFor < endExclusive))
+                .OrderBy(r => r.ReservedFor)
                 .ThenBy(r => r.Id)
                 .ToListAsync(cancellationToken);
 
@@ -939,7 +1089,7 @@ public sealed class AdminReportAggregationService(AppDbContext db)
                     : reservation.ReservationName.Trim();
 
                 rows.Add(BuildAnalyticalRow(
-                    eventTime: reservation.UpdatedAt,
+                    eventTime: ReservationReportTime.DisplayEventTime(reservation, start, endExclusive),
                     eventType: "Reservation",
                     orderId: reservation.UniqueId,
                     tableId: table?.UniqueId ?? string.Empty,
@@ -952,12 +1102,28 @@ public sealed class AdminReportAggregationService(AppDbContext db)
         }
 
         rows = rows
-            .OrderBy(r => r[0])
-            .ThenBy(r => r[2])
-            .ThenBy(r => r[3])
+            .OrderByDescending(ParseAnalyticalRowInstant)
+            .ThenByDescending(r => r.Count > 3 && ReportDailyTimelineSort.IsPinnedPayrollSalaryEventType(r[3]))
+            .ThenBy(r => r[3], StringComparer.Ordinal)
             .ToList();
 
         return (AnalyticalHeaders, rows);
+    }
+
+    private static DateTime ParseAnalyticalRowInstant(IReadOnlyList<string> r)
+    {
+        if (r.Count < 3)
+            return DateTime.MinValue;
+
+        if (DateTime.TryParseExact(
+                $"{r[0]} {r[2]}",
+                "yyyy-MM-dd HH:mm",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var dt))
+            return dt;
+
+        return DateTime.MinValue;
     }
 
     private static (IReadOnlyList<string> Headers, IReadOnlyList<IReadOnlyList<string>> Rows) BuildOrderExportRows(
@@ -972,14 +1138,17 @@ public sealed class AdminReportAggregationService(AppDbContext db)
             var subtotal = order.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
             var totals = OrderTotalsHelper.ComputeTotals(subtotal, "None", 0m);
             var grandUsd = totals.GrandTotal;
-            var payUsd = order.PaymentAmountUsd > 0m ? order.PaymentAmountUsd : grandUsd;
-            var payFc = order.PaymentAmountFc > 0m ? order.PaymentAmountFc : CurrencyHelper.ConvertUsdToFc(payUsd);
+            var payUsd = order.PaymentAmountUsd > 0m
+                ? order.PaymentAmountUsd
+                : (order.PaymentAmountFc <= 0m ? grandUsd : 0m);
+            var payFc = order.PaymentAmountFc;
+            var anchor = OrderReportAnchor.Anchor(order);
 
             rows.Add(
             [
-                order.CreatedAt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                order.CreatedAt.ToString("dddd", CultureInfo.InvariantCulture),
-                order.CreatedAt.ToString("HH:mm", CultureInfo.InvariantCulture),
+                anchor.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                anchor.ToString("dddd", CultureInfo.InvariantCulture),
+                anchor.ToString("HH:mm", CultureInfo.InvariantCulture),
                 DisplayOrFallback(order.UniqueId, order.Id.ToString(CultureInfo.InvariantCulture)),
                 order.Status,
                 DisplayOrFallback(order.ServerName, "Unassigned"),
@@ -1042,23 +1211,6 @@ public sealed class AdminReportAggregationService(AppDbContext db)
         "Barman ID",
         "Barman Name"
     ];
-
-    private static bool TryParseEmployeeIdFromSalaryJustification(string justification, out int employeeId)
-    {
-        employeeId = 0;
-        if (string.IsNullOrEmpty(justification))
-            return false;
-
-        const string marker = "| EMP:";
-        var idx = justification.IndexOf(marker, StringComparison.Ordinal);
-        if (idx < 0)
-            return false;
-
-        var from = idx + marker.Length;
-        var end = justification.IndexOf('|', from);
-        var slice = end >= 0 ? justification.Substring(from, end - from) : justification.Substring(from);
-        return int.TryParse(slice, NumberStyles.Integer, CultureInfo.InvariantCulture, out employeeId);
-    }
 
     private static IReadOnlyList<string> BuildAnalyticalRow(
         DateTime eventTime,
