@@ -4,12 +4,21 @@ public sealed class PublicMenuSetting
 {
     public int Id { get; set; }
     public string Key { get; set; } = "default";
-    public string RestaurantName { get; set; } = "Elite Restaurant";
+    public string RestaurantName { get; set; } = string.Empty;
     public string Phone { get; set; } = string.Empty;
     public string Address { get; set; } = string.Empty;
     public string WebsiteDomain { get; set; } = string.Empty;
     public string SocialMedia { get; set; } = string.Empty;
     public string? CustomerMenuTagline { get; set; }
+
+    /// <summary>Public menu footer — About sheet body (plain text).</summary>
+    public string? CustomerMenuAboutText { get; set; }
+
+    /// <summary>Public menu footer — optional intro above address/phone on Contact sheet.</summary>
+    public string? CustomerMenuContactIntro { get; set; }
+
+    /// <summary>Public menu footer — Notes sheet body (plain text; may include line breaks).</summary>
+    public string? CustomerMenuNotesText { get; set; }
     public string StaffLoginPasscode { get; set; } = "er4124";
     public string TicketFooterText { get; set; } = "MERCI / THANK YOU";
     public string TaxIdLegalInfo { get; set; } = string.Empty;

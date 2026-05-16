@@ -714,6 +714,15 @@ namespace EliteRestaurant.Core.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("CustomerMenuAboutText")
+                        .HasColumnType("text");
+
+                    b.Property<string>("CustomerMenuContactIntro")
+                        .HasColumnType("text");
+
+                    b.Property<string>("CustomerMenuNotesText")
+                        .HasColumnType("text");
+
                     b.Property<string>("CustomerMenuTagline")
                         .HasColumnType("text");
 

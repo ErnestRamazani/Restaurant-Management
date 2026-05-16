@@ -67,6 +67,9 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     private bool _hasSavedDatabasePassword;
     private string _publicMenuBaseUrl = CloudEndpoints.ProductionApiBaseUrl;
     private string _customerMenuTagline = string.Empty;
+    private string _customerMenuAboutText = string.Empty;
+    private string _customerMenuContactIntro = string.Empty;
+    private string _customerMenuNotesText = string.Empty;
     private string _staffLoginPasscode = "er4124";
     private string _onlinePromoTitle = string.Empty;
     private string _onlinePromoSubtitle = string.Empty;
@@ -314,6 +317,24 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     {
         get => _customerMenuTagline;
         set => SetField(ref _customerMenuTagline, value);
+    }
+
+    public string CustomerMenuAboutText
+    {
+        get => _customerMenuAboutText;
+        set => SetField(ref _customerMenuAboutText, value);
+    }
+
+    public string CustomerMenuContactIntro
+    {
+        get => _customerMenuContactIntro;
+        set => SetField(ref _customerMenuContactIntro, value);
+    }
+
+    public string CustomerMenuNotesText
+    {
+        get => _customerMenuNotesText;
+        set => SetField(ref _customerMenuNotesText, value);
     }
 
     public string StaffLoginPasscode
@@ -805,6 +826,9 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
             ? (PublicMenuUrlHelper.SuggestBaseUrlForPhones() ?? CloudEndpoints.ProductionApiBaseUrl)
             : CloudEndpoints.NormalizeApiBaseUrl(business.PublicMenuBaseUrl);
         CustomerMenuTagline = business.CustomerMenuTagline ?? string.Empty;
+        CustomerMenuAboutText = business.CustomerMenuAboutText ?? string.Empty;
+        CustomerMenuContactIntro = business.CustomerMenuContactIntro ?? string.Empty;
+        CustomerMenuNotesText = business.CustomerMenuNotesText ?? string.Empty;
         StaffLoginPasscode = string.IsNullOrWhiteSpace(business.StaffLoginPasscode)
             ? "er4124"
             : business.StaffLoginPasscode.Trim();
@@ -1150,6 +1174,15 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         _settings.BusinessProfile.CustomerMenuTagline = string.IsNullOrWhiteSpace(CustomerMenuTagline)
             ? null
             : CustomerMenuTagline.Trim();
+        _settings.BusinessProfile.CustomerMenuAboutText = string.IsNullOrWhiteSpace(CustomerMenuAboutText)
+            ? null
+            : CustomerMenuAboutText.Trim();
+        _settings.BusinessProfile.CustomerMenuContactIntro = string.IsNullOrWhiteSpace(CustomerMenuContactIntro)
+            ? null
+            : CustomerMenuContactIntro.Trim();
+        _settings.BusinessProfile.CustomerMenuNotesText = string.IsNullOrWhiteSpace(CustomerMenuNotesText)
+            ? null
+            : CustomerMenuNotesText.Trim();
         _settings.BusinessProfile.StaffLoginPasscode = string.IsNullOrWhiteSpace(StaffLoginPasscode)
             ? "er4124"
             : StaffLoginPasscode.Trim();

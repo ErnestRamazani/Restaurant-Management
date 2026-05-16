@@ -77,6 +77,9 @@ public sealed record AdminCloudSettingsRequest(
     int PayrollLateDaysPerAttendanceUnit = 4,
     bool PayrollAbsenceCountsAsAttendanceUnit = true,
     decimal PayrollSalesBonusPercent = 5m,
-    decimal PayrollMaxSalaryAdvancePercentOfGross = 30m);
+    decimal PayrollMaxSalaryAdvancePercentOfGross = 30m,
+    string? CustomerMenuAboutText = null,
+    string? CustomerMenuContactIntro = null,
+    string? CustomerMenuNotesText = null);
 
 public sealed record AdminCloudSettingsResponse(bool Success, string? LogoUrl, string Message);

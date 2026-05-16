@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fetchConfig, fetchProducts } from '../utils/api'
+import { restaurantDisplayName } from '../utils/guestMenuConfig'
 
 export function useMenu() {
   const [config, setConfig] = useState(null)
@@ -13,6 +14,8 @@ export function useMenu() {
     try {
       const [c, p] = await Promise.all([fetchConfig(), fetchProducts()])
       setConfig(c)
+      const title = restaurantDisplayName(c)
+      if (title) document.title = title
       // Web menu must mirror API/desktop data exactly (no local fallback injection).
       setProducts(Array.isArray(p) ? p : [])
     } catch (e) {

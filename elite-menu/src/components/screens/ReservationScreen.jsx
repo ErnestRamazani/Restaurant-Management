@@ -63,7 +63,12 @@ function validateReservationLeadTime(localValue, leadDays, maxMonthsAhead) {
 
 export function ReservationScreen({ config }) {
   const navigate = useNavigate()
-  const name = config?.restaurantName ? String(config.restaurantName) : 'Elite Restaurant'
+  const name =
+    config?.restaurantName && String(config.restaurantName).trim()
+      ? String(config.restaurantName).trim()
+      : config?.RestaurantName && String(config.RestaurantName).trim()
+        ? String(config.RestaurantName).trim()
+        : ''
   const phone = config ? String(config.phone ?? config.Phone ?? '').trim() : ''
   const address = config ? String(config.address ?? config.Address ?? '').trim() : ''
   const leadDaysRaw = Number(config?.reservationLeadDays ?? 2)

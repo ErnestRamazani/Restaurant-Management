@@ -60,7 +60,10 @@ public sealed class AdminSettingsApiClient(EliteApiClient? apiClient = null)
             settings.Salary.LateDaysPerAttendanceUnit,
             settings.Salary.AbsenceCountsAsAttendanceUnit,
             settings.Salary.SalesBonusPercent,
-            settings.Salary.MaxSalaryAdvancePercentOfGross);
+            settings.Salary.MaxSalaryAdvancePercentOfGross,
+            settings.BusinessProfile.CustomerMenuAboutText,
+            settings.BusinessProfile.CustomerMenuContactIntro,
+            settings.BusinessProfile.CustomerMenuNotesText);
 
         await _apiClient.PostAsync<AdminCloudSettingsRequest, AdminCloudSettingsResponse>(
             "api/admin/settings/cloud-profile",

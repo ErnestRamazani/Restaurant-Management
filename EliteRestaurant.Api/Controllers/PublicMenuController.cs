@@ -62,6 +62,19 @@ public sealed class PublicMenuController(
         var tagline = string.IsNullOrWhiteSpace(taglineValue)
             ? null
             : taglineValue.Trim();
+        var hasCloud = cloudSettings is not null;
+        var aboutText = PublicMenuBrandingMerge.ProfileRichText(
+            hasCloud,
+            cloudSettings?.CustomerMenuAboutText,
+            business.CustomerMenuAboutText);
+        var contactIntro = PublicMenuBrandingMerge.ProfileRichText(
+            hasCloud,
+            cloudSettings?.CustomerMenuContactIntro,
+            business.CustomerMenuContactIntro);
+        var menuNotesText = PublicMenuBrandingMerge.ProfileRichText(
+            hasCloud,
+            cloudSettings?.CustomerMenuNotesText,
+            business.CustomerMenuNotesText);
         var phone = PublicMenuBrandingMerge.ProfileString(
             cloudSettings is not null,
             cloudSettings?.Phone,
@@ -111,6 +124,9 @@ public sealed class PublicMenuController(
             name,
             "/api/public/menu/assets/logo",
             tagline,
+            aboutText,
+            contactIntro,
+            menuNotesText,
             mode,
             rate,
             tax,

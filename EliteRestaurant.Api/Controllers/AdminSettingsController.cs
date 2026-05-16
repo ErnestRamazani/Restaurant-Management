@@ -30,6 +30,15 @@ public sealed class AdminSettingsController(AppDbContext db) : ControllerBase
         row.CustomerMenuTagline = string.IsNullOrWhiteSpace(request.CustomerMenuTagline)
             ? null
             : request.CustomerMenuTagline.Trim();
+        row.CustomerMenuAboutText = string.IsNullOrWhiteSpace(request.CustomerMenuAboutText)
+            ? null
+            : request.CustomerMenuAboutText.Trim();
+        row.CustomerMenuContactIntro = string.IsNullOrWhiteSpace(request.CustomerMenuContactIntro)
+            ? null
+            : request.CustomerMenuContactIntro.Trim();
+        row.CustomerMenuNotesText = string.IsNullOrWhiteSpace(request.CustomerMenuNotesText)
+            ? null
+            : request.CustomerMenuNotesText.Trim();
         row.StaffLoginPasscode = string.IsNullOrWhiteSpace(request.StaffLoginPasscode)
             ? "er4124"
             : request.StaffLoginPasscode.Trim();
@@ -81,6 +90,9 @@ public sealed class AdminSettingsController(AppDbContext db) : ControllerBase
         settings.BusinessProfile.WebsiteDomain = row.WebsiteDomain;
         settings.BusinessProfile.SocialMedia = row.SocialMedia;
         settings.BusinessProfile.CustomerMenuTagline = row.CustomerMenuTagline;
+        settings.BusinessProfile.CustomerMenuAboutText = row.CustomerMenuAboutText;
+        settings.BusinessProfile.CustomerMenuContactIntro = row.CustomerMenuContactIntro;
+        settings.BusinessProfile.CustomerMenuNotesText = row.CustomerMenuNotesText;
         settings.BusinessProfile.StaffLoginPasscode = row.StaffLoginPasscode;
         settings.BusinessProfile.TicketFooterText = row.TicketFooterText;
         settings.BusinessProfile.TaxIdLegalInfo = row.TaxIdLegalInfo;

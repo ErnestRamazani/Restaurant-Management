@@ -4,6 +4,15 @@ import { BottomSheet } from '../ui/BottomSheet'
 import { ReservationOrderGatewayModal } from '../ui/ReservationOrderGatewayModal'
 import { GoldDivider } from '../ui/GoldDivider'
 import { resolveApiAssetUrl } from '../../utils/apiClient'
+import {
+  configString,
+  menuAboutText,
+  menuContactIntro,
+  menuNotesText,
+  menuTagline,
+  restaurantDisplayName,
+  textParagraphs,
+} from '../../utils/guestMenuConfig'
 
 function Particles() {
   const dots = Array.from({ length: 10 }, (_, i) => ({
@@ -72,18 +81,20 @@ export function HeroScreen({ config, onEnterMenu, onOrderOnline, onReservation, 
   const [info, setInfo] = useState(/** @type {null | 'about' | 'contact' | 'notes'} */ (null))
   const [gatewayOpen, setGatewayOpen] = useState(false)
 
-  const tagline =
-    config?.tagline && String(config.tagline).trim()
-      ? String(config.tagline).trim()
-      : 'Cuisine moderne · Kinshasa'
-  const name = config?.restaurantName ? String(config.restaurantName) : 'Elite Restaurant'
-  const logoUrl = config?.logoUrl ? String(config.logoUrl) : ''
+  const name = restaurantDisplayName(config)
+  const tagline = menuTagline(config)
+  const aboutBody = menuAboutText(config)
+  const contactIntro = menuContactIntro(config)
+  const notesBody = menuNotesText(config)
+  const logoUrl = configString(config, 'logoUrl', 'LogoUrl')
   const logoSrc = logoUrl ? resolveApiAssetUrl(logoUrl) : ''
-  const phone = config ? String(config.phone ?? config.Phone ?? '').trim() : ''
-  const address = config ? String(config.address ?? config.Address ?? '').trim() : ''
-  const website = config ? String(config.websiteDomain ?? config.WebsiteDomain ?? '').trim() : ''
-  const socialMedia = config ? String(config.socialMedia ?? config.SocialMedia ?? '').trim() : ''
-  const taxLegal = config ? String(config.taxIdLegalInfo ?? config.TaxIdLegalInfo ?? '').trim() : ''
+  const phone = configString(config, 'phone', 'Phone')
+  const address = configString(config, 'address', 'Address')
+  const website = configString(config, 'websiteDomain', 'WebsiteDomain')
+  const socialMedia = configString(config, 'socialMedia', 'SocialMedia')
+  const taxLegal = configString(config, 'taxIdLegalInfo', 'TaxIdLegalInfo')
+  const aboutParagraphs = textParagraphs(aboutBody)
+  const notesParagraphs = textParagraphs(notesBody)
 
   const websiteHref = formatWebsiteHref(website)
 
@@ -110,12 +121,14 @@ export function HeroScreen({ config, onEnterMenu, onOrderOnline, onReservation, 
               transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
             />
           ) : null}
-          <h1
-            className="-mt-4 text-center font-display text-[clamp(1.65rem,6.5vw,2.75rem)] italic leading-[1.12] tracking-[0.04em] text-champagne"
-            style={{ fontFamily: '"Playfair Display", serif' }}
-          >
-            {name}
-          </h1>
+          {name ? (
+            <h1
+              className="-mt-4 text-center font-display text-[clamp(1.65rem,6.5vw,2.75rem)] italic leading-[1.12] tracking-[0.04em] text-champagne"
+              style={{ fontFamily: '"Playfair Display", serif' }}
+            >
+              {name}
+            </h1>
+          ) : null}
         </motion.div>
 
         <motion.div
@@ -132,9 +145,11 @@ export function HeroScreen({ config, onEnterMenu, onOrderOnline, onReservation, 
           >
             <RoyalDivider />
           </motion.div>
-          <p className="mt-3 max-w-[min(100%,22rem)] text-center font-body text-[0.78rem] font-light uppercase leading-relaxed tracking-[0.18em] text-[var(--text-muted)]">
-            {tagline}
-          </p>
+          {tagline ? (
+            <p className="mt-3 max-w-[min(100%,22rem)] text-center font-body text-[0.78rem] font-light uppercase leading-relaxed tracking-[0.18em] text-[var(--text-muted)]">
+              {tagline}
+            </p>
+          ) : null}
         </motion.div>
 
         <div className="min-h-[5rem] flex-1" aria-hidden />
@@ -221,11 +236,21 @@ export function HeroScreen({ config, onEnterMenu, onOrderOnline, onReservation, 
                 About us
               </h2>
               <GoldDivider className="my-3" />
-              <p className="font-body text-[0.9rem] leading-relaxed text-champagne/85">
-                {name} is dedicated to quality ingredients, thoughtful preparation, and warm hospitality. Our menu
-                changes with the best of the season. Scan your table's code to order - your server is always there to
-                help with wine, timing, and special requests.
-              </p>
+              {aboutParagraphs.length > 0 ? (
+                aboutParagraphs.map((paragraph) => (
+                  <p
+                    key={paragraph.slice(0, 48)}
+                    className="mb-3 font-body text-[0.9rem] leading-relaxed text-champagne/85 last:mb-0"
+                  >
+                    {paragraph}
+                  </p>
+                ))
+              ) : (
+                <p className="font-body text-[0.9rem] text-[var(--text-muted)]">
+                  Add your About text in Settings → Business Profile on the restaurant desktop app, then save and push
+                  to the cloud.
+                </p>
+              )}
             </>
           ) : null}
           {info === 'contact' ? (
@@ -234,6 +259,9 @@ export function HeroScreen({ config, onEnterMenu, onOrderOnline, onReservation, 
                 Contact
               </h2>
               <GoldDivider className="my-3" />
+              {contactIntro ? (
+                <p className="mb-3 font-body text-[0.9rem] leading-relaxed text-champagne/85">{contactIntro}</p>
+              ) : null}
               {address ? (
                 <p className="mb-3 font-body text-[0.9rem] leading-relaxed text-champagne/85">{address}</p>
               ) : (
@@ -270,14 +298,20 @@ export function HeroScreen({ config, onEnterMenu, onOrderOnline, onReservation, 
                 Notes
               </h2>
               <GoldDivider className="my-3" />
-              <p className="font-body text-[0.9rem] leading-relaxed text-champagne/85">
-                <strong className="text-gold/90">Allergies &amp; diet:</strong> Please list allergies when you send your
-                order. Our team reads every request; always confirm with your server on site.
-              </p>
-              <p className="mt-3 font-body text-[0.9rem] leading-relaxed text-champagne/80">
-                <strong className="text-gold/90">Orders:</strong> The kitchen sees your order as a request. Timing may
-                vary during busy service.
-              </p>
+              {notesParagraphs.length > 0 ? (
+                notesParagraphs.map((paragraph) => (
+                  <p
+                    key={paragraph.slice(0, 48)}
+                    className="mb-3 font-body text-[0.9rem] leading-relaxed text-champagne/85 last:mb-0"
+                  >
+                    {paragraph}
+                  </p>
+                ))
+              ) : (
+                <p className="font-body text-[0.9rem] text-[var(--text-muted)]">
+                  Add Notes for guests in Settings → Business Profile, then save and push to the cloud.
+                </p>
+              )}
               {taxLegal ? (
                 <p className="mt-3 font-body text-[0.85rem] leading-relaxed text-champagne/60">{taxLegal}</p>
               ) : null}

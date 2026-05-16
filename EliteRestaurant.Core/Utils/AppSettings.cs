@@ -95,7 +95,7 @@ public sealed class CloudApiSettings
 
 public sealed class BusinessProfileSettings
 {
-    public string RestaurantName { get; set; } = "Elite Restaurant";
+    public string RestaurantName { get; set; } = string.Empty;
     public string Phone { get; set; } = string.Empty;
     public string Address { get; set; } = string.Empty;
     public string WebsiteDomain { get; set; } = string.Empty;
@@ -105,8 +105,17 @@ public sealed class BusinessProfileSettings
     /// <summary>Base URL for customer menu QR links (no trailing slash), e.g. http://192.168.1.50:5223</summary>
     public string PublicMenuBaseUrl { get; set; } = CloudEndpoints.ProductionApiBaseUrl;
 
-    /// <summary>Optional tagline for the public customer menu (e.g. Fine Dining · Est. 2024).</summary>
+    /// <summary>Optional tagline for the public customer menu (e.g. Cuisine moderne · Kinshasa).</summary>
     public string? CustomerMenuTagline { get; set; }
+
+    /// <summary>Public menu About sheet (plain text).</summary>
+    public string? CustomerMenuAboutText { get; set; }
+
+    /// <summary>Public menu Contact sheet intro (plain text).</summary>
+    public string? CustomerMenuContactIntro { get; set; }
+
+    /// <summary>Public menu Notes sheet (plain text).</summary>
+    public string? CustomerMenuNotesText { get; set; }
 
     /// <summary>Simple gate before exposing staff/admin workspace links from the public menu.</summary>
     public string StaffLoginPasscode { get; set; } = "er4124";
