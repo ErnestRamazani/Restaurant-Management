@@ -635,7 +635,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         ResetThemeCommand = new RelayCommand(_ => ResetTheme());
         ReloadSavedThemeCommand = new RelayCommand(_ => LoadFromCurrentTheme());
         ApplyPickerToTokenCommand = new RelayCommand(_ => ApplyPickerToToken());
-        SaveBusinessProfileCommand = new RelayCommand(_ => SaveBusinessProfile());
+        SaveBusinessProfileCommand = new RelayCommand(_ => _ = SaveBusinessProfileAsync());
         SaveTicketReceiptLayoutCommand = new RelayCommand(_ => SaveTicketReceiptLayout());
         BrowseTicketHeaderLogoCommand = new RelayCommand(_ => BrowseTicketHeaderLogo());
         BrowseTicketSocialIconCommand = new RelayCommand(o => BrowseTicketSocialIcon(o));
@@ -1158,7 +1158,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         return false;
     }
 
-    private void SaveBusinessProfile()
+    private async Task SaveBusinessProfileAsync()
     {
         _settings.BusinessProfile.RestaurantName = RestaurantName.Trim();
         _settings.BusinessProfile.Phone = RestaurantPhone.Trim();
@@ -1215,12 +1215,26 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         SettingsManager.Save(_settings);
         ReloadTicketReceiptSettingsFromDisk();
         _adminData.ReloadFromSettings();
-        _ = new AdminSettingsApiClient().PushSettingsAsync(_settings, applyLogoChanges: true, applyOnlinePromoImageChanges: true);
         RefreshBusinessProfileBindings();
-        var msg = "Business profile saved.";
-        if (PublicMenuUrlHelper.LooksLikeLocalHostOnly(_settings.BusinessProfile.PublicMenuBaseUrl))
-            msg += " QR: localhost will not work on customers’ phones on Wi-Fi — use the hosted cloud URL or this PC’s LAN URL and re-print QRs.";
-        StatusMessage = msg;
+
+        var pushTarget = EliteApiClient.ResolvePublicMenuCloudBaseUrl(_settings);
+        StatusMessage = $"Business profile saved on this PC. Pushing to {pushTarget}…";
+        try
+        {
+            await new AdminSettingsApiClient().PushSettingsAsync(_settings, applyLogoChanges: true, applyOnlinePromoImageChanges: true)
+                .ConfigureAwait(true);
+            var msg =
+                $"Business profile saved and pushed to the public menu API ({pushTarget}). Refresh etoilegourmandekin.com to see changes.";
+            if (PublicMenuUrlHelper.LooksLikeLocalHostOnly(_settings.BusinessProfile.PublicMenuBaseUrl))
+                msg += " QR: localhost will not work on customers’ phones — use the hosted cloud URL and re-print QRs.";
+            StatusMessage = msg;
+        }
+        catch (Exception ex)
+        {
+            StatusMessage =
+                $"Saved on this PC, but cloud push to {pushTarget} failed: {ex.GetBaseException().Message}. " +
+                "Sign in as admin on the web dashboard (or ensure Cloud API token in settings), then Save Business Profile again.";
+        }
     }
 
     private void SaveCurrencyPricing()

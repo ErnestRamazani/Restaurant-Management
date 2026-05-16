@@ -17,10 +17,8 @@ public sealed class AdminSettingsApiClient(EliteApiClient? apiClient = null)
     {
         var logo = ReadLogo(settings.BusinessProfile.LogoPath);
         var promo = ReadOnlinePromo(settings.BusinessProfile.OnlinePromoImagePath);
-        var menuBaseUrl = CloudEndpoints.NormalizeApiBaseUrl(
-            string.IsNullOrWhiteSpace(settings.BusinessProfile.PublicMenuBaseUrl?.Trim())
-                ? settings.CloudApi.BaseUrl
-                : settings.BusinessProfile.PublicMenuBaseUrl);
+        var pushApiBaseUrl = EliteApiClient.ResolvePublicMenuCloudBaseUrl(settings);
+        var menuBaseUrl = pushApiBaseUrl;
 
         settings.Salary ??= new SalarySettings();
 
@@ -66,6 +64,7 @@ public sealed class AdminSettingsApiClient(EliteApiClient? apiClient = null)
             settings.BusinessProfile.CustomerMenuNotesText);
 
         await _apiClient.PostAsync<AdminCloudSettingsRequest, AdminCloudSettingsResponse>(
+            pushApiBaseUrl,
             "api/admin/settings/cloud-profile",
             request,
             cancellationToken);

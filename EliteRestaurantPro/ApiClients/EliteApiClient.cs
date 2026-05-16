@@ -34,10 +34,13 @@ public sealed class EliteApiClient
 
     public bool IsConfigured => _apiBaseUrl.Length > 0;
 
-    private Uri BuildRequestUri(string path)
+    private Uri BuildRequestUri(string path) => BuildAbsoluteRequestUri(_apiBaseUrl, path);
+
+    private static Uri BuildAbsoluteRequestUri(string apiBaseUrl, string path)
     {
+        var baseNorm = CloudEndpoints.NormalizeApiBaseUrl(apiBaseUrl).TrimEnd('/') + "/";
         var relative = Normalize(path);
-        return new Uri(new Uri(_apiBaseUrl, UriKind.Absolute), relative);
+        return new Uri(new Uri(baseNorm, UriKind.Absolute), relative);
     }
 
     private static void ApplyBearer(HttpRequestMessage request, string? token)
@@ -118,10 +121,21 @@ public sealed class EliteApiClient
 
     public async Task<TResponse?> PostAsync<TRequest, TResponse>(string path, TRequest payload, CancellationToken cancellationToken = default)
     {
+        return await PostAsync<TRequest, TResponse>(_apiBaseUrl, path, payload, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>POST to an explicit API host (e.g. production public menu URL) instead of <see cref="ResolveDesktopApiBaseUrl"/>.</summary>
+    public async Task<TResponse?> PostAsync<TRequest, TResponse>(
+        string apiBaseUrl,
+        string path,
+        TRequest payload,
+        CancellationToken cancellationToken = default)
+    {
+        var uri = BuildAbsoluteRequestUri(apiBaseUrl, path);
         using var response = await SendWithRetryAsync(
                 () =>
                 {
-                    var r = new HttpRequestMessage(HttpMethod.Post, BuildRequestUri(path))
+                    var r = new HttpRequestMessage(HttpMethod.Post, uri)
                     {
                         Content = JsonContent.Create(payload, options: JsonOptions)
                     };
@@ -196,6 +210,18 @@ public sealed class EliteApiClient
             BaseAddress = new Uri(baseUrl, UriKind.Absolute),
             Timeout = TimeSpan.FromSeconds(20)
         };
+    }
+
+    /// <summary>
+    /// Base URL for pushing Business Profile / public menu settings to the hosted API.
+    /// Uses <see cref="BusinessProfileSettings.PublicMenuBaseUrl"/> and never applies the localhost dev redirect.
+    /// </summary>
+    public static string ResolvePublicMenuCloudBaseUrl(AppSettings appSettings)
+    {
+        var url = string.IsNullOrWhiteSpace(appSettings.BusinessProfile.PublicMenuBaseUrl)
+            ? appSettings.CloudApi.BaseUrl
+            : appSettings.BusinessProfile.PublicMenuBaseUrl;
+        return CloudEndpoints.NormalizeApiBaseUrl(url);
     }
 
     /// <summary>
