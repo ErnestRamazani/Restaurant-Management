@@ -21,6 +21,18 @@ public static class CloudEndpoints
 
         return trimmed;
     }
+
+    /// <summary>True when the API base URL targets this PC (localhost), not hosted production.</summary>
+    public static bool IsLocalDevelopmentApiUrl(string? baseUrl)
+    {
+        if (string.IsNullOrWhiteSpace(baseUrl))
+            return true;
+
+        var normalized = NormalizeApiBaseUrl(baseUrl).ToLowerInvariant();
+        return normalized.Contains("://localhost", StringComparison.Ordinal)
+               || normalized.Contains("://127.0.0.1", StringComparison.Ordinal)
+               || normalized.Contains("://[::1]", StringComparison.Ordinal);
+    }
 }
 
 public sealed class AppSettings

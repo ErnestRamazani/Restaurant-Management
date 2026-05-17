@@ -225,11 +225,16 @@ public sealed class EliteApiClient
     }
 
     /// <summary>
-    /// Keep desktop sync aligned with local dev/runtime by default:
-    /// when DB host is local and cloud base is still production default, route API calls to localhost.
+    /// API base for admin/sync and other desktop HTTP calls. When <see cref="BusinessProfileSettings.PublicMenuBaseUrl"/>
+    /// points at hosted production, use that host so menu/products and settings land in the same cloud database.
+    /// Localhost redirect applies only when both the public menu URL and cloud base are still dev/local targets.
     /// </summary>
-    private static string ResolveDesktopApiBaseUrl(AppSettings appSettings)
+    public static string ResolveDesktopApiBaseUrl(AppSettings appSettings)
     {
+        var publicMenuTarget = ResolvePublicMenuCloudBaseUrl(appSettings);
+        if (!CloudEndpoints.IsLocalDevelopmentApiUrl(publicMenuTarget))
+            return publicMenuTarget;
+
         var configured = CloudEndpoints.NormalizeApiBaseUrl(appSettings.CloudApi.BaseUrl);
         var dbHost = (appSettings.Database?.PostgreSqlHost ?? string.Empty).Trim().ToLowerInvariant();
         var localDbHost = dbHost is "localhost" or "127.0.0.1" or "::1";

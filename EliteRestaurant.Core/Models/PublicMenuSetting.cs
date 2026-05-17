@@ -31,6 +31,12 @@ public sealed class PublicMenuSetting
     public decimal ServicePercent { get; set; } = 10m;
     /// <summary>Optional: POS table id for guest online orders (must have assigned server in ops).</summary>
     public int? OnlineOrdersTableId { get; set; }
+
+    /// <summary>Minimum days before a guest may reserve (public menu + floor API).</summary>
+    public int ReservationLeadDays { get; set; } = 2;
+
+    /// <summary>How far ahead guests may book (months).</summary>
+    public int ReservationMaxMonthsAhead { get; set; } = 6;
     public string? OnlinePromoTitle { get; set; }
     public string? OnlinePromoSubtitle { get; set; }
     public string? OnlinePromoCtaLabel { get; set; }

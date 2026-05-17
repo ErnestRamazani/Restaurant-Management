@@ -1,3 +1,4 @@
+using EliteRestaurant.Api.Branding;
 using EliteRestaurant.Contracts.Floor;
 using EliteRestaurant.Api.Services;
 using EliteRestaurant.Core.Data;
@@ -142,7 +143,7 @@ public sealed class PublicFloorReservationController(
     }
 
     /// <summary>No past dates; enforce configurable lead-time and max horizon from business settings.</summary>
-    private static bool TryGetPublicBookingScheduleError(DateTime plannedStartUtc, out string? message)
+    private bool TryGetPublicBookingScheduleError(DateTime plannedStartUtc, out string? message)
     {
         message = null;
         var startUtc = plannedStartUtc.Kind switch
@@ -166,9 +167,7 @@ public sealed class PublicFloorReservationController(
             return true;
         }
 
-        var business = SettingsManager.Load().BusinessProfile;
-        var leadDays = Math.Clamp(business.ReservationLeadDays, 0, 30);
-        var maxMonthsAhead = Math.Clamp(business.ReservationMaxMonthsAhead, 1, 24);
+        var (leadDays, maxMonthsAhead) = PublicMenuReservationSettings.Resolve(db);
         if (startDay < todayUtc.AddDays(leadDays))
         {
             message =

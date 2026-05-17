@@ -70,6 +70,25 @@ public static class StaffPortalAuthentication
     }
 
     /// <summary>
+    /// Active AdminWeb employees matching sign-in ID, UniqueId, or display name (trim + case-insensitive).
+    /// </summary>
+    public static IQueryable<Employee> QueryActiveAdminWebPortalCandidates(IQueryable<Employee> employees, string staffId)
+    {
+        var trimmed = (staffId ?? string.Empty).Trim();
+        if (trimmed.Length == 0)
+            return employees.Where(_ => false);
+
+        var lower = trimmed.ToLowerInvariant();
+        return employees
+            .Where(e => e.EmploymentStatus == "Active")
+            .Where(e => e.Role.ToLower() == "adminweb")
+            .Where(e =>
+                (!string.IsNullOrWhiteSpace(e.SignInId) && e.SignInId.Trim().ToLower() == lower)
+                || e.UniqueId.Trim().ToLower() == lower
+                || e.Name.Trim().ToLower() == lower);
+    }
+
+    /// <summary>
     /// Active Admin or Manager employees matching sign-in ID, UniqueId, or display name (trim + case-insensitive).
     /// Used by desktop admin login (no PIN gate in current flow).
     /// </summary>

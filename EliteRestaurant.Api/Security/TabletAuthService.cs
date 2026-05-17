@@ -20,16 +20,18 @@ public sealed class TabletAuthService(AppDbContext db, JwtTokenService jwtTokenS
         // Admin / AdminWeb: allow match on sign-in ID, unique ID, or display name (desktop admin screen).
         // Other portals: sign-in ID or unique ID only (tablets).
         var idMatches = string.Equals(normalizedPortal, "Admin", StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(normalizedPortal, "AdminWeb", StringComparison.OrdinalIgnoreCase)
             ? StaffPortalAuthentication.QueryActiveAdminPortalCandidates(db.Employees.AsNoTracking(), id).ToList()
-            : StaffPortalAuthentication.QueryActiveEmployeesMatchingStaffId(db.Employees.AsNoTracking(), id).ToList();
+            : string.Equals(normalizedPortal, "AdminWeb", StringComparison.OrdinalIgnoreCase)
+                ? StaffPortalAuthentication.QueryActiveAdminWebPortalCandidates(db.Employees.AsNoTracking(), id).ToList()
+                : StaffPortalAuthentication.QueryActiveEmployeesMatchingStaffId(db.Employees.AsNoTracking(), id).ToList();
         if (idMatches.Count == 0)
         {
             return new TabletLoginOutcome(null,
-                string.Equals(normalizedPortal, "Admin", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(normalizedPortal, "AdminWeb", StringComparison.OrdinalIgnoreCase)
-                    ? "No active Admin or Manager matches that ID, employee code, or name. For the seeded web admin use sign-in er4124 (after migrations), or ask an administrator to set your Admin account."
-                    : "No active employee matches that sign-in ID. For the default web admin account use er4124 after the API has applied database migrations and startup seeding, or ask an administrator to add an AdminWeb user.");
+                string.Equals(normalizedPortal, "AdminWeb", StringComparison.OrdinalIgnoreCase)
+                    ? "No active AdminWeb user matches that sign-in ID. Use er4124 after the API has restarted on production (seeding), or add an employee with role AdminWeb in Elite Pro."
+                    : string.Equals(normalizedPortal, "Admin", StringComparison.OrdinalIgnoreCase)
+                        ? "No active Admin or Manager matches that ID, employee code, or name."
+                        : "No active employee matches that sign-in ID.");
         }
 
         var candidates = StaffPortalAuthentication.FilterPinMatches(idMatches, normalizedPin);

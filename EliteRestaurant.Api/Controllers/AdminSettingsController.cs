@@ -52,6 +52,8 @@ public sealed class AdminSettingsController(AppDbContext db) : ControllerBase
         row.TaxPercent = Math.Max(0, request.TaxPercent);
         row.ServicePercent = Math.Max(0, request.ServicePercent);
         row.OnlineOrdersTableId = request.OnlineOrdersTableId;
+        row.ReservationLeadDays = Math.Clamp(request.ReservationLeadDays, 0, 30);
+        row.ReservationMaxMonthsAhead = Math.Clamp(request.ReservationMaxMonthsAhead, 1, 24);
         row.OnlinePromoTitle = string.IsNullOrWhiteSpace(request.OnlinePromoTitle)
             ? null
             : request.OnlinePromoTitle.Trim();

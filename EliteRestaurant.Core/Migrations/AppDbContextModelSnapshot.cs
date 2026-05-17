@@ -769,6 +769,12 @@ namespace EliteRestaurant.Core.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int>("ReservationLeadDays")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ReservationMaxMonthsAhead")
+                        .HasColumnType("integer");
+
                     b.Property<string>("RoundingGrandTotal")
                         .IsRequired()
                         .HasColumnType("text");

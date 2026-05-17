@@ -983,15 +983,15 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     {
         try
         {
-            await new AdminSettingsApiClient().PushSettingsAsync(_settings, applyLogoChanges: false, applyOnlinePromoImageChanges: false)
+            await CloudSettingsPushService.PushAsync(_settings, applyLogoChanges: false, applyOnlinePromoImageChanges: false)
                 .ConfigureAwait(true);
             RefreshSalaryFromDiskIntoViewModel();
-            StatusMessage = "Salary payroll settings saved and pushed to the API.";
+            StatusMessage = $"Salary payroll settings saved and pushed to {CloudSettingsPushService.DescribePushTarget(_settings)}.";
         }
         catch (Exception ex)
         {
             StatusMessage =
-                $"Salary saved on this PC. Cloud push failed: {ex.GetBaseException().Message}. Fix API URL/token and use Save again to push.";
+                $"Salary saved on this PC. Cloud push failed: {ex.GetBaseException().Message}. Sign in as Admin, check Public menu base URL, then Save again.";
         }
     }
 
@@ -1013,10 +1013,26 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         _settings.BusinessProfile.ReservationMaxMonthsAhead = Math.Clamp(maxMonths, 1, 24);
         SettingsManager.Save(_settings);
         _adminData.ReloadFromSettings();
-        _ = new AdminSettingsApiClient().PushSettingsAsync(_settings, applyLogoChanges: false, applyOnlinePromoImageChanges: false);
         ReservationLeadDays = _settings.BusinessProfile.ReservationLeadDays.ToString(CultureInfo.InvariantCulture);
         ReservationMaxMonthsAhead = _settings.BusinessProfile.ReservationMaxMonthsAhead.ToString(CultureInfo.InvariantCulture);
-        StatusMessage = "Reservation settings saved and pushed to the public menu.";
+        StatusMessage = "Reservation settings saved on this PC. Pushing to cloud…";
+        _ = PushReservationSettingsCloudAsync();
+    }
+
+    private async Task PushReservationSettingsCloudAsync()
+    {
+        try
+        {
+            await CloudSettingsPushService.PushAsync(_settings, applyLogoChanges: false, applyOnlinePromoImageChanges: false)
+                .ConfigureAwait(true);
+            StatusMessage =
+                $"Reservation settings saved and pushed to {CloudSettingsPushService.DescribePushTarget(_settings)}.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage =
+                $"Reservation saved on this PC. Cloud push failed: {ex.GetBaseException().Message}. Sign in as Admin, check Public menu base URL, then Save again.";
+        }
     }
 
     private void LoadMenuTaxonomyUi()
@@ -1123,9 +1139,9 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     {
         try
         {
-            await new AdminSettingsApiClient().PushSettingsAsync(_settings, applyLogoChanges: false, applyOnlinePromoImageChanges: false)
+            await CloudSettingsPushService.PushAsync(_settings, applyLogoChanges: false, applyOnlinePromoImageChanges: false)
                 .ConfigureAwait(true);
-            StatusMessage = "Menu categories saved and pushed to the public menu API.";
+            StatusMessage = $"Menu categories saved and pushed to {CloudSettingsPushService.DescribePushTarget(_settings)}.";
         }
         catch (Exception ex)
         {
@@ -1208,7 +1224,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         _settings.BusinessProfile.ReservationLeadDays = Math.Clamp(leadDaysBp, 0, 30);
         _settings.BusinessProfile.ReservationMaxMonthsAhead = Math.Clamp(maxMonthsBp, 1, 24);
 
-        _settings.CloudApi.BaseUrl = CloudEndpoints.NormalizeApiBaseUrl(_settings.BusinessProfile.PublicMenuBaseUrl);
+        _settings.CloudApi.BaseUrl = EliteApiClient.ResolveDesktopApiBaseUrl(_settings);
 
         PersistTicketReceiptLayout();
 
@@ -1217,14 +1233,14 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         _adminData.ReloadFromSettings();
         RefreshBusinessProfileBindings();
 
-        var pushTarget = EliteApiClient.ResolvePublicMenuCloudBaseUrl(_settings);
+        var pushTarget = CloudSettingsPushService.DescribePushTarget(_settings);
         StatusMessage = $"Business profile saved on this PC. Pushing to {pushTarget}…";
         try
         {
-            await new AdminSettingsApiClient().PushSettingsAsync(_settings, applyLogoChanges: true, applyOnlinePromoImageChanges: true)
+            await CloudSettingsPushService.PushAsync(_settings, applyLogoChanges: true, applyOnlinePromoImageChanges: true)
                 .ConfigureAwait(true);
             var msg =
-                $"Business profile saved and pushed to the public menu API ({pushTarget}). Refresh etoilegourmandekin.com to see changes.";
+                $"Business profile saved and pushed to {pushTarget}. Refresh your live menu site to see changes (git deploy alone does not copy settings).";
             if (PublicMenuUrlHelper.LooksLikeLocalHostOnly(_settings.BusinessProfile.PublicMenuBaseUrl))
                 msg += " QR: localhost will not work on customers’ phones — use the hosted cloud URL and re-print QRs.";
             StatusMessage = msg;
@@ -1266,12 +1282,28 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         _settings.CurrencyPricing.TaxPercent = tax;
         _settings.CurrencyPricing.ServicePercent = service;
 
-        _settings.CloudApi.BaseUrl = CloudEndpoints.NormalizeApiBaseUrl(_settings.BusinessProfile.PublicMenuBaseUrl);
+        _settings.CloudApi.BaseUrl = EliteApiClient.ResolveDesktopApiBaseUrl(_settings);
 
         SettingsManager.Save(_settings);
         _adminData.ReloadFromSettings();
-        _ = new AdminSettingsApiClient().PushSettingsAsync(_settings, applyLogoChanges: false, applyOnlinePromoImageChanges: false);
-        StatusMessage = "Currency & pricing settings saved.";
+        StatusMessage = "Currency & pricing saved on this PC. Pushing to cloud…";
+        _ = PushCurrencyPricingCloudAsync();
+    }
+
+    private async Task PushCurrencyPricingCloudAsync()
+    {
+        try
+        {
+            await CloudSettingsPushService.PushAsync(_settings, applyLogoChanges: false, applyOnlinePromoImageChanges: false)
+                .ConfigureAwait(true);
+            StatusMessage =
+                $"Currency & pricing saved and pushed to {CloudSettingsPushService.DescribePushTarget(_settings)}.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage =
+                $"Currency saved on this PC. Cloud push failed: {ex.GetBaseException().Message}. Sign in as Admin, check Public menu base URL, then Save again.";
+        }
     }
 
     private static bool TryParseDecimalInput(string input, out decimal value)

@@ -104,8 +104,7 @@ public sealed class PublicMenuController(
             ? "/api/public/menu/assets/online-promo"
             : null;
         var onlineTableId = cloudSettings?.OnlineOrdersTableId;
-        var reservationLeadDays = Math.Clamp(SettingsManager.Load().BusinessProfile.ReservationLeadDays, 0, 30);
-        var reservationMaxMonthsAhead = Math.Clamp(SettingsManager.Load().BusinessProfile.ReservationMaxMonthsAhead, 1, 24);
+        var (reservationLeadDays, reservationMaxMonthsAhead) = PublicMenuReservationSettings.Resolve(db);
         var promoTitle = string.IsNullOrWhiteSpace(cloudSettings?.OnlinePromoTitle)
             ? null
             : cloudSettings!.OnlinePromoTitle.Trim();

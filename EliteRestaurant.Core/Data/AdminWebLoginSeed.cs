@@ -5,8 +5,8 @@ using Microsoft.EntityFrameworkCore;
 namespace EliteRestaurant.Core.Data;
 
 /// <summary>
-/// Ensures the documented default read-only web admin row exists after migrations.
-/// (If the seed migration was skipped or the DB predates it, login would otherwise always fail.)
+/// Ensures the documented default read-only web admin row exists after migrations (role <c>AdminWeb</c>).
+/// Business settings and public menu branding are changed only from the desktop app (Admin role).
 /// </summary>
 public static class AdminWebLoginSeed
 {
@@ -16,14 +16,24 @@ public static class AdminWebLoginSeed
 
     public static void EnsureSeeded(AppDbContext db)
     {
-        if (db.Employees.Any(e => e.UniqueId == SeedUniqueId))
+        var existing = db.Employees.FirstOrDefault(e => e.UniqueId == SeedUniqueId);
+        if (existing is not null)
+        {
+            if (RepairSeedRow(existing))
+                db.SaveChanges();
             return;
+        }
 
         var lower = SeedSignInId.ToLowerInvariant();
-        if (db.Employees.Any(e =>
-                !string.IsNullOrWhiteSpace(e.SignInId)
-                && e.SignInId.Trim().ToLowerInvariant() == lower))
+        var signInConflict = db.Employees.FirstOrDefault(e =>
+            !string.IsNullOrWhiteSpace(e.SignInId)
+            && e.SignInId.Trim().ToLowerInvariant() == lower);
+        if (signInConflict is not null)
+        {
+            if (RepairSeedRow(signInConflict))
+                db.SaveChanges();
             return;
+        }
 
         db.Employees.Add(new Employee
         {
@@ -49,5 +59,42 @@ public static class AdminWebLoginSeed
         });
 
         db.SaveChanges();
+    }
+
+    private static bool RepairSeedRow(Employee employee)
+    {
+        var changed = false;
+        if (!employee.Role.Equals("AdminWeb", StringComparison.OrdinalIgnoreCase))
+        {
+            employee.Role = "AdminWeb";
+            changed = true;
+        }
+
+        if (!string.Equals(employee.EmploymentStatus, "Active", StringComparison.OrdinalIgnoreCase))
+        {
+            employee.EmploymentStatus = "Active";
+            changed = true;
+        }
+
+        if (!string.Equals(employee.SignInId?.Trim(), SeedSignInId, StringComparison.OrdinalIgnoreCase))
+        {
+            employee.SignInId = SeedSignInId;
+            changed = true;
+        }
+
+        if (!EmployeePinHasher.Verify(DefaultPinPlaintext, employee.PinCode))
+        {
+            employee.PinCode = EmployeePinHasher.HashForStorage(DefaultPinPlaintext);
+            changed = true;
+        }
+
+        var notes = employee.Notes ?? string.Empty;
+        if (!notes.Contains("read-only admin web", StringComparison.OrdinalIgnoreCase))
+        {
+            employee.Notes = "Seed account for read-only admin web; rotate from Manager desktop or SQL.";
+            changed = true;
+        }
+
+        return changed;
     }
 }
