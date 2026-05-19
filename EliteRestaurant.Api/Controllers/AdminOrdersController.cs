@@ -322,6 +322,7 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
         context.Database.ProviderName?.Contains("InMemory", StringComparison.OrdinalIgnoreCase) == true;
 
     [HttpPost("pending/{orderId:int}/release-to-kitchen")]
+    [Authorize(Policy = "CashierDesk")]
     public async Task<ActionResult<AdminOrderReleasePendingResponse>> ReleasePendingToKitchen(int orderId)
     {
         var r = _ops.TryReleasePendingToKitchen(orderId);
@@ -364,12 +365,13 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
 
         await orderHub.Clients.Group("Kitchen").SendAsync("KitchenQueueChanged", new { reason = "advance", orderId });
 
-        if (outcome.BecameReady && outcome.ReadyNotification is not null)
+        if (outcome.BecameReady)
         {
-            await orderHub.Clients.Group("Cashier").SendAsync("OrderReady", outcome.ReadyNotification);
-            await orderHub.Clients.Group("Cashier").SendAsync(
-                "CashierOrderBoardChanged",
-                new { reason = "order-ready", orderId, orderCode = outcome.ReadyNotification.OrderCode });
+            await OrderHubBroadcasts.NotifyKitchenMarkedReadyAsync(
+                orderHub,
+                db,
+                orderId,
+                outcome.ReadyNotification);
         }
 
         return Ok(new AdminOrderAdvanceResponse("advanced", null));

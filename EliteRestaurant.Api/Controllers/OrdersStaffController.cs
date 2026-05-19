@@ -10,7 +10,7 @@ namespace EliteRestaurant.Api.Controllers;
 /// <summary>Cashier/admin order actions on canonical <c>api/orders</c> routes.</summary>
 [ApiController]
 [Route("api/orders")]
-[Authorize(Policy = "CashierOrAdmin")]
+[Authorize(Policy = "CashierDesk")]
 public sealed class OrdersStaffController(AppDbContext db, IHubContext<OrderHub> orderHub) : ControllerBase
 {
     private readonly AdminOrderOperationsService _ops = new(db);

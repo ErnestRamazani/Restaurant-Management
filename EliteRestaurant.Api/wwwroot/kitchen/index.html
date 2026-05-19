@@ -1324,19 +1324,13 @@
     actions.innerHTML = "";
     const id = o.id ?? o.Id;
     if (stKey === "pendingApproval" || stKey === "pendingCashier") {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "btn btn-waiting";
-      b.textContent = "Release to kitchen";
-      b.onclick = () => releasePendingToKitchen(id);
-      actions.appendChild(b);
       const hint = document.createElement("p");
       hint.className = "muted";
-      hint.style.margin = "8px 0 0";
+      hint.style.margin = "0";
       hint.textContent =
         stKey === "pendingCashier"
-          ? "Ticket is still with cashier: confirm and send to prep (inventory deducted, status becomes Waiting)."
-          : "Guest online order: approve and send to prep (inventory deducted, status becomes Waiting).";
+          ? "This ticket is with the cashier. Kitchen cannot release it — ask the cashier to send it to prep."
+          : "Guest online order awaiting cashier approval. Only the cashier can release it to the kitchen.";
       actions.appendChild(hint);
     } else if (stKey === "waiting") {
       const b = document.createElement("button");

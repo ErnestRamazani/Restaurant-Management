@@ -80,7 +80,8 @@ public sealed class OrderHub(IServiceScopeFactory scopeFactory) : Hub
             throw new HubException("Only kitchen staff can mark orders ready.");
 
         await using var scope = _scopeFactory.CreateAsyncScope();
-        var ops = new AdminOrderOperationsService(scope.ServiceProvider.GetRequiredService<AppDbContext>());
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var ops = new AdminOrderOperationsService(db);
         var hub = scope.ServiceProvider.GetRequiredService<IHubContext<OrderHub>>();
         var result = ops.TryMarkKitchenReadyForCashier(orderId);
         if (!result.Ok)
@@ -89,9 +90,6 @@ public sealed class OrderHub(IServiceScopeFactory scopeFactory) : Hub
         if (result.SuppressBroadcast || result.Notification is null)
             return;
 
-        await hub.Clients.Group("Cashier").SendAsync("OrderReady", result.Notification);
-        await hub.Clients.Group("Cashier").SendAsync(
-            "CashierOrderBoardChanged",
-            new { reason = "order-ready", orderId = result.Notification.OrderId, orderCode = result.Notification.OrderCode });
+        await OrderHubBroadcasts.NotifyKitchenMarkedReadyAsync(hub, db, orderId, result.Notification);
     }
 }

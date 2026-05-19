@@ -249,7 +249,8 @@ public sealed class PublicMenuController(
                 p.SubCategory,
                 p.Price,
                 p.Description,
-                p.Composition
+                p.Composition,
+                p.PrepMinutes
             })
             .ToList();
 
@@ -288,7 +289,8 @@ public sealed class PublicMenuController(
                 Description = p.Description,
                 Composition = p.Composition,
                 PhotoUrl = photoUrl,
-                IsAvailable = inStock
+                IsAvailable = inStock,
+                PrepMinutes = Math.Max(0, p.PrepMinutes)
             });
         }
 
@@ -493,7 +495,7 @@ public sealed class PublicMenuController(
             {
                 var p = dbProducts[i.ProductId];
                 var sub = string.IsNullOrWhiteSpace(p.SubCategory) ? "General" : p.SubCategory;
-                return (i.Quantity, p.Category, sub);
+                return (i.Quantity, p.PrepMinutes, p.Category, sub);
             })
             .ToList();
         var estimatedPrep = OrderPrepTimeEstimator.EstimateTicketPrepMinutes(prepLines);

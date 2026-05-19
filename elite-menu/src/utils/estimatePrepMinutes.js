@@ -1,10 +1,20 @@
 /**
  * Mirrors `OrderPrepTimeEstimator` in EliteRestaurant.Core (same as POS / WPF).
+ * @param {number} [prepMinutes] Menu admin value; when &gt; 0, overrides category estimate.
  * @param {string} category
  * @param {string} subCategory
  * @returns {number}
  */
-export function minutesForLineItem(category, subCategory) {
+export function minutesForLineItem(prepMinutes, category, subCategory) {
+  if (subCategory === undefined && typeof prepMinutes === 'string') {
+    return minutesForLineItem(0, prepMinutes, category)
+  }
+
+  const stored = Number(prepMinutes)
+  if (Number.isFinite(stored) && stored > 0) {
+    return Math.min(480, Math.max(1, Math.round(stored)))
+  }
+
   const c = (category || '').trim()
   const s = (subCategory || '').trim()
   let minutes = 10
@@ -34,7 +44,7 @@ export function minutesForLineItem(category, subCategory) {
 
 /**
  * Parallel prep: max line time + small bump for multiple lines (same as C# `EstimateTicketPrepMinutes`).
- * @param {{ quantity: number; category: string; subCategory: string }[]} lines
+ * @param {{ quantity: number; prepMinutes?: number; category: string; subCategory: string }[]} lines
  * @returns {number}
  */
 export function estimateTicketPrepMinutes(lines) {
@@ -42,7 +52,7 @@ export function estimateTicketPrepMinutes(lines) {
   const prep = []
   for (const t of lines) {
     const n = Math.max(0, Math.min(20, Math.floor(t.quantity)) || 0)
-    const m = minutesForLineItem(t.category, t.subCategory)
+    const m = minutesForLineItem(t.prepMinutes, t.category, t.subCategory)
     for (let i = 0; i < n; i += 1) prep.push(m)
   }
   if (prep.length === 0) return 0

@@ -12,6 +12,7 @@ public sealed record CreateOrderCatalogProduct(
     string Category,
     string SubCategory,
     decimal Price,
+    int PrepMinutes,
     bool IsAvailable);
 
 public sealed record CreateOrderArrivedReservationRow(
@@ -58,6 +59,7 @@ public sealed class TableLoadingService
                 p.Category,
                 string.IsNullOrWhiteSpace(p.SubCategory) ? "General" : p.SubCategory!,
                 p.Price,
+                Math.Max(0, p.PrepMinutes),
                 p.IsAvailable))
             .ToList();
 

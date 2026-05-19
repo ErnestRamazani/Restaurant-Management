@@ -10,9 +10,9 @@ public class OrderTotalsCalculatorTests
     [Fact]
     public void ComputeTicket_AggregatesDiscountTaxServicePrep()
     {
-        var prepLines = new List<(int Quantity, string Category, string SubCategory)>
+        var prepLines = new List<(int Quantity, int PrepMinutes, string Category, string SubCategory)>
         {
-            (2, "Main", "Pasta")
+            (2, 0, "Main", "Pasta")
         };
         var result = _calculator.ComputeTicket(100m, 2, "Percent", "10", prepLines);
 

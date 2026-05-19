@@ -128,11 +128,19 @@ public sealed class ServerPortalController(
                 p.Name,
                 p.Category,
                 SubCategory = string.IsNullOrWhiteSpace(p.SubCategory) ? "General" : p.SubCategory,
-                p.Price
+                p.Price,
+                p.Description,
+                p.Composition,
+                p.PrepMinutes
             })
             .ToList();
 
         var productIds = products.Select(p => p.Id).ToList();
+        var photoKeys = productIds.Select(ProductPhotoAssetKey).ToList();
+        var photoKeyPresent = db.PublicMenuAssets.AsNoTracking()
+            .Where(a => photoKeys.Contains(a.Key) && a.Content.Length > 0)
+            .Select(a => a.Key)
+            .ToHashSet();
         var ingredientStocks = db.ProductIngredients.AsNoTracking()
             .Where(pi => productIds.Contains(pi.ProductId))
             .Select(pi => new { pi.ProductId, pi.Quantity, Stock = pi.InventoryItem!.StockQuantity })
@@ -145,7 +153,21 @@ public sealed class ServerPortalController(
             var inStock = true;
             if (ingredientStocks.TryGetValue(p.Id, out var lines) && lines.Count > 0)
                 inStock = lines.All(x => x.Stock >= x.Quantity);
-            return new ServerProductDto(p.Id, p.UniqueId, p.Name, p.Category, p.SubCategory, p.Price, inStock);
+            var photoUrl = photoKeyPresent.Contains(ProductPhotoAssetKey(p.Id))
+                ? $"/api/public/menu/assets/product/{p.Id}"
+                : null;
+            return new ServerProductDto(
+                p.Id,
+                p.UniqueId,
+                p.Name,
+                p.Category,
+                p.SubCategory,
+                p.Price,
+                inStock,
+                photoUrl,
+                string.IsNullOrWhiteSpace(p.Description) ? null : p.Description.Trim(),
+                string.IsNullOrWhiteSpace(p.Composition) ? null : p.Composition.Trim(),
+                Math.Max(0, p.PrepMinutes));
         }).ToList();
 
         return Ok(rows);
@@ -398,9 +420,10 @@ public sealed class ServerPortalController(
             }
 
             if (string.Equals(openOrder.Status, "Ready", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(openOrder.Status, OrderWorkflow.Served, StringComparison.OrdinalIgnoreCase))
+                || string.Equals(openOrder.Status, OrderWorkflow.Served, StringComparison.OrdinalIgnoreCase)
+                || OrderWorkflow.IsKitchenQueueStatus(openOrder.Status))
             {
-                openOrder.Status = "In Kitchen";
+                openOrder.Status = OrderWorkflow.PendingCashier;
             }
 
             // Preserve existing discount when appending unless caller sends a meaningful non-None discount.
@@ -431,7 +454,7 @@ public sealed class ServerPortalController(
                 Mode: "Append",
                 OrderId: code,
                 LinesAdded: newItems.Count,
-                Message: $"Added {newItems.Count} line(s) to open check {code}.",
+                Message: $"Added {newItems.Count} line(s) to open check {code}. Sent back to cashier for release to kitchen.",
                 CreatedAtUtc: DateTime.UtcNow));
         }
 
@@ -491,15 +514,43 @@ public sealed class ServerPortalController(
             .OrderBy(o => o.CreatedAt)
             .ToList();
 
+        var productIds = orders
+            .SelectMany(o => o.Items)
+            .Select(i => i.ProductId)
+            .Distinct()
+            .ToList();
+        var photoKeys = productIds.Select(ProductPhotoAssetKey).ToList();
+        var photoKeyPresent = photoKeys.Count == 0
+            ? new HashSet<string>()
+            : db.PublicMenuAssets.AsNoTracking()
+                .Where(a => photoKeys.Contains(a.Key) && a.Content.Length > 0)
+                .Select(a => a.Key)
+                .ToHashSet();
+
         var rows = orders.Select(o =>
         {
             var subtotal = o.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
             var totals = OrderTotalsHelper.ComputeTotals(subtotal, o.DiscountMode, o.DiscountValue);
+            var guestName = ResolveGuestCustomerName(o);
+            var lines = o.Items
+                .OrderBy(i => i.Product?.Name ?? string.Empty)
+                .Select(i =>
+                {
+                    var photoUrl = photoKeyPresent.Contains(ProductPhotoAssetKey(i.ProductId))
+                        ? $"/api/public/menu/assets/product/{i.ProductId}"
+                        : null;
+                    return new ServerReadyOrderLineDto(
+                        i.ProductId,
+                        string.IsNullOrWhiteSpace(i.Product?.Name) ? "Unknown" : i.Product.Name.Trim(),
+                        i.Quantity,
+                        photoUrl);
+                })
+                .ToList();
             return new ServerReadyOrderDto(
                 o.Id,
                 string.IsNullOrWhiteSpace(o.UniqueId) ? $"#{o.Id:000}" : o.UniqueId,
                 o.TableId ?? 0,
-                $"{o.TableCode} · {o.TableName}",
+                OrderRecordUiLabels.TableCaption(o),
                 string.IsNullOrWhiteSpace(o.ServerName) ? "-" : o.ServerName,
                 o.Status,
                 string.Join(", ", o.Items.Select(i => $"{i.Product?.Name ?? "Unknown"} x{i.Quantity}")),
@@ -507,8 +558,14 @@ public sealed class ServerPortalController(
                 totals.GrandTotal,
                 CurrencyHelper.ConvertUsdToFc(totals.GrandTotal),
                 o.CreatedAt,
-                o.CreatedAt.ToString("HH:mm"))
-            ;
+                o.CreatedAt.ToString("HH:mm"),
+                (o.CustomerNotes ?? string.Empty).Trim(),
+                (o.AllergyNotes ?? string.Empty).Trim(),
+                guestName,
+                o.OrderOrigin ?? OrderOrigin.InStore,
+                o.OrderSource ?? "WalkIn",
+                OrderOrigin.IsOnline(o.OrderOrigin),
+                lines);
         }).ToList();
 
         return Ok(rows);
@@ -589,6 +646,18 @@ public sealed class ServerPortalController(
 
         return map.Select(kv => (kv.Key, kv.Value)).ToList();
     }
+
+    private static string? ResolveGuestCustomerName(OrderRecord order)
+    {
+        var ticket = DeliveryTicketInfoParser.TryParse(order);
+        if (ticket is not null && !string.IsNullOrWhiteSpace(ticket.CustomerName))
+            return ticket.CustomerName.Trim();
+
+        var reservation = (order.ReservationGuestName ?? string.Empty).Trim();
+        return reservation.Length > 0 ? reservation : null;
+    }
+
+    private static string ProductPhotoAssetKey(int productId) => $"product:{productId}";
 
     private static List<OrderItem> BuildOrderItems(
         IReadOnlyList<ServerOrderLineRequest> lines,

@@ -440,6 +440,7 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
                         Category = p.Category,
                         SubCategory = p.SubCategory,
                         Price = p.Price,
+                        PrepMinutes = p.PrepMinutes,
                         Quantity = 1,
                         IsAvailable = p.IsAvailable
                     };
@@ -697,7 +698,7 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
             ticketSubtotal = GetPersistedOpenOrderLineSubtotal() + newLinesSubtotal;
         LiveSubtotal = ticketSubtotal;
 
-        var prepLines = selected.Select(s => (s.Quantity, s.Category, s.SubCategory)).ToList();
+        var prepLines = selected.Select(s => (s.Quantity, s.PrepMinutes, s.Category, s.SubCategory)).ToList();
         var ticket = _totalsCalculator.ComputeTicket(
             ticketSubtotal,
             selected.Sum(s => s.Quantity),

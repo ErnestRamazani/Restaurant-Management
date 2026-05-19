@@ -48,6 +48,9 @@ public sealed class PublicProductDto
     public string? Description { get; set; }
     public string? Composition { get; set; }
     public string? PhotoUrl { get; set; }
+
+    /// <summary>Kitchen prep minutes from menu admin (0 = category fallback for estimates).</summary>
+    public int PrepMinutes { get; set; }
     public bool IsAvailable { get; set; }
 }
 

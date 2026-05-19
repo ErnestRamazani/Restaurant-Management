@@ -13,6 +13,8 @@ public class ProductSelectionItemViewModel : BaseViewModel
     public string SubCategory { get; set; } = string.Empty;
     public decimal Price { get; set; }
 
+    public int PrepMinutes { get; set; }
+
     /// <summary>False when ingredient stock cannot cover at least one unit (same rule as guest menu).</summary>
     public bool IsAvailable
     {

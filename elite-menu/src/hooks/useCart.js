@@ -170,6 +170,7 @@ export function useCart(config) {
     return estimateTicketPrepMinutes(
       lines.map((l) => ({
         quantity: l.quantity,
+        prepMinutes: Number(l.product.prepMinutes ?? l.product.PrepMinutes ?? 0),
         category: String(l.product.category ?? ''),
         subCategory: String(l.product.subcategory ?? 'General'),
       })),

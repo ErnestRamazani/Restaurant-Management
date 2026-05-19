@@ -7,7 +7,11 @@ public sealed record ServerProductDto(
     string Category,
     string SubCategory,
     decimal Price,
-    bool InStock);
+    bool InStock,
+    string? PhotoUrl,
+    string? Description,
+    string? Composition,
+    int PrepMinutes);
 
 public sealed record ServerOrderLineRequest(int ProductId, int Quantity);
 
@@ -39,6 +43,12 @@ public sealed record ServerPortalConfigDto(
     decimal TaxPercent,
     decimal ServicePercent);
 
+public sealed record ServerReadyOrderLineDto(
+    int ProductId,
+    string Name,
+    int Quantity,
+    string? PhotoUrl);
+
 public sealed record ServerReadyOrderDto(
     int Id,
     string OrderId,
@@ -51,7 +61,14 @@ public sealed record ServerReadyOrderDto(
     decimal TotalUsd,
     decimal TotalFc,
     DateTime CreatedAt,
-    string TimeText);
+    string TimeText,
+    string CustomerNotes,
+    string AllergyNotes,
+    string? GuestCustomerName,
+    string OrderOrigin,
+    string OrderSource,
+    bool IsOnlineMenuOrder,
+    IReadOnlyList<ServerReadyOrderLineDto> Lines);
 
 public sealed record ServerMarkServedResponse(
     bool Ok,

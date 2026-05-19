@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -34,15 +34,25 @@
       flex-direction: column;
       gap: 8px;
     }
-    .brand-wrap { margin-bottom: 6px; }
+    .brand-wrap {
+      margin-bottom: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+    }
     .brand-logo {
       width: 100%;
+      height: 80px;
       max-height: 92px;
-      object-fit: cover;
+      object-fit: contain;
+      object-position: center center;
+      display: block;
+      margin: 0 auto 8px;
+      padding: 10px 8px;
+      box-sizing: border-box;
       border-radius: var(--radius);
       border: 1px solid #334155;
       background: #111c27;
-      margin-bottom: 8px;
     }
     .brand { font-weight: 700; font-size: 14px; letter-spacing: 0.5px; color: var(--amber); }
     .nav-btn {
@@ -142,11 +152,315 @@
       min-height: 44px;
       border-radius: var(--radius);
     }
-    #menuTab .list-box, #pickupTab .list-box {
-      background: #fafaf9;
-      border: 1px solid #e5e7eb;
-      border-radius: var(--radius);
+    #pickupTab .ready-orders-grid {
+      display: grid;
+      grid-template-columns: repeat(1, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 12px;
+      align-content: start;
     }
+    @media (min-width: 720px) {
+      #pickupTab .ready-orders-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    .ready-orders-empty {
+      grid-column: 1 / -1;
+      padding: 28px 20px;
+      text-align: center;
+      background: #fafaf9;
+      border: 1px dashed #d1d5db;
+      border-radius: 14px;
+      color: var(--text-muted);
+    }
+    .ready-orders-empty strong {
+      display: block;
+      color: var(--text-dark);
+      font-size: 1rem;
+      margin-bottom: 6px;
+    }
+    .ready-order-card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+    }
+    .ready-order-card__head {
+      padding: 12px 14px 10px;
+      border-bottom: 1px solid #f3f4f6;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .ready-order-card__title {
+      font-weight: 800;
+      font-size: 1rem;
+      color: var(--text-dark);
+      line-height: 1.25;
+    }
+    .ready-order-card__meta {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      line-height: 1.35;
+    }
+    .ready-order-card__guest {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 8px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #fef3c7;
+      border: 1px solid #fcd34d;
+      color: #92400e;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .ready-order-card__guest-label {
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-size: 10px;
+      opacity: 0.85;
+    }
+    .ready-order-card__time {
+      font-size: 12px;
+      font-weight: 700;
+      color: #059669;
+      white-space: nowrap;
+    }
+    .ready-order-card__lines {
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .ready-order-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px;
+      border-radius: 10px;
+      background: #fafaf9;
+      border: 1px solid #f3f4f6;
+    }
+    .ready-order-line__media {
+      position: relative;
+      flex: 0 0 64px;
+      width: 64px;
+      height: 48px;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #e7e5e0;
+    }
+    .ready-order-line__media img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .ready-order-line__ph {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: rgba(255, 255, 255, 0.92);
+    }
+    .ready-order-line__qty {
+      position: absolute;
+      right: 4px;
+      bottom: 4px;
+      min-width: 20px;
+      height: 20px;
+      padding: 0 5px;
+      border-radius: 999px;
+      background: #f59e0b;
+      color: #000;
+      font-size: 11px;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+    }
+    .ready-order-line__name {
+      flex: 1;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-dark);
+      line-height: 1.3;
+    }
+    .ready-order-card__details {
+      padding: 0 14px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .ready-order-card__detail-block {
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      font-size: 12px;
+      line-height: 1.4;
+      color: #78350f;
+    }
+    .ready-order-card__detail-block--allergy {
+      background: #fef2f2;
+      border-color: #fecaca;
+      color: #991b1b;
+    }
+    .ready-order-card__detail-label {
+      display: block;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+      opacity: 0.85;
+    }
+    .ready-order-card__foot {
+      padding: 10px 14px 14px;
+      border-top: 1px solid #f3f4f6;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .ready-order-card__total {
+      font-weight: 800;
+      font-size: 1rem;
+      color: #b45309;
+    }
+    .ready-order-card__foot button {
+      min-height: 44px;
+      padding: 0 16px;
+      font-weight: 700;
+    }
+    #menuTab .menu-search {
+      width: 100%;
+      min-height: 44px;
+      border-radius: var(--radius);
+      border: 1px solid #d1d5db;
+      padding: 10px 14px;
+      font-family: inherit;
+      font-size: 15px;
+      background: #fff;
+      color: var(--text-dark);
+      margin-bottom: 12px;
+    }
+    .menu-catalog-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      align-content: start;
+    }
+    @media (min-width: 640px) {
+      .menu-catalog-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+    @media (min-width: 1024px) {
+      .menu-catalog-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    }
+    .menu-catalog-empty {
+      grid-column: 1 / -1;
+      padding: 28px 16px;
+      text-align: center;
+      color: var(--text-muted);
+    }
+    .menu-catalog-card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+    .menu-catalog-card--unavailable { opacity: 0.72; }
+    .menu-catalog-card .product-card__media { cursor: default; }
+    .menu-catalog-card__body {
+      padding: 10px 12px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+    }
+    .menu-catalog-card__name {
+      font-weight: 800;
+      font-size: 0.95rem;
+      line-height: 1.3;
+      color: var(--text-dark);
+    }
+    .menu-catalog-card__meta {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.35;
+    }
+    .menu-catalog-card__prep {
+      font-size: 12px;
+      font-weight: 600;
+      color: #b45309;
+      margin-top: 4px;
+    }
+    .menu-catalog-card__id {
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: 11px;
+      color: #6b7280;
+    }
+    .menu-catalog-card__desc,
+    .menu-catalog-card__composition {
+      font-size: 12px;
+      line-height: 1.4;
+      color: #4b5563;
+    }
+    .menu-catalog-card__desc {
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .menu-catalog-card__composition {
+      font-style: italic;
+      color: var(--text-muted);
+    }
+    .menu-catalog-card__foot {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 4px;
+      padding-top: 8px;
+      border-top: 1px solid #f3f4f6;
+    }
+    .menu-catalog-card__price {
+      font-weight: 800;
+      font-size: 1rem;
+      color: #b45309;
+      line-height: 1.25;
+    }
+    .menu-catalog-card__price-dual {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .menu-catalog-card__avail {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .menu-catalog-card__avail--ok { color: #059669; }
+    .menu-catalog-card__avail--no { color: #dc2626; }
     .list-box { max-height: 350px; overflow: auto; border-radius: var(--radius); padding: 8px; }
     .ready-item, .menu-item {
       display: flex;
@@ -178,7 +492,7 @@
     }
     h2, h3 { margin: 6px 0 10px; }
 
-    /* ΓÇöΓÇöΓÇö Create order: split POS ΓÇöΓÇöΓÇö */
+    /* --- Create order: split POS --- */
     #takeOrder.create-order-tab {
       display: flex;
       flex-direction: column;
@@ -332,6 +646,8 @@
     .notes-details summary::-webkit-details-marker { display: none; }
     .notes-details:not([open]) .notes-sum-expanded { display: none; }
     .notes-details[open] .notes-sum-collapsed { display: none; }
+    .notes-sum-collapsed::before { content: "> "; opacity: 0.65; }
+    .notes-sum-expanded::before { content: "v "; opacity: 0.65; }
     .notes-details textarea { margin-top: 8px; }
 
     .pos-zone-b {
@@ -363,10 +679,27 @@
       pointer-events: none;
     }
     .cart-empty-state__icon {
-      font-size: 2.5rem;
-      opacity: 0.15;
-      line-height: 1;
+      display: block;
+      width: 52px;
+      height: 38px;
       margin-bottom: 12px;
+      opacity: 0.15;
+      position: relative;
+      border: 2.5px solid #6b7280;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    .cart-empty-state__icon::before {
+      content: "";
+      position: absolute;
+      top: -12px;
+      left: 10px;
+      width: 28px;
+      height: 14px;
+      border: 2.5px solid #6b7280;
+      border-bottom: none;
+      border-radius: 10px 10px 0 0;
+      box-sizing: border-box;
     }
     .cart-empty-state__title {
       font-size: 0.85rem;
@@ -612,7 +945,12 @@
       font-weight: 700;
       box-shadow: none;
     }
-    .cat-tab-ic { font-size: 20px; line-height: 1; }
+    .cat-tab-ic {
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: 0.02em;
+    }
     .cat-tab-lb { text-align: center; line-height: 1.2; word-break: break-word; }
     .pos-menu-tools {
       padding: 0 12px 10px;
@@ -684,18 +1022,24 @@
     }
     .product-card__media {
       position: relative;
-      height: 120px;
+      aspect-ratio: 4 / 3;
+      height: auto;
+      min-height: 120px;
       background: #e7e5e0;
       overflow: hidden;
       border-radius: 14px 14px 0 0;
     }
     .product-card__media img {
+      position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
       object-fit: cover;
       display: block;
     }
     .product-card__ph {
+      position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
       display: flex;
@@ -829,6 +1173,115 @@
       margin-top: 8px;
       line-height: 1.3;
     }
+    .customer-toast-host .server-ready-toast { pointer-events: auto; }
+    .server-ready-toast {
+      width: 100%;
+      background: #fff;
+      color: #111827;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      border-left: 4px solid #16a34a;
+      box-shadow: 0 10px 32px rgba(15, 25, 35, 0.22);
+      padding: 12px 12px 10px;
+      font-size: 0.9rem;
+      line-height: 1.35;
+      animation: server-ready-toast-in 0.35s ease-out;
+    }
+    @keyframes server-ready-toast-in {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .server-ready-toast__head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .server-ready-toast__title {
+      font-weight: 800;
+      color: #0f1923;
+      font-size: 0.95rem;
+    }
+    .server-ready-toast__badge {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: #dcfce7;
+      color: #166534;
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      vertical-align: middle;
+    }
+    .server-ready-toast__dismiss {
+      border: none;
+      background: transparent;
+      color: #64748b;
+      font-size: 1.1rem;
+      line-height: 1;
+      cursor: pointer;
+      padding: 2px 6px;
+    }
+    .server-ready-toast__meta { color: #64748b; font-size: 0.8rem; margin: 4px 0 8px; }
+    .server-ready-toast__items {
+      font-size: 0.78rem;
+      color: #334155;
+      margin-bottom: 8px;
+      line-height: 1.35;
+    }
+    .server-ready-toast__countdown {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      margin-bottom: 8px;
+    }
+    .server-ready-toast__cta {
+      display: block;
+      width: 100%;
+      margin-top: 4px;
+      padding: 12px 14px;
+      border: none;
+      border-radius: 8px;
+      background: #16a34a;
+      color: #fff;
+      font-weight: 800;
+      font-size: 0.95rem;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .server-ready-toast__cta:hover { filter: brightness(1.06); }
+    .nav-pickup-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 1.25rem;
+      height: 1.25rem;
+      padding: 0 5px;
+      margin-left: 6px;
+      border-radius: 999px;
+      background: #16a34a;
+      color: #fff;
+      font-size: 0.68rem;
+      font-weight: 800;
+      vertical-align: middle;
+    }
+    .nav-pickup-badge.hidden { display: none; }
+    .nav-btn.has-pickup-alert {
+      box-shadow: inset 3px 0 0 #4ade80;
+      animation: pickup-nav-pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes pickup-nav-pulse {
+      0%, 100% { background: rgba(74, 222, 128, 0.08); }
+      50% { background: rgba(74, 222, 128, 0.2); }
+    }
+    .ready-order-card--highlight {
+      box-shadow: 0 0 0 2px #4ade80, 0 8px 24px rgba(15, 25, 35, 0.12);
+      animation: ready-card-highlight 1.2s ease-out 2;
+    }
+    @keyframes ready-card-highlight {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.01); }
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.7/dist/browser/signalr.min.js" crossorigin="anonymous"></script>
 </head>
@@ -846,7 +1299,7 @@
       <div id="loginMessage" class="muted" style="margin-top:10px;min-height:1.25em;white-space:pre-wrap;"></div>
       <p class="muted">After <span class="mono">SeedRunner</span> defaults: e.g. <strong class="mono">SRV01</strong> / PIN <strong class="mono">3101</strong>.</p>
       <p class="muted">This portal is server-only. No reservation flow in this phase.</p>
-      <p class="muted">Cashiers: <a href="/cashier.html" style="color:#b45309;">open Cashier Portal</a> ┬╖ <a href="/cashier-order.html" style="color:#b45309;">compact order screen</a></p>
+      <p class="muted">Cashiers: <a href="/cashier.html" style="color:#b45309;">open Cashier Portal</a> | <a href="/cashier-order.html" style="color:#b45309;">compact order screen</a></p>
     </div>
   </div>
 
@@ -858,7 +1311,7 @@
       </div>
       <button type="button" class="nav-btn active" data-tab="takeOrder">Take Order</button>
       <button type="button" class="nav-btn" data-tab="menuTab">Menu</button>
-      <button type="button" class="nav-btn" data-tab="pickupTab">Pick Up & Serve</button>
+      <button type="button" class="nav-btn" data-tab="pickupTab">Pick Up &amp; Serve<span id="pickupNavBadge" class="nav-pickup-badge hidden" aria-label="Ready orders count"></span></button>
       <button type="button" id="btnRefreshAll" class="nav-btn">Refresh Data</button>
       <div class="who">
         <div class="who-top">
@@ -910,11 +1363,6 @@
             <div class="pos-zone-a">
               <div class="pos-zone-label">Order setup</div>
               <div class="pos-cart-controls">
-                <select id="orderSource" class="full">
-                  <option value="WalkIn">WalkIn</option>
-                  <option value="Delivery">Delivery</option>
-                </select>
-                <input id="sourceReference" class="full" placeholder="Reference (for Delivery)">
                 <select id="tableSelect" class="full"></select>
                 <select id="paymentCurrency" class="full">
                   <option value="USD">USD</option>
@@ -925,11 +1373,11 @@
                 <legend>Send as (this table)</legend>
                 <label style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;">
                   <input type="radio" name="ticketMode" id="ticketModeAppend" value="append" checked>
-                  <span><strong>Same ticket</strong> ΓÇö add lines to the current open check</span>
+                  <span><strong>Same ticket</strong> - add lines to the current open check</span>
                 </label>
                 <label style="display:flex;gap:8px;align-items:flex-start;">
                   <input type="radio" name="ticketMode" id="ticketModeNew" value="new">
-                  <span><strong>New ticket</strong> ΓÇö separate check on the same table</span>
+                  <span><strong>New ticket</strong> - separate check on the same table</span>
                 </label>
                 <p id="ticketModeHint" class="muted" style="margin:10px 0 0;font-size:12px;line-height:1.35;color:#94a3b8;"></p>
               </fieldset>
@@ -954,15 +1402,15 @@
               </div>
               <details class="notes-details">
                 <summary>
-                  <span class="notes-sum-collapsed">Γû╕ Add customer notes</span>
-                  <span class="notes-sum-expanded">Γû╛ Customer notes</span>
+                  <span class="notes-sum-collapsed">Add customer notes</span>
+                  <span class="notes-sum-expanded">Customer notes</span>
                 </summary>
                 <textarea id="customerNotes" placeholder="Customer notes"></textarea>
               </details>
               <details class="notes-details">
                 <summary>
-                  <span class="notes-sum-collapsed">Γû╕ Add allergy notes</span>
-                  <span class="notes-sum-expanded">Γû╛ Allergy notes</span>
+                  <span class="notes-sum-collapsed">Add allergy notes</span>
+                  <span class="notes-sum-expanded">Allergy notes</span>
                 </summary>
                 <textarea id="allergyNotes" placeholder="Allergy notes"></textarea>
               </details>
@@ -974,8 +1422,10 @@
       <section id="menuTab" class="tab hidden">
         <div class="card">
           <h2>Menu Catalog</h2>
-          <p class="muted">Server view of menu items and prices.</p>
-          <div id="menuCatalog" class="list-box"></div>
+          <p class="muted">Full menu with photos, pricing, and item details.</p>
+          <label class="visually-hidden" for="menuSearch">Search menu</label>
+          <input type="search" id="menuSearch" class="menu-search" placeholder="Search name or ID…" autocomplete="off">
+          <div id="menuCatalog" class="menu-catalog-grid" role="list"></div>
         </div>
       </section>
 
@@ -984,7 +1434,7 @@
           <h2>Pick Up & Serve</h2>
           <p class="muted">Shows Ready orders assigned to this server.</p>
           <button type="button" id="btnRefreshReady">Refresh Ready Orders</button>
-          <div id="readyOrders" class="list-box" style="margin-top:8px;"></div>
+          <div id="readyOrders" class="ready-orders-grid" role="list" aria-live="polite"></div>
         </div>
       </section>
 
@@ -997,15 +1447,17 @@
     let tables = [];
     let products = [];
     let readyOrders = [];
+    let readyOrderPollTimer = null;
+    let highlightedReadyOrderIds = new Set();
     let drafts = [];
     let orderHubConnection = null;
     let draftListPollTimer = null;
     let config = { restaurantName: "Elite Restaurant", restaurantLogoUrl: "", employeePhotoUrl: "", currencyDisplayMode: "Dual", usdToFcRate: 2250, taxPercent: 7, servicePercent: 10 };
     const cart = new Map();
+    const SERVER_ORDER_SOURCE = "WalkIn";
+    const SERVER_SOURCE_REFERENCE = "";
 
     const PLACEHOLDER_PALETTE = ["#4a5568", "#5c4d4a", "#4a5c4d", "#544a5c", "#5c5a4a", "#4a5c5c", "#565c4a", "#5c4a52"];
-    const CAT_TAB_ICONS = ["≡ƒì╜", "≡ƒÑû", "≡ƒÑù", "≡ƒì│", "≡ƒì░", "Γÿò", "≡ƒÑñ", "≡ƒì£"];
-
     const setOut = (title, data) => console.log(`[ServerPortal] ${title}`, data);
 
     function esc(s) {
@@ -1021,11 +1473,9 @@
     }
 
     function categoryTabIcon(cat) {
-      if (cat === "All") return "≡ƒôï";
-      let h = 0;
-      const str = String(cat);
-      for (let i = 0; i < str.length; i++) h = (h + str.charCodeAt(i) * (i + 1)) % 997;
-      return CAT_TAB_ICONS[h % CAT_TAB_ICONS.length];
+      if (cat === "All") return "#";
+      const ch = String(cat).trim().charAt(0).toUpperCase();
+      return /[A-Z0-9]/.test(ch) ? ch : "?";
     }
 
     function placeholderColorForCategory(cat) {
@@ -1035,12 +1485,21 @@
       return PLACEHOLDER_PALETTE[Math.abs(h) % PLACEHOLDER_PALETTE.length];
     }
 
+    function absMediaUrl(u) {
+      const t = (u || "").trim();
+      if (!t) return "";
+      if (t.startsWith("http://") || t.startsWith("https://")) return t;
+      if (t.startsWith("/")) return location.origin + t;
+      return t;
+    }
+
     function productPhotoPath(p) {
       const u = p && (p.photoUrl || p.PhotoUrl);
       if (!u || typeof u !== "string") return "";
       const t = u.trim();
-      if (!t.startsWith("/")) return "";
-      return t;
+      if (!t) return "";
+      if (t.startsWith("http://") || t.startsWith("https://") || t.startsWith("/")) return t;
+      return "";
     }
 
     function productInStock(p) {
@@ -1049,31 +1508,66 @@
       return true;
     }
 
+    function productDescription(p) {
+      return String((p && (p.description || p.Description)) || "").trim();
+    }
+
+    function productComposition(p) {
+      return String((p && (p.composition || p.Composition)) || "").trim();
+    }
+
+    function productPrepMinutes(p) {
+      const n = Number(p && (p.prepMinutes ?? p.PrepMinutes));
+      return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
+    }
+
+    function productCookTimeLabel(p) {
+      const m = productPrepMinutes(p);
+      return m > 0 ? `${m} min cook` : "Cook time not set";
+    }
+
+    function formatProductPriceDisplay(price) {
+      const usd = fmtUsd(price);
+      const fc = fmtFc(toFc(price));
+      const mode = String(config.currencyDisplayMode || "Dual").toLowerCase();
+      if (mode === "usd") return { primary: usd, secondary: "" };
+      if (mode === "fc") return { primary: fc, secondary: "" };
+      return { primary: usd, secondary: fc };
+    }
+
+    function productMediaBlockHtml(p, opts = {}) {
+      const ok = productInStock(p);
+      const phColor = placeholderColorForCategory(p.category);
+      const initial = (p.name || "?").trim().charAt(0) || "?";
+      const dot = ok ? "product-card__dot--ok" : "product-card__dot--no";
+      const path = productPhotoPath(p);
+      const photoFull = path ? absMediaUrl(path) : "";
+      const imgHtml = photoFull
+        ? `<img src="${escAttr(photoFull)}" alt="" loading="lazy" onerror="this.classList.add('hidden');var n=this.nextElementSibling;if(n)n.classList.remove('hidden');">`
+        : "";
+      const phHidden = photoFull ? " hidden" : "";
+      let badgeHtml = "";
+      if (opts.showBadge) {
+        const q = Number(opts.badgeQty || 0);
+        const badgeCls = q > 0 ? "product-card__badge" : "product-card__badge hidden";
+        const badgeTxt = q > 0 ? esc(String(q)) : "";
+        badgeHtml = `<span class="${badgeCls}">${badgeTxt}</span>`;
+      }
+      return `
+          <div class="product-card__media">
+            <span class="product-card__dot ${dot}" title="${ok ? "In stock" : "Out of stock"}"></span>
+            ${badgeHtml}
+            ${imgHtml}
+            <div class="product-card__ph${phHidden}" style="background:${phColor}">${esc(initial)}</div>
+          </div>`;
+    }
+
     function addToCart(productId) {
       const id = Number(productId);
       const p = products.find(x => x.id === id);
       if (!p || !productInStock(p)) return;
       cart.set(id, (cart.get(id) || 0) + 1);
       renderCart();
-    }
-
-    async function tryProductCardPhoto(imgEl, phEl, path) {
-      revokeImgBlob(imgEl);
-      if (!path || !token) return;
-      try {
-        const res = await fetch(path, { headers: { Authorization: "Bearer " + token } });
-        if (!res.ok) throw new Error("bad");
-        const blob = await res.blob();
-        imgEl.src = URL.createObjectURL(blob);
-        imgEl.classList.remove("hidden");
-        phEl.classList.add("hidden");
-        imgEl.onerror = () => {
-          phEl.classList.remove("hidden");
-          imgEl.classList.add("hidden");
-        };
-      } catch {
-        /* keep placeholder */
-      }
     }
 
     function renderCategoryTabs() {
@@ -1241,21 +1735,10 @@
       el.innerHTML = rows.map(p => {
         const ok = productInStock(p);
         const dis = ok ? "" : " product-card--disabled";
-        const phColor = placeholderColorForCategory(p.category);
-        const initial = (p.name || "?").trim().charAt(0) || "?";
-        const dot = ok ? "product-card__dot--ok" : "product-card__dot--no";
-        const path = productPhotoPath(p);
         const cq = cart.get(p.id) || 0;
-        const badgeCls = cq > 0 ? "product-card__badge" : "product-card__badge hidden";
-        const badgeTxt = cq > 0 ? esc(String(cq)) : "";
         return `
         <div class="product-card${dis}" data-add-card="${p.id}" role="button" tabindex="0">
-          <div class="product-card__media">
-            <span class="product-card__dot ${dot}" title="${ok ? "In stock" : "Out of stock"}"></span>
-            <span class="${badgeCls}">${badgeTxt}</span>
-            <img class="hidden" alt="" data-product-img="1" data-src="${escAttr(path)}">
-            <div class="product-card__ph" style="background:${phColor}">${esc(initial)}</div>
-          </div>
+          ${productMediaBlockHtml(p, { showBadge: true, badgeQty: cq })}
           <div class="product-card__body">
             <div class="product-card__name">${esc(p.name)}</div>
             <div class="product-card__price">${fmtUsd(p.price)}</div>
@@ -1277,12 +1760,6 @@
         };
       });
 
-      el.querySelectorAll(".product-card__media").forEach(media => {
-        const img = media.querySelector("[data-product-img]");
-        const ph = media.querySelector(".product-card__ph");
-        const path = img && img.getAttribute("data-src");
-        if (img && ph && path) tryProductCardPhoto(img, ph, path);
-      });
       updateProductCardBadges();
     }
 
@@ -1294,7 +1771,7 @@
       }).filter(Boolean);
       if (!rows.length) {
         el.innerHTML = `<div class="cart-empty-state" role="status">
-          <span class="cart-empty-state__icon" aria-hidden="true">≡ƒ¢Æ</span>
+          <span class="cart-empty-state__icon" aria-hidden="true"></span>
           <p class="cart-empty-state__title">No items yet</p>
           <p class="cart-empty-state__hint">Tap a product to add it</p>
         </div>`;
@@ -1310,13 +1787,13 @@
             <div class="cart-line-top">
               <div class="cart-line-total">${fmtUsd(lineTot)}</div>
             </div>
-            <button type="button" class="btn-remove" data-remove="${r.p.id}" aria-label="Remove">├ù</button>
+            <button type="button" class="btn-remove" data-remove="${r.p.id}" aria-label="Remove">&times;</button>
             <div class="cart-line-main">
               <div class="cart-line-name">${esc(r.p.name)}</div>
               <div class="cart-line-unit">${fmtUsd(r.p.price)} each</div>
             </div>
             <div class="cart-line-actions">
-              <button type="button" class="qty-btn" data-minus="${r.p.id}" aria-label="Decrease quantity">ΓêÆ</button>
+              <button type="button" class="qty-btn" data-minus="${r.p.id}" aria-label="Decrease quantity">-</button>
               <span class="qty-val">${r.qty}</span>
               <button type="button" class="qty-btn" data-plus="${r.p.id}" aria-label="Increase quantity">+</button>
             </div>
@@ -1348,35 +1825,167 @@
       sel.innerHTML = tables.map(t => `<option value="${t.id}">Table ${t.tableNumber} - ${t.name} (${t.status})</option>`).join("");
     }
 
+    function menuCatalogProducts() {
+      const s = (document.getElementById("menuSearch")?.value || "").trim().toLowerCase();
+      return products.filter(p => {
+        if (!s) return true;
+        const hay = [p.name, p.uniqueId, p.category, p.subCategory, productDescription(p), productComposition(p), productCookTimeLabel(p)]
+          .map(x => String(x || "").toLowerCase())
+          .join(" ");
+        return hay.includes(s);
+      });
+    }
+
     function renderMenuCatalog() {
       const el = document.getElementById("menuCatalog");
-      if (!products.length) { el.innerHTML = "<div class='menu-item'>No products.</div>"; return; }
-      el.innerHTML = products.map(p => `
-        <div class="menu-item">
-          <div><strong>${esc(p.name)}</strong><br><span class="muted">${esc(p.category)} / ${esc(p.subCategory)} ┬╖ ${esc(p.uniqueId)}</span></div>
-          <div>${fmtUsd(p.price)}</div>
-        </div>
-      `).join("");
+      if (!el) return;
+      const rows = menuCatalogProducts();
+      if (!products.length) {
+        el.innerHTML = "<div class='menu-catalog-empty' role='status'>No products loaded.</div>";
+        return;
+      }
+      if (!rows.length) {
+        el.innerHTML = "<div class='menu-catalog-empty' role='status'>No items match your search.</div>";
+        return;
+      }
+      el.innerHTML = rows.map(p => {
+        const ok = productInStock(p);
+        const desc = productDescription(p);
+        const comp = productComposition(p);
+        const prices = formatProductPriceDisplay(p.price);
+        const priceHtml = prices.secondary
+          ? `<div class="menu-catalog-card__price">${esc(prices.primary)}<div class="menu-catalog-card__price-dual">${esc(prices.secondary)}</div></div>`
+          : `<div class="menu-catalog-card__price">${esc(prices.primary)}</div>`;
+        const availCls = ok ? "menu-catalog-card__avail--ok" : "menu-catalog-card__avail--no";
+        const cardCls = ok ? "menu-catalog-card" : "menu-catalog-card menu-catalog-card--unavailable";
+        return `
+        <article class="${cardCls}" role="listitem">
+          ${productMediaBlockHtml(p)}
+          <div class="menu-catalog-card__body">
+            <div class="menu-catalog-card__name">${esc(p.name)}</div>
+            <div class="menu-catalog-card__meta">${esc(p.category)} · ${esc(p.subCategory)}</div>
+            <div class="menu-catalog-card__prep">${esc(productCookTimeLabel(p))}</div>
+            <div class="menu-catalog-card__id">${esc(p.uniqueId)}</div>
+            ${desc ? `<p class="menu-catalog-card__desc">${esc(desc)}</p>` : ""}
+            ${comp ? `<p class="menu-catalog-card__composition">${esc(comp)}</p>` : ""}
+            <div class="menu-catalog-card__foot">
+              ${priceHtml}
+              <span class="menu-catalog-card__avail ${availCls}">${ok ? "Available" : "Unavailable"}</span>
+            </div>
+          </div>
+        </article>`;
+      }).join("");
+    }
+
+    function readyOrderField(o, camel, pascal) {
+      const v = o[camel] ?? o[pascal];
+      return v == null ? "" : String(v).trim();
+    }
+
+    function readyOrderLineMediaHtml(line) {
+      const name = line.name || line.Name || "?";
+      const qty = Number(line.quantity ?? line.Quantity) || 1;
+      const path = (line.photoUrl || line.PhotoUrl || "").trim();
+      const photoFull = path ? absMediaUrl(path) : "";
+      const initial = String(name).trim().charAt(0) || "?";
+      const phColor = placeholderColorForCategory("Food");
+      const imgHtml = photoFull
+        ? `<img src="${escAttr(photoFull)}" alt="" loading="lazy" onerror="this.classList.add('hidden');var n=this.nextElementSibling;if(n)n.classList.remove('hidden');">`
+        : "";
+      const phHidden = photoFull ? " hidden" : "";
+      return `
+        <div class="ready-order-line__media">
+          ${imgHtml}
+          <div class="ready-order-line__ph${phHidden}" style="background:${phColor}">${esc(initial)}</div>
+          <span class="ready-order-line__qty">${esc(String(qty))}</span>
+        </div>`;
+    }
+
+    function readyOrderLinesHtml(o) {
+      const lines = o.lines || o.Lines;
+      if (Array.isArray(lines) && lines.length) {
+        return lines.map(line => `
+          <div class="ready-order-line">
+            ${readyOrderLineMediaHtml(line)}
+            <div class="ready-order-line__name">${esc(line.name || line.Name || "Unknown")}</div>
+          </div>`).join("");
+      }
+      const summary = readyOrderField(o, "itemsSummary", "ItemsSummary") || "-";
+      return `<div class="ready-order-line"><div class="ready-order-line__name">${esc(summary)}</div></div>`;
+    }
+
+    function readyOrderDetailsHtml(o) {
+      const notes = readyOrderField(o, "customerNotes", "CustomerNotes");
+      const allergy = readyOrderField(o, "allergyNotes", "AllergyNotes");
+      const blocks = [];
+      if (notes) {
+        blocks.push(`<div class="ready-order-card__detail-block">
+          <span class="ready-order-card__detail-label">Customer notes</span>
+          ${esc(notes)}
+        </div>`);
+      }
+      if (allergy) {
+        blocks.push(`<div class="ready-order-card__detail-block ready-order-card__detail-block--allergy">
+          <span class="ready-order-card__detail-label">Allergy info</span>
+          ${esc(allergy)}
+        </div>`);
+      }
+      return blocks.length ? `<div class="ready-order-card__details">${blocks.join("")}</div>` : "";
     }
 
     function renderReadyOrders() {
       const el = document.getElementById("readyOrders");
-      if (!readyOrders.length) { el.innerHTML = "<div class='ready-item'>No ready orders assigned to you.</div>"; return; }
-      el.innerHTML = readyOrders.map(o => `
-        <div class="ready-item">
-          <div>
-            <strong>${esc(o.orderId)}</strong> ┬╖ ${esc(o.tableLabel)}<br>
-            <span class="muted">${esc(o.itemsSummary || "-")} ┬╖ ${o.itemCount} items ┬╖ ${fmtUsd(o.totalUsd)} ┬╖ ${esc(o.timeText)}</span>
-          </div>
-          <button type="button" data-serve="${o.id}">Mark Served</button>
-        </div>
-      `).join("");
+      if (!el) return;
+      if (!readyOrders.length) {
+        el.innerHTML = `
+          <div class="ready-orders-empty" role="status">
+            <strong>No ready orders</strong>
+            <p class="muted" style="margin:0;">When the kitchen marks your tickets Ready, they appear here as cards.</p>
+          </div>`;
+        updatePickupNavBadge();
+        return;
+      }
+      el.innerHTML = readyOrders.map(o => {
+        const numericId = Number(o.id ?? o.Id) || 0;
+        const highlightClass = highlightedReadyOrderIds.has(numericId) ? " ready-order-card--highlight" : "";
+        const orderId = readyOrderField(o, "orderId", "OrderId") || "#?";
+        const tableLabel = readyOrderField(o, "tableLabel", "TableLabel") || "-";
+        const timeText = readyOrderField(o, "timeText", "TimeText");
+        const guestName = readyOrderField(o, "guestCustomerName", "GuestCustomerName");
+        const isMenu = o.isOnlineMenuOrder === true || o.IsOnlineMenuOrder === true;
+        const totalUsd = Number(o.totalUsd ?? o.TotalUsd) || 0;
+        const itemCount = Number(o.itemCount ?? o.ItemCount) || 0;
+        const guestHtml = guestName
+          ? `<div class="ready-order-card__guest" title="${isMenu ? "Guest name from Explore our Menu" : "Guest name"}">
+              <span class="ready-order-card__guest-label">Guest</span>
+              <span>${esc(guestName)}</span>
+            </div>`
+          : "";
+        return `
+        <article class="ready-order-card${highlightClass}" role="listitem">
+          <header class="ready-order-card__head">
+            <div>
+              <div class="ready-order-card__title">${esc(orderId)}</div>
+              <div class="ready-order-card__meta">${esc(tableLabel)} · ${itemCount} item${itemCount === 1 ? "" : "s"}</div>
+              ${guestHtml}
+            </div>
+            <span class="ready-order-card__time">${esc(timeText)}</span>
+          </header>
+          <div class="ready-order-card__lines">${readyOrderLinesHtml(o)}</div>
+          ${readyOrderDetailsHtml(o)}
+          <footer class="ready-order-card__foot">
+            <span class="ready-order-card__total">${fmtUsd(totalUsd)}</span>
+            <button type="button" data-serve="${Number(o.id ?? o.Id)}">Mark Served</button>
+          </footer>
+        </article>`;
+      }).join("");
       el.querySelectorAll("[data-serve]").forEach(b => b.onclick = async () => {
         const id = Number(b.getAttribute("data-serve"));
         const r = await api(`/api/server/orders/${id}/serve`, "POST");
         setOut("Mark served result", r);
         await loadReadyOrders();
       });
+      updatePickupNavBadge();
     }
 
     async function loadReadyOrders() {
@@ -1524,7 +2133,7 @@
       return false;
     }
 
-    /** Uses server product categories (same rules as customer menu) ΓÇö first line item decides. */
+    /** Uses server product categories (same rules as customer menu)  - first line item decides. */
     function foodOrDrinkLabelFromItems(items) {
       if (!Array.isArray(items) || !products || !products.length) return "";
       for (const l of items) {
@@ -1540,10 +2149,6 @@
     }
 
     function applyPublicMenuPayloadToPos(body) {
-      document.getElementById("orderSource").value = "WalkIn";
-      document.getElementById("sourceReference").value = "";
-      document.getElementById("sourceReference").disabled = true;
-
       // Handle both camelCase (new) and PascalCase (old) payloads
       const tableId      = body.tableId      ?? body.TableId      ?? 0;
       const customerName = body.customerName ?? body.CustomerName ?? "";
@@ -1569,14 +2174,14 @@
       if (name) bits.push("Customer: " + name + (fd ? " (" + fd + ")" : ""));
       if (notes)       bits.push(notes);
       if (cookingNote) bits.push(cookingNote);
-      document.getElementById("customerNotes").value = bits.join(" ┬╖ ");
+      document.getElementById("customerNotes").value = bits.join(" | ");
       const allergyStr = String(allergyNotes).trim();
       if (!allergyStr) {
         document.getElementById("allergyNotes").value = "";
       } else if (name) {
-        document.getElementById("allergyNotes").value = "Allergy: " + name + (fd ? " (" + fd + ") ┬╖ " : " ┬╖ ") + allergyStr;
+        document.getElementById("allergyNotes").value = "Allergy: " + name + (fd ? " (" + fd + ") | " : " | ") + allergyStr;
       } else {
-        document.getElementById("allergyNotes").value = "Allergy: " + (fd ? "(" + fd + ") ┬╖ " : "") + allergyStr;
+        document.getElementById("allergyNotes").value = "Allergy: " + (fd ? "(" + fd + ") | " : "") + allergyStr;
       }
 
       cart.clear();
@@ -1604,7 +2209,7 @@
 
       const draft = drafts.find(d => d.id === draftId);
       if (!draft) {
-        setDraftStatus("Draft not found ΓÇö click Refresh Data.", false);
+        setDraftStatus("Draft not found  - click Refresh Data.", false);
         setOut("Load draft", { ok: false, message: "Draft not in list." });
         return;
       }
@@ -1628,12 +2233,12 @@
       console.warn("[loadDraft] products loaded:", products.length);
 
       if (isPublicMenuCustomerPayload(raw)) {
-        console.warn("[loadDraft] ΓåÆ applying customer payload");
+        console.warn("[loadDraft] -> applying customer payload");
         applyPublicMenuPayloadToPos(raw);
         console.warn("[loadDraft] cart size after apply:", cart.size);
       } else if (Array.isArray(raw.Items) && raw.Items.length > 0) {
         // Fallback: PascalCase customer draft (old draft before camelCase fix)
-        console.warn("[loadDraft] ΓåÆ PascalCase customer draft detected, normalizing...");
+        console.warn("[loadDraft] -> PascalCase customer draft detected, normalizing...");
         const normalized = {
           tableId:         raw.TableId,
           customerName:    raw.CustomerName,
@@ -1651,7 +2256,7 @@
         applyPublicMenuPayloadToPos(normalized);
         console.warn("[loadDraft] cart size after apply:", cart.size);
       } else {
-        console.warn("[loadDraft] ΓåÆ applying as server snapshot");
+        console.warn("[loadDraft] -> applying as server snapshot");
         applySnapshot(raw);
       }
 
@@ -1664,6 +2269,157 @@
     function removeCustomerDraftToastEl(el, tickRef) {
       if (tickRef && tickRef.t) clearInterval(tickRef.t);
       if (el && el.parentNode) el.remove();
+    }
+
+    function myServerEmployeeId() {
+      return Number(me && (me.employeeId ?? me.EmployeeId)) || 0;
+    }
+
+    function isPickupTabActive() {
+      const tab = document.getElementById("pickupTab");
+      return tab && !tab.classList.contains("hidden");
+    }
+
+    function updatePickupNavBadge() {
+      const badge = document.getElementById("pickupNavBadge");
+      const navBtn = document.querySelector('.nav-btn[data-tab="pickupTab"]');
+      const count = readyOrders.length;
+      if (!badge || !navBtn) return;
+      if (count > 0 && !isPickupTabActive()) {
+        badge.textContent = String(count);
+        badge.classList.remove("hidden");
+        badge.setAttribute("aria-hidden", "false");
+        navBtn.classList.add("has-pickup-alert");
+      } else {
+        badge.textContent = "";
+        badge.classList.add("hidden");
+        badge.setAttribute("aria-hidden", "true");
+        navBtn.classList.remove("has-pickup-alert");
+      }
+    }
+
+    function navigateToPickupTab() {
+      const btn = document.querySelector('.nav-btn[data-tab="pickupTab"]');
+      if (btn) btn.click();
+    }
+
+    function unlockServerAudioFromUserGesture() {
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        const ctx = new Ctx();
+        if (ctx.state === "suspended") void ctx.resume();
+        void ctx.close();
+      } catch { /* ignore */ }
+    }
+
+    function playServerReadyRing() {
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        const ctx = new Ctx();
+        const playTone = (freq, start, dur) => {
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.type = "sine";
+          o.frequency.value = freq;
+          o.connect(g);
+          g.connect(ctx.destination);
+          g.gain.setValueAtTime(0.0001, start);
+          g.gain.exponentialRampToValueAtTime(0.09, start + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+          o.start(start);
+          o.stop(start + dur + 0.02);
+        };
+        const t0 = ctx.currentTime;
+        playTone(880, t0, 0.12);
+        playTone(988, t0 + 0.16, 0.12);
+        playTone(1175, t0 + 0.32, 0.18);
+        void ctx.resume().finally(() => {
+          setTimeout(() => {
+            try { ctx.close(); } catch { /* ignore */ }
+          }, 700);
+        });
+      } catch { /* ignore */ }
+    }
+
+    function markReadyOrderHighlighted(orderId) {
+      const id = Number(orderId) || 0;
+      if (!id) return;
+      highlightedReadyOrderIds.add(id);
+      setTimeout(() => {
+        highlightedReadyOrderIds.delete(id);
+        if (!isPickupTabActive()) return;
+        renderReadyOrders();
+      }, 12000);
+    }
+
+    function showServerReadyOrderToast(payload) {
+      const host = document.getElementById("customerToastHost");
+      if (!host || !payload) return;
+      const orderId = Number(payload.orderId ?? payload.OrderId) || 0;
+      const code = String(payload.orderCode ?? payload.OrderCode ?? (orderId ? "#" + orderId : "Order")).trim();
+      const table = String(payload.tableLabel ?? payload.TableLabel ?? "").trim();
+      const guest = String(payload.guestCustomerName ?? payload.GuestCustomerName ?? "").trim();
+      const items = String(payload.itemsSummary ?? payload.ItemsSummary ?? "").trim();
+      const itemCount = Number(payload.itemCount ?? payload.ItemCount) || 0;
+
+      const el = document.createElement("div");
+      el.className = "server-ready-toast";
+      const metaParts = [
+        table || null,
+        guest ? "Guest: " + guest : null,
+        itemCount > 0 ? itemCount + " items" : null
+      ].filter(Boolean);
+      const metaLine = metaParts.length ? metaParts.join(" | ") : "Kitchen marked this order Ready for you.";
+
+      el.innerHTML = `
+<div class="server-ready-toast__head">
+  <div class="server-ready-toast__title">Ready to serve<span class="server-ready-toast__badge">NEW</span></div>
+  <button type="button" class="server-ready-toast__dismiss" aria-label="Dismiss">&times;</button>
+</div>
+<div class="server-ready-toast__meta">${esc(code)} · ${esc(metaLine)}</div>
+${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
+<div class="server-ready-toast__countdown" data-cd>Closing in 20s</div>
+<button type="button" class="server-ready-toast__cta" data-open-pickup>View Pick Up &amp; Serve</button>`;
+
+      const tickRef = { t: null };
+      let countSec = 20;
+      const close = () => removeCustomerDraftToastEl(el, tickRef);
+      el.querySelector(".server-ready-toast__dismiss").onclick = close;
+      const cd = el.querySelector("[data-cd]");
+      tickRef.t = setInterval(() => {
+        countSec -= 1;
+        if (countSec <= 0) {
+          close();
+          return;
+        }
+        if (cd) cd.textContent = "Closing in " + countSec + "s";
+      }, 1000);
+      el.querySelector("[data-open-pickup]").onclick = async () => {
+        close();
+        navigateToPickupTab();
+        await loadReadyOrders();
+      };
+      host.prepend(el);
+    }
+
+    async function handleServerReadyOrderArrived(payload) {
+      if (!payload || typeof payload !== "object") return;
+      const serverId = Number(payload.serverId ?? payload.ServerId) || 0;
+      const myId = myServerEmployeeId();
+      if (myId > 0 && serverId > 0 && serverId !== myId) return;
+
+      const orderId = Number(payload.orderId ?? payload.OrderId) || 0;
+      markReadyOrderHighlighted(orderId);
+      playServerReadyRing();
+      showServerReadyOrderToast(payload);
+
+      try {
+        await loadReadyOrders();
+      } catch { /* ignore */ }
+
+      if (!isPickupTabActive()) updatePickupNavBadge();
     }
 
     function showCustomerDraftArrivedToast(payload) {
@@ -1679,15 +2435,15 @@
         payload.itemCount != null ? String(Number(payload.itemCount)) + " items" : null,
         payload.totalUsd != null ? esc(fmtUsd(payload.totalUsd)) : null
       ].filter(Boolean);
-      const metaLine = pSub.length ? pSub.join(" ┬╖ ") : "New customer order draft.";
+      const metaLine = pSub.length ? pSub.join(" | ") : "New customer order draft.";
 
       el.innerHTML = `<!--
-  CustomerDraftArrived ΓÇö primary CTA below calls loadDraft(draftId) (same as draft dropdown + Load),
+  CustomerDraftArrived  - primary CTA below calls loadDraft(draftId) (same as draft dropdown + Load),
   then navigateToTakeOrder() for the Take Order / Create Order screen.
 -->
 <div class="customer-draft-toast__head">
   <div class="customer-draft-toast__title">${esc(label)}</div>
-  <button type="button" class="customer-draft-toast__dismiss" aria-label="Dismiss">├ù</button>
+  <button type="button" class="customer-draft-toast__dismiss" aria-label="Dismiss">&times;</button>
 </div>
 <div class="customer-draft-toast__meta">${metaLine}</div>
 <div class="customer-draft-toast__countdown" data-cd>Closing in 15s</div>
@@ -1730,6 +2486,9 @@
         } catch { /* ignore */ }
         showCustomerDraftArrivedToast(p);
       });
+      conn.on("ServerReadyOrderArrived", p => {
+        void handleServerReadyOrderArrived(p);
+      });
       try {
         await conn.start();
         await conn.invoke("JoinServer");
@@ -1756,10 +2515,29 @@
       }, 30000);
     }
 
+    function startReadyOrdersPolling() {
+      if (readyOrderPollTimer) clearInterval(readyOrderPollTimer);
+      readyOrderPollTimer = setInterval(() => {
+        if (!token) return;
+        if (
+          orderHubConnection
+          && typeof signalR !== "undefined"
+          && orderHubConnection.state === signalR.HubConnectionState.Connected
+        ) {
+          return;
+        }
+        loadReadyOrders();
+      }, 25000);
+    }
+
     function stopOrderHubAndPolling() {
       if (draftListPollTimer) {
         clearInterval(draftListPollTimer);
         draftListPollTimer = null;
+      }
+      if (readyOrderPollTimer) {
+        clearInterval(readyOrderPollTimer);
+        readyOrderPollTimer = null;
       }
       if (orderHubConnection) {
         try { orderHubConnection.stop(); } catch { /* ignore */ }
@@ -1767,13 +2545,14 @@
       }
       const h = document.getElementById("customerToastHost");
       if (h) h.innerHTML = "";
+      highlightedReadyOrderIds.clear();
     }
 
     function snapshotState() {
       const { mode, value } = normalizeDiscount();
       return {
-        orderSource: document.getElementById("orderSource").value,
-        sourceReference: document.getElementById("sourceReference").value,
+        orderSource: SERVER_ORDER_SOURCE,
+        sourceReference: SERVER_SOURCE_REFERENCE,
         tableId: Number(document.getElementById("tableSelect").value || "0"),
         paymentCurrencyCode: document.getElementById("paymentCurrency").value,
         discountMode: mode,
@@ -1786,8 +2565,6 @@
     }
     function applySnapshot(s) {
       if (!s) return;
-      document.getElementById("orderSource").value = s.orderSource || "WalkIn";
-      document.getElementById("sourceReference").value = s.sourceReference || "";
       document.getElementById("tableSelect").value = String(s.tableId || 0);
       document.getElementById("paymentCurrency").value = s.paymentCurrencyCode || "USD";
       document.getElementById("discountMode").value = s.discountMode || "None";
@@ -1810,9 +2587,6 @@
 
     function clearCurrentOrder() {
       cart.clear();
-      document.getElementById("orderSource").value = "WalkIn";
-      document.getElementById("sourceReference").value = "";
-      document.getElementById("sourceReference").disabled = true;
       document.getElementById("discountMode").value = "None";
       document.getElementById("discountValue").value = "";
       setTicketMode("new");
@@ -1831,9 +2605,14 @@
       const tab = btn.getAttribute("data-tab");
       document.querySelectorAll(".tab").forEach(x => x.classList.add("hidden"));
       document.getElementById(tab).classList.remove("hidden");
+      if (tab === "pickupTab") {
+        updatePickupNavBadge();
+        void loadReadyOrders();
+      }
     });
 
     document.getElementById("search").addEventListener("input", renderProducts);
+    document.getElementById("menuSearch")?.addEventListener("input", renderMenuCatalog);
     document.getElementById("discountMode").addEventListener("change", renderTotals);
     document.getElementById("discountValue").addEventListener("input", renderTotals);
     document.getElementById("paymentCurrency").addEventListener("change", renderTotals);
@@ -1841,14 +2620,6 @@
       void checkOpenCheck();
       void loadDrafts();
     });
-    document.getElementById("sourceReference").disabled = true;
-    document.getElementById("orderSource").addEventListener("change", () => {
-      const src = document.getElementById("orderSource").value;
-      const ref = document.getElementById("sourceReference");
-      ref.disabled = src !== "Delivery";
-      if (src !== "Delivery") ref.value = "";
-    });
-
     document.getElementById("btnLogin").onclick = async () => {
       const btn = document.getElementById("btnLogin");
       const staffId = (document.getElementById("staffId").value || "").trim();
@@ -1857,7 +2628,7 @@
         setLoginMessage("Enter SignInId / UniqueId and PIN.", "error");
         return;
       }
-      setLoginMessage("Signing inΓÇª");
+      setLoginMessage("Signing in...");
       btn.disabled = true;
       let res;
       try {
@@ -1889,10 +2660,12 @@
       document.getElementById("sessionLabel").textContent = `${me.name} (${me.signInId || me.employeeUniqueId})`;
       document.getElementById("loginWrap").classList.add("hidden");
       document.getElementById("app").classList.remove("hidden");
+      unlockServerAudioFromUserGesture();
       const ok = await loadPortalData();
       await loadDrafts();
       void startOrderHub();
       startDraftListPolling();
+      startReadyOrdersPolling();
       setOut("Server login success", { login: res, loaded: ok });
     };
 
@@ -1979,18 +2752,11 @@
         setOut("Submit blocked", { message: "Cart is empty." });
         return;
       }
-      const source = document.getElementById("orderSource").value;
-      const sourceRef = document.getElementById("sourceReference").value || "";
-      if (source === "Delivery" && !sourceRef.trim()) {
-        alert("Delivery requires a reference.");
-        setOut("Submit blocked", { message: "Delivery source needs a reference." });
-        return;
-      }
       const d = normalizeDiscount();
       const payload = {
         tableId,
-        orderSource: source,
-        sourceReference: sourceRef,
+        orderSource: SERVER_ORDER_SOURCE,
+        sourceReference: SERVER_SOURCE_REFERENCE,
         discountMode: d.mode,
         discountValue: d.value,
         paymentCurrencyCode: document.getElementById("paymentCurrency").value,

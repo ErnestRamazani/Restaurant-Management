@@ -625,6 +625,9 @@ namespace EliteRestaurant.Core.Migrations
                     b.Property<decimal>("Price")
                         .HasColumnType("numeric");
 
+                    b.Property<int>("PrepMinutes")
+                        .HasColumnType("integer");
+
                     b.Property<string>("SubCategory")
                         .IsRequired()
                         .HasColumnType("text");

@@ -56,6 +56,7 @@ public class MenuViewModel : AdminBaseViewModel
     private string _selectedCategory = "Drink";
     private string _selectedSubCategory = "Beer";
     private string _priceText = string.Empty;
+    private string _prepMinutesText = string.Empty;
     private string _productDescription = string.Empty;
     private string _productComposition = string.Empty;
     private string _selectedViewCategory = "All";
@@ -67,6 +68,7 @@ public class MenuViewModel : AdminBaseViewModel
     private string _detailsCategory = string.Empty;
     private string _detailsSubCategory = string.Empty;
     private string _detailsPrice = string.Empty;
+    private string _detailsPrepMinutes = string.Empty;
     private string _detailsDescription = string.Empty;
     private string _detailsComposition = string.Empty;
     private string _productImagePath = string.Empty;
@@ -140,6 +142,12 @@ public class MenuViewModel : AdminBaseViewModel
     {
         get => _priceText;
         set => SetField(ref _priceText, value);
+    }
+
+    public string PrepMinutesText
+    {
+        get => _prepMinutesText;
+        set => SetField(ref _prepMinutesText, value);
     }
 
     public string ProductDescription
@@ -227,6 +235,12 @@ public class MenuViewModel : AdminBaseViewModel
     {
         get => _detailsPrice;
         set => SetField(ref _detailsPrice, value);
+    }
+
+    public string DetailsPrepMinutes
+    {
+        get => _detailsPrepMinutes;
+        set => SetField(ref _detailsPrepMinutes, value);
     }
 
     public string DetailsDescription
@@ -553,6 +567,7 @@ public class MenuViewModel : AdminBaseViewModel
         SelectedCategory = Categories.First();
         SelectedSubCategory = SubCategories.FirstOrDefault() ?? string.Empty;
         PriceText = string.Empty;
+        PrepMinutesText = string.Empty;
         ProductDescription = string.Empty;
         ProductComposition = string.Empty;
         ProductImagePath = string.Empty;
@@ -596,6 +611,9 @@ public class MenuViewModel : AdminBaseViewModel
             ? SubCategories.FirstOrDefault() ?? string.Empty
             : product.SubCategory;
         PriceText = product.Price.ToString("0.00", CultureInfo.InvariantCulture);
+        PrepMinutesText = product.PrepMinutes > 0
+            ? product.PrepMinutes.ToString(CultureInfo.InvariantCulture)
+            : string.Empty;
         ProductDescription = product.Description ?? string.Empty;
         ProductComposition = product.Composition ?? string.Empty;
         ProductImagePath = string.Empty;
@@ -648,6 +666,9 @@ public class MenuViewModel : AdminBaseViewModel
         DetailsCategory = string.IsNullOrWhiteSpace(product.Category) ? "Uncategorized" : product.Category;
         DetailsSubCategory = string.IsNullOrWhiteSpace(product.SubCategory) ? "General" : product.SubCategory;
         DetailsPrice = product.Price.ToString("N2", CultureInfo.InvariantCulture);
+        DetailsPrepMinutes = product.PrepMinutes > 0
+            ? $"{product.PrepMinutes} min"
+            : "Not set (category estimate used on orders)";
         DetailsDescription = string.IsNullOrWhiteSpace(product.Description)
             ? "No description provided."
             : product.Description.Trim();
@@ -694,6 +715,23 @@ public class MenuViewModel : AdminBaseViewModel
             string.IsNullOrWhiteSpace(SelectedSubCategory) ||
             !decimal.TryParse(PriceText, NumberStyles.Number, CultureInfo.InvariantCulture, out var price))
         {
+            MessageBox.Show(
+                "Enter product name, section, type, and a valid price.",
+                "Validation",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        if (!int.TryParse((PrepMinutesText ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var prepMinutes)
+            || prepMinutes < 1
+            || prepMinutes > 480)
+        {
+            MessageBox.Show(
+                "Cooking time must be a whole number between 1 and 480 minutes.",
+                "Validation",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 
@@ -730,6 +768,7 @@ public class MenuViewModel : AdminBaseViewModel
                 existing.Category = SelectedCategory.Trim();
                 existing.SubCategory = SelectedSubCategory.Trim();
                 existing.Price = price;
+                existing.PrepMinutes = prepMinutes;
                 existing.Description = string.IsNullOrWhiteSpace(desc) ? null : desc;
                 existing.Composition = string.IsNullOrWhiteSpace(comp) ? null : comp;
                 ops.Add(DesktopCloudPersistence.UpsertOperation(existing));
@@ -771,6 +810,7 @@ public class MenuViewModel : AdminBaseViewModel
                     Category = SelectedCategory.Trim(),
                     SubCategory = SelectedSubCategory.Trim(),
                     Price = price,
+                    PrepMinutes = prepMinutes,
                     Description = string.IsNullOrWhiteSpace(desc) ? null : desc,
                     Composition = string.IsNullOrWhiteSpace(comp) ? null : comp
                 };

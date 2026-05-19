@@ -127,6 +127,7 @@ try
         options.AddPolicy("StaffAny", policy => policy.RequireAuthenticatedUser());
         // Reservation floor API + SignalR — Admin + Cashier only.
         options.AddPolicy("CashierOrAdmin", policy => policy.RequireRole("Admin", "Cashier"));
+        options.AddPolicy("CashierDesk", policy => policy.RequireRole("Admin", "Manager", "Cashier"));
     });
     builder.Services.AddScoped<EliteRestaurant.Core.Reporting.AdminReportAggregationService>();
     builder.Services.Configure<ReservationSchedulingOptions>(builder.Configuration.GetSection("ReservationScheduling"));

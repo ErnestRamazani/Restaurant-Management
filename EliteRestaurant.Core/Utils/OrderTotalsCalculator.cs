@@ -18,7 +18,7 @@ public sealed class OrderTotalsCalculator
         int liveItemCount,
         string discountMode,
         string discountInput,
-        IReadOnlyList<(int Quantity, string Category, string SubCategory)> prepLines)
+        IReadOnlyList<(int Quantity, int PrepMinutes, string Category, string SubCategory)> prepLines)
     {
         var discountRaw = OrderDiscountParser.Parse(discountInput);
         var totals = OrderTotalsHelper.ComputeTotals(ticketSubtotal, discountMode, discountRaw);

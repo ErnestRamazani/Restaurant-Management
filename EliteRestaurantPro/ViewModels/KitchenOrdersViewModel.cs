@@ -406,16 +406,16 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
     private void ApplyDetailKitchenActions(OrderEntry entry, string status)
     {
         var key = OrderWorkflow.KitchenStatusKey(status);
-        ShowDetailReleaseToKitchen = entry.ShowReleaseToKitchen;
+        ShowDetailReleaseToKitchen = false;
         ShowDetailReceiveInKitchen = entry.ShowReceiveInKitchen;
         ShowDetailMarkReady = entry.ShowMarkReadyForPickup;
 
         DetailActionHint = key switch
         {
             "pendingCashier" =>
-                "Ticket is still with cashier: release to send to prep (inventory deducted, status becomes Waiting).",
+                "Ticket is with the cashier. Only the cashier can release it to the kitchen (status becomes Waiting).",
             "pendingApproval" =>
-                "Guest online order: release to kitchen to start prep (inventory deducted, status becomes Waiting).",
+                "Guest online order awaiting cashier approval. Only the cashier can release it to the kitchen.",
             "ready" =>
                 "This ticket is ready for pickup. Servers or cashier can complete it from their screens.",
             "served" or "other" =>
@@ -587,7 +587,7 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
             StatusColor = StatusColorFor(order.Status),
             OrderOrigin = order.OrderOrigin,
             FulfillmentHeadline = OrderRecordUiLabels.KitchenFulfillmentHeadline(order),
-            ShowReleaseToKitchen = awaitsRelease,
+            ShowReleaseToKitchen = false,
             ShowReceiveInKitchen = OrderWorkflow.KitchenStatusKey(order.Status) == "waiting",
             ShowMarkReadyForPickup = OrderWorkflow.IsKitchenPreparingColumn(order.Status)
         };
