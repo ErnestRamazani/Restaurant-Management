@@ -1,8 +1,11 @@
+using EliteRestaurant.Core.Tenancy;
+
 namespace EliteRestaurant.Core.Models;
 
-public class SyncOutbox
+public class SyncOutbox : IRestaurantScoped
 {
     public int Id { get; set; }
+    public int RestaurantId { get; set; }
     public string IdempotencyKey { get; set; } = string.Empty;
     public string EntityName { get; set; } = string.Empty;
     public string Operation { get; set; } = string.Empty;

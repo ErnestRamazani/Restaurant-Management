@@ -2,9 +2,12 @@ using System.Net;
 using System.Threading.RateLimiting;
 using EliteRestaurant.Api;
 using EliteRestaurant.Api.Hubs;
+using EliteRestaurant.Api.Middleware;
 using EliteRestaurant.Api.Notifications;
 using EliteRestaurant.Api.Security;
 using EliteRestaurant.Api.Services;
+using EliteRestaurant.Api.Tenancy;
+using EliteRestaurant.Core.Tenancy;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Reservations;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -41,7 +44,7 @@ try
     var builder = WebApplication.CreateBuilder(args);
     builder.Host.UseSerilog();
 
-    if (!builder.Environment.IsEnvironment("Testing"))
+    if (!builder.Environment.IsEnvironment("Testing") && !EF.IsDesignTime)
         DatabaseInitializer.Initialize(builder.Configuration);
 
     builder.Services.Configure<CurrencyPricingOptions>(builder.Configuration.GetSection("CurrencyPricing"));
@@ -59,32 +62,36 @@ try
 
     if (builder.Environment.IsEnvironment("Testing"))
     {
-        builder.Services.AddDbContext<AppDbContext>(o =>
-            o.UseInMemoryDatabase("IntegrationTest"));
+        builder.Services.AddScoped<ITenantContext, TenantContext>();
+        builder.Services.AddScoped<RestaurantTenantResolver>();
+        builder.Services.AddDbContext<AppDbContext>((sp, o) =>
+        {
+            o.UseInMemoryDatabase("IntegrationTest");
+        });
     }
     else
     {
-        builder.Services.AddDbContextPool<AppDbContext>(
-            o =>
+        builder.Services.AddScoped<ITenantContext, TenantContext>();
+        builder.Services.AddScoped<RestaurantTenantResolver>();
+        builder.Services.AddDbContext<AppDbContext>((sp, o) =>
+        {
+            if (AppDbContext.TryGetPostgreSqlConnectionString(
+                    out var cs,
+                    builder.Configuration.GetConnectionString("DefaultConnection")))
             {
-                if (AppDbContext.TryGetPostgreSqlConnectionString(
-                        out var cs,
-                        builder.Configuration.GetConnectionString("DefaultConnection")))
-                {
-                    o.UseNpgsql(cs, n => n.EnableRetryOnFailure());
-                }
-                else if (AppDbContext.TryGetDatabaseUrlLastResort(out var databaseUrl))
-                {
-                    o.UseNpgsql(databaseUrl, n => n.EnableRetryOnFailure());
-                }
-                else
-                {
-                    Console.WriteLine(
-                        "[EliteRestaurant] Warning: no PostgreSQL connection string was found during API startup. " +
-                        "Continuing without configuring a database provider.");
-                }
-            },
-            poolSize: 32);
+                o.UseNpgsql(cs, n => n.EnableRetryOnFailure());
+            }
+            else if (AppDbContext.TryGetDatabaseUrlLastResort(out var databaseUrl))
+            {
+                o.UseNpgsql(databaseUrl, n => n.EnableRetryOnFailure());
+            }
+            else
+            {
+                Console.WriteLine(
+                    "[EliteRestaurant] Warning: no PostgreSQL connection string was found during API startup. " +
+                    "Continuing without configuring a database provider.");
+            }
+        });
     }
 
     builder.Services.AddControllers();
@@ -265,7 +272,11 @@ try
 
     app.UseCors(CorsPolicyAllowAll);
     app.UseRateLimiter();
+    if (!app.Environment.IsEnvironment("Testing"))
+        app.UseMiddleware<TenantResolutionMiddleware>();
     app.UseAuthentication();
+    if (!app.Environment.IsEnvironment("Testing"))
+        app.UseMiddleware<TenantJwtAlignmentMiddleware>();
     app.UseMiddleware<EliteRestaurant.Api.Middleware.AdminWebReadOnlyApiMiddleware>();
     app.UseAuthorization();
     static void ApplyHtmlNoStore(HttpResponse response)

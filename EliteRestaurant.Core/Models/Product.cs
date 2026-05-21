@@ -1,10 +1,13 @@
 using System.ComponentModel.DataAnnotations.Schema;
 
+using EliteRestaurant.Core.Tenancy;
+
 namespace EliteRestaurant.Core.Models;
 
-public class Product
+public class Product : IRestaurantScoped
 {
     public int Id { get; set; }
+    public int RestaurantId { get; set; }
     public string UniqueId { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Category { get; set; } = string.Empty;

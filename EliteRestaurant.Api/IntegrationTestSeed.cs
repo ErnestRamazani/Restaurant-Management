@@ -18,6 +18,8 @@ public static class IntegrationTestSeed
 
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        RestaurantTenantBootstrap.EnsureDefaultRestaurant(db);
+
         if (!db.Employees.Any(e => e.SignInId == AdminWebTestSignInId))
         {
             db.Employees.Add(new Employee

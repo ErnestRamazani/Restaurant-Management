@@ -1,8 +1,11 @@
+using EliteRestaurant.Core.Tenancy;
+
 namespace EliteRestaurant.Core.Models;
 
-public class OrderRecord
+public class OrderRecord : IRestaurantScoped
 {
     public int Id { get; set; }
+    public int RestaurantId { get; set; }
     public string UniqueId { get; set; } = string.Empty;
     /// <summary>Guest-facing 6-digit proof code for online pickup/delivery orders.</summary>
     public string? ConfirmationCode { get; set; }

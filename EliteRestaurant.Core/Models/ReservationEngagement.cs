@@ -1,11 +1,14 @@
+using EliteRestaurant.Core.Tenancy;
+
 namespace EliteRestaurant.Core.Models;
 
 /// <summary>
 /// Floor booking instance: ties an optional legacy <see cref="ReservationBooking"/> to placement and timetable.
 /// </summary>
-public sealed class ReservationEngagement
+public sealed class ReservationEngagement : IRestaurantScoped
 {
     public int Id { get; set; }
+    public int RestaurantId { get; set; }
 
     /// <summary>Guest-facing reference (6 uppercase letters, e.g. KQRTNP).</summary>
     public string? ConfirmationCode { get; set; }

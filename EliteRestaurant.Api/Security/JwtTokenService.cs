@@ -23,6 +23,7 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options)
             new(ClaimTypes.Name, session.Name),
             new(ClaimTypes.Role, session.Role),
             new("employeeId", session.EmployeeId.ToString()),
+            new("restaurantId", session.RestaurantId.ToString()),
             new("employeeUniqueId", session.EmployeeUniqueId),
             new("portal", session.Portal),
             new("signInId", session.SignInId),
@@ -59,6 +60,9 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options)
             if (!int.TryParse(employeeIdText, out var employeeId))
                 return null;
 
+            var restaurantIdText = principal.FindFirstValue("restaurantId");
+            _ = int.TryParse(restaurantIdText, out var restaurantId);
+
             var expiresAtUtc = jwt.ValidTo.Kind == DateTimeKind.Utc
                 ? jwt.ValidTo
                 : DateTime.SpecifyKind(jwt.ValidTo, DateTimeKind.Utc);
@@ -66,6 +70,7 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options)
             return new AuthenticatedStaffSession(
                 token.Trim(),
                 employeeId,
+                restaurantId,
                 principal.FindFirstValue("employeeUniqueId") ?? string.Empty,
                 principal.FindFirstValue(ClaimTypes.Name) ?? string.Empty,
                 principal.FindFirstValue(ClaimTypes.Role) ?? string.Empty,

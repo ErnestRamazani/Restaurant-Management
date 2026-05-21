@@ -2,6 +2,7 @@ using System;
 using System.Text.Json;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Sync;
+using EliteRestaurant.Core.Tenancy;
 using EliteRestaurant.Core.Utils;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
@@ -13,15 +14,24 @@ namespace EliteRestaurant.Core.Data;
 public class AppDbContext : DbContext
 {
     private static readonly JsonSerializerOptions SyncJsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly ITenantContext _tenantContext;
 
     public AppDbContext()
     {
+        _tenantContext = new NullTenantContext();
     }
 
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
+        _tenantContext = new NullTenantContext();
     }
 
+    public AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext tenantContext) : base(options)
+    {
+        _tenantContext = tenantContext;
+    }
+
+    public DbSet<Restaurant> Restaurants => Set<Restaurant>();
     public DbSet<Employee> Employees => Set<Employee>();
     public DbSet<Product> Products => Set<Product>();
     public DbSet<Table> Tables => Set<Table>();
@@ -80,6 +90,7 @@ public class AppDbContext : DbContext
 
     public override int SaveChanges()
     {
+        ApplyTenantOnInsert();
         var queued = QueueCloudSyncOperations();
         var result = base.SaveChanges(acceptAllChangesOnSuccess: true);
         NotifyCloudSyncQueued(queued);
@@ -88,6 +99,7 @@ public class AppDbContext : DbContext
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
+        ApplyTenantOnInsert();
         var queued = QueueCloudSyncOperations();
         var result = base.SaveChanges(acceptAllChangesOnSuccess);
         NotifyCloudSyncQueued(queued);
@@ -96,6 +108,7 @@ public class AppDbContext : DbContext
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        ApplyTenantOnInsert();
         var queued = QueueCloudSyncOperations();
         var result = await base.SaveChangesAsync(acceptAllChangesOnSuccess: true, cancellationToken);
         NotifyCloudSyncQueued(queued);
@@ -106,6 +119,7 @@ public class AppDbContext : DbContext
         bool acceptAllChangesOnSuccess,
         CancellationToken cancellationToken = default)
     {
+        ApplyTenantOnInsert();
         var queued = QueueCloudSyncOperations();
         var result = await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
         NotifyCloudSyncQueued(queued);
@@ -114,6 +128,16 @@ public class AppDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<Restaurant>().ToTable("Restaurants");
+        modelBuilder.Entity<Restaurant>().HasIndex(r => r.Slug).IsUnique();
+        modelBuilder.Entity<Restaurant>().HasIndex(r => r.UniqueId).IsUnique();
+        modelBuilder.Entity<Restaurant>()
+            .HasIndex(r => r.CustomDomain)
+            .IsUnique()
+            .HasFilter("\"CustomDomain\" IS NOT NULL AND \"CustomDomain\" <> ''");
+
+        ApplyTenantQueryFilters(modelBuilder);
+
         modelBuilder.Entity<Table>()
             .HasOne(t => t.AssignedServer)
             .WithMany()
@@ -154,26 +178,26 @@ public class AppDbContext : DbContext
             .HasForeignKey(t => t.EmployeeId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        modelBuilder.Entity<Employee>().HasIndex(e => e.UniqueId).IsUnique();
+        modelBuilder.Entity<Employee>().HasIndex(e => new { e.RestaurantId, e.UniqueId }).IsUnique();
         modelBuilder.Entity<Employee>()
-            .HasIndex(e => e.SignInId)
+            .HasIndex(e => new { e.RestaurantId, e.SignInId })
             .IsUnique()
             .HasFilter("\"SignInId\" IS NOT NULL AND \"SignInId\" <> ''");
-        modelBuilder.Entity<Product>().HasIndex(p => p.UniqueId).IsUnique();
-        modelBuilder.Entity<Table>().HasIndex(t => t.UniqueId).IsUnique();
-        modelBuilder.Entity<Table>().HasIndex(t => t.TableNumber).IsUnique();
-        modelBuilder.Entity<OrderRecord>().HasIndex(o => o.UniqueId).IsUnique();
+        modelBuilder.Entity<Product>().HasIndex(p => new { p.RestaurantId, p.UniqueId }).IsUnique();
+        modelBuilder.Entity<Table>().HasIndex(t => new { t.RestaurantId, t.UniqueId }).IsUnique();
+        modelBuilder.Entity<Table>().HasIndex(t => new { t.RestaurantId, t.TableNumber }).IsUnique();
+        modelBuilder.Entity<OrderRecord>().HasIndex(o => new { o.RestaurantId, o.UniqueId }).IsUnique();
         modelBuilder.Entity<OrderRecord>()
             .Property(o => o.ConfirmationCode)
             .HasMaxLength(6);
         modelBuilder.Entity<OrderRecord>()
-            .HasIndex(o => o.ConfirmationCode)
+            .HasIndex(o => new { o.RestaurantId, o.ConfirmationCode })
             .IsUnique()
             .HasFilter("\"ConfirmationCode\" IS NOT NULL AND \"ConfirmationCode\" <> ''");
-        modelBuilder.Entity<InventoryItem>().HasIndex(i => i.UniqueId).IsUnique();
-        modelBuilder.Entity<CustomerProfile>().HasIndex(c => c.UniqueId).IsUnique();
+        modelBuilder.Entity<InventoryItem>().HasIndex(i => new { i.RestaurantId, i.UniqueId }).IsUnique();
+        modelBuilder.Entity<CustomerProfile>().HasIndex(c => new { c.RestaurantId, c.UniqueId }).IsUnique();
         modelBuilder.Entity<CustomerProfile>().HasIndex(c => c.PrimaryPhone);
-        modelBuilder.Entity<ReservationBooking>().HasIndex(r => r.UniqueId).IsUnique();
+        modelBuilder.Entity<ReservationBooking>().HasIndex(r => new { r.RestaurantId, r.UniqueId }).IsUnique();
         modelBuilder.Entity<ReservationBooking>().HasIndex(r => r.ReservedFor);
         modelBuilder.Entity<ReservationBooking>().HasIndex(r => r.Status);
         modelBuilder.Entity<PlacementUnit>().HasIndex(p => p.TableId).IsUnique();
@@ -182,22 +206,22 @@ public class AppDbContext : DbContext
             .Property(e => e.ConfirmationCode)
             .HasMaxLength(6);
         modelBuilder.Entity<ReservationEngagement>()
-            .HasIndex(e => e.ConfirmationCode)
+            .HasIndex(e => new { e.RestaurantId, e.ConfirmationCode })
             .IsUnique()
             .HasFilter("\"ConfirmationCode\" IS NOT NULL AND \"ConfirmationCode\" <> ''");
         modelBuilder.Entity<ReservationEngagement>().HasIndex(e => e.PlannedStartUtc);
         modelBuilder.Entity<ReservationEngagement>().HasIndex(e => e.Status);
         modelBuilder.Entity<ReservationEngagement>().HasIndex(e => e.PlacementUnitId);
         modelBuilder.Entity<ReservationEngagement>().HasIndex(e => e.TableId);
-        modelBuilder.Entity<WaitlistEntry>().HasIndex(w => w.UniqueId).IsUnique();
+        modelBuilder.Entity<WaitlistEntry>().HasIndex(w => new { w.RestaurantId, w.UniqueId }).IsUnique();
         modelBuilder.Entity<WaitlistEntry>().HasIndex(w => w.CreatedAt);
         modelBuilder.Entity<WaitlistEntry>().HasIndex(w => w.Status);
-        modelBuilder.Entity<SharedOrderDraft>().HasIndex(d => d.UniqueId).IsUnique();
+        modelBuilder.Entity<SharedOrderDraft>().HasIndex(d => new { d.RestaurantId, d.UniqueId }).IsUnique();
         modelBuilder.Entity<SharedOrderDraft>().HasIndex(d => new { d.EmployeeId, d.Portal, d.UpdatedAtUtc });
         modelBuilder.Entity<SyncOutbox>().HasIndex(o => o.IdempotencyKey).IsUnique();
         modelBuilder.Entity<SyncOutbox>().HasIndex(o => new { o.Status, o.QueuedAtUtc });
-        modelBuilder.Entity<PublicMenuSetting>().HasIndex(s => s.Key).IsUnique();
-        modelBuilder.Entity<PublicMenuAsset>().HasIndex(a => a.Key).IsUnique();
+        modelBuilder.Entity<PublicMenuSetting>().HasIndex(s => new { s.RestaurantId, s.Key }).IsUnique();
+        modelBuilder.Entity<PublicMenuAsset>().HasIndex(a => new { a.RestaurantId, a.Key }).IsUnique();
         modelBuilder.Entity<EmployeeAttendance>()
             .HasIndex(a => new { a.EmployeeId, a.WorkDate })
             .IsUnique();
@@ -299,6 +323,12 @@ public class AppDbContext : DbContext
             .HasForeignKey(e => e.ReservationBookingId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        modelBuilder.Entity<Restaurant>()
+            .HasMany<Employee>()
+            .WithOne()
+            .HasForeignKey(e => e.RestaurantId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
             foreach (var property in entityType.GetProperties())
@@ -328,6 +358,41 @@ public class AppDbContext : DbContext
             DateTimeKind.Local => v.ToUniversalTime(),
             _ => DateTime.SpecifyKind(v, DateTimeKind.Utc)
         };
+
+    private void ApplyTenantQueryFilters(ModelBuilder modelBuilder)
+    {
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            if (!typeof(IRestaurantScoped).IsAssignableFrom(entityType.ClrType))
+                continue;
+
+            var method = typeof(AppDbContext)
+                .GetMethod(nameof(ConfigureTenantFilter), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+                .MakeGenericMethod(entityType.ClrType);
+            method.Invoke(this, [modelBuilder]);
+        }
+    }
+
+    private void ConfigureTenantFilter<TEntity>(ModelBuilder modelBuilder)
+        where TEntity : class, IRestaurantScoped
+    {
+        modelBuilder.Entity<TEntity>()
+            .HasQueryFilter(e => !_tenantContext.IsResolved || e.RestaurantId == _tenantContext.RestaurantId);
+    }
+
+    private void ApplyTenantOnInsert()
+    {
+        if (!_tenantContext.IsResolved)
+            return;
+
+        foreach (var entry in ChangeTracker.Entries<IRestaurantScoped>())
+        {
+            if (entry.State != EntityState.Added)
+                continue;
+            if (entry.Entity.RestaurantId <= 0)
+                entry.Entity.RestaurantId = _tenantContext.RestaurantId;
+        }
+    }
 
     private int QueueCloudSyncOperations()
     {

@@ -1,8 +1,11 @@
+using EliteRestaurant.Core.Tenancy;
+
 namespace EliteRestaurant.Core.Models;
 
-public class WaitlistEntry
+public class WaitlistEntry : IRestaurantScoped
 {
     public int Id { get; set; }
+    public int RestaurantId { get; set; }
     public string UniqueId { get; set; } = string.Empty;
     public string GuestName { get; set; } = string.Empty;
     public string GuestPhone { get; set; } = string.Empty;

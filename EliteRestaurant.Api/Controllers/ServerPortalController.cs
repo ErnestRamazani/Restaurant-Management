@@ -12,6 +12,7 @@ using EliteRestaurant.Api.Security;
 using EliteRestaurant.Api.Services;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Tenancy;
 using EliteRestaurant.Core.Orders;
 using EliteRestaurant.Core.Staff;
 using EliteRestaurant.Core.Utils;
@@ -30,8 +31,9 @@ namespace EliteRestaurant.Api.Controllers;
 [ApiController]
 [Route("api/server")]
 [Authorize(Policy = "StaffAny")]
-public sealed class ServerPortalController(
+public sealed class     ServerPortalController(
     TabletAuthService authService,
+    ITenantContext tenant,
     IWebHostEnvironment environment,
     IOptions<CurrencyPricingOptions> currencyPricingOptions,
     AppDbContext db,
@@ -616,7 +618,10 @@ public sealed class ServerPortalController(
         if (session is null)
             return Unauthorized(new { message = "Missing/invalid token or non-server role." });
 
-        var pendingCalls = TableServerCallQueue.ListForServer(session.EmployeeId, pendingOnly: true);
+        if (!tenant.IsResolved)
+            return BadRequest(new { message = "Restaurant site could not be resolved." });
+
+        var pendingCalls = TableServerCallQueue.ListForServer(tenant.RestaurantId, session.EmployeeId, pendingOnly: true);
         var pendingByTable = pendingCalls
             .GroupBy(c => c.TableId)
             .ToDictionary(

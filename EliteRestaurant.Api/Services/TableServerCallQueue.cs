@@ -5,6 +5,7 @@ namespace EliteRestaurant.Api.Services;
 public sealed class TableServerCallEntry
 {
     public Guid Id { get; init; }
+    public int RestaurantId { get; init; }
     public int TableId { get; init; }
     public int TableNumber { get; init; }
     public string TableName { get; init; } = string.Empty;
@@ -25,6 +26,7 @@ public static class TableServerCallQueue
     private static readonly TimeSpan Retention = TimeSpan.FromHours(12);
 
     public static TableServerCallEntry Enqueue(
+        int restaurantId,
         int tableId,
         int tableNumber,
         string tableName,
@@ -37,6 +39,7 @@ public static class TableServerCallQueue
         var entry = new TableServerCallEntry
         {
             Id = Guid.NewGuid(),
+            RestaurantId = restaurantId,
             TableId = tableId,
             TableNumber = tableNumber,
             TableName = tableName.Trim(),
@@ -50,10 +53,11 @@ public static class TableServerCallQueue
         return entry;
     }
 
-    public static IReadOnlyList<TableServerCallEntry> ListForServer(int? viewerServerEmployeeId, bool pendingOnly)
+    public static IReadOnlyList<TableServerCallEntry> ListForServer(int restaurantId, int? viewerServerEmployeeId, bool pendingOnly)
     {
         PurgeOld();
         return Calls.Values
+            .Where(c => c.RestaurantId == restaurantId)
             .Where(c => MatchesServer(c, viewerServerEmployeeId))
             .Where(c => !pendingOnly || c.IsPending)
             .OrderByDescending(c => c.CalledAtUtc)

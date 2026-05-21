@@ -1,8 +1,11 @@
+using EliteRestaurant.Core.Tenancy;
+
 namespace EliteRestaurant.Core.Models;
 
-public sealed class SharedOrderDraft
+public sealed class SharedOrderDraft : IRestaurantScoped
 {
     public int Id { get; set; }
+    public int RestaurantId { get; set; }
     public string UniqueId { get; set; } = string.Empty;
     public int EmployeeId { get; set; }
     /// <summary>Which floor table this draft belongs to (0 = unknown / pre-migration). Customer menu drafts always set this.</summary>

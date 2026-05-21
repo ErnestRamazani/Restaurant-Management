@@ -1,10 +1,12 @@
 using System.ComponentModel.DataAnnotations.Schema;
+using EliteRestaurant.Core.Tenancy;
 
 namespace EliteRestaurant.Core.Models;
 
-public class ReservationBooking
+public class ReservationBooking : IRestaurantScoped
 {
     public int Id { get; set; }
+    public int RestaurantId { get; set; }
     public string UniqueId { get; set; } = string.Empty;
     public string ReservationName { get; set; } = string.Empty;
 

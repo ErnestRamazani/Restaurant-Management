@@ -1,8 +1,11 @@
+using EliteRestaurant.Core.Tenancy;
+
 namespace EliteRestaurant.Core.Models;
 
-public class MoneyTransaction
+public class MoneyTransaction : IRestaurantScoped
 {
     public int Id { get; set; }
+    public int RestaurantId { get; set; }
     /// <summary>When set, ties this row to an order for reporting filters (e.g. Money by origin).</summary>
     public int? RelatedOrderId { get; set; }
     /// <summary><see cref="OrderOrigin"/> from the source order when posted from a sale.</summary>

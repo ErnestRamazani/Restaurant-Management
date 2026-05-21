@@ -39,6 +39,7 @@ internal static class AdminDevLoginBypass
             return new AuthenticatedStaffSession(
                 "dev-admin-bypass",
                 impersonate.Id,
+                impersonate.RestaurantId,
                 impersonate.UniqueId ?? string.Empty,
                 impersonate.Name,
                 impersonate.Role,
@@ -49,6 +50,7 @@ internal static class AdminDevLoginBypass
 
         return new AuthenticatedStaffSession(
             "dev-admin-bypass",
+            0,
             0,
             "DEV-ADMIN",
             string.IsNullOrWhiteSpace(staffId) ? "Dev Admin" : staffId,

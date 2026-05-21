@@ -17,6 +17,7 @@ using Npgsql;
 using Serilog;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Tenancy;
 using EliteRestaurant.Core.Orders;
 using EliteRestaurant.Core.Staff;
 using EliteRestaurant.Core.Menu;
@@ -31,7 +32,8 @@ public sealed class PublicMenuController(
     AppDbContext db,
     IWebHostEnvironment environment,
     IHubContext<OrderHub> hubContext,
-    JwtTokenService jwtTokenService) : ControllerBase
+    JwtTokenService jwtTokenService,
+    ITenantContext tenant) : ControllerBase
 {
     private static readonly JsonSerializerOptions JsonStoreOptions = new()
     {
@@ -212,6 +214,7 @@ public sealed class PublicMenuController(
             session = new AuthenticatedStaffSession(
                 Token: string.Empty,
                 EmployeeId: employee.Id,
+                RestaurantId: employee.RestaurantId,
                 EmployeeUniqueId: string.IsNullOrWhiteSpace(employee.UniqueId) ? "EMP" : employee.UniqueId.Trim(),
                 Name: string.IsNullOrWhiteSpace(employee.Name) ? "Staff" : employee.Name.Trim(),
                 Role: employee.Role,
@@ -225,6 +228,7 @@ public sealed class PublicMenuController(
             session = new AuthenticatedStaffSession(
                 Token: string.Empty,
                 EmployeeId: 0,
+                RestaurantId: tenant.IsResolved ? tenant.RestaurantId : 0,
                 EmployeeUniqueId: "MENU-STAFF",
                 Name: "Menu Staff",
                 Role: "Server",
@@ -566,6 +570,7 @@ public sealed class PublicMenuController(
             : null;
 
         var entry = TableServerCallQueue.Enqueue(
+            table.RestaurantId,
             table.Id,
             table.TableNumber,
             table.Name,

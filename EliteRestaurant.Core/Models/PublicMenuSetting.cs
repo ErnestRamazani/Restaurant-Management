@@ -1,8 +1,11 @@
+using EliteRestaurant.Core.Tenancy;
+
 namespace EliteRestaurant.Core.Models;
 
-public sealed class PublicMenuSetting
+public sealed class PublicMenuSetting : IRestaurantScoped
 {
     public int Id { get; set; }
+    public int RestaurantId { get; set; }
     public string Key { get; set; } = "default";
     public string RestaurantName { get; set; } = string.Empty;
     public string Phone { get; set; } = string.Empty;

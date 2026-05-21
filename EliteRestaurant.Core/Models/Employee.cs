@@ -1,13 +1,15 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
+using EliteRestaurant.Core.Tenancy;
 using EliteRestaurant.Core.Utils;
 
 namespace EliteRestaurant.Core.Models;
 
-public class Employee
+public class Employee : IRestaurantScoped
 {
     public int Id { get; set; }
+    public int RestaurantId { get; set; }
     public string UniqueId { get; set; } = string.Empty;
     /// <summary>Short memorable ID for tablet sign-in with <see cref="PinCode"/> (unique when non-empty).</summary>
     public string SignInId { get; set; } = string.Empty;

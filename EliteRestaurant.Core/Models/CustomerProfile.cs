@@ -1,8 +1,11 @@
+using EliteRestaurant.Core.Tenancy;
+
 namespace EliteRestaurant.Core.Models;
 
-public class CustomerProfile
+public class CustomerProfile : IRestaurantScoped
 {
     public int Id { get; set; }
+    public int RestaurantId { get; set; }
     public string UniqueId { get; set; } = string.Empty;
     public string FullName { get; set; } = string.Empty;
     public string PrimaryPhone { get; set; } = string.Empty;

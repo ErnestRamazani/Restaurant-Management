@@ -30,6 +30,7 @@ public static class DatabaseInitializer
             .UseNpgsql(cs, npgsql => npgsql.EnableRetryOnFailure(5))
             .Options;
         using var db = new AppDbContext(options);
+        RestaurantTenantBootstrap.EnsureDefaultRestaurant(db);
         AdminWebLoginSeed.EnsureSeeded(db);
         SampleDataBootstrapper.SeedIfEnabled(db);
         SharedOrderDraftStore.PurgeDraftsOlderThan(TimeSpan.FromDays(30));

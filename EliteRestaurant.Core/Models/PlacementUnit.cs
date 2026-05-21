@@ -1,8 +1,11 @@
+using EliteRestaurant.Core.Tenancy;
+
 namespace EliteRestaurant.Core.Models;
 
-public sealed class PlacementUnit
+public sealed class PlacementUnit : IRestaurantScoped
 {
     public int Id { get; set; }
+    public int RestaurantId { get; set; }
     public int TableId { get; set; }
     public Table? Table { get; set; }
 

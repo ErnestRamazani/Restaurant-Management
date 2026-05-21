@@ -117,6 +117,7 @@ public sealed class TabletAuthService(AppDbContext db, JwtTokenService jwtTokenS
         return new AuthenticatedStaffSession(
             row.Token,
             row.EmployeeId,
+            ResolveRestaurantIdForEmployee(row.EmployeeId),
             row.EmployeeUniqueId,
             row.Name,
             row.Role,
@@ -124,6 +125,13 @@ public sealed class TabletAuthService(AppDbContext db, JwtTokenService jwtTokenS
             row.Portal,
             row.ExpiresAtUtc);
     }
+
+    private int ResolveRestaurantIdForEmployee(int employeeId) =>
+        db.Employees.IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(e => e.Id == employeeId)
+            .Select(e => e.RestaurantId)
+            .FirstOrDefault();
 
     private static AuthenticatedStaffSession ToAuthenticatedSession(
         string token,
@@ -133,6 +141,7 @@ public sealed class TabletAuthService(AppDbContext db, JwtTokenService jwtTokenS
         new(
             token,
             employee.Id,
+            employee.RestaurantId,
             employee.UniqueId ?? string.Empty,
             employee.Name,
             employee.Role,
