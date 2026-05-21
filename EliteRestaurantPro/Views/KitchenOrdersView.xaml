@@ -27,7 +27,7 @@
                         <Run Text=" / Bar" Foreground="{StaticResource GoldAccentBrush}"/>
                         <Run Text=" Queue" Foreground="{StaticResource TextPrimaryBrush}"/>
                     </TextBlock>
-                    <TextBlock Text="Incoming shows Waiting plus online/cashier pending tickets. Release pending orders to prep, receive Waiting into In Kitchen, then mark Ready. Select any ticket for full detail."
+                    <TextBlock Text="Incoming shows Waiting tickets (newest first). Cashier releases pending orders to Waiting; then receive into In Kitchen and mark Ready. Select any ticket for full detail."
                                Style="{StaticResource BodyText}" FontSize="13" Margin="0,6,0,0" TextWrapping="Wrap"/>
                     <TextBlock Text="{Binding LoadStatusMessage, Mode=OneWay}"
                                Foreground="#FFB74D" FontSize="12" Margin="0,8,0,0" TextWrapping="Wrap"
@@ -116,6 +116,8 @@
                                             <TextBlock Text="{Binding TableNumber}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,4,0,0"/>
                                             <TextBlock Text="{Binding ServerName, StringFormat=Server: {0}}" Foreground="{StaticResource StatBlueBrush}" FontSize="11" Margin="0,2,0,0"/>
                                             <TextBlock Text="{Binding Items}" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,6,0,0" TextWrapping="Wrap" MaxHeight="36" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding KitchenWorkSummary}" Foreground="#FDE68A" FontSize="10" FontWeight="SemiBold" Margin="0,4,0,0" TextWrapping="Wrap"
+                                                       Visibility="{Binding ShowKitchenWorkSummary, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                             <TextBlock Text="{Binding Total, StringFormat=$ {0:N2}}" Foreground="{StaticResource GoldAccentBrush}" Margin="0,6,0,8"/>
                                             <Button Content="View order" Margin="0,0,0,8"
                                                     Command="{Binding DataContext.ViewFullOrderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
@@ -217,6 +219,8 @@
                                             <TextBlock Text="{Binding TableNumber}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,4,0,0"/>
                                             <TextBlock Text="{Binding ServerName, StringFormat=Server: {0}}" Foreground="{StaticResource StatBlueBrush}" FontSize="11" Margin="0,2,0,0"/>
                                             <TextBlock Text="{Binding Items}" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,6,0,0" TextWrapping="Wrap" MaxHeight="36" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding KitchenWorkSummary}" Foreground="#FDE68A" FontSize="10" FontWeight="SemiBold" Margin="0,4,0,0" TextWrapping="Wrap"
+                                                       Visibility="{Binding ShowKitchenWorkSummary, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                             <TextBlock Text="{Binding Total, StringFormat=$ {0:N2}}" Foreground="{StaticResource GoldAccentBrush}" Margin="0,6,0,8"/>
                                             <Button Content="View order" Margin="0,0,0,8"
                                                     Command="{Binding DataContext.ViewFullOrderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
@@ -330,6 +334,8 @@
                                 <TextBlock Text="{Binding DetailTime}" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,2,0,0"/>
                                 <TextBlock Text="{Binding DetailStatus, StringFormat=Status: {0}}" Foreground="{StaticResource StatOrangeBrush}" FontSize="12" Margin="0,8,0,0"/>
                                 <TextBlock Text="{Binding DetailTotal, StringFormat=Total: {0}}" Foreground="{StaticResource GoldAccentBrush}" FontSize="13" Margin="0,4,0,0"/>
+                                <TextBlock Text="{Binding DetailKitchenWorkSummary}" Foreground="#FDE68A" FontSize="12" FontWeight="SemiBold" Margin="0,10,0,0" TextWrapping="Wrap"
+                                           Visibility="{Binding HasDetailKitchenWorkSummary, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
                                 <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
                                     <Button Content="Release to kitchen"
@@ -370,14 +376,33 @@
                                 <ItemsControl ItemsSource="{Binding DetailLines}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Border Background="#22000000" CornerRadius="8" Padding="10,8" Margin="0,0,0,6">
+                                            <Border CornerRadius="8" Padding="10,8" Margin="0,0,0,6">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="#22000000"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsNewForKitchen}" Value="True">
+                                                                <Setter Property="Background" Value="#33E8A838"/>
+                                                                <Setter Property="BorderBrush" Value="{StaticResource GoldAccentBrush}"/>
+                                                                <Setter Property="BorderThickness" Value="0,0,0,3"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding IsAlreadyPrepared}" Value="True">
+                                                                <Setter Property="Opacity" Value="0.65"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
                                                 <Grid>
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="*"/>
                                                         <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="Auto"/>
                                                     </Grid.ColumnDefinitions>
                                                     <StackPanel>
-                                                        <TextBlock Text="{Binding ProductName}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <TextBlock Text="{Binding ProductName}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                                            <TextBlock Text="{Binding LineBadge}" Foreground="#FDE68A" FontSize="10" FontWeight="Bold" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                                                        </StackPanel>
                                                         <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,4,0,0">
                                                             <Run Text="Station: "/>
                                                             <Run Text="{Binding Station}" Foreground="{StaticResource StatBlueBrush}"/>

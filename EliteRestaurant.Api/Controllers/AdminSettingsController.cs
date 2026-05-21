@@ -39,9 +39,9 @@ public sealed class AdminSettingsController(AppDbContext db) : ControllerBase
         row.CustomerMenuNotesText = string.IsNullOrWhiteSpace(request.CustomerMenuNotesText)
             ? null
             : request.CustomerMenuNotesText.Trim();
-        row.StaffLoginPasscode = string.IsNullOrWhiteSpace(request.StaffLoginPasscode)
-            ? "er4124"
-            : request.StaffLoginPasscode.Trim();
+        row.StaffLoginPasscode = (request.StaffLoginPasscode ?? string.Empty).Trim();
+        row.AdminWebSignInId = (request.AdminWebSignInId ?? string.Empty).Trim();
+        row.AdminWebPin = (request.AdminWebPin ?? string.Empty).Trim();
         row.TicketFooterText = request.TicketFooterText?.Trim() ?? string.Empty;
         row.TaxIdLegalInfo = request.TaxIdLegalInfo?.Trim() ?? string.Empty;
         row.DefaultCurrencyDisplayMode = Normalize(request.DefaultCurrencyDisplayMode, "Dual");
@@ -82,6 +82,7 @@ public sealed class AdminSettingsController(AppDbContext db) : ControllerBase
         MergeLogoAssets(request);
         MergeOnlinePromoAssets(request);
         await db.SaveChangesAsync(cancellationToken);
+        AdminWebLoginSeed.EnsureSeeded(db);
 
         // Keep the existing file-based settings as a local fallback for older deployments.
         var settings = SettingsManager.Load();
@@ -96,6 +97,8 @@ public sealed class AdminSettingsController(AppDbContext db) : ControllerBase
         settings.BusinessProfile.CustomerMenuContactIntro = row.CustomerMenuContactIntro;
         settings.BusinessProfile.CustomerMenuNotesText = row.CustomerMenuNotesText;
         settings.BusinessProfile.StaffLoginPasscode = row.StaffLoginPasscode;
+        settings.BusinessProfile.AdminWebSignInId = row.AdminWebSignInId;
+        settings.BusinessProfile.AdminWebPin = row.AdminWebPin;
         settings.BusinessProfile.TicketFooterText = row.TicketFooterText;
         settings.BusinessProfile.TaxIdLegalInfo = row.TaxIdLegalInfo;
         if (!string.IsNullOrWhiteSpace(request.PublicMenuBaseUrl))

@@ -49,12 +49,13 @@ public static class OrderWorkflow
         };
     }
 
-    /// <summary>Incoming kitchen column: Waiting plus tickets still with cashier or awaiting online approval (web KDS parity).</summary>
-    public static bool IsKitchenIncomingColumn(string? status)
-    {
-        var k = KitchenStatusKey(status);
-        return k is "waiting" or "pendingApproval" or "pendingCashier";
-    }
+    /// <summary>Incoming kitchen column (KDS): <c>Waiting</c> only — after cashier release. Excludes pending cashier/approval.</summary>
+    public static bool IsKitchenIncomingColumn(string? status) =>
+        KitchenStatusKey(status) == "waiting";
+
+    /// <summary>Orders visible on kitchen KDS (web + desktop + API when portal is KitchenBar).</summary>
+    public static bool IsKitchenKdsVisibleStatus(string? status) =>
+        IsKitchenQueueStatus(status);
 
     public static bool IsKitchenPreparingColumn(string? status) =>
         KitchenStatusKey(status) == "inKitchen";

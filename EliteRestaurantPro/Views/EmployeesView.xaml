@@ -265,6 +265,9 @@
                                                                                     <DataTrigger Binding="{Binding BadgeVariant}" Value="Evening">
                                                                                         <Setter Property="Background" Value="#152196F3"/>
                                                                                     </DataTrigger>
+                                                                                    <DataTrigger Binding="{Binding BadgeVariant}" Value="FullDay">
+                                                                                        <Setter Property="Background" Value="#1A34A853"/>
+                                                                                    </DataTrigger>
                                                                                 </Style.Triggers>
                                                                             </Style>
                                                                         </Border.Style>
@@ -281,6 +284,9 @@
                                                                                         </DataTrigger>
                                                                                         <DataTrigger Binding="{Binding BadgeVariant}" Value="Evening">
                                                                                             <Setter Property="Foreground" Value="{StaticResource StatBlueBrush}"/>
+                                                                                        </DataTrigger>
+                                                                                        <DataTrigger Binding="{Binding BadgeVariant}" Value="FullDay">
+                                                                                            <Setter Property="Foreground" Value="#FF34A853"/>
                                                                                         </DataTrigger>
                                                                                     </Style.Triggers>
                                                                                 </Style>

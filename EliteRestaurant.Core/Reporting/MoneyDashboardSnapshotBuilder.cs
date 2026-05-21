@@ -147,7 +147,7 @@ public static class MoneyDashboardSnapshotBuilder
             TodayNetProfitText = CurrencyHelper.FormatDualCurrency(
                 todayRevenueUsd - todayExpensesUsd,
                 todayRevenueFc - todayExpensesFc),
-            TodayNetProfitColor = todayRevenueUsd - todayExpensesUsd >= 0m && todayRevenueFc - todayExpensesFc >= 0m
+            TodayNetProfitColor = todayRevenueUsd - todayExpensesUsd >= 0m
                 ? "#2ECC71"
                 : "#DC143C",
             SelectedPeriodLabel = period.Label,
@@ -157,7 +157,7 @@ public static class MoneyDashboardSnapshotBuilder
             TotalRevenueText = CurrencyHelper.FormatDualCurrency(totalRevenueUsd, totalRevenueFc),
             TotalExpensesText = CurrencyHelper.FormatDualCurrency(totalExpensesUsd, totalExpensesFc),
             NetProfitText = CurrencyHelper.FormatDualCurrency(netUsd, netFc),
-            NetProfitColor = netUsd >= 0m && netFc >= 0m ? "#2ECC71" : "#DC143C",
+            NetProfitColor = netUsd >= 0m ? "#2ECC71" : "#DC143C",
             SalesSummaryText = CurrencyHelper.FormatDualCurrency(salesUsd, salesFc),
             TipsSummaryText = CurrencyHelper.FormatDualCurrency(tipsUsd, tipsFc),
             PayrollSummaryText = CurrencyHelper.FormatDualCurrency(payrollUsd, payrollFc),

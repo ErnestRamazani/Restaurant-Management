@@ -46,4 +46,9 @@ public class OrderEntry
 
     /// <summary>KDS origin badge (DELIVERY / TO GO / PLATED).</summary>
     public string FulfillmentHeadline { get; set; } = string.Empty;
+
+    /// <summary>e.g. "1 new item · 3 already prepared" when ticket returned after partial service.</summary>
+    public string KitchenWorkSummary { get; set; } = string.Empty;
+
+    public bool ShowKitchenWorkSummary => !string.IsNullOrWhiteSpace(KitchenWorkSummary);
 }

@@ -1,9 +1,12 @@
+using EliteRestaurant.Api.Branding;
 using EliteRestaurant.Api.Dtos;
 using EliteRestaurant.Api.Hubs;
+using EliteRestaurant.Api.Orders;
 using EliteRestaurant.Api.Security;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Orders;
+using EliteRestaurant.Core.Tickets;
 using EliteRestaurant.Core.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -18,7 +21,8 @@ namespace EliteRestaurant.Api.Controllers;
 public sealed class CashierPortalController(
     TabletAuthService authService,
     AppDbContext db,
-    IHubContext<OrderHub> orderHub) : ControllerBase
+    IHubContext<OrderHub> orderHub,
+    IWebHostEnvironment env) : ControllerBase
 {
     private readonly AdminOrderOperationsService _ops = new(db);
 
@@ -87,12 +91,14 @@ public sealed class CashierPortalController(
             return BadRequest(new { message = result.ErrorMessage ?? "Release failed." });
 
         await orderHub.Clients.Group("Kitchen").SendAsync("KitchenQueueChanged", new { reason = "cashier-release", orderId });
+        await OrderHubBroadcasts.NotifyCashierOrderBoardChangedAsync(orderHub, db, orderId, "released-to-kitchen");
+        await OrderHubBroadcasts.NotifyReceptionDeliveryPickupChangedAsync(orderHub, db, orderId, "released-to-kitchen");
 
         return Ok(new { ok = true, orderCode = result.ReleasedOrderCode });
     }
 
     [HttpPost("orders/pending/{orderId:int}/cancel")]
-    public ActionResult CancelPending(int orderId)
+    public async Task<ActionResult> CancelPending(int orderId)
     {
         var session = RequireCashierSession();
         if (session is null)
@@ -101,6 +107,8 @@ public sealed class CashierPortalController(
         var err = _ops.TryCancelPendingCashier(orderId);
         if (err is not null)
             return BadRequest(new { message = err });
+
+        await OrderHubBroadcasts.NotifyCashierOrderBoardChangedAsync(orderHub, db, orderId, "pending-cancelled");
 
         return Ok(new { ok = true });
     }
@@ -174,53 +182,57 @@ public sealed class CashierPortalController(
         if (order is null)
             return NotFound(new { message = "Order not found." });
 
-        var lineSubtotal = order.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
-        var merchTotals = OrderTotalsHelper.ComputeTotals(lineSubtotal, order.DiscountMode, order.DiscountValue);
-        var totals = OrderTotalsHelper.ComputeTotalsWithDeliveryFee(
-            lineSubtotal,
-            order.DiscountMode,
-            order.DiscountValue,
-            order.DeliveryFeeUsd);
-        var lines = order.Items.Select(i => new CashierOrderLineDto(
-            i.ProductId,
-            i.Product?.Name ?? "Unknown",
-            i.Product?.Price ?? 0m,
-            i.Quantity,
-            (i.Product?.Price ?? 0m) * i.Quantity)).ToList();
-
-        var dto = new CashierOrderDetailDto(
-            order.Id,
-            string.IsNullOrWhiteSpace(order.UniqueId) ? $"#{order.Id:000}" : order.UniqueId,
-            OrderRecordUiLabels.TableCaption(order),
-            OrderRecordUiLabels.ServerCaption(order),
-            order.Status,
-            order.CustomerNotes ?? string.Empty,
-            order.AllergyNotes ?? string.Empty,
-            order.DiscountMode ?? "None",
-            order.DiscountValue,
-            lineSubtotal,
-            merchTotals.Tax,
-            merchTotals.Service,
-            merchTotals.DiscountApplied,
-            totals.GrandTotal,
-            CurrencyHelper.ConvertUsdToFc(totals.GrandTotal),
-            lines,
-            string.IsNullOrWhiteSpace(order.OrderOrigin) ? OrderOrigin.InStore : order.OrderOrigin,
-            order.OrderSource ?? "WalkIn",
-            order.DeliveryFeeUsd,
-            string.IsNullOrWhiteSpace(order.PaymentTiming) ? OrderPaymentTiming.Immediate : order.PaymentTiming,
-            merchTotals.TaxableSubtotal,
-            merchTotals.GrandTotal);
-
-        return Ok(dto);
+        return Ok(CashierOrderDetailBuilder.Build(order));
     }
 
     /// <summary>Alias for the full invoice breakdown (same payload as <see cref="GetOrderDetail"/>).</summary>
     [HttpGet("orders/{orderId:int}/invoice")]
     public ActionResult<CashierOrderDetailDto> GetOrderInvoice(int orderId) => GetOrderDetail(orderId);
 
+    /// <summary>
+    /// Thermal receipt PDF — same QuestPDF layout as Elite Pro (client ticket before payment, payment receipt after).
+    /// </summary>
+    [HttpGet("orders/{orderId:int}/ticket.pdf")]
+    public ActionResult GetOrderTicketPdf(int orderId, [FromQuery] string? variant = null)
+    {
+        var session = RequireCashierSession();
+        if (session is null)
+            return Unauthorized(new { message = "Missing/invalid token or non-cashier role." });
+
+        var order = db.Orders
+            .AsNoTracking()
+            .Include(o => o.Items)
+            .ThenInclude(i => i.Product)
+            .Include(o => o.Table)
+            .Include(o => o.Server)
+            .SingleOrDefault(o => o.Id == orderId);
+        if (order is null)
+            return NotFound(new { message = "Order not found." });
+        if (order.Items.Count == 0)
+            return BadRequest(new { message = "Order has no line items." });
+
+        var usePayment = variant switch
+        {
+            "payment" or "receipt" => true,
+            "client" or "ticket" => false,
+            _ => OrderTicketPdfBuilder.UsePaymentReceiptVariant(order)
+        };
+
+        var settings = SettingsManager.Load();
+        var headerBytes = TicketBrandingImageResolver.ResolveHeaderLogoBytes(settings, db, env);
+        var model = OrderTicketPdfBuilder.Build(order, settings, headerBytes);
+        var pdfBytes = usePayment
+            ? AdminTicketPdfExportService.GeneratePaymentReceiptPdfBytes(model)
+            : AdminTicketPdfExportService.GenerateClientTicketPdfBytes(model);
+
+        var code = AdminTicketPdfExportService.SanitizeFileName(
+            string.IsNullOrWhiteSpace(order.UniqueId) ? $"order-{order.Id}" : order.UniqueId);
+        var suffix = usePayment ? "payment" : "client";
+        return File(pdfBytes, "application/pdf", $"{code}-{suffix}.pdf");
+    }
+
     [HttpPost("orders/{orderId:int}/complete")]
-    public ActionResult CompleteOrder(int orderId, [FromBody] CashierCompleteOrderRequest request)
+    public async Task<ActionResult> CompleteOrder(int orderId, [FromBody] CashierCompleteOrderRequest request)
     {
         var session = RequireCashierSession();
         if (session is null)
@@ -253,6 +265,8 @@ public sealed class CashierPortalController(
         {
             return BadRequest(new { message = ex.Message });
         }
+
+        await OrderHubBroadcasts.NotifyReceptionDeliveryPickupChangedAsync(orderHub, db, orderId, "order-completed");
 
         return Ok(new { ok = true });
     }

@@ -190,7 +190,10 @@ public sealed class AdminOrderOperationsService(AppDbContext db)
     }
 
     /// <summary>Kitchen marks <c>In Kitchen</c> → <c>Ready</c>. Idempotent: no broadcast if already <c>Ready</c> or a concurrent request won the transition.</summary>
-    public KitchenReadyResult TryMarkKitchenReadyForCashier(int orderId)
+    public KitchenReadyResult TryMarkKitchenReadyForCashier(int orderId, string? prepStationPortal = null) =>
+        TryMarkKitchenReadyForCashierCore(orderId, prepStationPortal);
+
+    private KitchenReadyResult TryMarkKitchenReadyForCashierCore(int orderId, string? prepStationPortal)
     {
         var order = _db.Orders.AsNoTracking().SingleOrDefault(o => o.Id == orderId);
         if (order is null)
@@ -202,16 +205,16 @@ public sealed class AdminOrderOperationsService(AppDbContext db)
         if (!string.Equals(order.Status, "In Kitchen", StringComparison.OrdinalIgnoreCase))
             return new KitchenReadyResult(false, "Only orders being prepared can be marked ready.", true, null);
 
-        return TryAtomicInKitchenToReady(orderId);
+        return TryMarkPrepStationReady(orderId, prepStationPortal);
     }
 
     /// <summary>
     /// Returns <c>null</c> when the order was advanced; empty string when the order no longer exists (silent no-op);
     /// otherwise an error message for the user.
     /// </summary>
-    public string? TryAdvanceOrder(int orderId)
+    public string? TryAdvanceOrder(int orderId, string? prepStationPortal = null)
     {
-        var o = TryAdvanceOrderWithOutcome(orderId);
+        var o = TryAdvanceOrderWithOutcome(orderId, prepStationPortal);
         if (o.Missing)
             return string.Empty;
         if (o.Error is not null)
@@ -220,9 +223,12 @@ public sealed class AdminOrderOperationsService(AppDbContext db)
     }
 
     /// <summary>Same semantics as <see cref="TryAdvanceOrder"/> with kitchen→ready payload for SignalR.</summary>
-    public AdvanceOrderOutcome TryAdvanceOrderWithOutcome(int orderId)
+    public AdvanceOrderOutcome TryAdvanceOrderWithOutcome(int orderId, string? prepStationPortal = null)
     {
-        var order = _db.Orders.SingleOrDefault(o => o.Id == orderId);
+        var order = _db.Orders
+            .Include(o => o.Items)
+            .ThenInclude(i => i.Product)
+            .SingleOrDefault(o => o.Id == orderId);
         if (order is null)
             return new AdvanceOrderOutcome(true, string.Empty, false, null);
 
@@ -231,7 +237,7 @@ public sealed class AdminOrderOperationsService(AppDbContext db)
 
         if (string.Equals(order.Status, "In Kitchen", StringComparison.OrdinalIgnoreCase))
         {
-            var ready = TryAtomicInKitchenToReady(orderId);
+            var ready = TryMarkPrepStationReady(orderId, prepStationPortal);
             if (!ready.Ok)
                 return new AdvanceOrderOutcome(false, ready.ErrorMessage, false, null);
             return new AdvanceOrderOutcome(
@@ -239,6 +245,13 @@ public sealed class AdminOrderOperationsService(AppDbContext db)
                 null,
                 !ready.SuppressBroadcast && ready.Notification is not null,
                 ready.SuppressBroadcast ? null : ready.Notification);
+        }
+
+        if (KitchenStationPrep.AppliesStationScope(prepStationPortal))
+        {
+            var items = order.Items?.ToList() ?? [];
+            if (KitchenStationPrep.GetPortalLines(prepStationPortal, items).Count == 0)
+                return new AdvanceOrderOutcome(false, "This ticket has no items for your station.", false, null);
         }
 
         return DatabaseResilientTransaction.Execute(_db, () =>
@@ -267,14 +280,109 @@ public sealed class AdminOrderOperationsService(AppDbContext db)
         });
     }
 
+    /// <summary>
+    /// Marks portal lines prepared; moves order to <c>Ready</c> only when every line on the ticket is prepared.
+    /// Admin / legacy callers (no portal) stamp all lines and finalize in one step.
+    /// </summary>
+    private KitchenReadyResult TryMarkPrepStationReady(int orderId, string? prepStationPortal)
+    {
+        var order = _db.Orders
+            .Include(o => o.Items)
+            .ThenInclude(i => i.Product)
+            .SingleOrDefault(o => o.Id == orderId);
+        if (order is null)
+            return new KitchenReadyResult(false, "Order not found.", true, null);
+
+        if (string.Equals(order.Status, "Ready", StringComparison.OrdinalIgnoreCase))
+            return new KitchenReadyResult(true, null, true, null);
+
+        if (!string.Equals(order.Status, "In Kitchen", StringComparison.OrdinalIgnoreCase))
+            return new KitchenReadyResult(false, "Only orders being prepared can be marked ready.", true, null);
+
+        var items = order.Items?.ToList() ?? [];
+        if (KitchenStationPrep.AppliesStationScope(prepStationPortal))
+        {
+            if (KitchenStationPrep.GetPortalLines(prepStationPortal, items).Count == 0)
+                return new KitchenReadyResult(false, "This ticket has no items for your station.", true, null);
+
+            if (KitchenStationPrep.AllPortalLinesPrepared(prepStationPortal, items))
+            {
+                if (KitchenStationPrep.AllOrderLinesPrepared(items))
+                    return TryAtomicInKitchenToReady(orderId, stampRemainingLines: false);
+                return new KitchenReadyResult(true, null, true, null);
+            }
+        }
+
+        if (IsInMemoryDatabase(_db))
+            return TryMarkPrepStationReadyInMemory(orderId, prepStationPortal);
+
+        return DatabaseResilientTransaction.Execute(_db, () =>
+        {
+            using var tx = _db.Database.BeginTransaction();
+            try
+            {
+                var tracked = _db.Orders
+                    .Include(o => o.Items)
+                    .ThenInclude(i => i.Product)
+                    .Single(o => o.Id == orderId);
+
+                var trackedItems = tracked.Items?.ToList() ?? [];
+                KitchenStationPrep.MarkPortalUnpreparedLinesPrepared(prepStationPortal, trackedItems);
+                _db.SaveChanges();
+
+                if (!KitchenStationPrep.AllOrderLinesPrepared(trackedItems))
+                {
+                    DataReconciler.ReconcileTableStatusesWithOrders(_db);
+                    _db.SaveChanges();
+                    tx.Commit();
+                    _db.ChangeTracker.Clear();
+                    return new KitchenReadyResult(true, null, true, null);
+                }
+
+                tx.Commit();
+            }
+            catch
+            {
+                tx.Rollback();
+                throw;
+            }
+
+            _db.ChangeTracker.Clear();
+            return TryAtomicInKitchenToReady(orderId, stampRemainingLines: false);
+        });
+    }
+
+    private KitchenReadyResult TryMarkPrepStationReadyInMemory(int orderId, string? prepStationPortal)
+    {
+        var tracked = _db.Orders
+            .Include(o => o.Items)
+            .ThenInclude(i => i.Product)
+            .Single(o => o.Id == orderId);
+
+        var trackedItems = tracked.Items?.ToList() ?? [];
+        KitchenStationPrep.MarkPortalUnpreparedLinesPrepared(prepStationPortal, trackedItems);
+        DataReconciler.ReconcileTableStatusesWithOrders(_db);
+        _db.SaveChanges();
+
+        if (!KitchenStationPrep.AllOrderLinesPrepared(trackedItems))
+        {
+            _db.ChangeTracker.Clear();
+            return new KitchenReadyResult(true, null, true, null);
+        }
+
+        _db.ChangeTracker.Clear();
+        var fulfill = CustomerFulfillmentStatuses.ResolveCodeForOrder(tracked.OrderSource);
+        return TryInKitchenToReadyForInMemory(orderId, fulfill, stampRemainingLines: false);
+    }
+
     /// <summary>Single row update — only one caller gets a broadcast when racing (SQL providers). In-memory uses a tracked update for tests.</summary>
-    private KitchenReadyResult TryAtomicInKitchenToReady(int orderId)
+    private KitchenReadyResult TryAtomicInKitchenToReady(int orderId, bool stampRemainingLines = true)
     {
         var src = _db.Orders.AsNoTracking().Where(o => o.Id == orderId).Select(o => o.OrderSource).FirstOrDefault();
         var fulfill = CustomerFulfillmentStatuses.ResolveCodeForOrder(src);
 
         if (IsInMemoryDatabase(_db))
-            return TryInKitchenToReadyForInMemory(orderId, fulfill);
+            return TryInKitchenToReadyForInMemory(orderId, fulfill, stampRemainingLines);
 
         return DatabaseResilientTransaction.Execute(_db, () =>
         {
@@ -304,6 +412,8 @@ public sealed class AdminOrderOperationsService(AppDbContext db)
                     return new KitchenReadyResult(false, "Order changed — refresh and try again.", true, null);
                 }
 
+                if (stampRemainingLines)
+                    StampKitchenPreparedLines(orderId);
                 _db.ChangeTracker.Clear();
                 DataReconciler.ReconcileTableStatusesWithOrders(_db);
                 _db.SaveChanges();
@@ -321,9 +431,11 @@ public sealed class AdminOrderOperationsService(AppDbContext db)
         });
     }
 
-    private KitchenReadyResult TryInKitchenToReadyForInMemory(int orderId, string fulfill)
+    private KitchenReadyResult TryInKitchenToReadyForInMemory(int orderId, string fulfill, bool stampRemainingLines = true)
     {
-        var order = _db.Orders.SingleOrDefault(o => o.Id == orderId);
+        var order = _db.Orders
+            .Include(o => o.Items)
+            .SingleOrDefault(o => o.Id == orderId);
         if (order is null)
             return new KitchenReadyResult(false, "Order not found.", true, null);
 
@@ -335,11 +447,20 @@ public sealed class AdminOrderOperationsService(AppDbContext db)
 
         order.Status = "Ready";
         order.CustomerFulfillmentStatus = fulfill;
+        if (stampRemainingLines)
+            KitchenLineVisibility.MarkUnpreparedLinesPrepared(order.Items);
         DataReconciler.ReconcileTableStatusesWithOrders(_db);
         _db.SaveChanges();
         _db.ChangeTracker.Clear();
         var fresh = _db.Orders.AsNoTracking().Single(o => o.Id == orderId);
         return new KitchenReadyResult(true, null, false, BuildOrderReadyNotification(fresh));
+    }
+
+    private void StampKitchenPreparedLines(int orderId)
+    {
+        var items = _db.OrderItems.Where(i => i.OrderRecordId == orderId && i.KitchenPreparedAt == null).ToList();
+        KitchenLineVisibility.MarkUnpreparedLinesPrepared(items);
+        _db.SaveChanges();
     }
 
     private static bool IsInMemoryDatabase(AppDbContext db) =>

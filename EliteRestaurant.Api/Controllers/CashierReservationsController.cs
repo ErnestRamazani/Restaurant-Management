@@ -1,12 +1,15 @@
+using EliteRestaurant.Api.Branding;
 using EliteRestaurant.Api.Dtos;
 using EliteRestaurant.Api.Security;
 using EliteRestaurant.Api.Services;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Reservations;
+using EliteRestaurant.Core.Staff;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace EliteRestaurant.Api.Controllers;
 
@@ -18,8 +21,124 @@ public sealed class CashierReservationsController(
     AppDbContext db,
     ReservationSchedulingService scheduling,
     ReservationFloorRealtimePublisher realtime,
-    FloorSnapshotBuilder snapshotBuilder) : ControllerBase
+    FloorSnapshotBuilder snapshotBuilder,
+    IOptions<ReservationSchedulingOptions> schedulingOptions) : ControllerBase
 {
+    [HttpGet("scheduling")]
+    public ActionResult<CashierReservationSchedulingDto> GetScheduling()
+    {
+        if (RequireCashierOrAdminSession() is null)
+            return Unauthorized(new { message = "Missing/invalid token or non-cashier role." });
+
+        var (leadDays, maxMonthsAhead) = PublicMenuReservationSettings.Resolve(db);
+        var opt = schedulingOptions.Value;
+        return Ok(new CashierReservationSchedulingDto(
+            leadDays,
+            maxMonthsAhead,
+            opt.BufferMinutes,
+            opt.DefaultDurationMinutes,
+            opt.SuggestionSlotStepMinutes,
+            opt.SuggestionHorizonDays));
+    }
+
+    [HttpPost("engagements")]
+    public async Task<ActionResult<CashierCreateWalkInEngagementResponse>> CreateWalkIn(
+        [FromBody] CashierCreateWalkInEngagementRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (RequireCashierOrAdminSession() is null)
+            return Unauthorized(new { message = "Missing/invalid token or non-cashier role." });
+
+        var guestName = (request.GuestName ?? string.Empty).Trim();
+        var guestPhone = (request.GuestPhone ?? string.Empty).Trim();
+        if (guestName.Length is < 1 or > 80)
+            return BadRequest(new { message = "Guest name is required (1–80 characters)." });
+        if (guestPhone.Length is < 5 or > 40)
+            return BadRequest(new { message = "Phone is required (5–40 characters)." });
+        var guestEmail = (request.GuestEmail ?? string.Empty).Trim();
+        if (guestEmail.Length > 120)
+            return BadRequest(new { message = "Email must be 120 characters or fewer." });
+        if (request.PartySize < 1 || request.PartySize > 99)
+            return BadRequest(new { message = "Party size must be between 1 and 99." });
+
+        if (TryGetWalkInScheduleError(request.PlannedStartUtc, out var scheduleErr))
+            return BadRequest(new { message = scheduleErr });
+
+        var end = request.PlannedEndUtc ?? scheduling.DefaultEndUtc(request.PlannedStartUtc);
+        if (end <= request.PlannedStartUtc)
+            return BadRequest(new { message = "End time must be after start time." });
+
+        PlacementUnit? placement = null;
+        if (request.PlacementUnitId is > 0)
+        {
+            placement = await db.PlacementUnits.FirstOrDefaultAsync(p => p.Id == request.PlacementUnitId, cancellationToken);
+            if (placement is null)
+                return NotFound(new { message = "Table placement not found." });
+        }
+        else if (request.TableId is > 0)
+        {
+            placement = await db.PlacementUnits
+                .Where(p => p.TableId == request.TableId)
+                .OrderBy(p => p.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (placement is null)
+                return NotFound(new { message = "No floor placement for that table." });
+        }
+
+        if (placement is not null)
+        {
+            if (request.PartySize < placement.MinPartyCapacity || request.PartySize > placement.MaxPartyCapacity)
+                return BadRequest(new { message = "Party size is out of range for this table." });
+
+            if (!string.Equals(placement.Status, PlacementUnitStatuses.Available, StringComparison.OrdinalIgnoreCase))
+                return Conflict(new { message = "This table is not available for new bookings right now." });
+
+            var conflict = await scheduling.DetectConflictAsync(
+                placement.Id,
+                request.PlannedStartUtc,
+                end,
+                excludeEngagementId: null,
+                cancellationToken);
+            if (conflict.HasConflict)
+            {
+                return Conflict(new
+                {
+                    message = "That time conflicts with another reservation on this or a linked table.",
+                    conflictingEngagementIds = conflict.ConflictingEngagementIds
+                });
+            }
+        }
+
+        var now = DateTime.UtcNow;
+        var engagement = new ReservationEngagement
+        {
+            PlacementUnitId = placement?.Id ?? 0,
+            TableId = placement?.TableId ?? (request.TableId ?? 0),
+            PlannedStartUtc = request.PlannedStartUtc,
+            PlannedEndUtc = end,
+            GuestName = guestName,
+            GuestPhone = guestPhone,
+            GuestEmail = guestEmail,
+            PartySize = request.PartySize,
+            UserNotes = (request.UserNotes ?? string.Empty).Trim(),
+            Status = ReservationEngagementStatuses.Scheduled,
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
+        };
+
+        if (placement is not null)
+            placement.Status = PlacementUnitStatuses.Reserved;
+
+        db.ReservationEngagements.Add(engagement);
+        await db.SaveChangesAsync(cancellationToken);
+        await PublishFloorAsync(cancellationToken);
+
+        return Ok(new CashierCreateWalkInEngagementResponse(
+            engagement.Id,
+            engagement.PlannedStartUtc,
+            engagement.PlannedEndUtc));
+    }
+
     [HttpGet("engagements")]
     public async Task<ActionResult<IReadOnlyList<CashierEngagementListRow>>> ListEngagements(CancellationToken cancellationToken)
     {
@@ -221,15 +340,48 @@ public sealed class CashierReservationsController(
         }
     }
 
+    /// <summary>Walk-in desk bookings: must be in the future, within max horizon; no online lead-time delay.</summary>
+    private bool TryGetWalkInScheduleError(DateTime plannedStartUtc, out string? message)
+    {
+        message = null;
+        var startUtc = plannedStartUtc.Kind switch
+        {
+            DateTimeKind.Utc => plannedStartUtc,
+            DateTimeKind.Local => plannedStartUtc.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(plannedStartUtc, DateTimeKind.Utc)
+        };
+
+        if (startUtc <= DateTime.UtcNow)
+        {
+            message = "Reservation time must be in the future.";
+            return true;
+        }
+
+        var startDay = startUtc.Date;
+        var todayUtc = DateTime.UtcNow.Date;
+        if (startDay < todayUtc)
+        {
+            message = "You cannot reserve a past date.";
+            return true;
+        }
+
+        var (_, maxMonthsAhead) = PublicMenuReservationSettings.Resolve(db);
+        var latestAllowed = todayUtc.AddMonths(maxMonthsAhead);
+        if (startDay > latestAllowed)
+        {
+            message = $"Reservations may be booked up to {maxMonthsAhead} month(s) ahead.";
+            return true;
+        }
+
+        return false;
+    }
+
     private AuthenticatedStaffSession? RequireCashierOrAdminSession()
     {
         var token = Request.ReadBearerToken();
         var session = authService.Validate(token);
         if (session is null)
             return null;
-        return session.Role.Equals("Cashier", StringComparison.OrdinalIgnoreCase)
-               || session.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase)
-            ? session
-            : null;
+        return StaffPortalAuthentication.IsReceptionRole(session.Role) ? session : null;
     }
 }

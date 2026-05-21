@@ -4,7 +4,6 @@ using EliteRestaurant.Contracts.Auth;
 using EliteRestaurant.Core.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace EliteRestaurant.Api.Controllers;
@@ -16,7 +15,6 @@ public sealed class AuthController(
     TabletAuthService authService,
     JwtTokenService jwtTokenService,
     AppDbContext db,
-    IHostEnvironment environment,
     IOptions<AuthDevOptions> authDevOptions) : ControllerBase
 {
     [HttpGet("session")]
@@ -40,7 +38,7 @@ public sealed class AuthController(
     [HttpPost("login")]
     public ActionResult<CloudLoginResponse> Login([FromBody] CloudLoginRequest request)
     {
-        if (AdminDevLoginBypass.TryCreateSession(request, db, environment, authDevOptions) is { } devSession)
+        if (AdminDevLoginBypass.TryCreateSession(request, db, authDevOptions) is { } devSession)
         {
             var devJwt = jwtTokenService.CreateToken(devSession, out var devExpiresAtUtc);
             return Ok(new CloudLoginResponse(

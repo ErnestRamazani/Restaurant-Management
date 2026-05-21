@@ -34,7 +34,7 @@
       background: var(--navy);
       color: #e8eef4;
     }
-    .layout { display: grid; grid-template-columns: 220px 1fr; grid-template-rows: 1fr; min-height: 100vh; }
+    .layout { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; height: 100vh; overflow: hidden; }
     .sidebar {
       border-right: 1px solid #1e293b;
       background: var(--navy);
@@ -42,6 +42,8 @@
       display: flex;
       flex-direction: column;
       gap: 8px;
+      min-height: 0;
+      overflow-y: auto;
     }
     .brand { font-weight: 700; font-size: 15px; letter-spacing: 0.04em; color: var(--amber); }
     .brand-sub { font-size: 11px; color: #94a3b8; line-height: 1.4; margin-top: 6px; }
@@ -66,6 +68,7 @@
     #app .main-area {
       padding: 16px 18px 24px;
       min-height: 0;
+      height: 100%;
       align-self: stretch;
       background: linear-gradient(165deg, var(--navy) 0%, #0d1219 45%, #0a0d12 100%);
       color: var(--text-dark);
@@ -73,6 +76,7 @@
       display: flex;
       flex-direction: column;
       gap: 14px;
+      overflow: hidden;
     }
     #loginWrap.main-area {
       min-height: 100vh;
@@ -88,8 +92,10 @@
       padding: 22px; color: var(--text-dark);
       box-shadow: 0 24px 60px rgba(0,0,0,0.45);
     }
-    #loginWrap h1 { margin: 0 0 8px; font-size: 1.35rem; color: var(--text-dark); }
-    #loginWrap .lead { color: var(--text-muted); font-size: 14px; margin: 0 0 18px; line-height: 1.5; }
+    #loginWrap h1 { margin: 0 0 12px; font-size: 1.35rem; color: var(--text-dark); }
+    #loginWrap .login-stack { display: flex; flex-direction: column; gap: 14px; margin-top: 4px; }
+    #loginWrap #btnLogin { margin-top: 18px; }
+    #loginWrap .login-stack .login-field { display: flex; flex-direction: column; gap: 0; }
     label.lbl { display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 6px; }
     input.inp, select.sel, textarea.txa {
       width: 100%; min-height: 44px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
@@ -129,25 +135,25 @@
     .card-panel h3 { margin: 0 0 10px; font-size: 0.95rem; font-weight: 600; color: #cbd5e1; }
     .row-flex { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
     .grow { flex: 1; min-width: 140px; }
-    .take-split {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 12px; flex: 1; min-height: 0; align-items: stretch;
-    }
     @media (max-width: 1000px) {
-      .take-split { grid-template-columns: 1fr; }
-      .layout { grid-template-columns: 1fr; }
+      .layout { grid-template-columns: 1fr; height: auto; min-height: 100vh; overflow: visible; }
       .sidebar { flex-direction: row; flex-wrap: wrap; border-right: none; border-bottom: 1px solid #1e293b; }
       .who { width: 100%; }
+      #app .main-area { height: auto; overflow: visible; }
     }
     .list-scroll {
       flex: 1; overflow-y: auto; min-height: 0;
       border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--navy-elev);
     }
-    .take-split .list-scroll { min-height: 200px; }
+    #viewOrders .orders-split {
+      flex: 1;
+      min-height: 0;
+    }
     .orders-split {
       flex: 1;
       min-height: 0;
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr 1fr 1fr;
       gap: 12px;
       align-items: stretch;
     }
@@ -418,21 +424,37 @@
       height: 38px;
       box-sizing: border-box;
     }
-    @media (max-width: 900px) { .orders-split { grid-template-columns: 1fr; } }
+    .nav-badge {
+      display: inline-block; min-width: 18px; padding: 0 6px; margin-left: 6px;
+      border-radius: 999px; font-size: 10px; font-weight: 700; line-height: 18px;
+      background: rgba(232, 168, 56, 0.35); color: #fde68a; vertical-align: middle;
+    }
+    .nav-badge.hidden { display: none !important; }
+    @media (max-width: 1100px) { .orders-split { grid-template-columns: 1fr; } }
+    #viewTableMenu .table-menu-fill,
+    #viewReservations .res-list-fill {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    #viewTableMenu #tableMenuList,
+    #viewReservations #reservationsList {
+      flex: 1;
+      min-height: 0;
+      max-height: none;
+    }
     .mono { font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
     .menu-section { margin-bottom: 18px; }
     .menu-section h3 { margin: 0 0 10px; font-size: 0.85rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em; }
     .menu-section h4 { margin: 12px 0 8px; font-size: 0.8rem; color: var(--text-muted); }
     .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
-    button.menu-card {
+    .menu-card {
       background: var(--navy-elev); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px;
       font-size: 13px; line-height: 1.4;
       display: grid; grid-template-columns: 76px 1fr; gap: 12px; align-items: start;
-      text-align: left; cursor: pointer; font-family: inherit; color: inherit;
-      transition: border-color 0.15s, transform 0.12s, box-shadow 0.12s;
+      text-align: left; cursor: default; font-family: inherit; color: inherit;
     }
-    button.menu-card:hover { border-color: rgba(232, 168, 56, 0.45); transform: translateY(-2px); box-shadow: 0 10px 28px rgba(0,0,0,0.22); }
-    button.menu-card:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
     .menu-card-text { min-width: 0; }
     .menu-thumb {
       width: 76px; height: 76px; border-radius: 10px; overflow: hidden;
@@ -447,7 +469,9 @@
     .menu-thumb-ph.hidden { display: none !important; }
     .menu-card .title { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
     .menu-card .price { color: var(--amber-dim); font-weight: 600; margin-bottom: 8px; }
-    .menu-card .ing { font-size: 12px; color: var(--text-muted); }
+    .menu-card .menu-card-desc { margin-bottom: 8px; font-size: 12px; }
+    .menu-card .ing, .menu-card .comp { font-size: 12px; color: var(--text-muted); }
+    .menu-card .comp { margin-top: 8px; }
     .modal-backdrop {
       position: fixed; inset: 0; background: rgba(15,24,35,0.45); display: flex; align-items: center; justify-content: center;
       padding: 16px; z-index: 200;
@@ -458,24 +482,389 @@
       padding: 20px 22px; box-shadow: 0 28px 70px rgba(0,0,0,0.55); max-height: 90vh; overflow-y: auto;
     }
     .modal-card h3 { margin: 0 0 12px; }
-    .modal-card pre.detail-pre {
-      white-space: pre-wrap; font-size: 12px; background: var(--navy-elev); border: 1px solid var(--border);
-      border-radius: var(--radius-sm); padding: 12px; max-height: 320px; overflow: auto; margin: 0 0 12px;
+    /* Order detail — premium receipt-style modal */
+    .modal-card.order-detail-modal {
+      max-width: min(520px, 92vw);
+      width: 100%;
+      padding: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      max-height: min(90vh, 720px);
+      border: 1px solid rgba(232, 168, 56, 0.16);
+      background: linear-gradient(165deg, #151b27 0%, #10151e 100%);
+      box-shadow: 0 28px 70px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.04);
     }
+    .od-modal-header {
+      flex-shrink: 0;
+      padding: 20px 22px 16px;
+      background: radial-gradient(100% 80% at 12% 0%, rgba(232, 168, 56, 0.14) 0%, transparent 52%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 100%);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .od-modal-header-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+    }
+    .od-modal-label {
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .od-modal-code {
+      font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #f8fafc;
+      line-height: 1.2;
+      word-break: break-word;
+    }
+    .od-status-pill {
+      flex-shrink: 0;
+      margin-top: 2px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #e2e8f0;
+      background: rgba(255, 255, 255, 0.05);
+      max-width: 160px;
+      text-align: center;
+      line-height: 1.25;
+    }
+    .od-status-pill--pending { color: #fde68a; background: rgba(232, 168, 56, 0.14); border-color: rgba(232, 168, 56, 0.35); }
+    .od-status-pill--wait { color: #bae6fd; background: rgba(56, 189, 248, 0.12); border-color: rgba(56, 189, 248, 0.3); }
+    .od-status-pill--kitchen { color: #fcd34d; background: rgba(251, 191, 36, 0.1); border-color: rgba(251, 191, 36, 0.28); }
+    .od-status-pill--ready { color: #6ee7b7; background: rgba(45, 212, 191, 0.12); border-color: rgba(45, 212, 191, 0.32); }
+    .od-status-pill--served { color: #c4b5fd; background: rgba(167, 139, 250, 0.12); border-color: rgba(167, 139, 250, 0.3); }
+    .od-modal-body {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 16px 22px 10px;
+      font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+      -webkit-overflow-scrolling: touch;
+    }
+    .od-section {
+      margin-bottom: 18px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .od-section:last-of-type {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+    .od-section-title {
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin: 0 0 10px;
+    }
+    .od-meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 14px;
+    }
+    @media (max-width: 400px) {
+      .od-meta-grid { grid-template-columns: 1fr; }
+    }
+    .od-meta-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--border);
+    }
+    .od-meta-k {
+      font-size: 0.65rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .od-meta-v {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: #e2e8f0;
+      word-break: break-word;
+    }
+    .od-items-table {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      background: rgba(0, 0, 0, 0.18);
+    }
+    .od-items-head,
+    .od-line-row {
+      display: grid;
+      grid-template-columns: 2.25rem minmax(0, 1fr) minmax(4.5rem, auto) minmax(4.5rem, auto);
+      gap: 8px 10px;
+      align-items: center;
+      padding: 8px 12px;
+      font-size: 0.8rem;
+    }
+    .od-items-head {
+      font-size: 0.65rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.03);
+      border-bottom: 1px solid var(--border);
+    }
+    .od-line-row {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      color: #e8eaef;
+    }
+    .od-line-row:last-child { border-bottom: none; }
+    .od-line-qty {
+      font-weight: 700;
+      color: var(--amber);
+      font-variant-numeric: tabular-nums;
+    }
+    .od-line-name { min-width: 0; line-height: 1.35; }
+    .od-num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      color: #cbd5e1;
+      font-size: 0.78rem;
+    }
+    .od-line-row .od-num:last-child {
+      font-weight: 600;
+      color: #f1f5f9;
+    }
+    .od-totals {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 4px 0;
+      background: rgba(0, 0, 0, 0.15);
+    }
+    .od-total-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      padding: 8px 14px;
+      font-size: 0.85rem;
+    }
+    .od-total-row span:first-child { color: var(--text-muted); }
+    .od-total-row span:last-child {
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      color: #e2e8f0;
+      text-align: right;
+      white-space: nowrap;
+    }
+    .od-total-row--grand {
+      margin-top: 4px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(232, 168, 56, 0.22);
+      background: linear-gradient(90deg, rgba(232, 168, 56, 0.06), transparent);
+    }
+    .od-total-row--grand span:first-child {
+      color: #fde68a;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-size: 0.72rem;
+    }
+    .od-total-row--grand span:last-child {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--amber);
+    }
+    .od-notes-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    @media (max-width: 480px) {
+      .od-notes-grid { grid-template-columns: 1fr; }
+    }
+    .od-note {
+      border: 1px solid rgba(232, 168, 56, 0.2);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      background: rgba(11, 14, 20, 0.45);
+      min-height: 72px;
+    }
+    .od-note--allergy {
+      border-color: rgba(251, 113, 133, 0.35);
+      background: rgba(127, 29, 29, 0.12);
+    }
+    .od-note-title {
+      font-size: 0.65rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    .od-note--allergy .od-note-title { color: #fca5a5; }
+    .od-note-body {
+      font-size: 0.88rem;
+      line-height: 1.45;
+      color: #e2e8f0;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .od-note-empty { color: var(--text-muted); font-style: italic; }
+    .od-modal-footer {
+      flex-shrink: 0;
+      padding: 14px 22px 18px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      display: flex;
+      justify-content: flex-end;
+      background: rgba(0, 0, 0, 0.2);
+    }
+    .od-modal-footer .btn { min-width: 100px; }
+    /* Complete payment — two-step flow (matches desktop cashier) */
+    .modal-card.payment-flow-modal {
+      max-width: min(760px, 96vw);
+      width: 100%;
+      padding: 22px 24px;
+      border: 1px solid rgba(232, 168, 56, 0.35);
+      background: linear-gradient(165deg, #151b27 0%, #10151e 100%);
+      box-shadow: 0 28px 70px rgba(0, 0, 0, 0.55);
+    }
+    .pay-flow-title {
+      margin: 0;
+      font-size: 1.35rem;
+      font-weight: 600;
+      color: var(--amber);
+      letter-spacing: -0.02em;
+    }
+    .pay-flow-meta { margin: 6px 0 0; font-size: 0.88rem; color: var(--text-muted); line-height: 1.45; }
+    .pay-flow-meta strong { color: #e2e8f0; font-weight: 600; }
+    .pay-flow-sep {
+      height: 1px; margin: 12px 0 10px; border: none;
+      background: linear-gradient(90deg, rgba(232, 168, 56, 0.45), transparent);
+    }
+    .pay-flow-body {
+      display: grid;
+      grid-template-columns: 1fr 240px;
+      gap: 16px;
+      margin: 4px 0 14px;
+      align-items: start;
+    }
+    @media (max-width: 640px) {
+      .pay-flow-body { grid-template-columns: 1fr; }
+      .pay-numpad { max-width: 280px; margin: 0 auto; }
+    }
+    .pay-dual-label {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--amber);
+      line-height: 1.1;
+      margin: 0;
+      padding-right: 8px;
+    }
+    .pay-amount-row { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; }
+    .pay-amount-fields { display: flex; flex-direction: column; gap: 0; min-width: 0; }
+    .pay-amount-input {
+      width: 100%; min-height: 42px; padding: 10px 12px;
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      background: var(--navy-elev); color: #f8fafc;
+      font-size: 1.05rem; font-weight: 600; font-variant-numeric: tabular-nums;
+      cursor: text; font-family: inherit; text-align: left;
+    }
+    .pay-amount-input::placeholder { color: var(--text-muted); font-weight: 500; }
+    .pay-amount-input:focus { outline: none; border-color: rgba(232, 168, 56, 0.55); box-shadow: 0 0 0 1px rgba(232, 168, 56, 0.2); }
+    .pay-amount-input.is-active {
+      border-color: rgba(56, 189, 248, 0.55);
+      box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.25);
+    }
+    .pay-edit-btn {
+      align-self: flex-start; margin-top: 6px; min-height: 32px; padding: 0 10px;
+      font-size: 12px; font-weight: 600;
+    }
+    .pay-kpi-row {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 16px;
+    }
+    .pay-kpi {
+      padding: 10px; border-radius: 8px; background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .pay-kpi-k {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    }
+    .pay-kpi-k--due { color: var(--amber); }
+    .pay-kpi-k--rem { color: var(--accent-blue); }
+    .pay-kpi-k--chg { color: var(--accent-teal); }
+    .pay-kpi-v { font-size: 1.05rem; font-weight: 700; color: #f1f5f9; margin-top: 4px; font-variant-numeric: tabular-nums; }
+    .pay-kpi-sub { font-size: 0.82rem; font-weight: 600; color: var(--text-muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+    .pay-hint { margin: 12px 0 0; font-size: 11px; color: var(--text-muted); line-height: 1.45; }
+    .pay-numpad {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+    }
+    .pay-numpad .btn-numpad {
+      min-height: 48px; padding: 0; font-size: 1.15rem; font-weight: 600;
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      background: linear-gradient(180deg, rgba(56, 189, 248, 0.22) 0%, rgba(30, 58, 95, 0.55) 100%);
+      color: #e0f2fe;
+      border-radius: var(--radius-sm);
+    }
+    .pay-numpad .btn-numpad:hover { background: linear-gradient(180deg, rgba(56, 189, 248, 0.35) 0%, rgba(30, 58, 95, 0.7) 100%); }
+    .pay-numpad .btn-numpad-ghost {
+      background: var(--surface); color: var(--text-dark);
+      border: 1px solid var(--border);
+    }
+    .pay-alloc-panel {
+      border-radius: 10px; background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.06); padding: 14px;
+    }
+    .pay-alloc-title { margin: 0 0 12px; font-size: 1.1rem; font-weight: 700; color: var(--amber); }
+    .pay-alloc-grid {
+      display: grid; grid-template-columns: 150px 1fr 1fr; gap: 8px 10px; align-items: center;
+      font-size: 0.88rem;
+    }
+    @media (max-width: 520px) {
+      .pay-alloc-grid { grid-template-columns: 1fr; }
+    }
+    .pay-alloc-due { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+    .pay-remaining-banner {
+      margin-top: 14px; padding: 10px; border-radius: 8px;
+      background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .pay-remaining-banner .pay-kpi-k--rem { font-size: 1rem; }
+    .pay-flow-footer {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    }
+    .pay-flow-footer--three { grid-template-columns: 1fr 1fr 1fr; }
+    .pay-step.hidden { display: none !important; }
   </style>
 </head>
 <body>
   <div id="loginWrap" class="main-area">
     <div class="card">
       <h1>Cashier</h1>
-      <p class="lead">Sign in with your cashier station ID. Same flows as the desktop cashier: validate tickets, take orders, complete payments when served.</p>
       <div id="loginErr" class="danger hidden"></div>
-      <label class="lbl" for="staffId">Sign-in ID</label>
-      <input class="inp" id="staffId" type="text" autocomplete="username">
-      <label class="lbl" for="pin">PIN</label>
-      <input class="inp" id="pin" type="password" autocomplete="current-password">
-      <button type="button" class="btn btn-primary btn-block" id="btnLogin">Sign in</button>
-      <p class="muted" style="margin-top:14px;">Open from your API host so <span class="mono">/api</span> and SignalR work.</p>
+      <div class="login-stack">
+        <div class="login-field">
+          <label class="lbl" for="staffId">Sign-in ID</label>
+          <input class="inp" id="staffId" type="text" autocomplete="username">
+        </div>
+        <div class="login-field">
+          <label class="lbl" for="pin">PIN</label>
+          <input class="inp" id="pin" type="password" autocomplete="current-password">
+        </div>
+        <button type="button" class="btn btn-primary btn-block" id="btnLogin">Sign in</button>
+      </div>
     </div>
   </div>
 
@@ -487,11 +876,8 @@
         <div class="brand-sub">Register, validation, and payments — aligned with the desktop cashier.</div>
       </div>
       <div class="nav-stack">
-        <button type="button" class="nav-btn active" id="navTake" data-view="take">Take order</button>
-        <button type="button" class="nav-btn" id="navOrders" data-view="orders">Orders</button>
+        <button type="button" class="nav-btn active" id="navOrders" data-view="orders">Orders <span id="navOrdersBadge" class="nav-badge hidden" aria-hidden="true"></span></button>
         <button type="button" class="nav-btn" id="navMenu" data-view="menu">Menu</button>
-        <button type="button" class="nav-btn" id="navTableMenu" data-view="tableMenu">Table menu</button>
-        <button type="button" class="nav-btn" id="navRes" data-view="reservations">Reservations</button>
       </div>
       <div class="row-flex" style="margin-top:4px;">
         <span id="hubPill" class="hub-pill off">Live: …</span>
@@ -511,94 +897,7 @@
     </aside>
 
     <main class="main-area">
-      <div id="viewTake" class="view-panel">
-        <div class="toolbar">
-          <h2>Take order</h2>
-          <span id="draftFlash" class="muted"></span>
-        </div>
-        <div class="card-panel">
-          <div class="row-flex">
-            <select class="sel grow" id="orderSource" style="max-width:200px;">
-              <option value="WalkIn">Walk-in</option>
-              <option value="Delivery">Delivery</option>
-            </select>
-            <input class="inp grow" id="sourceReference" placeholder="Delivery reference">
-            <select class="sel grow" id="tableSelect"></select>
-            <select class="sel" id="paymentCurrency" style="max-width:120px;">
-              <option value="USD">USD</option>
-              <option value="FC">FC</option>
-            </select>
-          </div>
-          <div class="row-flex" style="margin-top:12px; align-items:flex-start;">
-            <fieldset class="ticket-field grow">
-              <legend>Ticket mode</legend>
-              <label class="row-flex" style="cursor:pointer; margin-bottom:8px;">
-                <input type="radio" name="ticketMode" id="ticketModeAppend" value="append" checked>
-                <span><strong>Same ticket</strong> — append to open check</span>
-              </label>
-              <label class="row-flex" style="cursor:pointer;">
-                <input type="radio" name="ticketMode" id="ticketModeNew" value="new">
-                <span><strong>New ticket</strong> — separate check on this table</span>
-              </label>
-              <p id="ticketModeHint" class="muted" style="margin:10px 0 0;"></p>
-            </fieldset>
-            <div>
-              <button type="button" class="btn btn-ghost btn-sm" id="btnCheckOpen">Check open check</button>
-              <div id="openCheckInfo" class="muted" style="margin-top:6px;"></div>
-            </div>
-          </div>
-        </div>
-        <div class="card-panel">
-          <div class="row-flex">
-            <input class="search-field" id="prodSearch" type="search" placeholder="Search products…" autocomplete="off">
-            <select class="sel" id="category" style="max-width:180px;"></select>
-            <select class="sel" id="subCategory" style="max-width:180px;"></select>
-            <select class="sel grow" id="drafts"></select>
-            <button type="button" class="btn btn-ghost btn-sm" id="btnLoadDraft">Load</button>
-            <button type="button" class="btn btn-ghost btn-sm" id="btnSaveDraft">Save</button>
-            <button type="button" class="btn btn-danger btn-sm" id="btnDeleteDraft">Delete</button>
-          </div>
-          <div id="draftStatus" class="muted" style="margin-top:8px;">Drafts sync with the server.</div>
-        </div>
-        <div class="take-split">
-          <div class="card-panel" style="display:flex; flex-direction:column; min-height:0;">
-            <h3>Products</h3>
-            <div id="products" class="list-scroll"></div>
-          </div>
-          <div id="takeOrderCartPanel" class="card-panel" style="display:flex; flex-direction:column; min-height:0;">
-            <h3>Cart &amp; totals</h3>
-            <div class="row-flex" style="margin-bottom:8px;">
-              <textarea class="txa grow" id="customerNotes" placeholder="Customer notes" style="min-height:56px;"></textarea>
-            </div>
-            <div class="row-flex" style="margin-bottom:8px;">
-              <textarea class="txa grow" id="allergyNotes" placeholder="Allergy notes" style="min-height:56px;"></textarea>
-            </div>
-            <div class="row-flex" style="margin-bottom:8px;">
-              <select class="sel" id="discountMode" style="max-width:140px;">
-                <option value="None">No discount</option>
-                <option value="Percent">Percent</option>
-                <option value="Usd">USD</option>
-              </select>
-              <input class="inp" id="discountValue" type="number" step="0.01" min="0" placeholder="Value" style="max-width:140px;">
-            </div>
-            <div id="cartItems" class="list-scroll"></div>
-            <div class="kpi-grid" aria-label="Order totals — tap to focus cart or send">
-              <button type="button" class="kpi-tile kpi-tile--blue" data-kpi="cart" title="Scroll to line items"><span class="k">Items</span><span class="v" id="itemCount">0</span></button>
-              <button type="button" class="kpi-tile kpi-tile--amber" data-kpi="cart"><span class="k">Subtotal</span><span class="v" id="subtotalUsd">$ 0.00</span></button>
-              <button type="button" class="kpi-tile kpi-tile--teal" data-kpi="cart"><span class="k">Tax</span><span class="v" id="taxAmount">$ 0.00</span></button>
-              <button type="button" class="kpi-tile kpi-tile--violet" data-kpi="cart"><span class="k">Service</span><span class="v" id="serviceAmount">$ 0.00</span></button>
-              <button type="button" class="kpi-tile kpi-tile--rose" data-kpi="cart"><span class="k">Discount</span><span class="v" id="discountAmount">$ 0.00</span></button>
-              <button type="button" class="kpi-tile kpi-tile--lime" data-kpi="submit" title="Focus send to kitchen"><span class="k">Grand total</span><span class="v" id="grandTotal">$ 0.00</span></button>
-            </div>
-            <div class="row-flex" style="margin-top:12px;">
-              <button type="button" class="btn btn-ghost" id="btnClearOrder">Clear</button>
-              <button type="button" class="btn btn-primary" id="btnSubmit">Send to cashier (pending)</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div id="viewOrders" class="view-panel hidden">
+      <div id="viewOrders" class="view-panel">
         <div class="toolbar">
           <h2>Orders</h2>
           <span id="ordersUpdated" class="muted"></span>
@@ -607,11 +906,11 @@
           <p class="muted" style="margin:0 0 8px;">Pending tickets need release to kitchen or cancel. <strong>Dine-in:</strong> complete payment only when status is <strong>Served</strong>. <strong>Guest online (pickup/delivery):</strong> complete payment when the kitchen marks <strong>Ready</strong> — no server step.</p>
           <div id="cashierAlerts" class="mono" style="white-space:pre-wrap; font-size:12px; color:#fbbf24;"></div>
         </div>
-        <div class="card-panel">
-          <h3>Awaiting validation</h3>
-          <div id="pendingOrders" class="list-scroll" style="min-height:120px; max-height:min(36vh,340px);"></div>
-        </div>
         <div class="orders-split">
+          <div class="card-panel">
+            <h3>Awaiting validation</h3>
+            <div id="pendingOrders" class="list-scroll"></div>
+          </div>
           <div class="card-panel">
             <h3>Active</h3>
             <input class="search-field" id="activeSearch" type="search" placeholder="Search active…" style="width:100%; max-width:none; margin-bottom:8px;">
@@ -627,17 +926,6 @@
         </div>
       </div>
 
-      <div id="viewTableMenu" class="view-panel hidden">
-        <div class="toolbar">
-          <h2>Table menu</h2>
-          <button type="button" class="btn btn-ghost" id="btnRefreshTableMenu">Refresh tables</button>
-        </div>
-        <div class="card-panel">
-          <p class="muted" style="margin:0 0 8px;">Open the <strong>guest</strong> ordering screen (same as the QR / table link) for any table. Uses this site’s address — if your public menu is hosted elsewhere, open that site with <span class="mono">?table=</span> and the table id.</p>
-          <div id="tableMenuList" class="list-scroll" style="max-height:min(70vh,560px);"></div>
-        </div>
-      </div>
-
       <div id="viewMenu" class="view-panel hidden">
         <div class="toolbar">
           <h2>Menu</h2>
@@ -650,69 +938,140 @@
         <div id="menuBody"></div>
       </div>
 
-      <div id="viewReservations" class="view-panel hidden">
-        <div class="toolbar">
-          <h2>Reservations</h2>
-          <button type="button" class="btn btn-ghost" id="btnRefreshRes">Refresh</button>
-        </div>
-        <p class="muted" style="margin:0 0 10px;">Scheduled and checked-in floor bookings. Tap a row for full details and updates.</p>
-        <div class="card-panel">
-          <div id="reservationsList" class="list-scroll res-booking-list" style="max-height:min(70vh,560px);"></div>
-        </div>
-      </div>
     </main>
   </div>
 
-  <div id="resDetailModal" class="modal-backdrop hidden">
-    <div class="modal-card res-detail-modal">
-      <div class="res-detail-hero">
-        <h3 id="resDetailTitle" class="res-modal-title">Reservation</h3>
-        <div id="resDetailMeta" class="res-detail-meta"></div>
-      </div>
-      <div id="resDetailBody" class="res-detail-body-scroll"></div>
-      <div id="reschedulePanel" class="res-resched-panel hidden">
-        <label class="lbl" for="resSchedLocal">New arrival (local)</label>
-        <input class="inp" id="resSchedLocal" type="datetime-local" style="width:100%; margin-bottom:8px;">
-        <div class="row-flex" style="gap:8px; flex-wrap:wrap;">
-          <button type="button" class="btn btn-primary btn-sm" id="resSchedApply">Apply reschedule</button>
-          <button type="button" class="btn btn-ghost btn-sm" id="resSchedCancel">Cancel</button>
+  <div id="orderDetailModal" class="modal-backdrop hidden" role="presentation">
+    <div class="modal-card order-detail-modal" role="dialog" aria-modal="true" aria-labelledby="detailOrderCode">
+      <header class="od-modal-header">
+        <div class="od-modal-header-row">
+          <div>
+            <div class="od-modal-label">Order</div>
+            <div id="detailOrderCode" class="od-modal-code">—</div>
+          </div>
+          <span id="detailStatusPill" class="od-status-pill" aria-live="polite">—</span>
         </div>
-      </div>
-      <div id="resDetailActions" class="res-action-bar row-flex" data-res-actions style="flex-wrap:wrap;"></div>
-      <div class="res-detail-footer">
-        <button type="button" class="btn btn-ghost" id="resDetailClose">Close</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="orderDetailModal" class="modal-backdrop hidden">
-    <div class="modal-card">
-      <h3 id="detailTitle">Order</h3>
-      <pre id="detailBody" class="detail-pre"></pre>
-      <div class="row-flex" style="justify-content:flex-end;">
+      </header>
+      <div id="detailBodyScroll" class="od-modal-body"></div>
+      <footer class="od-modal-footer">
+        <button type="button" class="btn btn-ghost" id="detailPrintTicket">Print ticket</button>
         <button type="button" class="btn btn-ghost" id="detailClose">Close</button>
-      </div>
+      </footer>
     </div>
   </div>
 
-  <div id="paymentModal" class="modal-backdrop hidden">
-    <div class="modal-card">
-      <h3>Complete payment</h3>
-      <p class="muted" id="paymentDueLine"></p>
-      <div class="row-flex">
-        <label class="grow">Paid USD<br><input class="inp" id="payUsd" type="number" step="0.01" min="0" value="0"></label>
-        <label class="grow">Paid FC<br><input class="inp" id="payFc" type="number" step="1" min="0" value="0"></label>
+  <div id="paymentModal" class="modal-backdrop hidden" role="presentation">
+    <div class="modal-card payment-flow-modal" role="dialog" aria-modal="true" aria-labelledby="payFlowTitle">
+      <!-- Step A: guest payment -->
+      <div id="payStepPayment" class="pay-step">
+        <header>
+          <h3 id="payFlowTitle" class="pay-flow-title">Complete Order Payment</h3>
+          <p class="pay-flow-meta">Order: <strong id="payOrderCode">—</strong></p>
+          <p class="pay-flow-meta">Amount due: <strong id="payDueUsd">$ 0.00</strong> (<span id="payDueFc">FC 0</span>)</p>
+          <hr class="pay-flow-sep" aria-hidden="true">
+        </header>
+        <div class="pay-flow-body">
+          <div class="pay-flow-main">
+            <div class="pay-amount-row">
+              <p class="pay-dual-label">USD + FC</p>
+              <div class="pay-amount-fields">
+                <input type="text" inputmode="decimal" autocomplete="off" class="pay-amount-input is-active" id="payUsdInput" data-numpad-target="PaidUsd" aria-label="Paid USD" placeholder="0.00">
+                <button type="button" class="btn btn-ghost btn-sm pay-edit-btn" data-select-numpad="PaidUsd">Edit Paid USD</button>
+                <input type="text" inputmode="decimal" autocomplete="off" class="pay-amount-input" id="payFcInput" data-numpad-target="PaidFc" aria-label="Paid FC" placeholder="0" style="margin-top:8px;">
+                <button type="button" class="btn btn-ghost btn-sm pay-edit-btn" data-select-numpad="PaidFc">Edit Paid FC</button>
+              </div>
+            </div>
+            <div class="pay-kpi-row" aria-label="Payment summary">
+              <div class="pay-kpi">
+                <div class="pay-kpi-k pay-kpi-k--due">Due</div>
+                <div class="pay-kpi-v" id="payKpiDueUsd">$ 0.00</div>
+                <div class="pay-kpi-sub" id="payKpiDueFc">FC 0</div>
+              </div>
+              <div class="pay-kpi">
+                <div class="pay-kpi-k pay-kpi-k--rem">Remaining</div>
+                <div class="pay-kpi-v" id="payKpiRemUsd">$ 0.00</div>
+                <div class="pay-kpi-sub" id="payKpiRemFc">FC 0</div>
+              </div>
+              <div class="pay-kpi">
+                <div class="pay-kpi-k pay-kpi-k--chg">Change</div>
+                <div class="pay-kpi-v" id="payKpiChgUsd">$ 0.00</div>
+                <div class="pay-kpi-sub" id="payKpiChgFc">FC 0</div>
+              </div>
+            </div>
+            <p class="pay-hint">Type amounts or use the numpad for Paid USD and Paid FC. If one currency is not used, leave it at 0.</p>
+          <p style="margin:12px 0 0;"><button type="button" class="btn btn-ghost btn-sm" id="payPrintTicket">Print ticket</button></p>
+          </div>
+          <div class="pay-numpad" aria-label="Numeric keypad">
+            <button type="button" class="btn btn-numpad" data-numpad-digit="7">7</button>
+            <button type="button" class="btn btn-numpad" data-numpad-digit="8">8</button>
+            <button type="button" class="btn btn-numpad" data-numpad-digit="9">9</button>
+            <button type="button" class="btn btn-numpad" data-numpad-digit="4">4</button>
+            <button type="button" class="btn btn-numpad" data-numpad-digit="5">5</button>
+            <button type="button" class="btn btn-numpad" data-numpad-digit="6">6</button>
+            <button type="button" class="btn btn-numpad" data-numpad-digit="1">1</button>
+            <button type="button" class="btn btn-numpad" data-numpad-digit="2">2</button>
+            <button type="button" class="btn btn-numpad" data-numpad-digit="3">3</button>
+            <button type="button" class="btn btn-numpad btn-numpad-ghost" data-numpad-dot=".">.</button>
+            <button type="button" class="btn btn-numpad" data-numpad-digit="0">0</button>
+            <button type="button" class="btn btn-numpad btn-numpad-ghost" data-numpad-backspace aria-label="Backspace">⌫</button>
+          </div>
+        </div>
+        <footer class="pay-flow-footer">
+          <button type="button" class="btn btn-ghost" id="payCancel">Cancel</button>
+          <button type="button" class="btn btn-primary" id="payGoToChange" disabled>Go to change</button>
+        </footer>
       </div>
-      <p class="muted" id="paymentSummary"></p>
-      <h4 style="margin:12px 0 6px; font-size:14px;">Change to guest</h4>
-      <div class="row-flex">
-        <label class="grow">Change USD<br><input class="inp" id="chgUsd" type="number" step="0.01" min="0" value="0"></label>
-        <label class="grow">Change FC<br><input class="inp" id="chgFc" type="number" step="1" min="0" value="0"></label>
-      </div>
-      <p class="muted" id="changeSummary"></p>
-      <div class="row-flex" style="justify-content:flex-end; margin-top:14px; gap:8px;">
-        <button type="button" class="btn btn-ghost" id="payCancel">Cancel</button>
-        <button type="button" class="btn btn-primary" id="payConfirm">Complete sale</button>
+
+      <!-- Step B: change allocation -->
+      <div id="payStepChange" class="pay-step hidden">
+        <header>
+          <h3 class="pay-flow-title">Change Allocation</h3>
+          <p class="pay-flow-meta">Order: <strong id="payChangeOrderCode">—</strong></p>
+          <p class="pay-flow-meta">Change required: <strong id="payChangeDueUsd">$ 0.00</strong> (<span id="payChangeDueFc">FC 0</span>)</p>
+          <hr class="pay-flow-sep" aria-hidden="true">
+        </header>
+        <div class="pay-flow-body">
+          <div class="pay-flow-main">
+            <div class="pay-alloc-panel">
+              <p class="pay-alloc-title">Allocate Change</p>
+              <div class="pay-alloc-grid">
+                <span>USD change</span>
+                <span class="pay-alloc-due" id="payAllocDueUsd">Due $ 0.00</span>
+                <input type="text" inputmode="decimal" autocomplete="off" class="pay-amount-input is-active" id="chgUsdInput" data-numpad-target="ChangeUsd" aria-label="Change USD" placeholder="0.00">
+              </div>
+              <button type="button" class="btn btn-ghost btn-sm pay-edit-btn" data-select-numpad="ChangeUsd" style="margin-left:auto;display:block;width:170px;max-width:100%;">Edit USD change</button>
+              <div class="pay-alloc-grid" style="margin-top:12px;">
+                <span>FC change</span>
+                <span class="pay-alloc-due" id="payAllocDueFc">Due FC 0</span>
+                <input type="text" inputmode="decimal" autocomplete="off" class="pay-amount-input" id="chgFcInput" data-numpad-target="ChangeFc" aria-label="Change FC" placeholder="0">
+              </div>
+              <button type="button" class="btn btn-ghost btn-sm pay-edit-btn" data-select-numpad="ChangeFc" style="margin-left:auto;display:block;width:170px;max-width:100%;">Edit FC change</button>
+              <div class="pay-remaining-banner">
+                <div class="pay-kpi-k pay-kpi-k--rem">Remaining to allocate: <span id="payRemAllocUsd" style="font-size:1rem;color:#e2e8f0;">$ 0.00</span></div>
+                <div class="pay-kpi-sub" id="payRemAllocFc" style="margin-top:4px;">FC 0</div>
+              </div>
+            </div>
+          </div>
+          <div class="pay-numpad" aria-label="Numeric keypad">
+            <button type="button" class="btn btn-numpad" data-numpad-digit="7">7</button>
+            <button type="button" class="btn btn-numpad" data-numpad-digit="8">8</button>
+            <button type="button" class="btn btn-numpad" data-numpad-digit="9">9</button>
+            <button type="button" class="btn btn-numpad" data-numpad-digit="4">4</button>
+            <button type="button" class="btn btn-numpad" data-numpad-digit="5">5</button>
+            <button type="button" class="btn btn-numpad" data-numpad-digit="6">6</button>
+            <button type="button" class="btn btn-numpad" data-numpad-digit="1">1</button>
+            <button type="button" class="btn btn-numpad" data-numpad-digit="2">2</button>
+            <button type="button" class="btn btn-numpad" data-numpad-digit="3">3</button>
+            <button type="button" class="btn btn-numpad btn-numpad-ghost" data-numpad-dot=".">.</button>
+            <button type="button" class="btn btn-numpad" data-numpad-digit="0">0</button>
+            <button type="button" class="btn btn-numpad btn-numpad-ghost" data-numpad-backspace aria-label="Backspace">⌫</button>
+          </div>
+        </div>
+        <footer class="pay-flow-footer pay-flow-footer--three">
+          <button type="button" class="btn btn-ghost" id="payChangeBack">Back</button>
+          <button type="button" class="btn btn-ghost" id="payChangeCancel">Cancel</button>
+          <button type="button" class="btn btn-primary" id="payConfirm" disabled>Confirm Complete</button>
+        </footer>
       </div>
     </div>
   </div>

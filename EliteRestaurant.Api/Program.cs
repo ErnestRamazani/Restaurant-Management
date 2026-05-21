@@ -14,6 +14,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using QuestPDF.Infrastructure;
 using Serilog;
 using Serilog.Context;
 
@@ -35,6 +36,8 @@ Log.Logger = new LoggerConfiguration()
 
 try
 {
+    QuestPDF.Settings.License = LicenseType.Community;
+
     var builder = WebApplication.CreateBuilder(args);
     builder.Host.UseSerilog();
 
@@ -120,13 +123,16 @@ try
         options.AddPolicy("AdminRead", policy => policy.RequireRole("Admin", "Manager", "AdminWeb"));
         options.AddPolicy("AdminWrite", policy => policy.RequireRole("Admin", "Manager"));
         options.AddPolicy("OperationalWrite", policy => policy.RequireRole(
-            "Admin", "Manager", "Chef", "Barman", "Bartender", "Sous Chef", "Cashier", "Server"));
+            "Admin", "Manager", "Chef", "Barman", "Bartender", "Sous Chef", "Cashier", "Server", "Front desk"));
         options.AddPolicy("ServerOnly", policy => policy.RequireRole("Server"));
         options.AddPolicy("CashierOnly", policy => policy.RequireRole("Cashier"));
-        options.AddPolicy("KitchenOnly", policy => policy.RequireRole("Chef", "Barman", "Bartender", "Sous Chef"));
+        options.AddPolicy("KitchenOnly", policy => policy.RequireRole("Chef", "Sous Chef"));
+        options.AddPolicy("BarOnly", policy => policy.RequireRole("Barman", "Bartender"));
         options.AddPolicy("StaffAny", policy => policy.RequireAuthenticatedUser());
-        // Reservation floor API + SignalR — Admin + Cashier only.
-        options.AddPolicy("CashierOrAdmin", policy => policy.RequireRole("Admin", "Cashier"));
+        // Reservation floor API + SignalR — Admin, Manager, Cashier, and front desk.
+        options.AddPolicy("CashierOrAdmin", policy => policy.RequireRole("Admin", "Manager", "Cashier", "Front desk"));
+        // Reception / front desk (reservations, delivery & pickup tracking).
+        options.AddPolicy("ReceptionDesk", policy => policy.RequireRole("Admin", "Manager", "Cashier", "Front desk"));
         options.AddPolicy("CashierDesk", policy => policy.RequireRole("Admin", "Manager", "Cashier"));
     });
     builder.Services.AddScoped<EliteRestaurant.Core.Reporting.AdminReportAggregationService>();
@@ -279,6 +285,8 @@ try
     });
     app.MapGet("/server", () => Results.Redirect("/server/index.html"));
     app.MapGet("/cashier", () => Results.Redirect("/cashier/index.html"));
+    app.MapGet("/reception", () => Results.Redirect("/reception/index.html"));
+    app.MapGet("/front-desk", () => Results.Redirect("/reception/index.html"));
     app.MapGet("/server/", async (IWebHostEnvironment env, HttpContext context) =>
     {
         var serverPortal = Path.Combine(env.WebRootPath, "server", "index.html");
@@ -307,6 +315,20 @@ try
         ApplyHtmlNoStore(context.Response);
         await context.Response.SendFileAsync(cashierPortal);
     });
+    app.MapGet("/reception/", async (IWebHostEnvironment env, HttpContext context) =>
+    {
+        var receptionPortal = Path.Combine(env.WebRootPath, "reception", "index.html");
+        context.Response.ContentType = "text/html; charset=utf-8";
+        ApplyHtmlNoStore(context.Response);
+        await context.Response.SendFileAsync(receptionPortal);
+    });
+    app.MapGet("/reception/index.html", async (IWebHostEnvironment env, HttpContext context) =>
+    {
+        var receptionPortal = Path.Combine(env.WebRootPath, "reception", "index.html");
+        context.Response.ContentType = "text/html; charset=utf-8";
+        ApplyHtmlNoStore(context.Response);
+        await context.Response.SendFileAsync(receptionPortal);
+    });
     app.MapGet("/kitchen", () => Results.Redirect("/kitchen/index.html"));
     app.MapGet("/kitchen/", async (IWebHostEnvironment env, HttpContext context) =>
     {
@@ -318,6 +340,21 @@ try
     app.MapGet("/kitchen/index.html", async (IWebHostEnvironment env, HttpContext context) =>
     {
         var path = Path.Combine(env.WebRootPath, "kitchen", "index.html");
+        context.Response.ContentType = "text/html; charset=utf-8";
+        ApplyHtmlNoStore(context.Response);
+        await context.Response.SendFileAsync(path);
+    });
+    app.MapGet("/bar", () => Results.Redirect("/bar/index.html"));
+    app.MapGet("/bar/", async (IWebHostEnvironment env, HttpContext context) =>
+    {
+        var path = Path.Combine(env.WebRootPath, "bar", "index.html");
+        context.Response.ContentType = "text/html; charset=utf-8";
+        ApplyHtmlNoStore(context.Response);
+        await context.Response.SendFileAsync(path);
+    });
+    app.MapGet("/bar/index.html", async (IWebHostEnvironment env, HttpContext context) =>
+    {
+        var path = Path.Combine(env.WebRootPath, "bar", "index.html");
         context.Response.ContentType = "text/html; charset=utf-8";
         ApplyHtmlNoStore(context.Response);
         await context.Response.SendFileAsync(path);
@@ -355,8 +392,9 @@ try
             return;
         }
 
-        // Staff portals live under /server/, /cashier/, /kitchen/. Do not serve the customer SPA for unknown paths there.
+        // Staff portals live under /server/, /cashier/, /reception/, /kitchen/. Do not serve the customer SPA for unknown paths there.
         if (context.Request.Path.StartsWithSegments("/cashier")
+            || context.Request.Path.StartsWithSegments("/reception")
             || context.Request.Path.StartsWithSegments("/kitchen")
             || context.Request.Path.StartsWithSegments("/server")
             || context.Request.Path.StartsWithSegments("/admin"))

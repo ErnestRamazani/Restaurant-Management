@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
+using EliteRestaurant.Core.Utils;
 
 namespace EliteRestaurant.Core.Models;
 
@@ -119,6 +120,9 @@ public class Employee
         var n = (configured ?? string.Empty).Trim();
         if (string.IsNullOrEmpty(n) || n.Equals("Off", StringComparison.OrdinalIgnoreCase))
             return ("Off", "Off");
+
+        if (AttendanceScheduleHelper.IsFullDayShift(n))
+            return ("Full Day", "FullDay");
 
         if (n.Contains("Night", StringComparison.OrdinalIgnoreCase) ||
             n.Contains("Evening", StringComparison.OrdinalIgnoreCase))

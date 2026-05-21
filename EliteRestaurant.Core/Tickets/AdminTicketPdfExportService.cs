@@ -1,12 +1,10 @@
 using System.Globalization;
-using System.IO;
-using System.Linq;
 using EliteRestaurant.Core.Orders;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 
-namespace EliteRestaurantPro.Services;
+namespace EliteRestaurant.Core.Tickets;
 
 /// <summary>Order ticket PDFs: continuous thermal-width receipt, black on white (POS-style).</summary>
 public static class AdminTicketPdfExportService
@@ -68,7 +66,6 @@ public static class AdminTicketPdfExportService
         column.Item().AlignCenter().Text(text).FontFamily("Courier New").FontSize(FontBody).FontColor(Colors.Black);
     }
 
-    /// <summary>Centers a compact horizontal group (icon + label) across the full receipt width.</summary>
     private static void CenteredInlineRow(ColumnDescriptor column, Action<RowDescriptor> composeInlineRow)
     {
         column.Item().ExtendHorizontal().Row(outer =>
@@ -329,8 +326,7 @@ public static class AdminTicketPdfExportService
         page.DefaultTextStyle(ReceiptBaseStyle());
     }
 
-    public static void ExportPaymentReceiptPdf(string filePath, TicketReceiptPdfModel m)
-    {
+    public static byte[] GeneratePaymentReceiptPdfBytes(TicketReceiptPdfModel m) =>
         Document.Create(container =>
         {
             container.Page(page =>
@@ -338,11 +334,9 @@ public static class AdminTicketPdfExportService
                 ConfigureReceiptPage(page);
                 page.Content().Column(c => ComposeReceiptBody(c, m, includePaymentSection: true));
             });
-        }).GeneratePdf(filePath);
-    }
+        }).GeneratePdf();
 
-    public static void ExportClientTicketPdf(string filePath, TicketReceiptPdfModel m)
-    {
+    public static byte[] GenerateClientTicketPdfBytes(TicketReceiptPdfModel m) =>
         Document.Create(container =>
         {
             container.Page(page =>
@@ -350,8 +344,13 @@ public static class AdminTicketPdfExportService
                 ConfigureReceiptPage(page);
                 page.Content().Column(c => ComposeReceiptBody(c, m, includePaymentSection: false));
             });
-        }).GeneratePdf(filePath);
-    }
+        }).GeneratePdf();
+
+    public static void ExportPaymentReceiptPdf(string filePath, TicketReceiptPdfModel m) =>
+        File.WriteAllBytes(filePath, GeneratePaymentReceiptPdfBytes(m));
+
+    public static void ExportClientTicketPdf(string filePath, TicketReceiptPdfModel m) =>
+        File.WriteAllBytes(filePath, GenerateClientTicketPdfBytes(m));
 
     public static string SanitizeFileName(string input)
     {

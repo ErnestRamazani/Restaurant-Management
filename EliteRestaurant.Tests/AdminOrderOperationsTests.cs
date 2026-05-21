@@ -93,6 +93,100 @@ public class AdminOrderOperationsTests
     }
 
     [Fact]
+    public void ReleaseOnlinePending_MixedFoodAndDrink_VisibleOnKitchenAndBarQueues()
+    {
+        using var db = BuildDb($"mix-rel-{Guid.NewGuid():N}");
+        var chef = new Employee
+        {
+            UniqueId = "E1",
+            SignInId = "chef1",
+            Name = "Chef",
+            Role = "Chef",
+            PinCode = "x",
+            EmploymentStatus = "Active",
+            JoinDate = DateTime.UtcNow
+        };
+        db.Employees.Add(chef);
+        var food = new Product
+        {
+            UniqueId = "PF",
+            Name = "Steak",
+            Category = "Main",
+            SubCategory = "Meat",
+            Price = 20m
+        };
+        var drink = new Product
+        {
+            UniqueId = "PD",
+            Name = "Spritz",
+            Category = "Drink",
+            SubCategory = "Cocktail",
+            Price = 11m
+        };
+        db.Products.AddRange(food, drink);
+        db.Tables.Add(new Table
+        {
+            UniqueId = "T1",
+            TableNumber = 1,
+            Name = "Online",
+            Capacity = 4,
+            Status = "Available",
+            AssignedServerId = chef.Id
+        });
+        db.SaveChanges();
+
+        var order = new OrderRecord
+        {
+            UniqueId = "ORD-MIX",
+            TableId = 1,
+            TableCode = "Table 1",
+            TableName = "Online",
+            Status = OrderWorkflow.PendingApproval,
+            OrderOrigin = OrderOrigin.Online,
+            CreatedAt = DateTime.UtcNow
+        };
+        order.Items.Add(new OrderItem
+        {
+            ProductId = food.Id,
+            Quantity = 1,
+            Product = food,
+            PreparedByEmployeeId = chef.Id,
+            PreparedByRole = "Chef",
+            PreparedByName = chef.Name
+        });
+        order.Items.Add(new OrderItem
+        {
+            ProductId = drink.Id,
+            Quantity = 2,
+            Product = drink,
+            PreparedByEmployeeId = chef.Id,
+            PreparedByRole = "Barman",
+            PreparedByName = "Bar"
+        });
+        db.Orders.Add(order);
+        db.SaveChanges();
+
+        var ops = new AdminOrderOperationsService(db);
+        Assert.True(ops.TryReleasePendingToKitchen(order.Id).Ok);
+
+        db.ChangeTracker.Clear();
+        var released = db.Orders.AsNoTracking()
+            .Include(o => o.Items)
+            .ThenInclude(i => i.Product)
+            .Single(o => o.Id == order.Id);
+        Assert.Equal("Waiting", released.Status);
+
+        Assert.True(KitchenQueueKindFilter.OrderMatchesPortalQueue("Kitchen", released));
+        Assert.True(KitchenQueueKindFilter.OrderMatchesPortalQueue("Bar", released));
+        var kitchen = KitchenQueueKindFilter.FilterForPortal("Kitchen", [released]).ToList();
+        var bar = KitchenQueueKindFilter.FilterForPortal("Bar", [released]).ToList();
+        Assert.Single(kitchen);
+        Assert.Single(bar);
+        Assert.Single(KitchenOrderQueueMapper.ToQueueRow(released, "Kitchen").Items);
+        Assert.Single(KitchenOrderQueueMapper.ToQueueRow(released, "Bar").Items);
+    }
+
+    [Fact]
     public void Release_Rejects_WhenPendingCashierButOnlineOrigin()
     {
         using var db = SeedPendingOnlineOrder($"mix-{Guid.NewGuid():N}").db;
@@ -117,6 +211,117 @@ public class AdminOrderOperationsTests
         var r2 = ops.TryReleasePendingToKitchen(orderId);
         Assert.False(r2.Ok);
         Assert.Contains("already released", r2.ErrorMessage ?? "", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static (AppDbContext db, int orderId, int foodItemId, int drinkItemId) SeedMixedInKitchen(string dbName)
+    {
+        var db = BuildDb(dbName);
+        var chef = new Employee
+        {
+            UniqueId = "E1",
+            SignInId = "chef1",
+            Name = "Chef",
+            Role = "Chef",
+            PinCode = "x",
+            EmploymentStatus = "Active",
+            JoinDate = DateTime.UtcNow
+        };
+        db.Employees.Add(chef);
+        var food = new Product
+        {
+            UniqueId = "PF",
+            Name = "Steak",
+            Category = "Main",
+            SubCategory = "Meat",
+            Price = 20m
+        };
+        var drink = new Product
+        {
+            UniqueId = "PD",
+            Name = "Spritz",
+            Category = "Drink",
+            SubCategory = "Cocktail",
+            Price = 11m
+        };
+        db.Products.AddRange(food, drink);
+        db.SaveChanges();
+
+        var order = new OrderRecord
+        {
+            UniqueId = "ORD-MIX-PREP",
+            Status = "In Kitchen",
+            OrderOrigin = OrderOrigin.Online,
+            CreatedAt = DateTime.UtcNow
+        };
+        var foodItem = new OrderItem
+        {
+            ProductId = food.Id,
+            Quantity = 1,
+            Product = food,
+            PreparedByEmployeeId = chef.Id,
+            PreparedByRole = "Chef",
+            PreparedByName = chef.Name
+        };
+        var drinkItem = new OrderItem
+        {
+            ProductId = drink.Id,
+            Quantity = 1,
+            Product = drink,
+            PreparedByEmployeeId = chef.Id,
+            PreparedByRole = "Barman",
+            PreparedByName = "Bar"
+        };
+        order.Items.Add(foodItem);
+        order.Items.Add(drinkItem);
+        db.Orders.Add(order);
+        db.SaveChanges();
+        return (db, order.Id, foodItem.Id, drinkItem.Id);
+    }
+
+    [Fact]
+    public void Advance_KitchenPortal_MixedOrder_OnlyStampsFood_StaysInKitchen()
+    {
+        var (db, orderId, foodItemId, drinkItemId) = SeedMixedInKitchen($"mix-k-{Guid.NewGuid():N}");
+        using (db)
+        {
+        var ops = new AdminOrderOperationsService(db);
+
+        var outcome = ops.TryAdvanceOrderWithOutcome(orderId, KitchenQueueKindFilter.PortalKitchen);
+        Assert.Null(outcome.Error);
+        Assert.False(outcome.BecameReady);
+
+        db.ChangeTracker.Clear();
+        var order = db.Orders.AsNoTracking().Single(o => o.Id == orderId);
+        Assert.Equal("In Kitchen", order.Status);
+
+        var items = db.OrderItems.AsNoTracking().Where(i => i.OrderRecordId == orderId).ToList();
+        Assert.NotNull(items.Single(i => i.Id == foodItemId).KitchenPreparedAt);
+        Assert.Null(items.Single(i => i.Id == drinkItemId).KitchenPreparedAt);
+        }
+    }
+
+    [Fact]
+    public void Advance_MixedOrder_ReadyOnlyAfterBothPortalsComplete()
+    {
+        var (db, orderId, foodItemId, drinkItemId) = SeedMixedInKitchen($"mix-both-{Guid.NewGuid():N}");
+        using (db)
+        {
+        var ops = new AdminOrderOperationsService(db);
+
+        Assert.Null(ops.TryAdvanceOrder(orderId, KitchenQueueKindFilter.PortalKitchen));
+        db.ChangeTracker.Clear();
+        Assert.Equal("In Kitchen", db.Orders.AsNoTracking().Single(o => o.Id == orderId).Status);
+
+        var barReady = ops.TryAdvanceOrderWithOutcome(orderId, KitchenQueueKindFilter.PortalBar);
+        Assert.Null(barReady.Error);
+        Assert.True(barReady.BecameReady);
+
+        db.ChangeTracker.Clear();
+        Assert.Equal("Ready", db.Orders.AsNoTracking().Single(o => o.Id == orderId).Status);
+        Assert.All(
+            db.OrderItems.AsNoTracking().Where(i => i.OrderRecordId == orderId),
+            i => Assert.NotNull(i.KitchenPreparedAt));
+        }
     }
 
     [Fact]
@@ -147,6 +352,10 @@ public class AdminOrderOperationsTests
         var again = ops.TryMarkKitchenReadyForCashier(orderId);
         Assert.True(again.Ok);
         Assert.True(again.SuppressBroadcast);
+
+        db.ChangeTracker.Clear();
+        var stamped = db.OrderItems.AsNoTracking().Where(i => i.OrderRecordId == orderId).ToList();
+        Assert.All(stamped, i => Assert.NotNull(i.KitchenPreparedAt));
     }
 
     [Fact]

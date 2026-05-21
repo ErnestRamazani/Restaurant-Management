@@ -175,7 +175,13 @@ public sealed class PublicMenuController(
                              .Select(s => s.StaffLoginPasscode)
                              .FirstOrDefault()
                          ?? SettingsManager.Load().BusinessProfile.StaffLoginPasscode;
-        var expected = string.IsNullOrWhiteSpace(configured) ? "er4124" : configured.Trim();
+        var expected = (configured ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(expected))
+        {
+            return BadRequest(new StaffLoginCodeResponse(false,
+                "Staff passcode is not configured. Set it in Elite Pro → Appearance → Business profile, then push to cloud."));
+        }
+
         var submitted = code?.Trim() ?? string.Empty;
         if (!string.Equals(submitted, expected, StringComparison.Ordinal))
         {
@@ -505,6 +511,7 @@ public sealed class PublicMenuController(
         {
             draftId = entity.UniqueId,
             label = entity.DraftLabel,
+            tableId = entity.TableId,
             tableCode = tableCode,
             tableName = table.Name,
             customerName = name,
@@ -670,7 +677,7 @@ public sealed class PublicMenuController(
             return HandlePublicMenuOrderSaveFailure(ex, "orders/submit");
         }
 
-        await TryNotifyCashierOrderBoardChangedAsync(hubContext, order.Id, "online-order-submitted");
+        await TryNotifyCashierOrderBoardChangedAsync(hubContext, db, order.Id, "online-order-submitted");
 
         var code = order.UniqueId;
         return StatusCode(201, new PublicOrderSubmitResponse(
@@ -896,7 +903,7 @@ public sealed class PublicMenuController(
             return HandlePublicMenuOrderSaveFailure(ex, "orders/online");
         }
 
-        await TryNotifyCashierOrderBoardChangedAsync(hubContext, order.Id, "online-order-submitted");
+        await TryNotifyCashierOrderBoardChangedAsync(hubContext, db, order.Id, "online-order-submitted");
 
         return StatusCode(201, new PublicOrderSubmitResponse(
             order.UniqueId,
@@ -1102,14 +1109,13 @@ public sealed class PublicMenuController(
 
     private static async Task TryNotifyCashierOrderBoardChangedAsync(
         IHubContext<OrderHub> hubContext,
+        AppDbContext db,
         int orderId,
         string reason)
     {
         try
         {
-            var payload = new { reason, orderId };
-            await hubContext.Clients.Group("Cashier").SendAsync("CashierOrderBoardChanged", payload);
-            await hubContext.Clients.Group("Server").SendAsync("CashierOrderBoardChanged", payload);
+            await OrderHubBroadcasts.NotifyCashierOrderBoardChangedAsync(hubContext, db, orderId, reason);
         }
         catch (Exception ex)
         {

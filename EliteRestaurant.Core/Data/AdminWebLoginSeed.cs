@@ -5,32 +5,38 @@ using Microsoft.EntityFrameworkCore;
 namespace EliteRestaurant.Core.Data;
 
 /// <summary>
-/// Ensures the documented default read-only web admin row exists after migrations (role <c>AdminWeb</c>).
-/// Business settings and public menu branding are changed only from the desktop app (Admin role).
+/// Ensures the read-only web admin employee (<see cref="SeedUniqueId"/>) matches credentials from business settings.
+/// Credentials are configured in Elite Pro → Appearance → Admin web portal (pushed to cloud).
 /// </summary>
 public static class AdminWebLoginSeed
 {
     public const string SeedUniqueId = "EMP-SEED-ADMINWEB";
-    public const string SeedSignInId = "er4124";
-    public const string DefaultPinPlaintext = "4124";
 
     public static void EnsureSeeded(AppDbContext db)
     {
+        var (signInId, pin) = AdminWebSettingsResolver.Resolve(db);
+        if (string.IsNullOrWhiteSpace(signInId) || string.IsNullOrWhiteSpace(pin))
+            return;
+
+        signInId = signInId.Trim();
+        pin = pin.Trim();
+
         var existing = db.Employees.FirstOrDefault(e => e.UniqueId == SeedUniqueId);
         if (existing is not null)
         {
-            if (RepairSeedRow(existing))
+            if (SyncSeedRow(existing, signInId, pin))
                 db.SaveChanges();
             return;
         }
 
-        var lower = SeedSignInId.ToLowerInvariant();
+        var lower = signInId.ToLowerInvariant();
         var signInConflict = db.Employees.FirstOrDefault(e =>
             !string.IsNullOrWhiteSpace(e.SignInId)
-            && e.SignInId.Trim().ToLowerInvariant() == lower);
+            && e.SignInId.Trim().ToLowerInvariant() == lower
+            && e.UniqueId != SeedUniqueId);
         if (signInConflict is not null)
         {
-            if (RepairSeedRow(signInConflict))
+            if (SyncSeedRow(signInConflict, signInId, pin))
                 db.SaveChanges();
             return;
         }
@@ -38,17 +44,17 @@ public static class AdminWebLoginSeed
         db.Employees.Add(new Employee
         {
             UniqueId = SeedUniqueId,
-            SignInId = SeedSignInId,
-            Name = "Web Admin (seed)",
+            SignInId = signInId,
+            Name = "Web Admin (settings)",
             Role = "AdminWeb",
-            PinCode = EmployeePinHasher.HashForStorage(DefaultPinPlaintext),
+            PinCode = EmployeePinHasher.HashForStorage(pin),
             ProfileImagePath = string.Empty,
             PhoneNumber = string.Empty,
             HourlyRate = 0m,
             MonthlySalaryUSD = 0m,
             JoinDate = DateTime.SpecifyKind(new DateTime(2026, 1, 1), DateTimeKind.Utc),
             EmploymentStatus = "Active",
-            Notes = "Seed account for read-only admin web; rotate from Manager desktop or SQL.",
+            Notes = "Read-only admin web account; credentials from business settings.",
             MondayShift = "Off",
             TuesdayShift = "Off",
             WednesdayShift = "Off",
@@ -61,7 +67,7 @@ public static class AdminWebLoginSeed
         db.SaveChanges();
     }
 
-    private static bool RepairSeedRow(Employee employee)
+    private static bool SyncSeedRow(Employee employee, string signInId, string pin)
     {
         var changed = false;
         if (!employee.Role.Equals("AdminWeb", StringComparison.OrdinalIgnoreCase))
@@ -76,22 +82,22 @@ public static class AdminWebLoginSeed
             changed = true;
         }
 
-        if (!string.Equals(employee.SignInId?.Trim(), SeedSignInId, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(employee.SignInId?.Trim(), signInId, StringComparison.OrdinalIgnoreCase))
         {
-            employee.SignInId = SeedSignInId;
+            employee.SignInId = signInId;
             changed = true;
         }
 
-        if (!EmployeePinHasher.Verify(DefaultPinPlaintext, employee.PinCode))
+        if (!EmployeePinHasher.Verify(pin, employee.PinCode))
         {
-            employee.PinCode = EmployeePinHasher.HashForStorage(DefaultPinPlaintext);
+            employee.PinCode = EmployeePinHasher.HashForStorage(pin);
             changed = true;
         }
 
         var notes = employee.Notes ?? string.Empty;
-        if (!notes.Contains("read-only admin web", StringComparison.OrdinalIgnoreCase))
+        if (!notes.Contains("admin web", StringComparison.OrdinalIgnoreCase))
         {
-            employee.Notes = "Seed account for read-only admin web; rotate from Manager desktop or SQL.";
+            employee.Notes = "Read-only admin web account; credentials from business settings.";
             changed = true;
         }
 

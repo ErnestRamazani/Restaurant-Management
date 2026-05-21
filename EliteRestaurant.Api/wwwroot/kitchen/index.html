@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Elite Kitchen / Bar</title>
+  <title>Elite Kitchen</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -41,7 +41,27 @@
       flex-direction: column;
       gap: 8px;
     }
-    .brand { font-weight: 700; font-size: 15px; letter-spacing: 0.04em; color: var(--amber); }
+    .brand-wrap {
+      margin-bottom: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .brand-logo {
+      width: 100%;
+      height: 80px;
+      max-height: 92px;
+      object-fit: contain;
+      object-position: center center;
+      display: block;
+      margin: 0 auto 8px;
+      padding: 10px 8px;
+      box-sizing: border-box;
+      border-radius: var(--radius);
+      border: 1px solid #334155;
+      background: #111c27;
+    }
+    .brand { font-weight: 700; font-size: 14px; letter-spacing: 0.04em; color: var(--amber); }
     .brand-sub { font-size: 11px; color: #94a3b8; line-height: 1.4; margin-top: 6px; }
     .nav-btn {
       width: 100%; text-align: left; padding: 12px 14px; min-height: 44px;
@@ -227,16 +247,87 @@
     .detail-card {
       background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px;
       box-shadow: 0 4px 24px rgba(0,0,0,0.2);
-      max-height: 42vh;
-      overflow: auto;
+      max-height: min(58vh, 720px);
+      display: flex; flex-direction: column; min-height: 0;
     }
-    .detail-card h4 { margin: 0 0 12px; font-size: 1rem; color: #e8eaef; }
-    .detail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; font-size: 13px; margin-bottom: 12px; }
-    .detail-grid div span { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 2px; }
-    .line-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    .line-table th { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; }
-    .line-table td { padding: 10px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
-    .actions-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 14px; padding: 12px; border: 1px solid rgba(56,189,248,0.22); border-radius: var(--radius-sm); background: rgba(56,189,248,0.06); }
+    .detail-card h4 { margin: 0 0 12px; font-size: 1rem; color: #e8eaef; flex-shrink: 0; }
+    #detailContent.detail-layout {
+      display: flex; flex-direction: column; gap: 0; min-height: 0; flex: 1;
+    }
+    .detail-priority { flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+    .detail-priority .actions-row { margin: 0; }
+    .detail-notes {
+      padding: 10px 12px; border-radius: var(--radius-sm);
+      border: 1px solid rgba(251, 191, 36, 0.35); background: rgba(245, 158, 11, 0.08);
+    }
+    .detail-notes__block + .detail-notes__block { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(251, 191, 36, 0.2); }
+    .detail-notes__label {
+      display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
+      color: #fbbf24; font-weight: 700; margin-bottom: 4px;
+    }
+    .detail-notes__text { margin: 0; font-size: 15px; line-height: 1.45; color: #f8fafc; font-weight: 500; }
+    .detail-notes__text--empty { color: var(--text-muted); font-weight: 400; font-style: italic; }
+    .detail-source {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+      padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+      background: var(--navy-elev);
+    }
+    .detail-source .kds-origin-badge { font-size: 13px; padding: 6px 12px; }
+    .detail-source__meta { margin: 0; font-size: 13px; line-height: 1.4; color: #cbd5e1; flex: 1; min-width: 140px; }
+    .detail-source__meta strong { color: #e2e8f0; font-weight: 600; }
+    .detail-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px 10px;
+      font-size: 12px;
+    }
+    .detail-grid--compact { margin: 0; padding-top: 10px; border-top: 1px solid var(--border); }
+    .detail-grid div span {
+      display: block; font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--text-muted); margin-bottom: 1px;
+    }
+    .detail-meta-footer { flex-shrink: 0; margin-top: 8px; }
+    .detail-items-section {
+      flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; margin: 0;
+    }
+    .detail-items-section--scroll { overflow: hidden; }
+    .detail-items-heading {
+      margin: 0 0 6px; font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--text-muted); font-weight: 700; flex-shrink: 0;
+    }
+    .detail-line-list {
+      display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0;
+      overflow-y: auto; min-height: 0; flex: 1 1 auto;
+    }
+    button.detail-line-card {
+      width: 100%; text-align: left; cursor: pointer; font-family: inherit; color: inherit;
+      display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; gap: 2px 10px; align-items: center;
+      padding: 8px 10px; min-height: 44px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+      background: var(--navy-elev); transition: border-color 0.12s, background 0.12s;
+    }
+    button.detail-line-card:hover:not(:disabled) {
+      border-color: rgba(232, 168, 56, 0.5); background: var(--surface-hover);
+    }
+    button.detail-line-card:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+    button.detail-line-card:disabled { cursor: default; opacity: 0.85; }
+    button.detail-line-card--new {
+      border-color: rgba(232, 168, 56, 0.45); background: rgba(232, 168, 56, 0.14);
+      box-shadow: inset 3px 0 0 var(--amber);
+    }
+    button.detail-line-card--prepared { opacity: 0.78; color: var(--text-muted); }
+    .detail-line-card__main { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; grid-column: 1; }
+    .detail-line-card__name { font-size: 0.95rem; font-weight: 700; line-height: 1.2; letter-spacing: -0.01em; }
+    .detail-line-card__qty {
+      font-size: 0.85rem; font-weight: 800; min-width: 2rem; text-align: center;
+      padding: 3px 8px; border-radius: 999px; background: rgba(255,255,255,0.08); color: #f8fafc;
+      grid-column: 2; grid-row: 1 / span 2; align-self: center;
+    }
+    .detail-line-card__station {
+      grid-column: 1; font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .detail-line-empty {
+      padding: 8px 10px; border-radius: var(--radius-sm); border: 1px dashed rgba(251, 191, 36, 0.45);
+      color: #fbbf24; background: rgba(245, 158, 11, 0.08); font-size: 12px; line-height: 1.4;
+    }
+    .actions-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px; border: 1px solid rgba(56,189,248,0.22); border-radius: var(--radius-sm); background: rgba(56,189,248,0.06); }
     .actions-row:empty { display: none; }
     .line-empty { color: #fbbf24; background: rgba(245, 158, 11, 0.08); }
     .btn-waiting { background: rgba(56, 189, 248, 0.15); color: #7dd3fc; border: 1px solid rgba(56, 189, 248, 0.35); }
@@ -252,22 +343,23 @@
     }
     .sort-btn:hover { background: var(--surface-hover); }
     .sort-btn.active { border-color: rgba(232, 168, 56, 0.5); background: rgba(232, 168, 56, 0.12); font-weight: 600; }
-    .menu-section { margin-bottom: 18px; }
+    .menu-section { margin-bottom: 22px; }
     .menu-section h3 { margin: 0 0 10px; font-size: 0.85rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em; }
     .menu-section h4, .menu-sub { margin: 12px 0 8px; font-size: 0.8rem; color: var(--text-muted); }
-    .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+    .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
     button.menu-card {
       background: var(--navy-elev); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px;
-      font-size: 13px; line-height: 1.4;
-      display: grid; grid-template-columns: 76px 1fr; gap: 12px; align-items: start;
+      font-size: 13px; line-height: 1.45;
+      display: grid; grid-template-columns: 88px 1fr; gap: 12px; align-items: start;
       text-align: left; cursor: pointer; font-family: inherit; color: inherit;
       width: 100%; transition: border-color 0.15s, transform 0.12s, box-shadow 0.12s;
     }
+    button.menu-card--unavailable { opacity: 0.78; border-color: rgba(248, 113, 113, 0.25); }
     button.menu-card:hover { border-color: rgba(232, 168, 56, 0.45); transform: translateY(-2px); box-shadow: 0 10px 28px rgba(0,0,0,0.22); }
     button.menu-card:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
-    .menu-card-text { min-width: 0; }
+    .menu-card-text { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
     .menu-thumb {
-      width: 76px; height: 76px; border-radius: 10px; overflow: hidden;
+      width: 88px; height: 88px; border-radius: 10px; overflow: hidden;
       background: linear-gradient(145deg, #e2e8f0, #f8fafc); flex-shrink: 0;
     }
     .menu-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -277,9 +369,54 @@
       font-size: 1.35rem; opacity: 0.4;
     }
     .menu-thumb-ph.hidden { display: none !important; }
-    .menu-card .title { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
-    .menu-card .price { color: var(--amber-dim); font-weight: 600; margin-bottom: 8px; }
-    .menu-card .ing { font-size: 12px; color: var(--text-muted); }
+    .menu-card-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 10px; }
+    .menu-card .title { font-weight: 700; font-size: 15px; margin: 0; line-height: 1.25; }
+    .menu-card .price { color: var(--amber); font-weight: 700; font-size: 14px; margin: 0; white-space: nowrap; }
+    .menu-card-meta {
+      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 10px;
+      font-size: 11px; color: var(--text-muted);
+    }
+    .menu-card-meta span { display: block; }
+    .menu-card-meta strong { color: #cbd5e1; font-weight: 600; }
+    .menu-card-id { font-family: ui-monospace, Consolas, monospace; font-size: 10px; letter-spacing: 0.02em; word-break: break-all; }
+    .menu-card-prep { color: #a5b4fc; }
+    .menu-card-avail--ok { color: #34d399; font-weight: 600; }
+    .menu-card-avail--no { color: #f87171; font-weight: 600; }
+    .menu-card-desc,
+    .menu-card-comp {
+      margin: 0; font-size: 12px; color: #cbd5e1;
+    }
+    .menu-card-desc { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .menu-card-comp { color: var(--text-muted); }
+    .menu-card-comp strong { color: #cbd5e1; font-weight: 600; margin-right: 6px; }
+    .menu-card-comp-note { font-style: italic; font-size: 11px; color: var(--text-muted); }
+    .menu-composition-chips {
+      display: flex; flex-wrap: wrap; gap: 6px 8px; margin: 0; align-items: center;
+    }
+    .menu-composition-chips--inline { display: inline-flex; vertical-align: middle; }
+    .menu-composition-chip {
+      display: inline-block; padding: 4px 10px; font-size: 12px; line-height: 1.35;
+      color: #e2e8f0; background: rgba(15, 23, 42, 0.55);
+      border: 1px solid rgba(148, 163, 184, 0.28); border-radius: 8px; font-style: normal;
+    }
+    .menu-composition-chips--detail { margin-top: 2px; }
+    .menu-composition-chips--detail .menu-composition-chip { font-size: 13px; padding: 5px 12px; }
+    .menu-card-ing-title {
+      font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin: 0 0 4px;
+    }
+    .menu-card-ing-list { list-style: none; margin: 0; padding: 0; font-size: 11px; }
+    .menu-card-ing-list li {
+      display: grid; grid-template-columns: 1fr auto auto; gap: 8px; padding: 3px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .menu-card-ing-list li:last-child { border-bottom: none; }
+    .menu-card-ing-name { color: #e2e8f0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .menu-card-ing-recipe { color: #94a3b8; white-space: nowrap; }
+    .menu-card-ing-stock { white-space: nowrap; font-weight: 600; }
+    .menu-card-ing-stock--ok { color: #6ee7b7; }
+    .menu-card-ing-stock--low { color: #fbbf24; }
+    .menu-card-ing-stock--out { color: #f87171; }
+    .menu-card-hint { font-size: 10px; color: #64748b; margin: 0; }
     .inv-list { display: flex; flex-direction: column; gap: 10px; max-height: min(72vh, 940px); overflow-y: auto; }
     .inv-card {
       background: var(--navy-elev); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px;
@@ -301,40 +438,124 @@
     .badge-qty-ok { background: #ecfdf5; color: #047857; }
     .modal-backdrop {
       position: fixed; inset: 0; background: rgba(15,24,35,0.45); display: flex; align-items: center; justify-content: center;
-      padding: 16px; z-index: 200;
+      padding: 16px; z-index: 200; pointer-events: auto;
     }
-    .modal-backdrop.hidden { display: none !important; }
+    .modal-backdrop.hidden { display: none !important; pointer-events: none; }
     .modal-card {
       background: var(--surface); color: var(--text-dark); border: 1px solid var(--border); border-radius: var(--radius); max-width: 420px; width: 100%;
       padding: 20px 22px; box-shadow: 0 28px 70px rgba(0,0,0,0.55);
     }
+    .modal-card--menu {
+      position: relative; max-width: min(640px, 96vw); max-height: min(88vh, 820px); overflow: auto;
+      padding: 22px 24px 24px; border-color: rgba(232, 168, 56, 0.22);
+    }
+    .menu-detail-close {
+      position: absolute; top: 12px; right: 12px; z-index: 2;
+      width: 40px; height: 40px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      background: var(--navy-elev); color: var(--text-dark); font-size: 22px; line-height: 1;
+      cursor: pointer; font-family: inherit; display: flex; align-items: center; justify-content: center;
+    }
+    .menu-detail-close:hover { border-color: rgba(232, 168, 56, 0.5); color: var(--amber); }
+    .menu-detail-layout {
+      display: grid; grid-template-columns: minmax(120px, 160px) 1fr; gap: 18px 20px; align-items: start;
+    }
+    @media (max-width: 520px) {
+      .menu-detail-layout { grid-template-columns: 1fr; }
+    }
+    .menu-detail-thumb {
+      width: 100%; aspect-ratio: 1; border-radius: 12px; overflow: hidden;
+      background: linear-gradient(145deg, #1e293b, #0f172a); border: 1px solid var(--border);
+    }
+    .menu-detail-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .menu-detail-thumb-ph {
+      width: 100%; height: 100%; min-height: 120px; display: flex; align-items: center; justify-content: center;
+      font-size: 2.5rem; opacity: 0.35;
+    }
+    .menu-detail-head { padding-right: 36px; }
+    .menu-detail-title { margin: 0 0 6px; font-size: 1.35rem; font-weight: 700; line-height: 1.25; color: #f8fafc; }
+    .menu-detail-price { margin: 0 0 10px; font-size: 1.25rem; font-weight: 700; color: var(--amber); }
+    .menu-detail-avail { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 12px; }
+    .menu-detail-avail--ok { color: #34d399; }
+    .menu-detail-avail--no { color: #f87171; }
+    .menu-detail-grid {
+      display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px;
+      font-size: 14px; margin: 0 0 14px;
+    }
+    .menu-detail-grid div span {
+      display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--text-muted); margin-bottom: 3px;
+    }
+    .menu-detail-grid strong { font-weight: 600; color: #e2e8f0; word-break: break-word; }
+    .menu-detail-grid .mono { font-size: 13px; }
+    .menu-detail-block { margin: 0 0 14px; }
+    .menu-detail-block h4 {
+      margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); font-weight: 600;
+    }
+    .menu-detail-block p { margin: 0; font-size: 15px; line-height: 1.55; color: #e2e8f0; }
+    .menu-detail-ing-table {
+      width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 4px;
+    }
+    .menu-detail-ing-table th {
+      text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border);
+      color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+    }
+    .menu-detail-ing-table td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .menu-detail-ing-table tr:last-child td { border-bottom: none; }
+    .menu-detail-suff--ok { color: #6ee7b7; font-weight: 600; }
+    .menu-detail-suff--no { color: #fbbf24; font-weight: 600; }
+    .menu-detail-suff--out { color: #f87171; font-weight: 600; }
+    .menu-detail-main { min-width: 0; }
+    .menu-card-filter-link {
+      background: none; border: none; padding: 0; font: inherit; font-size: inherit; color: var(--amber);
+      cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
+    }
+    .menu-card-filter-link:hover { color: #fde68a; }
+    #menuDetailModal { z-index: 250; background: rgba(8, 10, 16, 0.72); }
     .modal-card h3 { margin: 0 0 12px; font-size: 1.05rem; }
     .modal-card label { color: #64748b; }
     .modal-card .row { margin-bottom: 12px; }
     .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap; }
     .modal-actions .btn { min-width: 100px; }
+    .kitchen-work-summary {
+      margin: 0; padding: 8px 12px; border-radius: var(--radius-sm);
+      background: rgba(232, 168, 56, 0.12); border: 1px solid rgba(232, 168, 56, 0.45);
+      color: #fde68a; font-size: 13px; font-weight: 600;
+    }
+    .detail-priority .kitchen-work-summary { margin: 0; }
+    .ticket-work-chip {
+      display: inline-block; margin-top: 6px; padding: 3px 8px; border-radius: 6px;
+      background: rgba(232, 168, 56, 0.18); color: #fde68a; font-size: 10px; font-weight: 700;
+      letter-spacing: 0.06em; text-transform: uppercase;
+    }
+    .line-badge {
+      display: inline-block; margin-left: 8px; padding: 2px 6px; border-radius: 4px;
+      font-size: 10px; font-weight: 800; letter-spacing: 0.08em; vertical-align: middle;
+    }
+    .line-badge--new { background: rgba(232, 168, 56, 0.25); color: #fde68a; }
+    .line-badge--prepared { background: rgba(148, 163, 184, 0.2); color: #94a3b8; }
   </style>
 </head>
 <body>
   <div id="loginWrap" class="main-area">
     <div class="card">
-      <h1>Kitchen / Bar</h1>
-      <p class="lead">Sign in with your kitchen or bar station ID. Receive tickets into prep, then mark ready for server pickup.</p>
+      <h1>Kitchen</h1>
+      <p class="lead">Sign in with your kitchen station ID. Receive food tickets into prep, then mark ready for server pickup.</p>
       <div id="loginErr" class="danger hidden"></div>
       <label for="staffId">Sign-in ID</label>
       <input id="staffId" type="text" autocomplete="username">
       <label for="pin">PIN</label>
       <input id="pin" type="password" autocomplete="current-password">
       <button type="button" class="btn btn-primary btn-block" id="btnLogin">Sign in</button>
-      <p class="muted" style="margin-top:14px;">Use the same credentials as the desktop Kitchen / Bar role. Open this page from your API host so login can reach <span class="mono">/api</span>.</p>
+      <p class="muted" style="margin-top:14px;">Use the same credentials as the desktop kitchen role (Chef, Sous Chef). Open this page from your API host so login can reach <span class="mono">/api</span>.</p>
     </div>
   </div>
 
   <div id="app" class="layout hidden">
     <aside class="sidebar">
-      <div>
-        <div class="brand">ELITE KITCHEN</div>
-        <div class="brand-sub">Queue &amp; prep workspace — aligned with the desktop kitchen flow.</div>
+      <div class="brand-wrap">
+        <img id="brandLogo" class="brand-logo hidden" alt="Restaurant logo">
+        <div id="brandName" class="brand">Kitchen</div>
+        <div class="brand-sub">Food queue &amp; prep — drinks use the Bar/Drink portal.</div>
       </div>
       <div class="nav-stack">
         <button type="button" class="nav-btn active" id="navQueue" data-view="queue">Queue</button>
@@ -374,8 +595,31 @@
         <div class="detail-card" id="detailPane">
           <h4>Ticket detail</h4>
         <p id="detailEmpty" class="muted">Select a ticket from Incoming, In kitchen, or Picked up to view items and notes.</p>
-        <div id="detailContent" class="hidden">
-          <div class="detail-grid">
+        <div id="detailContent" class="hidden detail-layout">
+          <header class="detail-priority">
+            <div class="actions-row" id="detailActions"></div>
+            <div class="detail-notes" aria-label="Customer and allergy notes">
+              <div class="detail-notes__block">
+                <span class="detail-notes__label">Customer notes</span>
+                <p id="dCust" class="detail-notes__text"></p>
+              </div>
+              <div class="detail-notes__block">
+                <span class="detail-notes__label">Allergy notes</span>
+                <p id="dAllergy" class="detail-notes__text"></p>
+              </div>
+            </div>
+            <div class="detail-source" id="dSourceBlock" aria-label="Order source and fulfillment">
+              <span id="dSourceBadge" class="kds-origin-badge kds-origin-badge--instore"></span>
+              <p id="dSourceMeta" class="detail-source__meta"></p>
+            </div>
+            <p id="dKitchenWork" class="kitchen-work-summary hidden" role="status"></p>
+          </header>
+          <section class="detail-items-section detail-items-section--scroll" aria-labelledby="detailItemsHeading">
+            <h5 id="detailItemsHeading" class="detail-items-heading">Dishes on this ticket</h5>
+            <div id="dLines" class="detail-line-list" role="list"></div>
+          </section>
+          <footer class="detail-meta-footer">
+            <div class="detail-grid detail-grid--compact" aria-label="Ticket metadata">
             <div><span>Code</span><strong id="dCode"></strong></div>
             <div><span>Table</span><span id="dTable"></span></div>
             <div><span>Server</span><span id="dServer"></span></div>
@@ -383,20 +627,10 @@
             <div><span>Created</span><span id="dTime"></span></div>
             <div><span>Ticket total</span><strong id="dTotal"></strong></div>
             <div><span>Fulfillment</span><strong id="dOrigin"></strong></div>
-          </div>
-          <div class="actions-row" id="detailActions"></div>
-          <div>
-            <span class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;">Customer notes</span>
-            <p id="dCust" style="margin:6px 0 10px;font-size:13px;"></p>
-            <span class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;">Allergy notes</span>
-            <p id="dAllergy" style="margin:6px 0 0;font-size:13px;"></p>
-          </div>
-          <table class="line-table" style="margin-top:14px;">
-            <thead><tr><th>Item</th><th>Qty</th><th>Station</th></tr></thead>
-            <tbody id="dLines"></tbody>
-          </table>
+            </div>
+          </footer>
         </div>
-      </div>
+        </div>
       </div>
 
       <div id="viewMenu" class="view-panel hidden">
@@ -407,7 +641,7 @@
             <button type="button" class="btn btn-ghost" id="btnRefreshMenu">Refresh</button>
           </div>
         </div>
-        <p class="muted" style="margin:0;">Products, photos when stored for the public menu, and linked inventory ingredients (read-only).</p>
+        <p class="muted" style="margin:0;">Full menu reference: prep time, menu ID, description, recipe ingredients with on-hand stock, and availability.</p>
         <div id="menuBody"></div>
       </div>
 
@@ -429,6 +663,13 @@
         <div id="invBody" class="inv-list"></div>
       </div>
     </main>
+  </div>
+
+  <div id="menuDetailModal" class="modal-backdrop hidden" aria-hidden="true">
+    <div class="modal-card modal-card--menu" role="dialog" aria-modal="true" aria-labelledby="menuDetailTitle">
+      <button type="button" class="menu-detail-close" id="menuDetailClose" aria-label="Close">&times;</button>
+      <div id="menuDetailContent"></div>
+    </div>
   </div>
 
   <div id="adjustModal" class="modal-backdrop hidden" aria-hidden="true">
@@ -477,10 +718,68 @@
   let inventoryCache = [];
   let inventorySortMode = "name";
   let adjustingItemId = null;
-  let invByIdForMenu = {};
   let menuCatalogRows = [];
+  let menuDetailKeydownBound = false;
+  let portalConfig = { restaurantName: "", restaurantLogoUrl: "" };
+  const KITCHEN_TOKEN_KEY = "eliteKitchenWebJwt";
+  const KITCHEN_ME_KEY = "eliteKitchenWebMe";
+  const PREP_STATION_PORTAL = "Kitchen";
 
   function $(id) { return document.getElementById(id); }
+
+  function revokeImgBlob(el) {
+    const s = el.getAttribute("src") || "";
+    if (s.startsWith("blob:")) {
+      URL.revokeObjectURL(s);
+      el.removeAttribute("src");
+    }
+  }
+
+  /** Load image via Bearer auth; plain img src cannot attach Authorization. */
+  async function setAuthImage(el, path) {
+    revokeImgBlob(el);
+    if (!path || !token) {
+      el.classList.add("hidden");
+      return;
+    }
+    try {
+      const res = await fetch(path, { headers: { Authorization: "Bearer " + token } });
+      if (!res.ok) throw new Error("unauthorized or missing");
+      const blob = await res.blob();
+      el.src = URL.createObjectURL(blob);
+      el.classList.remove("hidden");
+      el.onerror = () => el.classList.add("hidden");
+    } catch {
+      el.classList.add("hidden");
+    }
+  }
+
+  async function loadPortalBranding() {
+    const cfg = await api("/api/kitchen/config", "GET", null, true);
+    if (!cfg.ok) return false;
+    const body = cfg.body || {};
+    portalConfig = {
+      restaurantName: body.restaurantName ?? body.RestaurantName ?? "",
+      restaurantLogoUrl: body.restaurantLogoUrl ?? body.RestaurantLogoUrl ?? ""
+    };
+    const brandNameEl = $("brandName");
+    const brandLogoEl = $("brandLogo");
+    brandNameEl.textContent = (portalConfig.restaurantName || "Elite Kitchen").toUpperCase();
+    if (portalConfig.restaurantLogoUrl) {
+      await setAuthImage(brandLogoEl, portalConfig.restaurantLogoUrl);
+    } else {
+      revokeImgBlob(brandLogoEl);
+      brandLogoEl.classList.add("hidden");
+    }
+    return true;
+  }
+
+  function resetPortalBranding() {
+    $("brandName").textContent = "Kitchen";
+    revokeImgBlob($("brandLogo"));
+    $("brandLogo").classList.add("hidden");
+    portalConfig = { restaurantName: "", restaurantLogoUrl: "" };
+  }
 
   function sameOrderId(a, b) {
     if (a == null || b == null) return false;
@@ -497,6 +796,49 @@
     return [];
   }
 
+  function kitchenWorkSummaryText(o) {
+    return String(o.kitchenWorkSummary ?? o.KitchenWorkSummary ?? "").trim();
+  }
+
+  function lineKitchenPreparedAt(it) {
+    return it.kitchenPreparedAt ?? it.KitchenPreparedAt ?? null;
+  }
+
+  function isDrinkCategory(cat) {
+    const c = String(cat ?? "").trim().toLowerCase();
+    return c === "drink" || c === "drinks" || c === "beverage" || c === "beverages" || c === "bar";
+  }
+
+  function portalLineItems(o) {
+    return orderLineItems(o).filter(it => {
+      hydrateOrder(o);
+      const pid = it.productId ?? it.ProductId;
+      const pr = it._product || products[pid];
+      const drink = isDrinkCategory(pr ? (pr.category ?? pr.Category) : "");
+      return PREP_STATION_PORTAL === "Kitchen" ? !drink : drink;
+    });
+  }
+
+  function allPortalLinesPrepared(o) {
+    const lines = portalLineItems(o);
+    return lines.length > 0 && lines.every(it => !!lineKitchenPreparedAt(it));
+  }
+
+  function lineIsNewForKitchen(it, allItems) {
+    if (it.isNewForKitchen != null) return !!it.isNewForKitchen;
+    if (it.IsNewForKitchen != null) return !!it.IsNewForKitchen;
+    const prepared = lineKitchenPreparedAt(it);
+    if (prepared) return false;
+    return allItems.some(x => lineKitchenPreparedAt(x));
+  }
+
+  function lineKitchenStatus(it, allItems) {
+    const explicit = String(it.kitchenLineStatus ?? it.KitchenLineStatus ?? "").trim().toLowerCase();
+    if (explicit === "new" || explicit === "prepared") return explicit;
+    if (lineKitchenPreparedAt(it)) return "prepared";
+    return lineIsNewForKitchen(it, allItems) ? "new" : "new";
+  }
+
   /** Lowercase, collapse spaces — matches literals like `Pending approval`, `In kitchen`. */
   function kitchenStatusKey(st) {
     const n = String(st ?? "").trim().toLowerCase().replace(/\s+/g, " ");
@@ -507,6 +849,12 @@
     if (n === "served") return "served";
     if (n === "pending cashier") return "pendingCashier";
     return "other";
+  }
+
+  /** Kitchen KDS: Waiting / In kitchen / Ready only (after cashier release). */
+  function isKitchenKdsVisible(st) {
+    const k = kitchenStatusKey(st);
+    return k === "waiting" || k === "inKitchen" || k === "ready";
   }
 
   function newIdempotencyKey() {
@@ -805,23 +1153,275 @@
     return ($("menuSearch").value || "").trim().toLowerCase();
   }
 
+  function productPrepMinutes(p) {
+    const n = Number(p && (p.prepMinutes ?? p.PrepMinutes));
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
+  }
+
+  function productCookTimeLabel(p) {
+    const m = productPrepMinutes(p);
+    return m > 0 ? m + " min prep" : "Prep: category estimate";
+  }
+
+  function formatMenuQty(n) {
+    const x = Number(n);
+    if (!Number.isFinite(x)) return "0";
+    const r = Math.round(x * 100) / 100;
+    return (r % 1 === 0 ? String(r) : r.toFixed(2)).replace(/\.?0+$/, "");
+  }
+
+  function parseCompositionParts(composition) {
+    const raw = (composition == null ? "" : String(composition)).trim();
+    if (!raw) return [];
+    return raw.split(",").map(part => part.trim()).filter(Boolean);
+  }
+
+  function renderMenuCompositionChipsHtml(compositionOrParts, extraClass) {
+    const parts = Array.isArray(compositionOrParts)
+      ? compositionOrParts
+      : parseCompositionParts(compositionOrParts);
+    if (!parts.length) return "";
+    const wrapCls = "menu-composition-chips" + (extraClass ? " " + extraClass : "");
+    let html = '<div class="' + wrapCls + '">';
+    for (const part of parts) {
+      html += '<span class="menu-composition-chip">' + escapeHtml(part) + "</span>";
+    }
+    return html + "</div>";
+  }
+
+  function normalizeMenuProduct(raw) {
+    const ingredients = (raw.ingredients ?? raw.Ingredients ?? []).map(ing => ({
+      inventoryItemId: ing.inventoryItemId ?? ing.InventoryItemId,
+      name: (ing.name ?? ing.Name ?? "").trim(),
+      unit: (ing.unit ?? ing.Unit ?? "").trim(),
+      recipeQuantity: Number(ing.recipeQuantity ?? ing.RecipeQuantity ?? 0),
+      stockQuantity: Number(ing.stockQuantity ?? ing.StockQuantity ?? 0),
+      sufficient: ing.sufficientForRecipe ?? ing.SufficientForRecipe ?? true
+    }));
+    return {
+      id: raw.id ?? raw.Id,
+      uniqueId: (raw.uniqueId ?? raw.UniqueId ?? "").trim(),
+      name: (raw.name ?? raw.Name ?? "").trim(),
+      category: (raw.category ?? raw.Category ?? "").trim() || "Menu",
+      subCategory: (raw.subCategory ?? raw.SubCategory ?? "").trim() || "General",
+      price: Number(raw.price ?? raw.Price ?? 0),
+      prepMinutes: productPrepMinutes(raw),
+      inStock: raw.inStock ?? raw.InStock ?? true,
+      photoUrl: (raw.photoUrl ?? raw.PhotoUrl ?? "").trim(),
+      description: (raw.description ?? raw.Description ?? "").trim(),
+      composition: (raw.composition ?? raw.Composition ?? "").trim(),
+      ingredients
+    };
+  }
+
+  function menuProductSearchHaystack(row) {
+    const p = row.p;
+    const ingParts = (p.ingredients || []).map(i =>
+      i.name + " " + i.unit + " " + formatMenuQty(i.recipeQuantity) + " " + formatMenuQty(i.stockQuantity)
+    );
+    return [
+      p.name,
+      p.uniqueId,
+      String(p.id),
+      p.category,
+      p.subCategory,
+      p.description,
+      p.composition,
+      productCookTimeLabel(p),
+      String(p.prepMinutes),
+      "$" + p.price.toFixed(2),
+      p.inStock ? "available" : "unavailable",
+      ingParts.join(" ")
+    ].join("\n").toLowerCase();
+  }
+
   function invSearchQuery() {
     return ($("invSearch").value || "").trim().toLowerCase();
+  }
+
+  function ingredientStockClass(ing) {
+    if (ing.stockQuantity <= 0) return "menu-card-ing-stock--out";
+    if (!ing.sufficient) return "menu-card-ing-stock--low";
+    return "menu-card-ing-stock--ok";
+  }
+
+  function renderMenuIngredientsHtml(p) {
+    const ings = p.ingredients || [];
+    if (!ings.length) {
+      const compChips = renderMenuCompositionChipsHtml(p.composition, "menu-composition-chips--inline");
+      if (compChips)
+        return '<div class="menu-card-comp" style="margin:0;">' + compChips + '<span class="menu-card-comp-note"> (display composition — no recipe linked)</span></div>';
+      return '<p class="muted" style="margin:0;font-size:11px;">No recipe ingredients linked.</p>';
+    }
+    let html = '<p class="menu-card-ing-title">Recipe · on hand</p><ul class="menu-card-ing-list">';
+    for (const ing of ings) {
+      const unit = ing.unit ? " " + ing.unit : "";
+      const recipe = formatMenuQty(ing.recipeQuantity) + unit;
+      const stock = formatMenuQty(ing.stockQuantity) + unit;
+      const stockCls = ingredientStockClass(ing);
+      html += "<li><span class=\"menu-card-ing-name\">" + escapeHtml(ing.name || "?") + "</span>";
+      html += "<span class=\"menu-card-ing-recipe\">" + escapeHtml(recipe) + "</span>";
+      html += "<span class=\"menu-card-ing-stock " + stockCls + "\">" + escapeHtml(stock) + "</span></li>";
+    }
+    return html + "</ul>";
+  }
+
+  function findMenuCatalogRow(productId) {
+    const id = Number(productId);
+    if (!Number.isFinite(id)) return null;
+    return menuCatalogRows.find(row => Number(row.p.id) === id) || null;
+  }
+
+  /** Menu detail modal row: full catalog first, then admin products snapshot. */
+  function resolveMenuDetailRow(productId) {
+    const catalog = findMenuCatalogRow(productId);
+    if (catalog) return catalog;
+    const pid = Number(productId);
+    if (!Number.isFinite(pid)) return null;
+    const pr = products[pid];
+    if (!pr) return null;
+    return { p: normalizeMenuProduct(pr), photoUrl: "" };
+  }
+
+  function minimalMenuDetailRow(productId, displayName) {
+    const pid = Number(productId);
+    const name = String(displayName || "").trim() || ("Product #" + pid);
+    return {
+      p: {
+        id: pid,
+        uniqueId: "#" + pid,
+        name,
+        category: "Menu",
+        subCategory: "—",
+        price: 0,
+        prepMinutes: 0,
+        inStock: true,
+        photoUrl: "",
+        description: "",
+        composition: "",
+        ingredients: []
+      },
+      photoUrl: ""
+    };
+  }
+
+  function ingredientSufficientLabel(ing) {
+    if (ing.stockQuantity <= 0) return { text: "Out", cls: "menu-detail-suff--out" };
+    if (!ing.sufficient) return { text: "Insufficient", cls: "menu-detail-suff--no" };
+    return { text: "Sufficient", cls: "menu-detail-suff--ok" };
+  }
+
+  function renderMenuDetailIngredientsTable(p) {
+    const ings = p.ingredients || [];
+    if (!ings.length) {
+      const compChips = renderMenuCompositionChipsHtml(p.composition, "menu-composition-chips--detail");
+      if (compChips)
+        return '<div style="margin:0;font-size:14px;">' + compChips + '<p class="muted" style="margin:8px 0 0;font-size:13px;">Display composition — no recipe linked.</p></div>';
+      return '<p class="muted" style="margin:0;font-size:14px;">No recipe ingredients linked.</p>';
+    }
+    let html =
+      '<table class="menu-detail-ing-table"><thead><tr>' +
+      "<th>Ingredient</th><th>Recipe qty</th><th>On hand</th><th>Stock</th>" +
+      "</tr></thead><tbody>";
+    for (const ing of ings) {
+      const unit = ing.unit ? " " + ing.unit : "";
+      const recipe = formatMenuQty(ing.recipeQuantity) + unit;
+      const stock = formatMenuQty(ing.stockQuantity) + unit;
+      const suff = ingredientSufficientLabel(ing);
+      html += "<tr>";
+      html += "<td>" + escapeHtml(ing.name || "?") + "</td>";
+      html += "<td>" + escapeHtml(recipe) + "</td>";
+      html += "<td>" + escapeHtml(stock) + "</td>";
+      html += '<td class="' + suff.cls + '">' + escapeHtml(suff.text) + "</td>";
+      html += "</tr>";
+    }
+    return html + "</tbody></table>";
+  }
+
+  function renderMenuDetailModalHtml(row) {
+    const p = row.p;
+    const ok = !!p.inStock;
+    const menuId = p.uniqueId || ("#" + p.id);
+    const photoFull = row.photoUrl ? absMediaUrl(row.photoUrl) : "";
+    let thumb =
+      '<div class="menu-detail-thumb"><div class="menu-detail-thumb-ph" aria-hidden="true">🍽</div></div>';
+    if (photoFull) {
+      thumb =
+        '<div class="menu-detail-thumb">' +
+        '<img src="' + escapeHtml(photoFull) + '" alt="">' +
+        '<div class="menu-detail-thumb-ph hidden" aria-hidden="true">🍽</div></div>';
+    }
+    const availCls = ok ? "menu-detail-avail--ok" : "menu-detail-avail--no";
+    const prepLabel = productCookTimeLabel(p);
+    const prepDetail = p.prepMinutes > 0 ? (p.prepMinutes + " min") : prepLabel;
+    let html = '<div class="menu-detail-layout">';
+    html += thumb;
+    html += '<div class="menu-detail-main">';
+    html += '<div class="menu-detail-head">';
+    html += '<h2 id="menuDetailTitle" class="menu-detail-title">' + escapeHtml(p.name) + "</h2>";
+    html += '<p class="menu-detail-price">$ ' + p.price.toFixed(2) + "</p>";
+    html += '<span class="menu-detail-avail ' + availCls + '">' + (ok ? "Available" : "Unavailable") + "</span>";
+    html += "</div>";
+    html += '<div class="menu-detail-grid">';
+    html += "<div><span>Menu ID</span><strong class=\"mono\">" + escapeHtml(menuId) + "</strong></div>";
+    html += "<div><span>Internal ID</span><strong class=\"mono\">" + escapeHtml(String(p.id)) + "</strong></div>";
+    html += "<div><span>Type</span><strong>" + escapeHtml(p.category) + "</strong></div>";
+    html += "<div><span>Subtype</span><strong>" + escapeHtml(p.subCategory) + "</strong></div>";
+    html += "<div><span>Prep / cook</span><strong>" + escapeHtml(prepDetail) + "</strong></div>";
+    html += "<div><span>Availability</span><strong>" + (ok ? "In stock" : "Unavailable") + "</strong></div>";
+    html += "</div>";
+    if (p.description) {
+      html += '<div class="menu-detail-block"><h4>Description</h4><p>' + escapeHtml(p.description) + "</p></div>";
+    }
+    const compParts = parseCompositionParts(p.composition);
+    if (compParts.length) {
+      html += '<div class="menu-detail-block"><h4>Composition</h4>';
+      html += renderMenuCompositionChipsHtml(compParts, "menu-composition-chips--detail");
+      html += "</div>";
+    }
+    html += '<div class="menu-detail-block"><h4>Ingredients</h4>' + renderMenuDetailIngredientsTable(p) + "</div>";
+    html += "</div></div>";
+    return html;
+  }
+
+  function onMenuDetailKeydown(ev) {
+    if (ev.key !== "Escape") return;
+    const modal = $("menuDetailModal");
+    if (!modal || modal.classList.contains("hidden")) return;
+    closeMenuDetailModal();
+  }
+
+  async function openMenuDetailModal(productId, displayName) {
+    let row = resolveMenuDetailRow(productId);
+    if (!row && !menuCatalogRows.length) {
+      try { await loadMenu(); } catch (_) { /* queue still works without catalog */ }
+      row = resolveMenuDetailRow(productId);
+    }
+    if (!row) row = minimalMenuDetailRow(productId, displayName);
+    $("menuDetailContent").innerHTML = renderMenuDetailModalHtml(row);
+    const modal = $("menuDetailModal");
+    modal.classList.remove("hidden");
+    modal.setAttribute("aria-hidden", "false");
+    if (!menuDetailKeydownBound) {
+      document.addEventListener("keydown", onMenuDetailKeydown);
+      menuDetailKeydownBound = true;
+    }
+    const closeBtn = $("menuDetailClose");
+    if (closeBtn) closeBtn.focus();
+  }
+
+  function closeMenuDetailModal() {
+    const modal = $("menuDetailModal");
+    if (!modal) return;
+    modal.classList.add("hidden");
+    modal.setAttribute("aria-hidden", "true");
+    $("menuDetailContent").innerHTML = "";
   }
 
   function renderMenuFromCatalog() {
     const q = menuSearchQuery();
     let rows = menuCatalogRows;
-    if (q) {
-      rows = menuCatalogRows.filter(row => {
-        const p = row.p;
-        const hay = (
-          p.name + "\n" + row.category + "\n" + row.subCategory + "\n" +
-          (p.description || "") + "\n" + (p.composition || "") + "\n" + row.ingText
-        ).toLowerCase();
-        return hay.includes(q);
-      });
-    }
+    if (q) rows = menuCatalogRows.filter(row => menuProductSearchHaystack(row).includes(q));
     if (!rows.length) {
       $("menuBody").innerHTML =
         q ? '<p class="muted">No dishes match your search.</p>' : '<p class="muted">No products.</p>';
@@ -848,6 +1448,10 @@
         const list = subs[sc].slice().sort((a, b) => a.p.name.localeCompare(b.p.name, undefined, { sensitivity: "base" }));
         for (const row of list) {
           const p = row.p;
+          const ok = !!p.inStock;
+          const cardCls = "menu-card" + (ok ? "" : " menu-card--unavailable");
+          const availCls = ok ? "menu-card-avail--ok" : "menu-card-avail--no";
+          const menuId = p.uniqueId || ("#" + p.id);
           const photoFull = row.photoUrl ? absMediaUrl(row.photoUrl) : "";
           let thumb = '<div class="menu-thumb"><div class="menu-thumb-ph">🍽</div></div>';
           if (photoFull) {
@@ -857,13 +1461,28 @@
               'onerror="this.classList.add(\'hidden\');var n=this.nextElementSibling;if(n)n.classList.remove(\'hidden\');">' +
               '<div class="menu-thumb-ph hidden" aria-hidden="true">🍽</div></div>';
           }
-          html += '<button type="button" class="menu-card" data-menu-filter="' + escapeHtml(p.name) + '">' + thumb + '<div class="menu-card-text">';
-          html += '<div class="title">' + escapeHtml(p.name) + '</div>';
-          html += '<div class="price">$ ' + p.price.toFixed(2) + '</div>';
+          html += '<button type="button" class="' + cardCls + '" data-menu-id="' + escapeHtml(String(p.id)) + '">' + thumb;
+          html += '<div class="menu-card-text">';
+          html += '<div class="menu-card-head"><div class="title">' + escapeHtml(p.name) + '</div>';
+          html += '<div class="price">$ ' + p.price.toFixed(2) + '</div></div>';
+          html += '<div class="menu-card-meta">';
+          html += '<span><strong>Type</strong> ' + escapeHtml(p.category) + '</span>';
+          html += '<span><strong>Subtype</strong> ' + escapeHtml(p.subCategory) + '</span>';
+          html += '<span class="menu-card-prep"><strong>Prep</strong> ' + escapeHtml(productCookTimeLabel(p)) + '</span>';
+          html += '<span class="' + availCls + '">' + (ok ? "Available" : "Unavailable") + '</span>';
+          html += '<span class="menu-card-id" style="grid-column:1/-1;"><strong>Menu ID</strong> ' + escapeHtml(menuId);
+          html += ' · <strong>#</strong>' + escapeHtml(String(p.id)) + '</span>';
+          html += '</div>';
           if (p.description)
-            html += '<div class="muted" style="margin-bottom:8px;font-size:12px;">' + escapeHtml(p.description) + '</div>';
-          html += '<div class="ing"><strong>Ingredients</strong> · ' + escapeHtml(row.ingText) + '</div>';
-          html += '<div class="muted" style="margin-top:8px;font-size:11px;">Tap to filter menu search</div>';
+            html += '<p class="menu-card-desc">' + escapeHtml(p.description) + '</p>';
+          if (p.composition && (p.ingredients || []).length) {
+            const cardComp = renderMenuCompositionChipsHtml(p.composition, "menu-composition-chips--inline");
+            if (cardComp)
+              html += '<div class="menu-card-comp"><strong>Composition</strong> ' + cardComp + "</div>";
+          }
+          html += renderMenuIngredientsHtml(p);
+          html += '<p class="menu-card-hint">Tap for full details · ';
+          html += '<span class="menu-card-filter-link" role="button" tabindex="0" data-menu-filter="' + escapeHtml(p.name) + '">Filter search</span></p>';
           html += '</div></button>';
         }
         html += '</div>';
@@ -873,7 +1492,14 @@
     $("menuBody").innerHTML = html;
     $("menuBody").querySelectorAll(".menu-card").forEach(btn => {
       btn.addEventListener("click", () => {
-        const q = btn.getAttribute("data-menu-filter") || "";
+        const id = btn.getAttribute("data-menu-id");
+        if (id) void openMenuDetailModal(id);
+      });
+    });
+    $("menuBody").querySelectorAll(".menu-card-filter-link").forEach(link => {
+      link.addEventListener("click", ev => {
+        ev.stopPropagation();
+        const q = link.getAttribute("data-menu-filter") || "";
         $("menuSearch").value = q;
         renderMenuFromCatalog();
       });
@@ -881,62 +1507,17 @@
   }
 
   async function loadMenu() {
-    const [rp, rpi, ri, rpub] = await Promise.all([
-      api("/api/admin/data/products", "GET", null, true),
-      api("/api/admin/data/productingredients", "GET", null, true),
-      api("/api/admin/data/inventory", "GET", null, true),
-      api("/api/public/menu/products", "GET", null, false)
-    ]);
-    if (!rp.ok) throw new Error(rp.body?.message || "Failed to load products");
-    if (!rpi.ok) throw new Error(rpi.body?.message || "Failed to load product ingredients");
-    const photoById = {};
-    if (rpub.ok && Array.isArray(rpub.body)) {
-      for (const x of rpub.body) {
-        const id = x.id ?? x.Id;
-        const u = x.photoUrl ?? x.PhotoUrl;
-        if (id != null && u != null && String(u).trim())
-          photoById[id] = String(u).trim();
-      }
-    }
-    const invItems = (ri.ok ? (ri.body.items || ri.body.Items) : []) || [];
-    invByIdForMenu = {};
-    for (const raw of invItems) {
-      const n = invNormItem(raw);
-      if (n) invByIdForMenu[n.id] = n;
-    }
-    const prodList = (rp.body.items || rp.body.Items || []).map(p => ({
-      id: p.id ?? p.Id,
-      name: p.name ?? p.Name ?? "",
-      category: (p.category ?? p.Category ?? "").trim() || "Menu",
-      subCategory: (p.subCategory ?? p.SubCategory ?? "").trim() || "General",
-      price: Number(p.price ?? p.Price ?? 0),
-      description: (p.description ?? p.Description ?? "").trim(),
-      composition: (p.composition ?? p.Composition ?? "").trim()
-    }));
-    const byProd = {};
-    for (const row of (rpi.body.items || rpi.body.Items || [])) {
-      const pid = row.productId ?? row.ProductId;
-      const iid = row.inventoryItemId ?? row.InventoryItemId;
-      const q = Number(row.quantity ?? row.Quantity ?? 0);
-      if (!byProd[pid]) byProd[pid] = [];
-      const inv = invByIdForMenu[iid];
-      const nm = inv ? inv.name : ("#" + iid);
-      const un = inv ? inv.unit : "";
-      byProd[pid].push({ name: nm, qty: q, unit: un });
-    }
+    const res = await api("/api/kitchen/menu-catalog", "GET", null, true);
+    if (!res.ok) throw new Error(res.body?.message || res.body?.title || "Failed to load menu catalog");
+    const list = Array.isArray(res.body) ? res.body : (res.body.items || res.body.Items || []);
     menuCatalogRows = [];
-    for (const p of prodList) {
-      const ing = byProd[p.id] || [];
-      const ingText = ing.length
-        ? ing.map(x => x.name + (x.qty ? " (" + x.qty + (x.unit ? " " + x.unit : "") + ")" : "")).join(", ")
-        : (p.composition || "—");
-      const photoUrl = photoById[p.id] || "";
+    for (const raw of list) {
+      const p = normalizeMenuProduct(raw);
       menuCatalogRows.push({
         p,
         category: p.category,
         subCategory: p.subCategory,
-        ingText,
-        photoUrl
+        photoUrl: p.photoUrl
       });
     }
     renderMenuFromCatalog();
@@ -1020,6 +1601,42 @@
    * KDS wiring: prefers `OriginType`; falls back to `OrderSource` (WalkIn, Delivery, Reservation, …). Missing ⇒ in-store plating.
    * @returns {{ ringClass: string, headline: string, detailLabel: string, badgeMod: string, iconSvg: string }}
    */
+  function customerFulfillmentDisplay(o) {
+    const disp = String(o.customerFulfillmentDisplay ?? o.CustomerFulfillmentDisplay ?? "").trim();
+    if (disp) return disp;
+    const code = String(o.customerFulfillmentStatus ?? o.CustomerFulfillmentStatus ?? "").trim();
+    if (code === "OutForDelivery") return "Out for delivery";
+    if (code === "ReadyForPickup") return "Ready for pick-up";
+    return code;
+  }
+
+  function setDetailNoteText(el, raw) {
+    if (!el) return;
+    const t = String(raw ?? "").trim();
+    el.textContent = t || "—";
+    el.classList.toggle("detail-notes__text--empty", !t);
+  }
+
+  function renderDetailSource(o) {
+    const origin = parseKitchenOrigin(o);
+    const badge = $("dSourceBadge");
+    if (badge) {
+      badge.className = "kds-origin-badge " + origin.badgeMod;
+      badge.innerHTML = origin.iconSvg + "<span>" + escapeHtml(origin.headline) + "</span>";
+    }
+    const os = String(o.orderSource ?? o.OrderSource ?? "").trim() || "—";
+    const fulfill = customerFulfillmentDisplay(o);
+    const parts = [];
+    if (os !== "—") parts.push("<strong>Order source:</strong> " + escapeHtml(os));
+    if (fulfill) parts.push("<strong>Customer fulfillment:</strong> " + escapeHtml(fulfill));
+    const metaEl = $("dSourceMeta");
+    if (metaEl) {
+      metaEl.innerHTML = parts.length
+        ? parts.join(" · ")
+        : escapeHtml(origin.detailLabel);
+    }
+  }
+
   function parseKitchenOrigin(o) {
     const rawOt = o.originType ?? o.OriginType;
 
@@ -1155,7 +1772,8 @@
       const q = it.quantity ?? it.Quantity ?? 0;
       const pr = it._product || products[pid];
       const name = pr ? (pr.name || pr.Name) : ("#" + pid);
-      parts.push(name + " ×" + q);
+      const tag = lineIsNewForKitchen(it, items) ? " [NEW]" : "";
+      parts.push(name + " ×" + q + tag);
     }
     return parts.join(", ") || "—";
   }
@@ -1192,20 +1810,17 @@
       const o = typeof raw === "object" && raw !== null ? { ...raw } : {};
       hydrateOrder(o);
       return o;
-    });
+    }).filter(o => isKitchenKdsVisible(o.status || o.Status));
     renderLists();
     renderDetail();
     $("lastUpdated").textContent = "Updated " + new Date().toLocaleTimeString();
   }
 
   function renderLists() {
-    const waiting = ordersCache.filter(o => {
-      const k = kitchenStatusKey(o.status || o.Status);
-      return k === "waiting" || k === "pendingApproval" || k === "pendingCashier";
-    }).sort((a, b) => {
+    const waiting = ordersCache.filter(o => kitchenStatusKey(o.status || o.Status) === "waiting").sort((a, b) => {
       const ca = new Date(a.createdAt || a.CreatedAt).getTime();
       const cb = new Date(b.createdAt || b.CreatedAt).getTime();
-      return ca - cb;
+      return cb - ca;
     });
     const prep = ordersCache.filter(o => kitchenStatusKey(o.status || o.Status) === "inKitchen").sort((a, b) => {
       const ca = new Date(a.createdAt || a.CreatedAt).getTime();
@@ -1260,6 +1875,9 @@
       '<div class="ticket-top"><span class="ticket-code">' + escapeHtml(orderCode(o)) + '</span>' +
       '<span class="ticket-time">' + escapeHtml(timeShort) + '</span></div>' +
       '<div class="ticket-meta">' + escapeHtml(tableLabel(o)) + " · " + escapeHtml(serverName(o)) + '</div>' +
+      (kitchenWorkSummaryText(o)
+        ? '<div class="ticket-work-chip">' + escapeHtml(kitchenWorkSummaryText(o)) + '</div>'
+        : '') +
       '<div class="ticket-lines">' + escapeHtml(shortenLines(o)) + '</div>';
     el.onclick = () => { selectedOrderId = id; renderLists(); renderDetail(); };
     return el;
@@ -1289,50 +1907,87 @@
     $("dTime").textContent = formatTime(o.createdAt || o.CreatedAt);
     const totEl = $("dTotal");
     if (totEl) totEl.textContent = "$ " + computeGrandTotal(o).toFixed(2);
-    $("dCust").textContent = (o.customerNotes || o.CustomerNotes || "").trim() || "—";
-    $("dAllergy").textContent = (o.allergyNotes || o.AllergyNotes || "").trim() || "—";
+    setDetailNoteText(
+      $("dCust"),
+      o.kitchenCustomerNotes ?? o.KitchenCustomerNotes ?? o.customerNotes ?? o.CustomerNotes
+    );
+    setDetailNoteText($("dAllergy"), o.allergyNotes || o.AllergyNotes);
+    renderDetailSource(o);
     $("dOrigin").textContent = parseKitchenOrigin(o).detailLabel;
 
-    const tbody = $("dLines");
-    tbody.innerHTML = "";
+    const workEl = $("dKitchenWork");
+    const workText = kitchenWorkSummaryText(o);
+    if (workEl) {
+      if (workText) {
+        workEl.textContent = workText;
+        workEl.classList.remove("hidden");
+      } else {
+        workEl.textContent = "";
+        workEl.classList.add("hidden");
+      }
+    }
+
+    const listEl = $("dLines");
+    listEl.innerHTML = "";
     const items = orderLineItems(o);
     const sorted = [...items].sort((a, b) => {
       const na = ((a._product || {}).name || (a._product || {}).Name || "").localeCompare(((b._product || {}).name || (b._product || {}).Name || ""));
       return na;
     });
     if (!sorted.length) {
-      const tr = document.createElement("tr");
+      const empty = document.createElement("p");
       const preview = itemPreviewText(o);
-      tr.className = "line-empty";
-      tr.innerHTML = preview
-        ? '<td colspan="3"><strong>Items:</strong> ' + escapeHtml(preview) + '</td>'
-        : '<td colspan="3"><strong>No item lines were sent for this ticket.</strong> Refresh the queue. If this stays empty, the order was saved without cookable line items.</td>';
-      tbody.appendChild(tr);
+      empty.className = "detail-line-empty";
+      empty.setAttribute("role", "listitem");
+      empty.innerHTML = preview
+        ? "<strong>Items:</strong> " + escapeHtml(preview)
+        : "<strong>No item lines were sent for this ticket.</strong> Refresh the queue. If this stays empty, the order was saved without cookable line items.";
+      listEl.appendChild(empty);
     }
     for (const it of sorted) {
       const pid = it.productId ?? it.ProductId;
       const pr = it._product || products[pid];
-      const name = pr ? (pr.name || pr.Name || "Item") : "Item";
+      const name = pr ? (pr.name || pr.Name || "Item") : (pid ? ("Item #" + pid) : "Item");
       const qty = it.quantity ?? it.Quantity ?? 0;
-      const station = it.preparedByRole || it.PreparedByRole || "—";
-      const tr = document.createElement("tr");
-      tr.innerHTML = "<td>" + escapeHtml(name) + "</td><td>" + escapeHtml(String(qty)) + "</td><td>" + escapeHtml(station) + "</td>";
-      tbody.appendChild(tr);
+      const station = (it.preparedByRole || it.PreparedByRole || "—").trim() || "—";
+      const isNew = lineIsNewForKitchen(it, items);
+      const isPrepared = lineKitchenStatus(it, items) === "prepared";
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "detail-line-card";
+      if (isNew) btn.classList.add("detail-line-card--new");
+      else if (isPrepared) btn.classList.add("detail-line-card--prepared");
+      btn.setAttribute("role", "listitem");
+      const badge = isNew
+        ? '<span class="line-badge line-badge--new">NEW</span>'
+        : isPrepared
+          ? '<span class="line-badge line-badge--prepared">Prepared</span>'
+          : "";
+      const qtyLabel = qty === 1 ? "×1" : "×" + qty;
+      btn.innerHTML =
+        '<div class="detail-line-card__main"><span class="detail-line-card__name">' + escapeHtml(name) + "</span>" + badge + "</div>" +
+        '<span class="detail-line-card__qty" aria-label="Quantity">' + escapeHtml(qtyLabel) + "</span>" +
+        '<span class="detail-line-card__station">Station · ' + escapeHtml(station) + "</span>";
+      if (pid) {
+        btn.onclick = () => { void openMenuDetailModal(pid, name); };
+      } else {
+        btn.disabled = true;
+        btn.removeAttribute("onclick");
+      }
+      listEl.appendChild(btn);
     }
 
     const actions = $("detailActions");
     actions.innerHTML = "";
     const id = o.id ?? o.Id;
-    if (stKey === "pendingApproval" || stKey === "pendingCashier") {
+    if (workText && (stKey === "waiting" || stKey === "inKitchen")) {
       const hint = document.createElement("p");
       hint.className = "muted";
-      hint.style.margin = "0";
-      hint.textContent =
-        stKey === "pendingCashier"
-          ? "This ticket is with the cashier. Kitchen cannot release it — ask the cashier to send it to prep."
-          : "Guest online order awaiting cashier approval. Only the cashier can release it to the kitchen.";
+      hint.style.margin = "0 0 10px";
+      hint.textContent = "Prepare NEW lines only — already-prepared items do not need re-cooking.";
       actions.appendChild(hint);
-    } else if (stKey === "waiting") {
+    }
+    if (stKey === "waiting") {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "btn btn-waiting";
@@ -1340,12 +1995,20 @@
       b.onclick = () => advanceOrder(id, "waiting");
       actions.appendChild(b);
     } else if (stKey === "inKitchen") {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "btn btn-ready";
-      b.textContent = "Mark ready for pickup";
-      b.onclick = () => advanceOrder(id, "prep");
-      actions.appendChild(b);
+      if (allPortalLinesPrepared(o)) {
+        const p = document.createElement("p");
+        p.className = "muted";
+        p.style.margin = "0";
+        p.textContent = "Food prep complete — ticket stays here until bar finishes drinks, then moves to Ready.";
+        actions.appendChild(p);
+      } else {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "btn btn-ready";
+        b.textContent = "Mark food ready";
+        b.onclick = () => advanceOrder(id, "prep");
+        actions.appendChild(b);
+      }
     } else if (stKey === "ready") {
       const p = document.createElement("p");
       p.className = "muted";
@@ -1361,17 +2024,6 @@
     }
   }
 
-  async function releasePendingToKitchen(orderId) {
-    if (!confirm("Approve this order and release it to the kitchen? Inventory will be deducted.")) return;
-    const res = await api("/api/admin/orders/pending/" + orderId + "/release-to-kitchen", "POST", {}, true);
-    const ok = res.body?.ok ?? res.body?.Ok;
-    if (!res.ok || ok === false) {
-      alert(res.body?.errorMessage || res.body?.ErrorMessage || "Release failed (" + res.status + ")");
-      return;
-    }
-    await loadQueue();
-  }
-
   async function advanceOrder(orderId, from) {
     const o = ordersCache.find(x => sameOrderId(x.id ?? x.Id, orderId));
     const stKey = o ? kitchenStatusKey(o.status || o.Status) : "other";
@@ -1379,9 +2031,9 @@
     if (from === "prep" && stKey !== "inKitchen") { await loadQueue(); return; }
     const msg = from === "waiting"
       ? "Start preparing this ticket? Status moves from Waiting to In kitchen."
-      : "Mark this ticket ready for pickup? Servers and cashier will see it.";
+      : "Mark your food lines prepared? The ticket stays In kitchen until bar finishes drinks.";
     if (!confirm(msg)) return;
-    const res = await api("/api/admin/orders/" + orderId + "/advance", "POST", {}, true);
+    const res = await api("/api/admin/orders/" + orderId + "/advance", "POST", { prepStationPortal: PREP_STATION_PORTAL }, true);
     const r = res.body?.result ?? res.body?.Result;
     if (!res.ok) {
       alert(res.body?.message || "Request failed (" + res.status + ")");
@@ -1462,20 +2114,23 @@
       $("loginErr").classList.remove("hidden");
       return;
     }
-    const res = await api("/api/auth/login", "POST", { staffId, pin, portal: "KitchenBar" }, false);
+    const res = await api("/api/auth/login", "POST", { staffId, pin, portal: "Kitchen" }, false);
     if (!res.ok || !res.body?.accessToken) {
-      const hint = res.body?.message || res.body?.title || "Check credentials and kitchen/bar role.";
+      const hint = res.body?.message || res.body?.title || "Check credentials and kitchen role (Chef, Sous Chef, etc.).";
       $("loginErr").textContent = "Login failed (HTTP " + res.status + "). " + hint;
       $("loginErr").classList.remove("hidden");
       return;
     }
     token = res.body.accessToken;
     me = res.body;
+    sessionStorage.setItem(KITCHEN_TOKEN_KEY, token);
+    sessionStorage.setItem(KITCHEN_ME_KEY, JSON.stringify(me));
     $("sessionLabel").textContent = (me.name || "") + " (" + (me.signInId || me.employeeUniqueId || "") + ")";
     $("roleChip").textContent = me.role || "Kitchen";
     $("loginWrap").classList.add("hidden");
     $("app").classList.remove("hidden");
     setView("queue");
+    await loadPortalBranding();
     try {
       await loadQueue();
     } catch (e) {
@@ -1487,12 +2142,16 @@
 
   $("btnLogout").onclick = () => {
     stopOrderHubAndPolling();
+    resetPortalBranding();
+    sessionStorage.removeItem(KITCHEN_TOKEN_KEY);
+    sessionStorage.removeItem(KITCHEN_ME_KEY);
     token = ""; me = null; ordersCache = []; selectedOrderId = null;
-    inventoryCache = []; invByIdForMenu = {}; menuCatalogRows = [];
+    inventoryCache = []; menuCatalogRows = [];
     if ($("menuSearch")) $("menuSearch").value = "";
     if ($("invSearch")) $("invSearch").value = "";
     if ($("menuBody")) $("menuBody").innerHTML = "";
     closeAdjustModal();
+    closeMenuDetailModal();
     setView("queue");
     $("loginWrap").classList.remove("hidden");
     $("app").classList.add("hidden");
@@ -1529,10 +2188,45 @@
   $("adjCancel").onclick = () => closeAdjustModal();
   $("adjSubmit").onclick = () => { void submitInventoryAdjustment().catch(e => { $("adjErr").textContent = e.message || String(e); $("adjErr").classList.remove("hidden"); }); };
 
+  $("menuDetailClose").onclick = () => closeMenuDetailModal();
+  $("menuDetailModal").onclick = ev => {
+    if (ev.target === $("menuDetailModal")) closeMenuDetailModal();
+  };
+  $("menuDetailModal").querySelector(".modal-card")?.addEventListener("click", ev => ev.stopPropagation());
+
+  async function tryRestoreKitchenSession() {
+    const savedToken = sessionStorage.getItem(KITCHEN_TOKEN_KEY);
+    if (!savedToken) return;
+    token = savedToken;
+    try {
+      const raw = sessionStorage.getItem(KITCHEN_ME_KEY);
+      me = raw ? JSON.parse(raw) : null;
+    } catch {
+      me = null;
+    }
+    $("sessionLabel").textContent = me
+      ? (me.name || "") + " (" + (me.signInId || me.employeeUniqueId || "") + ")"
+      : "Kitchen session";
+    $("roleChip").textContent = (me && me.role) || "Kitchen";
+    $("loginWrap").classList.add("hidden");
+    $("app").classList.remove("hidden");
+    setView("queue");
+    void loadPortalBranding();
+    try {
+      await loadQueue();
+    } catch (e) {
+      console.warn("[Kitchen] restore queue failed", e);
+    }
+    void startOrderHub();
+    startPollingFallback();
+  }
+
   if (window.location.protocol === "file:") {
-    $("loginErr").textContent = "Open this page from the API site (e.g. http://localhost:8080/kitchen/) so /api and SignalR work.";
+    $("loginErr").textContent = "Open this page from the API site (e.g. http://localhost:8080/kitchen/) so /api and SignalR work. For drinks, use /bar/.";
     $("loginErr").classList.remove("hidden");
   }
+
+  void tryRestoreKitchenSession();
 })();
   </script>
 </body>

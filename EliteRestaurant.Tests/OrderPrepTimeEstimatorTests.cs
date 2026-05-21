@@ -19,7 +19,8 @@ public class OrderPrepTimeEstimatorTests
 
     [Fact]
     public void EstimateTicketPrepMinutes_Empty_IsZero() =>
-        Assert.Equal(0, OrderPrepTimeEstimator.EstimateTicketPrepMinutes([]));
+        Assert.Equal(0, OrderPrepTimeEstimator.EstimateTicketPrepMinutes(
+            Array.Empty<(int Quantity, int PrepMinutes, string Category, string SubCategory)>()));
 
     [Fact]
     public void EstimateTicketPrepMinutes_ParallelModel_UsesMaxPlusBump()

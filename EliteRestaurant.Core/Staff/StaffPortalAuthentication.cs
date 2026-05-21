@@ -6,16 +6,57 @@ namespace EliteRestaurant.Core.Staff;
 /// <summary>Shared staff sign-in: ID match query, PIN verification, and portal/role eligibility (API + desktop).</summary>
 public static class StaffPortalAuthentication
 {
-    public static bool IsKitchenBarRole(string? role)
+    public static bool IsKitchenBarRole(string? role) =>
+        IsKitchenFoodRole(role) || IsBarRole(role);
+
+    public static bool IsKitchenFoodRole(string? role)
     {
         if (string.IsNullOrWhiteSpace(role))
             return false;
 
         var r = role.Trim();
         return r.Equals("Chef", StringComparison.OrdinalIgnoreCase)
-               || r.Equals("Barman", StringComparison.OrdinalIgnoreCase)
-               || r.Equals("Bartender", StringComparison.OrdinalIgnoreCase)
                || r.Equals("Sous Chef", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static bool IsBarRole(string? role)
+    {
+        if (string.IsNullOrWhiteSpace(role))
+            return false;
+
+        var r = role.Trim();
+        return r.Equals("Barman", StringComparison.OrdinalIgnoreCase)
+               || r.Equals("Bartender", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static bool IsReceptionRole(string? role)
+    {
+        if (string.IsNullOrWhiteSpace(role))
+            return false;
+
+        var r = role.Trim();
+        return r.Equals("Front desk", StringComparison.OrdinalIgnoreCase)
+               || r.Equals("Cashier", StringComparison.OrdinalIgnoreCase)
+               || r.Equals("Admin", StringComparison.OrdinalIgnoreCase)
+               || r.Equals("Manager", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Elite Pro desktop admin app — Admin or Manager only (not AdminWeb, Server, Cashier, etc.).</summary>
+    public static bool IsAdminDesktopRole(string? role)
+    {
+        if (string.IsNullOrWhiteSpace(role))
+            return false;
+
+        var r = role.Trim();
+        return r.Equals("Admin", StringComparison.OrdinalIgnoreCase)
+               || r.Equals("Manager", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static string AdminDesktopPortalRejectedMessage(string? actualRole)
+    {
+        var roleLabel = string.IsNullOrWhiteSpace(actualRole) ? "unknown" : actualRole.Trim();
+        return $"Only Admin or Manager accounts can sign in to Elite Pro Admin (your role: {roleLabel}). "
+               + "Use Server, Cashier, Kitchen, Reception, or Bar for other roles.";
     }
 
     public static string CanonicalPortalForEmployee(Employee employee)
@@ -27,8 +68,12 @@ public static class StaffPortalAuthentication
             return "Admin";
         if (employee.Role.Equals("Cashier", StringComparison.OrdinalIgnoreCase))
             return "Cashier";
-        if (IsKitchenBarRole(employee.Role))
-            return "KitchenBar";
+        if (employee.Role.Equals("Front desk", StringComparison.OrdinalIgnoreCase))
+            return "Reception";
+        if (IsBarRole(employee.Role))
+            return "Bar";
+        if (IsKitchenFoodRole(employee.Role))
+            return "Kitchen";
         return "Server";
     }
 
@@ -46,8 +91,12 @@ public static class StaffPortalAuthentication
             return "Admin";
         if (r.Equals("Cashier", StringComparison.OrdinalIgnoreCase))
             return "Cashier";
-        if (IsKitchenBarRole(r))
-            return "KitchenBar";
+        if (r.Equals("Front desk", StringComparison.OrdinalIgnoreCase))
+            return "Reception";
+        if (IsBarRole(r))
+            return "Bar";
+        if (IsKitchenFoodRole(r))
+            return "Kitchen";
         return "Server";
     }
 
@@ -120,11 +169,7 @@ public static class StaffPortalAuthentication
             return null;
 
         if (string.Equals(normalizedPortal, "Admin", StringComparison.OrdinalIgnoreCase))
-        {
-            return pinMatchedCandidates.FirstOrDefault(e =>
-                e.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase)
-                || e.Role.Equals("Manager", StringComparison.OrdinalIgnoreCase));
-        }
+            return pinMatchedCandidates.FirstOrDefault(e => IsAdminDesktopRole(e.Role));
 
         if (string.Equals(normalizedPortal, "AdminWeb", StringComparison.OrdinalIgnoreCase))
         {
@@ -138,10 +183,17 @@ public static class StaffPortalAuthentication
                 e.Role.Equals("Cashier", StringComparison.OrdinalIgnoreCase));
         }
 
+        if (string.Equals(normalizedPortal, "Reception", StringComparison.OrdinalIgnoreCase))
+            return pinMatchedCandidates.FirstOrDefault(e => IsReceptionRole(e.Role));
+
+        if (string.Equals(normalizedPortal, "Bar", StringComparison.OrdinalIgnoreCase))
+            return pinMatchedCandidates.FirstOrDefault(e => IsBarRole(e.Role));
+
+        if (string.Equals(normalizedPortal, "Kitchen", StringComparison.OrdinalIgnoreCase))
+            return pinMatchedCandidates.FirstOrDefault(e => IsKitchenFoodRole(e.Role));
+
         if (string.Equals(normalizedPortal, "KitchenBar", StringComparison.OrdinalIgnoreCase))
-        {
             return pinMatchedCandidates.FirstOrDefault(e => IsKitchenBarRole(e.Role));
-        }
 
         /// <summary>Elite Menu PWA: passcode gate + optional tablet ID+PIN — return the PIN-matched employee (any role).</summary>
         if (string.Equals(normalizedPortal, "elite-menu", StringComparison.OrdinalIgnoreCase))

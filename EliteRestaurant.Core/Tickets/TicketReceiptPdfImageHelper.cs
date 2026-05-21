@@ -1,6 +1,4 @@
-using System.IO;
-
-namespace EliteRestaurantPro.Services;
+namespace EliteRestaurant.Core.Tickets;
 
 /// <summary>Loads local raster files for QuestPDF ticket images (PNG/JPEG/WebP/GIF/BMP).</summary>
 public static class TicketReceiptPdfImageHelper

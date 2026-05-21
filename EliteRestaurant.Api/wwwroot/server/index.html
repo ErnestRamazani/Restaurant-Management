@@ -9,14 +9,19 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --navy: #0f1923;
+      --navy: #0b0e14;
+      --navy-elev: #121722;
+      --surface: #161c28;
+      --surface-hover: #1c2433;
       --cream: #f7f5f0;
-      --amber: #f59e0b;
-      --amber-dim: #d97706;
+      --amber: #e8a838;
+      --amber-dim: #c98f2a;
       --cancel: #374151;
-      --text-dark: #1f2937;
-      --text-muted: #64748b;
-      --radius: 12px;
+      --text-dark: #e8eaef;
+      --text-muted: #8b93a7;
+      --border: rgba(255, 255, 255, 0.08);
+      --radius: 14px;
+      --radius-sm: 10px;
     }
     * { box-sizing: border-box; }
     body {
@@ -99,32 +104,73 @@
       background: #111c27;
     }
     #app .main {
-      padding: 12px 16px 16px;
+      padding: 16px 18px 24px;
       display: flex;
       flex-direction: column;
       min-height: 100vh;
-      background: var(--cream);
+      background: linear-gradient(165deg, var(--navy) 0%, #0d1219 45%, #0a0d12 100%);
       color: var(--text-dark);
       min-width: 0;
     }
-    #loginWrap.main {
-      background: var(--cream);
-      color: var(--text-dark);
+    #loginWrap.main-area {
       min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: linear-gradient(165deg, var(--navy) 0%, #0d1219 45%, #0a0d12 100%);
+      color: var(--text-dark);
     }
     #loginWrap .card {
-      border: 1px solid #e5e7eb;
-      background: #fff;
+      max-width: 420px;
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      padding: 22px;
+      color: var(--text-dark);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+      margin: 0;
+    }
+    #loginWrap h1 { margin: 0 0 8px; font-size: 1.35rem; }
+    #loginWrap .lead { color: var(--text-muted); font-size: 14px; margin: 0 0 18px; line-height: 1.5; }
+    #loginWrap label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    #loginWrap input {
+      width: 100%;
+      min-height: 44px;
+      padding: 0 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 15px;
+      margin-bottom: 14px;
+      background: var(--navy-elev);
       color: var(--text-dark);
     }
-    .grow { flex: 1 1 180px; min-width: 160px; }
-    #loginWrap input, #loginWrap button {
-      font-family: inherit;
+    .btn {
       min-height: 44px;
+      padding: 0 16px;
       border-radius: var(--radius);
-      border: 1px solid #d1d5db;
+      font-family: inherit;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      border: none;
     }
-    #loginWrap button { background: var(--amber); color: #111827; font-weight: 600; border: none; }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--amber), var(--amber-dim));
+      color: #0a0c10;
+      box-shadow: 0 4px 14px rgba(232, 168, 56, 0.25);
+    }
+    .btn-block { width: 100%; }
+    .grow { flex: 1 1 180px; min-width: 160px; }
     .hidden { display: none !important; }
     .visually-hidden {
       position: absolute;
@@ -138,19 +184,30 @@
       border: 0;
     }
     .card {
-      border: 1px solid #e5e7eb;
+      border: 1px solid var(--border);
       border-radius: var(--radius);
-      background: #fff;
+      background: var(--surface);
       margin-bottom: 12px;
-      padding: 14px;
+      padding: 16px 18px;
       color: var(--text-dark);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
     }
+    .card h2 { margin: 0 0 8px; font-size: 1.2rem; }
     .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
     .grow { flex: 1 1 180px; min-width: 160px; }
-    #menuTab input, #menuTab button, #pickupTab input, #pickupTab button {
+    #menuTab input, #menuTab button, #pickupTab input, #pickupTab button, #incomingOrderTab button {
       font-family: inherit;
       min-height: 44px;
       border-radius: var(--radius);
+    }
+    #menuTab button, #pickupTab button, #incomingOrderTab button {
+      padding: 0 16px;
+      border: none;
+      font-weight: 600;
+      background: linear-gradient(135deg, var(--amber), var(--amber-dim));
+      color: #0a0c10;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(232, 168, 56, 0.2);
     }
     #pickupTab .ready-orders-grid {
       display: grid;
@@ -166,8 +223,8 @@
       grid-column: 1 / -1;
       padding: 28px 20px;
       text-align: center;
-      background: #fafaf9;
-      border: 1px dashed #d1d5db;
+      background: var(--navy-elev);
+      border: 1px dashed var(--border);
       border-radius: 14px;
       color: var(--text-muted);
     }
@@ -178,17 +235,17 @@
       margin-bottom: 6px;
     }
     .ready-order-card {
-      background: #fff;
-      border: 1px solid #e5e7eb;
+      background: var(--surface);
+      border: 1px solid var(--border);
       border-radius: 14px;
       overflow: hidden;
       display: flex;
       flex-direction: column;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
     }
     .ready-order-card__head {
       padding: 12px 14px 10px;
-      border-bottom: 1px solid #f3f4f6;
+      border-bottom: 1px solid var(--border);
       display: flex;
       flex-wrap: wrap;
       align-items: flex-start;
@@ -214,9 +271,9 @@
       margin-top: 8px;
       padding: 4px 10px;
       border-radius: 999px;
-      background: #fef3c7;
-      border: 1px solid #fcd34d;
-      color: #92400e;
+      background: rgba(232, 168, 56, 0.15);
+      border: 1px solid rgba(232, 168, 56, 0.35);
+      color: #fbbf24;
       font-size: 12px;
       font-weight: 700;
     }
@@ -245,8 +302,8 @@
       gap: 10px;
       padding: 8px;
       border-radius: 10px;
-      background: #fafaf9;
-      border: 1px solid #f3f4f6;
+      background: var(--navy-elev);
+      border: 1px solid var(--border);
     }
     .ready-order-line__media {
       position: relative;
@@ -307,16 +364,16 @@
     .ready-order-card__detail-block {
       padding: 8px 10px;
       border-radius: 8px;
-      background: #fffbeb;
-      border: 1px solid #fde68a;
+      background: rgba(232, 168, 56, 0.12);
+      border: 1px solid rgba(232, 168, 56, 0.28);
       font-size: 12px;
       line-height: 1.4;
-      color: #78350f;
+      color: #fcd34d;
     }
     .ready-order-card__detail-block--allergy {
-      background: #fef2f2;
-      border-color: #fecaca;
-      color: #991b1b;
+      background: rgba(248, 113, 113, 0.12);
+      border-color: rgba(248, 113, 113, 0.35);
+      color: #fecaca;
     }
     .ready-order-card__detail-label {
       display: block;
@@ -329,7 +386,7 @@
     }
     .ready-order-card__foot {
       padding: 10px 14px 14px;
-      border-top: 1px solid #f3f4f6;
+      border-top: 1px solid var(--border);
       display: flex;
       flex-wrap: wrap;
       align-items: center;
@@ -339,25 +396,32 @@
     .ready-order-card__total {
       font-weight: 800;
       font-size: 1rem;
-      color: #b45309;
+      color: var(--amber);
     }
     .ready-order-card__foot button {
       min-height: 44px;
       padding: 0 16px;
       font-weight: 700;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--amber), var(--amber-dim));
+      color: #0a0c10;
     }
     #menuTab .menu-search {
       width: 100%;
       min-height: 44px;
       border-radius: var(--radius);
-      border: 1px solid #d1d5db;
+      border: 1px solid var(--border);
       padding: 10px 14px;
       font-family: inherit;
       font-size: 15px;
-      background: #fff;
+      background: var(--navy-elev);
       color: var(--text-dark);
       margin-bottom: 12px;
     }
+    #menuTab .menu-search::placeholder { color: var(--text-muted); }
     .menu-catalog-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -377,13 +441,13 @@
       color: var(--text-muted);
     }
     .menu-catalog-card {
-      background: #fff;
-      border: 1px solid #e5e7eb;
+      background: var(--surface);
+      border: 1px solid var(--border);
       border-radius: 14px;
       overflow: hidden;
       display: flex;
       flex-direction: column;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
     }
     .menu-catalog-card--unavailable { opacity: 0.72; }
     .menu-catalog-card .product-card__media { cursor: default; }
@@ -408,19 +472,19 @@
     .menu-catalog-card__prep {
       font-size: 12px;
       font-weight: 600;
-      color: #b45309;
+      color: var(--amber);
       margin-top: 4px;
     }
     .menu-catalog-card__id {
       font-family: ui-monospace, Consolas, monospace;
       font-size: 11px;
-      color: #6b7280;
+      color: var(--text-muted);
     }
     .menu-catalog-card__desc,
     .menu-catalog-card__composition {
       font-size: 12px;
       line-height: 1.4;
-      color: #4b5563;
+      color: var(--text-muted);
     }
     .menu-catalog-card__desc {
       display: -webkit-box;
@@ -440,12 +504,12 @@
       gap: 8px;
       margin-top: 4px;
       padding-top: 8px;
-      border-top: 1px solid #f3f4f6;
+      border-top: 1px solid var(--border);
     }
     .menu-catalog-card__price {
       font-weight: 800;
       font-size: 1rem;
-      color: #b45309;
+      color: var(--amber);
       line-height: 1.25;
     }
     .menu-catalog-card__price-dual {
@@ -468,27 +532,34 @@
       align-items: center;
       gap: 8px;
       padding: 10px;
-      border-bottom: 1px solid #e5e7eb;
+      border-bottom: 1px solid var(--border);
       min-height: 44px;
     }
     .ready-item:last-child, .menu-item:last-child { border-bottom: 0; }
     .muted { color: var(--text-muted); font-size: 12px; }
-    .muted.ok { color: #059669; }
-    .muted.danger { color: #dc2626; }
-    .warn { color: var(--amber-dim); }
-    .ok { color: #059669; }
-    .danger { color: #dc2626; }
+    .muted.ok { color: #34d399; }
+    .muted.danger { color: #fca5a5; }
+    .warn { color: var(--amber); }
+    .ok { color: #34d399; }
+    .danger {
+      color: #fecaca;
+      background: rgba(127, 29, 29, 0.35);
+      border: 1px solid rgba(248, 113, 113, 0.35);
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+    }
     .mono { font-family: ui-monospace, Consolas, monospace; }
     pre {
       white-space: pre-wrap;
       overflow: auto;
-      background: #fafaf9;
-      border: 1px solid #e5e7eb;
+      background: var(--navy-elev);
+      border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 10px;
       min-height: 90px;
       max-height: 250px;
-      color: var(--text-dark);
+      color: var(--text-muted);
     }
     h2, h3 { margin: 6px 0 10px; }
 
@@ -591,6 +662,70 @@
       font-weight: 600;
       cursor: pointer;
     }
+    .open-checks-panel { margin-top: 4px; }
+    .open-checks-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .open-checks-head strong { font-size: 12px; color: #d1d5db; letter-spacing: 0.03em; }
+    .open-checks-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 220px;
+      overflow-y: auto;
+      margin-bottom: 8px;
+    }
+    .open-check-card {
+      text-align: left;
+      width: 100%;
+      border: 1px solid #4b5563;
+      border-radius: 10px;
+      background: #1f2937;
+      color: #e5e7eb;
+      padding: 10px 12px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    .open-check-card:hover { border-color: #6b7280; }
+    .open-check-card.selected {
+      border-color: var(--amber);
+      box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.35);
+      background: #292419;
+    }
+    .open-check-card__title {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+    .open-check-kind {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #374151;
+      color: #fbbf24;
+    }
+    .open-check-kind--drink { color: #93c5fd; }
+    .open-check-lines { color: #9ca3af; margin: 4px 0; }
+    .open-check-meta { color: #6b7280; font-size: 11px; }
+    .open-check-empty {
+      padding: 10px 12px;
+      border: 1px dashed #4b5563;
+      border-radius: 8px;
+      color: #9ca3af;
+      font-size: 12px;
+    }
+    #newCheckKindFieldset.hidden { display: none; }
     .pos-draft-row {
       display: flex;
       flex-wrap: wrap;
@@ -900,9 +1035,9 @@
     .pos-menu {
       flex: 1;
       min-width: 0;
-      background: #f7f5f0;
+      background: var(--navy);
       border-radius: var(--radius);
-      border: 1px solid #e5e7eb;
+      border: 1px solid #1e293b;
       display: flex;
       flex-direction: column;
       min-height: 480px;
@@ -929,9 +1064,9 @@
       padding: 10px 14px;
       min-height: 48px;
       border-radius: 999px;
-      border: 1px solid #e5e7eb;
-      background: #fff;
-      color: #6b7280;
+      border: 1px solid #4b5563;
+      background: #1f2937;
+      color: #9ca3af;
       cursor: pointer;
       font-family: inherit;
       font-size: 11px;
@@ -963,22 +1098,23 @@
       font-family: inherit;
       min-height: 44px;
       border-radius: var(--radius);
-      border: 1px solid #e5e7eb;
+      border: 1px solid #4b5563;
       padding: 0 12px;
-      background: #fff;
-      color: var(--text-dark);
+      background: #374151;
+      color: #f1f5f9;
     }
     #search.pos-search {
       width: 100%;
       min-height: 44px;
       border-radius: var(--radius);
-      border: 1px solid #e5e7eb;
+      border: 1px solid #4b5563;
       padding: 10px 14px;
       font-family: inherit;
       font-size: 15px;
-      background: #fff;
-      color: var(--text-dark);
+      background: #374151;
+      color: #f1f5f9;
     }
+    #search.pos-search::placeholder { color: #9ca3af; }
     .product-grid {
       flex: 1;
       min-height: 0;
@@ -993,24 +1129,24 @@
       grid-column: 1 / -1;
       padding: 32px;
       text-align: center;
-      color: var(--text-muted);
+      color: #94a3b8;
     }
     .product-card {
-      background: #fff;
-      border: 1px solid #e5e7eb;
+      background: #1f2937;
+      border: 1px solid #374151;
       border-radius: 14px;
       overflow: visible;
       cursor: pointer;
       display: flex;
       flex-direction: column;
       min-width: 160px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
       transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
       position: relative;
     }
     .product-card:hover:not(.product-card--disabled) {
       border-color: #f59e0b;
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
       transform: translateY(-3px);
     }
     .product-card:active:not(.product-card--disabled) {
@@ -1084,14 +1220,14 @@
     .product-card__name {
       font-weight: 700;
       font-size: 0.9rem;
-      color: var(--text-dark);
+      color: #f1f5f9;
       line-height: 1.3;
       display: -webkit-box;
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
-    .product-card__price { font-weight: 800; font-size: 1rem; color: #b45309; }
+    .product-card__price { font-weight: 800; font-size: 1rem; color: #fbbf24; }
 
     @media (max-width: 1000px) {
       .layout { grid-template-columns: 1fr; }
@@ -1120,12 +1256,12 @@
     .customer-toast-host .customer-draft-toast { pointer-events: auto; }
     .customer-draft-toast {
       width: 100%;
-      background: #fff;
-      color: #111827;
+      background: var(--surface);
+      color: var(--text-dark);
       border-radius: 12px;
-      border: 1px solid #e5e7eb;
-      border-left: 4px solid #c9a227;
-      box-shadow: 0 8px 28px rgba(15, 25, 35, 0.18);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--amber);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
       padding: 12px 12px 10px;
       font-size: 0.9rem;
       line-height: 1.35;
@@ -1136,20 +1272,20 @@
       justify-content: space-between;
       gap: 8px;
     }
-    .customer-draft-toast__title { font-weight: 700; color: #0f1923; }
+    .customer-draft-toast__title { font-weight: 700; color: var(--text-dark); }
     .customer-draft-toast__dismiss {
       border: none;
       background: transparent;
-      color: #64748b;
+      color: var(--text-muted);
       font-size: 1.1rem;
       line-height: 1;
       cursor: pointer;
       padding: 2px 6px;
     }
-    .customer-draft-toast__meta { color: #64748b; font-size: 0.8rem; margin: 4px 0 8px; }
+    .customer-draft-toast__meta { color: var(--text-muted); font-size: 0.8rem; margin: 4px 0 8px; }
     .customer-draft-toast__countdown {
       font-size: 0.75rem;
-      color: #94a3b8;
+      color: var(--text-muted);
       margin-bottom: 8px;
     }
     .customer-draft-toast__cta {
@@ -1159,8 +1295,8 @@
       padding: 12px 14px;
       border: none;
       border-radius: 8px;
-      background: #d4a017;
-      color: #0f1923;
+      background: linear-gradient(135deg, var(--amber), var(--amber-dim));
+      color: #0a0c10;
       font-weight: 800;
       font-size: 0.95rem;
       font-family: inherit;
@@ -1176,12 +1312,12 @@
     .customer-toast-host .server-ready-toast { pointer-events: auto; }
     .server-ready-toast {
       width: 100%;
-      background: #fff;
-      color: #111827;
+      background: var(--surface);
+      color: var(--text-dark);
       border-radius: 12px;
-      border: 1px solid #e5e7eb;
+      border: 1px solid var(--border);
       border-left: 4px solid #16a34a;
-      box-shadow: 0 10px 32px rgba(15, 25, 35, 0.22);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
       padding: 12px 12px 10px;
       font-size: 0.9rem;
       line-height: 1.35;
@@ -1199,7 +1335,7 @@
     }
     .server-ready-toast__title {
       font-weight: 800;
-      color: #0f1923;
+      color: var(--text-dark);
       font-size: 0.95rem;
     }
     .server-ready-toast__badge {
@@ -1207,8 +1343,8 @@
       margin-left: 6px;
       padding: 2px 7px;
       border-radius: 999px;
-      background: #dcfce7;
-      color: #166534;
+      background: rgba(74, 222, 128, 0.15);
+      color: #4ade80;
       font-size: 0.68rem;
       font-weight: 800;
       letter-spacing: 0.04em;
@@ -1217,16 +1353,16 @@
     .server-ready-toast__dismiss {
       border: none;
       background: transparent;
-      color: #64748b;
+      color: var(--text-muted);
       font-size: 1.1rem;
       line-height: 1;
       cursor: pointer;
       padding: 2px 6px;
     }
-    .server-ready-toast__meta { color: #64748b; font-size: 0.8rem; margin: 4px 0 8px; }
+    .server-ready-toast__meta { color: var(--text-muted); font-size: 0.8rem; margin: 4px 0 8px; }
     .server-ready-toast__items {
       font-size: 0.78rem;
-      color: #334155;
+      color: var(--text-muted);
       margin-bottom: 8px;
       line-height: 1.35;
     }
@@ -1274,6 +1410,107 @@
       0%, 100% { background: rgba(74, 222, 128, 0.08); }
       50% { background: rgba(74, 222, 128, 0.2); }
     }
+    .nav-incoming-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 1.25rem;
+      height: 1.25rem;
+      padding: 0 5px;
+      margin-left: 6px;
+      border-radius: 999px;
+      background: #16a34a;
+      color: #fff;
+      font-size: 0.68rem;
+      font-weight: 800;
+      vertical-align: middle;
+    }
+    .nav-incoming-badge.hidden { display: none; }
+    .nav-btn.has-incoming-alert {
+      box-shadow: inset 3px 0 0 #4ade80;
+      animation: incoming-nav-pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes incoming-nav-pulse {
+      0%, 100% { background: rgba(74, 222, 128, 0.08); }
+      50% { background: rgba(74, 222, 128, 0.2); }
+    }
+    #incomingOrderTab .incoming-drafts-grid {
+      display: grid;
+      grid-template-columns: repeat(1, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 12px;
+      align-content: start;
+    }
+    @media (min-width: 720px) {
+      #incomingOrderTab .incoming-drafts-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    .incoming-drafts-empty {
+      grid-column: 1 / -1;
+      padding: 28px 20px;
+      text-align: center;
+      background: var(--navy-elev);
+      border: 1px dashed var(--border);
+      border-radius: 14px;
+      color: var(--text-muted);
+    }
+    .incoming-drafts-empty strong {
+      display: block;
+      color: var(--text-dark);
+      font-size: 1rem;
+      margin-bottom: 6px;
+    }
+    .incoming-draft-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+    }
+    .incoming-draft-card__head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .incoming-draft-card__title {
+      font-weight: 800;
+      font-size: 1rem;
+      color: var(--text-dark);
+      margin: 0;
+    }
+    .incoming-draft-card__meta {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+    .incoming-draft-card__actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .incoming-draft-card__actions button {
+      font-family: inherit;
+      min-height: 44px;
+      border-radius: var(--radius);
+      padding: 0 14px;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+    }
+    .incoming-draft-card__load {
+      flex: 1 1 140px;
+      background: linear-gradient(135deg, var(--amber), var(--amber-dim));
+      color: #0a0c10;
+    }
+    .incoming-draft-card__delete {
+      background: rgba(248, 113, 113, 0.15);
+      color: #fecaca;
+      border: 1px solid rgba(248, 113, 113, 0.35);
+    }
     .ready-order-card--highlight {
       box-shadow: 0 0 0 2px #4ade80, 0 8px 24px rgba(15, 25, 35, 0.12);
       animation: ready-card-highlight 1.2s ease-out 2;
@@ -1287,19 +1524,20 @@
 </head>
 <body>
   <div id="customerToastHost" class="customer-toast-host" aria-live="polite" aria-atomic="true"></div>
-  <div id="loginWrap" class="main">
-    <div class="card" style="max-width:760px;margin:32px auto;">
-      <h2>Server Portal Login</h2>
-      <div class="row">
-        <input id="staffId" class="grow" placeholder="SignInId or EMP UniqueId">
-        <input id="pin" placeholder="PIN">
-        <button type="button" id="btnLogin">Login as Server</button>
-      </div>
-      <p id="loginFileWarning" class="danger hidden" style="margin-top:10px;">This page was opened as a local file. Login will not work until you open it from the API site (for example <span class="mono">https://starfish-app-owtoz.ondigitalocean.app/server/</span>).</p>
-      <div id="loginMessage" class="muted" style="margin-top:10px;min-height:1.25em;white-space:pre-wrap;"></div>
-      <p class="muted">After <span class="mono">SeedRunner</span> defaults: e.g. <strong class="mono">SRV01</strong> / PIN <strong class="mono">3101</strong>.</p>
+  <div id="loginWrap" class="main-area">
+    <div class="card">
+      <h1>Server Portal</h1>
+      <p class="lead">Sign in with your server staff ID and PIN to take orders, view the menu, and serve ready tickets.</p>
+      <p id="loginFileWarning" class="danger hidden">This page was opened as a local file. Login will not work until you open it from the API site (for example <span class="mono">https://starfish-app-owtoz.ondigitalocean.app/server/</span>).</p>
+      <div id="loginMessage" class="muted" style="min-height:1.25em;white-space:pre-wrap;margin-bottom:12px;"></div>
+      <label for="staffId">Sign-in ID</label>
+      <input id="staffId" type="text" autocomplete="username" placeholder="SignInId or EMP UniqueId">
+      <label for="pin">PIN</label>
+      <input id="pin" type="password" autocomplete="current-password" placeholder="PIN">
+      <button type="button" class="btn btn-primary btn-block" id="btnLogin">Sign in</button>
+      <p class="muted" style="margin-top:14px;">After <span class="mono">SeedRunner</span> defaults: e.g. <strong class="mono">SRV01</strong> / PIN <strong class="mono">3101</strong>.</p>
       <p class="muted">This portal is server-only. No reservation flow in this phase.</p>
-      <p class="muted">Cashiers: <a href="/cashier.html" style="color:#b45309;">open Cashier Portal</a> | <a href="/cashier-order.html" style="color:#b45309;">compact order screen</a></p>
+      <p class="muted">Cashiers: <a href="/cashier.html" style="color:var(--amber);">open Cashier Portal</a> | <a href="/cashier-order.html" style="color:var(--amber);">compact order screen</a></p>
     </div>
   </div>
 
@@ -1309,7 +1547,8 @@
         <img id="brandLogo" class="brand-logo hidden" alt="Restaurant logo">
         <div id="brandName" class="brand">ELITE SERVER PORTAL</div>
       </div>
-      <button type="button" class="nav-btn active" data-tab="takeOrder">Take Order</button>
+      <button type="button" class="nav-btn active" data-tab="incomingOrderTab">Incoming Order<span id="incomingNavBadge" class="nav-incoming-badge hidden" aria-label="New customer drafts count"></span></button>
+      <button type="button" class="nav-btn" data-tab="takeOrder">Take Order</button>
       <button type="button" class="nav-btn" data-tab="menuTab">Menu</button>
       <button type="button" class="nav-btn" data-tab="pickupTab">Pick Up &amp; Serve<span id="pickupNavBadge" class="nav-pickup-badge hidden" aria-label="Ready orders count"></span></button>
       <button type="button" id="btnRefreshAll" class="nav-btn">Refresh Data</button>
@@ -1326,7 +1565,16 @@
     </aside>
 
     <main class="main">
-      <section id="takeOrder" class="tab create-order-tab">
+      <section id="incomingOrderTab" class="tab">
+        <div class="card">
+          <h2>Incoming Order</h2>
+          <p class="muted">Customer &ldquo;Explore our Menu&rdquo; drafts for your assigned tables. Load a draft to open Take Order with the table and items filled in.</p>
+          <button type="button" id="btnRefreshIncoming">Refresh drafts</button>
+          <div id="incomingDraftsList" class="incoming-drafts-grid" role="list" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <section id="takeOrder" class="tab create-order-tab hidden">
         <div class="pos-shell">
           <aside class="pos-column pos-column--cart" aria-label="Order cart">
             <div class="pos-zone-b">
@@ -1373,17 +1621,32 @@
                 <legend>Send as (this table)</legend>
                 <label style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;">
                   <input type="radio" name="ticketMode" id="ticketModeAppend" value="append" checked>
-                  <span><strong>Same ticket</strong> - add lines to the current open check</span>
+                  <span><strong>Same ticket</strong> - add lines to the selected open check below</span>
                 </label>
                 <label style="display:flex;gap:8px;align-items:flex-start;">
                   <input type="radio" name="ticketMode" id="ticketModeNew" value="new">
-                  <span><strong>New ticket</strong> - separate check on the same table</span>
+                  <span><strong>New ticket</strong> - separate food or drink check on this table</span>
                 </label>
                 <p id="ticketModeHint" class="muted" style="margin:10px 0 0;font-size:12px;line-height:1.35;color:#94a3b8;"></p>
               </fieldset>
-              <div class="row" style="gap:10px;">
-                <button type="button" id="btnCheckOpen" class="btn-ghost">Check Open Check</button>
-                <span id="openCheckInfo" class="muted" style="color:#94a3b8;font-size:12px;flex:1;"></span>
+              <fieldset id="newCheckKindFieldset" class="pos-fieldset hidden">
+                <legend>New ticket type</legend>
+                <label style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;">
+                  <input type="radio" name="newCheckKind" id="newCheckKindFood" value="Food" checked>
+                  <span><strong>Food</strong> - kitchen items only on this check</span>
+                </label>
+                <label style="display:flex;gap:8px;align-items:flex-start;">
+                  <input type="radio" name="newCheckKind" id="newCheckKindDrink" value="Drink">
+                  <span><strong>Drink</strong> - bar/beverage items only on this check</span>
+                </label>
+              </fieldset>
+              <div class="open-checks-panel">
+                <div class="open-checks-head">
+                  <strong>Open checks</strong>
+                  <button type="button" id="btnRefreshOpenChecks" class="btn-ghost" style="min-height:32px;height:32px;padding:0 10px;font-size:12px;">Refresh</button>
+                </div>
+                <div id="openChecksList" class="open-checks-list" aria-live="polite"></div>
+                <span id="openCheckInfo" class="muted" style="color:#94a3b8;font-size:12px;display:block;"></span>
               </div>
               <div class="pos-draft-row">
                 <select id="drafts" class="grow" style="flex:2;"></select>
@@ -1450,6 +1713,9 @@
     let readyOrderPollTimer = null;
     let highlightedReadyOrderIds = new Set();
     let drafts = [];
+    let incomingDrafts = [];
+    let openChecks = [];
+    let selectedOpenCheckId = 0;
     let orderHubConnection = null;
     let draftListPollTimer = null;
     let config = { restaurantName: "Elite Restaurant", restaurantLogoUrl: "", employeePhotoUrl: "", currencyDisplayMode: "Dual", usdToFcRate: 2250, taxPercent: 7, servicePercent: 10 };
@@ -1819,10 +2085,22 @@
       updateProductCardBadges();
     }
 
-    function renderTables() {
+    function renderTables(preferredTableId) {
       const sel = document.getElementById("tableSelect");
-      if (!tables.length) { sel.innerHTML = "<option value='0'>No assigned tables</option>"; return; }
-      sel.innerHTML = tables.map(t => `<option value="${t.id}">Table ${t.tableNumber} - ${t.name} (${t.status})</option>`).join("");
+      if (!tables.length) {
+        sel.innerHTML = "<option value='0'>No assigned tables</option>";
+        return;
+      }
+      const keepId =
+        preferredTableId !== undefined && preferredTableId !== null
+          ? Number(preferredTableId)
+          : Number(sel.value || "0");
+      sel.innerHTML = tables
+        .map(t => `<option value="${t.id}">Table ${t.tableNumber} - ${t.name} (${t.status})</option>`)
+        .join("");
+      const restoreId =
+        keepId > 0 && tables.some(t => t.id === keepId) ? keepId : tables[0].id;
+      sel.value = String(restoreId);
     }
 
     function menuCatalogProducts() {
@@ -2005,46 +2283,173 @@
       if (!a || !n) return;
       if (v === "new") { n.checked = true; a.checked = false; }
       else { a.checked = true; n.checked = false; }
+      syncNewCheckKindVisibility();
+      updateTicketModeHint();
     }
-    function updateTicketModeHint(body, tableId) {
+    function isDrinkCategory(cat) {
+      const c = String(cat || "").toLowerCase();
+      return c === "drink" || c === "drinks" || c === "beverage" || c === "beverages" || c === "bar";
+    }
+    function productKind(productId) {
+      const p = products.find(x => x.id === productId);
+      if (!p) return "Food";
+      return isDrinkCategory(p.category) ? "Drink" : "Food";
+    }
+    function getNewCheckKind() {
+      const d = document.getElementById("newCheckKindDrink");
+      return d && d.checked ? "Drink" : "Food";
+    }
+    function setNewCheckKind(kind) {
+      const food = document.getElementById("newCheckKindFood");
+      const drink = document.getElementById("newCheckKindDrink");
+      if (!food || !drink) return;
+      if (String(kind).toLowerCase() === "drink") { drink.checked = true; food.checked = false; }
+      else { food.checked = true; drink.checked = false; }
+    }
+    function selectedOpenCheck() {
+      if (!selectedOpenCheckId) return null;
+      return openChecks.find(c => Number(c.orderId ?? c.OrderId) === selectedOpenCheckId) || null;
+    }
+    function syncNewCheckKindVisibility() {
+      const fs = document.getElementById("newCheckKindFieldset");
+      if (!fs) return;
+      fs.classList.toggle("hidden", getTicketMode() !== "new");
+    }
+    function updateTicketModeHint() {
       const el = document.getElementById("ticketModeHint");
       if (!el) return;
-      if (!tableId) {
-        el.textContent = "Select a table to see open-check status.";
-        return;
-      }
-      if (!body) {
-        el.textContent = "";
-        return;
-      }
-      if (!body.hasOpenCheck) {
-        el.textContent = "No open check on this table yet. Send creates a pending ticket; both options behave the same until an open check exists.";
-      } else {
-        el.textContent = `Open check ${body.orderCode} (${body.status}). Same ticket adds these lines to it. New ticket starts a separate check on this table.`;
-      }
-    }
-
-    async function checkOpenCheck() {
       const tableId = Number(document.getElementById("tableSelect").value || "0");
-      const label = document.getElementById("openCheckInfo");
       if (!tableId) {
-        label.textContent = "";
-        updateTicketModeHint(null, 0);
+        el.textContent = "Select a table to see open checks.";
         return;
       }
-      const r = await api(`/api/server/open-check?tableId=${tableId}`);
+      const mode = getTicketMode();
+      if (!openChecks.length) {
+        el.textContent = mode === "new"
+          ? "No open checks yet. Choose Food or Drink, then place order to start a ticket."
+          : "No open check to append to. Use New ticket or place order to create one.";
+        return;
+      }
+      const sel = selectedOpenCheck();
+      if (mode === "append") {
+        if (!sel) {
+          el.textContent = "Select an open check below. Food and drink checks stay separate.";
+          return;
+        }
+        el.textContent = `Adding to ${sel.orderCode ?? sel.OrderCode} (${sel.checkKind ?? sel.CheckKind}, ${sel.status ?? sel.Status}). Only ${sel.checkKind ?? sel.CheckKind} items allowed.`;
+        return;
+      }
+      el.textContent = `New ticket on this table (${openChecks.length} open). Pick Food or Drink — cannot mix on one check.`;
+    }
+    function formatUsd(n) {
+      const v = Number(n);
+      return Number.isFinite(v) ? "$ " + v.toFixed(2) : "$ 0.00";
+    }
+    function renderOpenChecks() {
+      const list = document.getElementById("openChecksList");
+      const info = document.getElementById("openCheckInfo");
+      if (!list || !info) return;
+      syncNewCheckKindVisibility();
+      if (!openChecks.length) {
+        list.innerHTML = '<div class="open-check-empty">No open checks on this table.</div>';
+        info.textContent = "";
+        selectedOpenCheckId = 0;
+        updateTicketModeHint();
+        return;
+      }
+      const stillThere = openChecks.some(c => Number(c.orderId ?? c.OrderId) === selectedOpenCheckId);
+      if (!stillThere) {
+        const first = openChecks[0];
+        selectedOpenCheckId = Number(first.orderId ?? first.OrderId) || 0;
+      }
+      list.innerHTML = openChecks.map(ch => {
+        const id = Number(ch.orderId ?? ch.OrderId);
+        const code = ch.orderCode ?? ch.OrderCode ?? ("#" + id);
+        const status = ch.status ?? ch.Status ?? "";
+        const kind = ch.checkKind ?? ch.CheckKind ?? "Food";
+        const kindCls = String(kind).toLowerCase() === "drink" ? "open-check-kind open-check-kind--drink" : "open-check-kind";
+        const lines = ch.lines ?? ch.Lines ?? [];
+        const lineText = lines.length
+          ? lines.map(l => `${l.quantity ?? l.Quantity}× ${l.name ?? l.Name}`).join(", ")
+          : "No lines yet";
+        const notes = (ch.customerNotes ?? ch.CustomerNotes ?? "").trim();
+        const allergy = (ch.allergyNotes ?? ch.AllergyNotes ?? "").trim();
+        const noteBits = [];
+        if (notes) noteBits.push("Notes: " + notes);
+        if (allergy) noteBits.push("Allergy: " + allergy);
+        const selected = id === selectedOpenCheckId ? " selected" : "";
+        const grand = ch.grandTotalUsd ?? ch.GrandTotalUsd ?? 0;
+        return `<button type="button" class="open-check-card${selected}" data-open-check="${id}">
+          <div class="open-check-card__title"><span>${esc(code)}</span><span class="${kindCls}">${esc(kind)}</span></div>
+          <div class="open-check-meta">${esc(status)} · ${esc(formatUsd(grand))}</div>
+          <div class="open-check-lines">${esc(lineText)}</div>
+          ${noteBits.length ? `<div class="open-check-meta">${esc(noteBits.join(" · "))}</div>` : ""}
+        </button>`;
+      }).join("");
+      list.querySelectorAll("[data-open-check]").forEach(btn => {
+        btn.onclick = () => {
+          selectedOpenCheckId = Number(btn.getAttribute("data-open-check")) || 0;
+          setTicketMode("append");
+          renderOpenChecks();
+        };
+      });
+      const sel = selectedOpenCheck();
+      info.textContent = sel
+        ? `${openChecks.length} open check(s). Selected: ${sel.orderCode ?? sel.OrderCode}.`
+        : `${openChecks.length} open check(s). Click one to select.`;
+      updateTicketModeHint();
+    }
+    async function loadOpenChecks() {
+      const tableId = Number(document.getElementById("tableSelect").value || "0");
+      const info = document.getElementById("openCheckInfo");
+      if (!tableId) {
+        openChecks = [];
+        selectedOpenCheckId = 0;
+        renderOpenChecks();
+        return;
+      }
+      const r = await api(`/api/server/tables/${tableId}/open-checks`);
       if (!r.ok) {
-        label.textContent = "Cannot check open ticket.";
-        updateTicketModeHint(null, tableId);
+        openChecks = [];
+        selectedOpenCheckId = 0;
+        if (info) info.textContent = "Cannot load open checks.";
+        renderOpenChecks();
         return;
       }
-      if (!r.body.hasOpenCheck) {
-        label.textContent = "No open check on this table.";
-        updateTicketModeHint(r.body, tableId);
-        return;
+      const body = r.body || {};
+      openChecks = Array.isArray(body.checks) ? body.checks : (Array.isArray(body.Checks) ? body.Checks : []);
+      renderOpenChecks();
+    }
+    async function checkOpenCheck() {
+      await loadOpenChecks();
+    }
+    function validateCartForSubmit() {
+      const lines = [...cart.entries()].map(([productId, quantity]) => ({ productId, quantity }));
+      if (!lines.length) return "Cart is empty.";
+      const mode = getTicketMode();
+      if (mode === "append") {
+        if (!openChecks.length) return null;
+        const sel = selectedOpenCheck();
+        if (!sel) return "Select an open check to append to, or choose New ticket.";
+        const kind = sel.checkKind ?? sel.CheckKind ?? "Food";
+        for (const l of lines) {
+          if (productKind(l.productId) !== kind) {
+            return kind === "Drink"
+              ? "This drinks check cannot include food items."
+              : "This food check cannot include drink items.";
+          }
+        }
+        return null;
       }
-      label.textContent = `Open check ${r.body.orderCode} (${r.body.status}) found.`;
-      updateTicketModeHint(r.body, tableId);
+      const newKind = getNewCheckKind();
+      for (const l of lines) {
+        if (productKind(l.productId) !== newKind) {
+          return newKind === "Drink"
+            ? "Drink tickets cannot include food items."
+            : "Food tickets cannot include drink items.";
+        }
+      }
+      return null;
     }
 
     async function loadPortalData() {
@@ -2070,9 +2475,10 @@
       } else {
         staffPhotoEl.classList.add("hidden");
       }
+      const preserveTableId = Number(document.getElementById("tableSelect").value || "0");
       tables = Array.isArray(t.body) ? t.body : [];
       products = Array.isArray(p.body) ? p.body : [];
-      renderTables();
+      renderTables(preserveTableId);
       renderCategories();
       renderProducts();
       renderMenuCatalog();
@@ -2082,11 +2488,45 @@
       return true;
     }
 
+    function normalizeDraftFromApi(body) {
+      if (!body || typeof body !== "object") return null;
+      const id = body.id ?? body.Id;
+      if (!id) return null;
+      const tableId = Number(body.tableId ?? body.TableId ?? 0) || 0;
+      const updatedRaw = body.updatedAtUtc ?? body.UpdatedAtUtc ?? null;
+      let updatedAtUtc = null;
+      if (updatedRaw) {
+        const d = new Date(updatedRaw);
+        if (!Number.isNaN(d.getTime())) updatedAtUtc = d;
+      }
+      let isCustomer = body.isCustomerDraft === true || body.IsCustomerDraft === true;
+      if (!isCustomer && body.isCustomerDraft == null && body.IsCustomerDraft == null) {
+        try {
+          const snap = JSON.parse(body.snapshotJson ?? body.SnapshotJson ?? "{}");
+          isCustomer = !Object.prototype.hasOwnProperty.call(snap, "orderSource")
+            && !Object.prototype.hasOwnProperty.call(snap, "OrderSource");
+        } catch {
+          isCustomer = false;
+        }
+      }
+      return {
+        id: String(id),
+        label: String(body.label ?? body.Label ?? "Draft"),
+        snapshotJson: body.snapshotJson ?? body.SnapshotJson ?? "{}",
+        tableId,
+        updatedAtUtc,
+        isCustomerDraft: Boolean(isCustomer)
+      };
+    }
+
+
     async function loadDrafts() {
       const tableId = Number(document.getElementById("tableSelect").value || "0");
       const q = tableId > 0 ? `?tableId=${tableId}` : "";
       const r = await api(`/api/server/drafts${q}`);
-      drafts = r.ok && Array.isArray(r.body) ? r.body : [];
+      drafts = r.ok && Array.isArray(r.body)
+        ? r.body.map(normalizeDraftFromApi).filter(Boolean)
+        : [];
       renderDrafts();
       if (!r.ok) {
         setDraftStatus(`Draft sync failed: ${r.body?.message || "request failed"}`, false);
@@ -2110,6 +2550,190 @@
 
     async function refreshDraftList() {
       return loadDrafts();
+    }
+
+    function tableLabelForId(tableId) {
+      const tid = Number(tableId) || 0;
+      if (tid <= 0) return "Table ?";
+      const t = tables.find(x => x.id === tid);
+      if (!t) return `Table #${tid}`;
+      return `Table ${t.tableNumber} - ${t.name}`;
+    }
+
+    function draftMetaFromSnapshot(draft) {
+      let itemCount = 0;
+      let customerName = "";
+      try {
+        const raw = JSON.parse(draft.snapshotJson || "{}");
+        const items = raw.items ?? raw.Items ?? [];
+        itemCount = Array.isArray(items) ? items.length : 0;
+        customerName = String(raw.customerName ?? raw.CustomerName ?? "").trim();
+      } catch { /* ignore */ }
+      return { itemCount, customerName };
+    }
+
+    function formatDraftWhen(draft) {
+      if (!draft.updatedAtUtc) return "";
+      try {
+        return draft.updatedAtUtc.toLocaleString(undefined, {
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit"
+        });
+      } catch {
+        return "";
+      }
+    }
+
+    async function loadIncomingDrafts() {
+      const r = await api("/api/server/drafts?tableId=0");
+      const rows = r.ok && Array.isArray(r.body)
+        ? r.body.map(normalizeDraftFromApi).filter(Boolean)
+        : [];
+      incomingDrafts = rows.filter(d => d.isCustomerDraft);
+      renderIncomingDrafts();
+      updateIncomingNavBadge();
+      return r.ok;
+    }
+
+    function renderIncomingDrafts() {
+      const el = document.getElementById("incomingDraftsList");
+      if (!el) return;
+      if (!incomingDrafts.length) {
+        el.innerHTML = `<div class="incoming-drafts-empty" role="status"><strong>No incoming drafts</strong><br>When guests submit Explore our Menu on your tables, drafts appear here.</div>`;
+        return;
+      }
+      el.innerHTML = incomingDrafts.map(d => {
+        const meta = draftMetaFromSnapshot(d);
+        const when = formatDraftWhen(d);
+        const tableLine = esc(tableLabelForId(d.tableId));
+        const nameLine = meta.customerName ? esc(meta.customerName) + " · " : "";
+        const itemsLine = meta.itemCount === 1 ? "1 item" : `${meta.itemCount} items`;
+        return `<article class="incoming-draft-card" role="listitem" data-draft-id="${escAttr(d.id)}" data-table-id="${escAttr(String(d.tableId || 0))}">
+  <div class="incoming-draft-card__head">
+    <h3 class="incoming-draft-card__title">${esc(d.label)}</h3>
+  </div>
+  <div class="incoming-draft-card__meta">${tableLine}<br>${nameLine}${esc(itemsLine)}${when ? " · " + esc(when) : ""}</div>
+  <div class="incoming-draft-card__actions">
+    <button type="button" class="incoming-draft-card__load" data-incoming-load>Load draft</button>
+    <button type="button" class="incoming-draft-card__delete" data-incoming-delete>Delete</button>
+  </div>
+</article>`;
+      }).join("");
+      el.querySelectorAll("[data-incoming-load]").forEach(btn => {
+        btn.onclick = async () => {
+          const card = btn.closest(".incoming-draft-card");
+          const draftId = card?.getAttribute("data-draft-id") || "";
+          const tableId = Number(card?.getAttribute("data-table-id") || "0") || 0;
+          await loadDraft(draftId, { tableId });
+          await loadIncomingDrafts();
+        };
+      });
+      el.querySelectorAll("[data-incoming-delete]").forEach(btn => {
+        btn.onclick = async () => {
+          const card = btn.closest(".incoming-draft-card");
+          const draftId = card?.getAttribute("data-draft-id") || "";
+          const tableId = Number(card?.getAttribute("data-table-id") || "0") || 0;
+          if (!draftId) return;
+          const q = tableId > 0 ? `?tableId=${tableId}` : "";
+          const res = await api(`/api/server/drafts/${encodeURIComponent(draftId)}${q}`, "DELETE");
+          if (!res.ok) {
+            setOut("Delete incoming draft failed", res);
+            return;
+          }
+          await loadIncomingDrafts();
+          const curTableId = Number(document.getElementById("tableSelect").value || "0");
+          if (curTableId === tableId || tableId <= 0) await loadDrafts();
+          setOut("Incoming draft deleted", { id: draftId });
+        };
+      });
+    }
+
+    function isIncomingTabActive() {
+      const tab = document.getElementById("incomingOrderTab");
+      return tab && !tab.classList.contains("hidden");
+    }
+
+    function updateIncomingNavBadge() {
+      const badge = document.getElementById("incomingNavBadge");
+      const navBtn = document.querySelector('.nav-btn[data-tab="incomingOrderTab"]');
+      const count = incomingDrafts.length;
+      if (!badge || !navBtn) return;
+      if (count > 0 && !isIncomingTabActive()) {
+        badge.textContent = String(count);
+        badge.classList.remove("hidden");
+        badge.setAttribute("aria-hidden", "false");
+        navBtn.classList.add("has-incoming-alert");
+      } else {
+        badge.textContent = "";
+        badge.classList.add("hidden");
+        badge.setAttribute("aria-hidden", "true");
+        navBtn.classList.remove("has-incoming-alert");
+      }
+    }
+
+    function navigateToIncomingTab() {
+      const btn = document.querySelector('.nav-btn[data-tab="incomingOrderTab"]');
+      if (btn) btn.click();
+    }
+
+    function parseTableIdFromDraftSnapshot(raw) {
+      if (!raw || typeof raw !== "object") return 0;
+      const n = Number(
+        raw.tableId ?? raw.TableId ?? raw.selectedTableId ?? raw.SelectedTableId ?? 0
+      );
+      return Number.isFinite(n) && n > 0 ? n : 0;
+    }
+
+    /** Switch #tableSelect and refresh open-check + draft list when draft targets another table. */
+    async function selectDraftTable(tableId) {
+      if (!tableId || tableId <= 0) return;
+      const sel = document.getElementById("tableSelect");
+      const cur = Number(sel.value || "0");
+      if (cur === tableId) return;
+      sel.value = String(tableId);
+      await checkOpenCheck();
+      await loadDrafts();
+    }
+
+    function normalizeDraftRow(body) {
+      return normalizeDraftFromApi(body);
+    }
+
+    async function resolveDraftRow(draftId, hintTableId = 0) {
+      let draft = drafts.find(d => d.id === draftId);
+      if (draft) return draft;
+
+      if (hintTableId > 0) {
+        await selectDraftTable(hintTableId);
+        draft = drafts.find(d => d.id === draftId);
+        if (draft) return draft;
+      }
+
+      const r = await api(`/api/server/drafts/${encodeURIComponent(draftId)}`);
+      if (!r.ok) return null;
+      const row = normalizeDraftRow(r.body);
+      if (!row) return null;
+
+      const tid =
+        hintTableId > 0
+          ? hintTableId
+          : (() => {
+              try {
+                return parseTableIdFromDraftSnapshot(JSON.parse(row.snapshotJson || "{}"));
+              } catch {
+                return 0;
+              }
+            })();
+      if (tid > 0) await selectDraftTable(tid);
+
+      draft = drafts.find(d => d.id === draftId);
+      if (draft) return draft;
+
+      drafts.push(row);
+      renderDrafts();
+      return row;
     }
 
     function navigateToTakeOrder() {
@@ -2197,26 +2821,41 @@
       renderCategories();
       renderProducts();
       renderCart();
-      checkOpenCheck();
+      void afterPublicMenuPayloadLoaded(fd);
     }
 
-    async function loadDraft(draftId) {
+    async function afterPublicMenuPayloadLoaded(kindLabel) {
+      await loadOpenChecks();
+      const kind = String(kindLabel || "").trim();
+      if (!kind || !openChecks.length) return;
+      const match = openChecks.find(c => String(c.checkKind ?? c.CheckKind).toLowerCase() === kind.toLowerCase());
+      if (match) {
+        selectedOpenCheckId = Number(match.orderId ?? match.OrderId) || 0;
+        setTicketMode("append");
+        renderOpenChecks();
+      } else {
+        setTicketMode("new");
+        setNewCheckKind(kind);
+        renderOpenChecks();
+      }
+    }
+
+    async function loadDraft(draftId, options = {}) {
       if (!draftId) {
         setDraftStatus("Select a draft first.", false);
         setOut("Load draft", { ok: false, message: "Select a draft first." });
         return;
       }
 
-      const draft = drafts.find(d => d.id === draftId);
+      const hintTableId = Number(options.tableId ?? options.TableId ?? 0) || 0;
+      const draft = await resolveDraftRow(draftId, hintTableId);
       if (!draft) {
         setDraftStatus("Draft not found  - click Refresh Data.", false);
         setOut("Load draft", { ok: false, message: "Draft not in list." });
         return;
       }
 
-      // Log exactly what is stored in the draft
       const rawJson = draft.snapshotJson ?? draft.SnapshotJson ?? null;
-      console.warn("[loadDraft] snapshotJson value:", rawJson);
 
       let raw;
       try {
@@ -2227,39 +2866,31 @@
         return;
       }
 
-      console.warn("[loadDraft] parsed object keys:", Object.keys(raw));
-      console.warn("[loadDraft] has items?", Array.isArray(raw.items), "has Items?", Array.isArray(raw.Items));
-      console.warn("[loadDraft] isCustomerPayload?", isPublicMenuCustomerPayload(raw));
-      console.warn("[loadDraft] products loaded:", products.length);
+      const tableId = hintTableId || parseTableIdFromDraftSnapshot(raw);
+      if (tableId > 0) await selectDraftTable(tableId);
 
       if (isPublicMenuCustomerPayload(raw)) {
-        console.warn("[loadDraft] -> applying customer payload");
         applyPublicMenuPayloadToPos(raw);
-        console.warn("[loadDraft] cart size after apply:", cart.size);
-      } else if (Array.isArray(raw.Items) && raw.Items.length > 0) {
-        // Fallback: PascalCase customer draft (old draft before camelCase fix)
-        console.warn("[loadDraft] -> PascalCase customer draft detected, normalizing...");
+      } else if (Array.isArray(raw.Items) && raw.Items.length > 0 && !Object.prototype.hasOwnProperty.call(raw, "orderSource")) {
         const normalized = {
-          tableId:         raw.TableId,
-          customerName:    raw.CustomerName,
+          tableId:         raw.tableId ?? raw.TableId,
+          customerName:    raw.customerName ?? raw.CustomerName,
           orderKind:       raw.orderKind != null && raw.orderKind !== "" ? raw.orderKind : raw.OrderKind,
-          notes:           raw.Notes,
-          allergyNotes:    raw.AllergyNotes,
-          cookingTimeNote: raw.CookingTimeNote,
+          notes:           raw.notes ?? raw.Notes,
+          allergyNotes:    raw.allergyNotes ?? raw.AllergyNotes,
+          cookingTimeNote: raw.cookingTimeNote ?? raw.CookingTimeNote,
           items: (raw.Items || []).map(i => ({
-            productId: i.ProductId,
-            quantity:  i.Quantity,
-            unitPrice: i.UnitPrice
+            productId: i.productId ?? i.ProductId,
+            quantity:  i.quantity ?? i.Quantity,
+            unitPrice: i.unitPrice ?? i.UnitPrice
           }))
         };
-        console.warn("[loadDraft] normalized payload:", normalized);
         applyPublicMenuPayloadToPos(normalized);
-        console.warn("[loadDraft] cart size after apply:", cart.size);
       } else {
-        console.warn("[loadDraft] -> applying as server snapshot");
         applySnapshot(raw);
       }
 
+      await checkOpenCheck();
       document.getElementById("drafts").value = draftId;
       setDraftStatus("Draft loaded.", true);
       setOut("Draft loaded", { id: draft.id, label: draft.label });
@@ -2465,7 +3096,8 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       }, 1000);
       el.querySelector("[data-load]").onclick = async () => {
         close();
-        await loadDraft(draftId);
+        const tableId = Number(payload.tableId ?? payload.TableId ?? 0) || 0;
+        await loadDraft(draftId, { tableId });
       };
       host.appendChild(el);
     }
@@ -2483,7 +3115,9 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       conn.on("CustomerDraftArrived", async p => {
         try {
           await refreshDraftList();
+          await loadIncomingDrafts();
         } catch { /* ignore */ }
+        updateIncomingNavBadge();
         showCustomerDraftArrivedToast(p);
       });
       conn.on("ServerReadyOrderArrived", p => {
@@ -2504,14 +3138,12 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       if (draftListPollTimer) clearInterval(draftListPollTimer);
       draftListPollTimer = setInterval(() => {
         if (!token) return;
-        if (
+        const hubConnected =
           orderHubConnection
           && typeof signalR !== "undefined"
-          && orderHubConnection.state === signalR.HubConnectionState.Connected
-        ) {
-          return;
-        }
-        refreshDraftList();
+          && orderHubConnection.state === signalR.HubConnectionState.Connected;
+        if (!hubConnected) void refreshDraftList();
+        void loadIncomingDrafts();
       }, 30000);
     }
 
@@ -2558,6 +3190,8 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
         discountMode: mode,
         discountValue: value,
         appendMode: getTicketMode(),
+        selectedOpenCheckId,
+        newCheckKind: getNewCheckKind(),
         customerNotes: document.getElementById("customerNotes").value,
         allergyNotes: document.getElementById("allergyNotes").value,
         cart: [...cart.entries()]
@@ -2570,6 +3204,8 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       document.getElementById("discountMode").value = s.discountMode || "None";
       document.getElementById("discountValue").value = String(s.discountValue || 0);
       setTicketMode(s.appendMode || "append");
+      selectedOpenCheckId = Number(s.selectedOpenCheckId || 0) || 0;
+      if (s.newCheckKind) setNewCheckKind(s.newCheckKind);
       document.getElementById("customerNotes").value = s.customerNotes || "";
       document.getElementById("allergyNotes").value = s.allergyNotes || "";
       cart.clear();
@@ -2582,7 +3218,7 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       renderCategories();
       renderProducts();
       renderCart();
-      checkOpenCheck();
+      void checkOpenCheck();
     }
 
     function clearCurrentOrder() {
@@ -2605,6 +3241,10 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       const tab = btn.getAttribute("data-tab");
       document.querySelectorAll(".tab").forEach(x => x.classList.add("hidden"));
       document.getElementById(tab).classList.remove("hidden");
+      if (tab === "incomingOrderTab") {
+        updateIncomingNavBadge();
+        void loadIncomingDrafts();
+      }
       if (tab === "pickupTab") {
         updatePickupNavBadge();
         void loadReadyOrders();
@@ -2663,6 +3303,8 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       unlockServerAudioFromUserGesture();
       const ok = await loadPortalData();
       await loadDrafts();
+      await loadIncomingDrafts();
+      navigateToIncomingTab();
       void startOrderHub();
       startDraftListPolling();
       startReadyOrdersPolling();
@@ -2671,7 +3313,7 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
 
     document.getElementById("btnLogout").onclick = () => {
       stopOrderHubAndPolling();
-      token = ""; me = null; tables = []; products = []; readyOrders = []; drafts = []; cart.clear();
+      token = ""; me = null; tables = []; products = []; readyOrders = []; drafts = []; incomingDrafts = []; cart.clear();
       document.getElementById("brandName").textContent = "ELITE SERVER PORTAL";
       revokeImgBlob(document.getElementById("brandLogo"));
       document.getElementById("brandLogo").classList.add("hidden");
@@ -2685,13 +3327,31 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
     document.getElementById("btnRefreshAll").onclick = async () => {
       const ok = await loadPortalData();
       const draftOk = await loadDrafts();
-      setOut("Refresh data", { ok, draftOk, tables: tables.length, products: products.length, readyOrders: readyOrders.length, drafts: drafts.length });
+      const incomingOk = await loadIncomingDrafts();
+      setOut("Refresh data", {
+        ok,
+        draftOk,
+        incomingOk,
+        tables: tables.length,
+        products: products.length,
+        readyOrders: readyOrders.length,
+        drafts: drafts.length,
+        incomingDrafts: incomingDrafts.length
+      });
+    };
+    document.getElementById("btnRefreshIncoming").onclick = async () => {
+      const ok = await loadIncomingDrafts();
+      setOut("Refresh incoming drafts", { ok, incomingDrafts: incomingDrafts.length });
     };
     document.getElementById("btnRefreshReady").onclick = async () => {
       const ok = await loadReadyOrders();
       setOut("Refresh ready orders", { ok, readyOrders: readyOrders.length });
     };
-    document.getElementById("btnCheckOpen").onclick = checkOpenCheck;
+    document.getElementById("btnRefreshOpenChecks").onclick = () => { void loadOpenChecks(); };
+    document.getElementById("ticketModeAppend").addEventListener("change", () => { syncNewCheckKindVisibility(); updateTicketModeHint(); });
+    document.getElementById("ticketModeNew").addEventListener("change", () => { syncNewCheckKindVisibility(); updateTicketModeHint(); });
+    document.getElementById("newCheckKindFood").addEventListener("change", updateTicketModeHint);
+    document.getElementById("newCheckKindDrink").addEventListener("change", updateTicketModeHint);
 
     document.getElementById("btnSaveDraft").onclick = async () => {
       const snapshot = snapshotState();
@@ -2729,6 +3389,7 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
         return;
       }
       await loadDrafts();
+      await loadIncomingDrafts();
       document.getElementById("drafts").value = "";
       setDraftStatus("Draft deleted.", true);
       setOut("Draft deleted", { id });
@@ -2761,10 +3422,18 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
         discountValue: d.value,
         paymentCurrencyCode: document.getElementById("paymentCurrency").value,
         appendToOpenCheck: getTicketMode() === "append",
+        openOrderId: getTicketMode() === "append" && selectedOpenCheckId > 0 ? selectedOpenCheckId : null,
+        newCheckKind: getTicketMode() === "new" ? getNewCheckKind() : null,
         customerNotes: document.getElementById("customerNotes").value || "",
         allergyNotes: document.getElementById("allergyNotes").value || "",
         lines
       };
+      const cartErr = validateCartForSubmit();
+      if (cartErr) {
+        alert(cartErr);
+        setOut("Submit blocked", { message: cartErr });
+        return;
+      }
       const res = await api("/api/server/orders", "POST", payload);
       setOut("Submit order result", res);
       if (!res.ok) {

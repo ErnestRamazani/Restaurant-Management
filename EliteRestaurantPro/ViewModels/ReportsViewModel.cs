@@ -428,18 +428,17 @@ public sealed class ReportsViewModel : AdminBaseViewModel
 
         foreach (var row in attendanceRows)
         {
-            var clockIn = row.ClockInTime?.ToString("HH:mm") ?? "Not clocked in";
-            var clockOut = row.ClockOutTime?.ToString("HH:mm") ?? "Not clocked out";
-            var statusText = string.IsNullOrWhiteSpace(row.ClockInStatus) ? "Pending" : row.ClockInStatus;
-            var noteText = string.IsNullOrWhiteSpace(row.Justification) ? "-" : row.Justification;
-            entries.Add(new ReportTimeEntryDto
+            foreach (var ev in AttendanceReportEntries.BuildForEmployeeDetail(row, employee.Name))
             {
-                EventTime = row.ClockInTime ?? row.WorkDate.Date.AddHours(9),
-                EventType = "Attendance",
-                Summary = $"Clock In: {clockIn} ({statusText}) | Clock Out: {clockOut}",
-                RelatedInfo = $"Justification: {noteText}",
-                EntityContext = employee.Name
-            });
+                entries.Add(new ReportTimeEntryDto
+                {
+                    EventTime = ev.EventTime,
+                    EventType = ev.EventType,
+                    Summary = ev.Summary,
+                    RelatedInfo = ev.RelatedInfo,
+                    EntityContext = ev.EntityContext
+                });
+            }
         }
 
         var productsById = await LoadProductsByIdAsync().ConfigureAwait(true);
@@ -515,7 +514,7 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         ApplyDayGroups(EmployeeTimelineDays, entries);
 
         EmployeeSummary =
-            $"Name: {employee.Name}\nID: {employee.UniqueId}\nRole: {employee.Role}\nStatus: {employee.EmploymentStatus}\nPhone: {employee.PhoneNumber}\nAttendance Events: {attendanceRows.Count}\nOrders Served: {servedOrders.Count}\nItems Served: {servedOrders.Sum(o => o.Items.Sum(i => i.Quantity))}";
+            $"Name: {employee.Name}\nID: {employee.UniqueId}\nRole: {employee.Role}\nStatus: {employee.EmploymentStatus}\nPhone: {employee.PhoneNumber}\nClock-in / sign-in events: {attendanceRows.Count}\nOrders Served: {servedOrders.Count}\nItems Served: {servedOrders.Sum(o => o.Items.Sum(i => i.Quantity))}";
     }
 
     private async Task LoadTableDetailsAsync(int? tableId)
@@ -716,14 +715,18 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             if (row.Employee is null && employeesById.TryGetValue(row.EmployeeId, out var emp))
                 row.Employee = emp;
 
-            entries.Add(new ReportTimeEntryDto
+            var name = row.Employee?.Name ?? "Unknown";
+            foreach (var ev in AttendanceReportEntries.Build(row, name))
             {
-                EventTime = row.ClockInTime ?? row.WorkDate.Date.AddHours(9),
-                EventType = "Attendance",
-                Summary = $"{row.Employee?.Name ?? "Unknown"} clocked {(row.ClockInTime.HasValue ? "in" : "scheduled")} ({DisplayOrFallback(row.ClockInStatus, "Pending")})",
-                RelatedInfo = $"Clock Out: {row.ClockOutTime?.ToString("HH:mm") ?? "Not clocked out"} | Justification: {DisplayOrFallback(row.Justification, "-")}",
-                EntityContext = $"Employee: {row.Employee?.Name ?? "Unknown"}"
-            });
+                entries.Add(new ReportTimeEntryDto
+                {
+                    EventTime = ev.EventTime,
+                    EventType = ev.EventType,
+                    Summary = ev.Summary,
+                    RelatedInfo = ev.RelatedInfo,
+                    EntityContext = ev.EntityContext
+                });
+            }
         }
 
         var productsById = await LoadProductsByIdAsync().ConfigureAwait(true);
@@ -897,7 +900,7 @@ public sealed class ReportsViewModel : AdminBaseViewModel
 
         ApplyDayGroups(DailyTimelineDays, entries, dailyPayrollPinnedDaySort: true);
         DailySummary =
-            $"Daily timeline {start:yyyy-MM-dd} → {ReportEndDate:yyyy-MM-dd}: {entries.Count} events (attendance, orders, reservations, menu, inventory, payroll records, salary advances, Money salary ledger).";
+            $"Daily timeline {start:yyyy-MM-dd} → {ReportEndDate:yyyy-MM-dd}: {entries.Count} events (clock-ins/sign-ins, orders, reservations, menu, inventory, payroll records, salary advances, Money salary ledger).";
     }
 
     private static void ApplyDayGroups(
@@ -1163,12 +1166,17 @@ public sealed class ReportsViewModel : AdminBaseViewModel
                 if (row.Employee is null && employeesById.TryGetValue(row.EmployeeId, out var empAttach))
                     row.Employee = empAttach;
 
-                rows.Add(BuildAnalyticalRow(
-                    eventTime: row.ClockInTime ?? row.WorkDate.Date,
-                    eventType: "Attendance",
-                    employeeId: row.Employee?.UniqueId ?? string.Empty,
-                    employeeName: row.Employee?.Name ?? string.Empty,
-                    costOrPrice: string.Empty));
+                var empName = row.Employee?.Name ?? string.Empty;
+                foreach (var ev in AttendanceReportEntries.Build(row, empName))
+                {
+                    rows.Add(BuildAnalyticalRow(
+                        eventTime: ev.EventTime,
+                        eventType: ev.EventType,
+                        employeeId: row.Employee?.UniqueId ?? string.Empty,
+                        employeeName: empName,
+                        orderId: ev.Summary.Length > 120 ? ev.Summary[..120] + "…" : ev.Summary,
+                        costOrPrice: string.Empty));
+                }
             }
         }
 

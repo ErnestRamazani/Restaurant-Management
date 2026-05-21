@@ -15,6 +15,9 @@ public sealed class KitchenOrderLineVm
     public string ProductName { get; init; } = string.Empty;
     public int Quantity { get; init; }
     public string Station { get; init; } = string.Empty;
+    public bool IsNewForKitchen { get; init; }
+    public bool IsAlreadyPrepared { get; init; }
+    public string LineBadge { get; init; } = string.Empty;
 }
 
 public sealed class KitchenOrdersViewModel : AdminBaseViewModel
@@ -34,6 +37,7 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
     private bool _showDetailReceiveInKitchen;
     private bool _showDetailMarkReady;
     private string _detailActionHint = string.Empty;
+    private string _detailKitchenWorkSummary = string.Empty;
 
     public override string ActivePage => "KitchenQueue";
 
@@ -159,6 +163,14 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
 
     public bool HasDetailActionHint => !string.IsNullOrWhiteSpace(DetailActionHint);
 
+    public string DetailKitchenWorkSummary
+    {
+        get => _detailKitchenWorkSummary;
+        private set => SetField(ref _detailKitchenWorkSummary, value);
+    }
+
+    public bool HasDetailKitchenWorkSummary => !string.IsNullOrWhiteSpace(DetailKitchenWorkSummary);
+
     public OrderDetailPanelViewModel OrderDetail { get; } = new();
 
     public ICommand RefreshCommand { get; }
@@ -251,7 +263,9 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
             var employeesTask = _data.GetEmployeesAsync();
             await Task.WhenAll(ordersTask, productsTask, tablesTask, employeesTask).ConfigureAwait(false);
 
-            var orders = (await ordersTask.ConfigureAwait(false)).ToList();
+            var orders = (await ordersTask.ConfigureAwait(false))
+                .Where(o => OrderWorkflow.IsKitchenKdsVisibleStatus(o.Status))
+                .ToList();
             var productById = (await productsTask.ConfigureAwait(false)).ToDictionary(p => p.Id);
             var tableById = (await tablesTask.ConfigureAwait(false)).ToDictionary(t => t.Id);
             var empById = (await employeesTask.ConfigureAwait(false)).ToDictionary(e => e.Id);
@@ -270,7 +284,7 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
 
             var incoming = orders
                 .Where(o => OrderWorkflow.IsKitchenIncomingColumn(o.Status))
-                .OrderBy(o => o.CreatedAt)
+                .OrderByDescending(o => o.CreatedAt)
                 .Select(MapKitchenOrder)
                 .ToList();
 
@@ -375,22 +389,32 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
         var lineSubtotal = order.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
         var totals = OrderTotalsHelper.ComputeTotals(lineSubtotal, order.DiscountMode, order.DiscountValue);
         DetailTotal = $"$ {totals.GrandTotal:N2}";
-        DetailCustomerNotes = string.IsNullOrWhiteSpace(order.CustomerNotes) ? "—" : order.CustomerNotes.Trim();
+        var kitchenCust = KitchenCustomerNotesDisplay.ForKitchen(order);
+        DetailCustomerNotes = string.IsNullOrWhiteSpace(kitchenCust) ? "—" : kitchenCust;
         DetailAllergyNotes = string.IsNullOrWhiteSpace(order.AllergyNotes) ? "—" : order.AllergyNotes.Trim();
 
+        var lineItems = order.Items?.ToList() ?? [];
+        var work = KitchenLineVisibility.Summarize(lineItems);
+        DetailKitchenWorkSummary = work.CardSummaryText;
+
         DetailLines.Clear();
-        foreach (var item in order.Items.OrderBy(i => i.Product?.Name))
+        foreach (var item in lineItems.OrderBy(i => i.Product?.Name))
         {
+            var isNew = KitchenLineVisibility.IsNewForKitchen(item, lineItems);
+            var prepared = KitchenLineVisibility.IsLinePrepared(item);
             DetailLines.Add(new KitchenOrderLineVm
             {
                 ProductName = item.Product?.Name ?? "Item",
                 Quantity = item.Quantity,
-                Station = string.IsNullOrWhiteSpace(item.PreparedByRole) ? "—" : item.PreparedByRole
+                Station = string.IsNullOrWhiteSpace(item.PreparedByRole) ? "—" : item.PreparedByRole,
+                IsNewForKitchen = isNew,
+                IsAlreadyPrepared = prepared,
+                LineBadge = isNew ? "NEW" : prepared ? "Prepared" : string.Empty
             });
         }
 
         _selectedKitchenEntry = entry;
-        ApplyDetailKitchenActions(entry, order.Status);
+        ApplyDetailKitchenActions(entry, order.Status, work);
 
         HasDetail = true;
         OnPropertyChanged(nameof(DetailOrderCode));
@@ -403,24 +427,25 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
         OnPropertyChanged(nameof(DetailAllergyNotes));
     }
 
-    private void ApplyDetailKitchenActions(OrderEntry entry, string status)
+    private void ApplyDetailKitchenActions(OrderEntry entry, string status, KitchenWorkSummary work)
     {
         var key = OrderWorkflow.KitchenStatusKey(status);
         ShowDetailReleaseToKitchen = false;
         ShowDetailReceiveInKitchen = entry.ShowReceiveInKitchen;
         ShowDetailMarkReady = entry.ShowMarkReadyForPickup;
 
+        var newWorkHint = work.HighlightNewOnTicket
+            ? "Prepare NEW lines only — already-prepared items do not need re-cooking."
+            : string.Empty;
+
         DetailActionHint = key switch
         {
-            "pendingCashier" =>
-                "Ticket is with the cashier. Only the cashier can release it to the kitchen (status becomes Waiting).",
-            "pendingApproval" =>
-                "Guest online order awaiting cashier approval. Only the cashier can release it to the kitchen.",
+            "waiting" or "inKitchen" => newWorkHint,
             "ready" =>
                 "This ticket is ready for pickup. Servers or cashier can complete it from their screens.",
             "served" or "other" =>
                 "No kitchen action for this status. Refresh if the ticket changed.",
-            _ => string.Empty
+            _ => newWorkHint
         };
 
         OnPropertyChanged(nameof(HasDetailActionHint));
@@ -433,7 +458,9 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
         ShowDetailReceiveInKitchen = false;
         ShowDetailMarkReady = false;
         DetailActionHint = string.Empty;
+        DetailKitchenWorkSummary = string.Empty;
         OnPropertyChanged(nameof(HasDetailActionHint));
+        OnPropertyChanged(nameof(HasDetailKitchenWorkSummary));
 
         DetailLines.Clear();
         DetailOrderCode = string.Empty;
@@ -564,13 +591,14 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
 
     private static OrderEntry MapKitchenOrder(OrderRecord order)
     {
-        var lines = order.Items ?? [];
+        var lines = order.Items?.ToList() ?? [];
         var lineSubtotal = lines.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
         var totals = OrderTotalsHelper.ComputeTotals(lineSubtotal, order.DiscountMode, order.DiscountValue);
         var items = string.Join(", ",
             lines.Select(i => $"{i.Product?.Name ?? "Unknown"} x{i.Quantity}"));
 
         var awaitsRelease = OrderWorkflow.AwaitsCashierOrApprovalBeforeKitchen(order.Status);
+        var work = KitchenLineVisibility.Summarize(lines);
         return new OrderEntry
         {
             Id = order.Id,
@@ -578,6 +606,7 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
             TableNumber = OrderRecordUiLabels.TableCaption(order),
             ServerName = OrderRecordUiLabels.ServerCaption(order),
             Items = items,
+            KitchenWorkSummary = work.CardSummaryText,
             CustomerNotes = order.CustomerNotes ?? string.Empty,
             AllergyNotes = order.AllergyNotes ?? string.Empty,
             Status = order.Status,

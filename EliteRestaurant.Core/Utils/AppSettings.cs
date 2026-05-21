@@ -55,6 +55,7 @@ public sealed class AppSettings
 }
 
 /// <summary>Restaurant shift boundaries (local time of day). Serialized to app-settings.json.</summary>
+/// <remarks>Full Day employee shifts use <see cref="MorningShiftStart"/> through <see cref="NightShiftEnd"/> (operating hours).</remarks>
 public sealed class AttendanceSettings
 {
     public TimeSpan MorningShiftStart { get; set; } = new(12, 0, 0);
@@ -130,7 +131,13 @@ public sealed class BusinessProfileSettings
     public string? CustomerMenuNotesText { get; set; }
 
     /// <summary>Simple gate before exposing staff/admin workspace links from the public menu.</summary>
-    public string StaffLoginPasscode { get; set; } = "er4124";
+    public string StaffLoginPasscode { get; set; } = string.Empty;
+
+    /// <summary>Sign-in ID for the read-only admin web portal (<c>/admin/</c>).</summary>
+    public string AdminWebSignInId { get; set; } = string.Empty;
+
+    /// <summary>PIN for the read-only admin web portal (pushed to cloud and synced to AdminWeb employee).</summary>
+    public string AdminWebPin { get; set; } = string.Empty;
 
     public string HomepageBackgroundImagePath { get; set; } = string.Empty;
     public string TicketFooterText { get; set; } = "MERCI / THANK YOU";

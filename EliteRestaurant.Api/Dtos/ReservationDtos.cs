@@ -43,3 +43,41 @@ public sealed record CashierEngagementDetailDto(
 public sealed record CashierRescheduleEngagementRequest(
     DateTime PlannedStartUtc,
     DateTime? PlannedEndUtc);
+
+/// <summary>Reservation scheduling window for cashier / reception portals (desktop settings + appsettings).</summary>
+public sealed record CashierReservationSchedulingDto(
+    int ReservationLeadDays,
+    int ReservationMaxMonthsAhead,
+    int BufferMinutes,
+    int DefaultDurationMinutes,
+    int SuggestionSlotStepMinutes,
+    int SuggestionHorizonDays);
+
+/// <summary>Walk-in reservation created at the front desk (table optional).</summary>
+public sealed record CashierCreateWalkInEngagementRequest(
+    string GuestName,
+    string GuestPhone,
+    string? GuestEmail,
+    DateTime PlannedStartUtc,
+    DateTime? PlannedEndUtc,
+    int PartySize,
+    int? TableId,
+    int? PlacementUnitId,
+    string? UserNotes);
+
+public sealed record CashierCreateWalkInEngagementResponse(
+    int EngagementId,
+    DateTime PlannedStartUtc,
+    DateTime PlannedEndUtc);
+
+public sealed record ReceptionDeliveryPickupOrderRow(
+    int OrderId,
+    string OrderCode,
+    string GuestName,
+    string GuestPhone,
+    string FulfillmentType,
+    string Status,
+    DateTime CreatedAt,
+    string CreatedAtDisplay,
+    string ItemsSummary,
+    bool IsReadyForHandoff);

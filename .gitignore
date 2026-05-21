@@ -66,6 +66,19 @@ project.fragment.lock.json
 artifacts/
 .build-check/
 
+# Local agent/build verification scratch outputs (full publish copies)
+.build-verify*/
+.build-verify/
+_build*/
+_build_*/
+_verify*/
+_verify_*/
+.artifacts/
+
+# API runtime logs (Serilog / file sinks)
+EliteRestaurant.Api/logs/
+**/logs/*.log
+
 # Local coverage scratch (not produced by default test run)
 coverage-tmp/
 coverage-tmp2/

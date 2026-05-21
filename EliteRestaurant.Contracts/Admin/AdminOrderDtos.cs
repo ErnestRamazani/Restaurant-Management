@@ -46,5 +46,8 @@ public sealed record AdminOrderStatusUpdateRequest(
     decimal ChangeGivenUsd,
     decimal ChangeGivenFc);
 
+/// <summary>Optional body for kitchen/bar KDS advance (station-scoped prep on mixed tickets).</summary>
+public sealed record AdminOrderAdvanceRequest(string? PrepStationPortal);
+
 /// <summary><c>advanced</c>, <c>missing</c> (no-op), or <c>error</c>.</summary>
 public sealed record AdminOrderAdvanceResponse(string Result, string? ErrorMessage);

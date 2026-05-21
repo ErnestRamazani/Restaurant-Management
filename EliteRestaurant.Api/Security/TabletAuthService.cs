@@ -28,7 +28,7 @@ public sealed class TabletAuthService(AppDbContext db, JwtTokenService jwtTokenS
         {
             return new TabletLoginOutcome(null,
                 string.Equals(normalizedPortal, "AdminWeb", StringComparison.OrdinalIgnoreCase)
-                    ? "No active AdminWeb user matches that sign-in ID. Use er4124 after the API has restarted on production (seeding), or add an employee with role AdminWeb in Elite Pro."
+                    ? "No active AdminWeb user matches that sign-in ID. Configure Admin web sign-in ID and PIN in Elite Pro → Appearance, push to cloud, or add an employee with role AdminWeb."
                     : string.Equals(normalizedPortal, "Admin", StringComparison.OrdinalIgnoreCase)
                         ? "No active Admin or Manager matches that ID, employee code, or name."
                         : "No active employee matches that sign-in ID.");
@@ -41,9 +41,16 @@ public sealed class TabletAuthService(AppDbContext db, JwtTokenService jwtTokenS
         var employee = StaffPortalAuthentication.ResolvePortalCandidate(candidates, normalizedPortal);
         if (employee is null)
         {
+            if (string.Equals(normalizedPortal, "Admin", StringComparison.OrdinalIgnoreCase))
+            {
+                var wrongRole = candidates.FirstOrDefault()?.Role;
+                return new TabletLoginOutcome(null,
+                    StaffPortalAuthentication.AdminDesktopPortalRejectedMessage(wrongRole));
+            }
+
             return new TabletLoginOutcome(null,
                 string.Equals(normalizedPortal, "AdminWeb", StringComparison.OrdinalIgnoreCase)
-                    ? "This account is not an AdminWeb user. Use an employee with role AdminWeb (or the seeded er4124 account)."
+                    ? "This account is not an AdminWeb user. Use an employee with role AdminWeb or the credentials from business settings."
                     : "This account cannot use the selected portal.");
         }
 
@@ -52,12 +59,13 @@ public sealed class TabletAuthService(AppDbContext db, JwtTokenService jwtTokenS
         var token = Guid.NewGuid().ToString("N");
         var expiresAtUtc = DateTime.UtcNow.Add(SessionDuration);
         var canonicalPortal = StaffPortalAuthentication.CanonicalPortalForEmployee(employee);
+        var sessionPortal = ResolveSessionPortal(normalizedPortal, canonicalPortal, employee.Role);
 
         db.TabletSessions.Add(new TabletSession
         {
             Token = token,
             EmployeeId = employee.Id,
-            Portal = canonicalPortal,
+            Portal = sessionPortal,
             EmployeeUniqueId = employee.UniqueId ?? string.Empty,
             Name = employee.Name,
             Role = employee.Role,
@@ -67,7 +75,22 @@ public sealed class TabletAuthService(AppDbContext db, JwtTokenService jwtTokenS
         });
         db.SaveChanges();
 
-        return new TabletLoginOutcome(ToAuthenticatedSession(token, employee, canonicalPortal, expiresAtUtc), null);
+        return new TabletLoginOutcome(ToAuthenticatedSession(token, employee, sessionPortal, expiresAtUtc), null);
+    }
+
+    private static string ResolveSessionPortal(string requestedPortal, string canonicalPortal, string employeeRole)
+    {
+        if (StaffPortalAuthentication.IsReceptionRole(employeeRole)
+            && string.Equals(requestedPortal, "Reception", StringComparison.OrdinalIgnoreCase))
+            return "Reception";
+
+        if (StaffPortalAuthentication.IsKitchenBarRole(employeeRole)
+            && (string.Equals(requestedPortal, "Kitchen", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(requestedPortal, "Bar", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(requestedPortal, "KitchenBar", StringComparison.OrdinalIgnoreCase)))
+            return requestedPortal;
+
+        return canonicalPortal;
     }
 
     public AuthenticatedStaffSession? Validate(string? token)

@@ -49,6 +49,8 @@ public sealed record AdminCloudSettingsRequest(
     string SocialMedia,
     string? CustomerMenuTagline,
     string StaffLoginPasscode,
+    string AdminWebSignInId,
+    string AdminWebPin,
     string TicketFooterText,
     string TaxIdLegalInfo,
     string DefaultCurrencyDisplayMode,

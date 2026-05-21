@@ -1,4 +1,5 @@
 using System.Windows.Input;
+using EliteRestaurant.Core.Staff;
 using EliteRestaurant.Core.Utils;
 using EliteRestaurantPro.ApiClients;
 
@@ -65,6 +66,14 @@ public class AdminLoginViewModel : BaseViewModel
                 ? auth.ErrorMessage
                 : "Sign-in failed. Check your ID and password.";
             HasError = true;
+            return;
+        }
+
+        if (!StaffPortalAuthentication.IsAdminDesktopRole(auth.Response.Role))
+        {
+            ErrorMessage = StaffPortalAuthentication.AdminDesktopPortalRejectedMessage(auth.Response.Role);
+            HasError = true;
+            AppSession.Clear();
             return;
         }
 

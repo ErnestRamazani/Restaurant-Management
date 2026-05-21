@@ -19,7 +19,13 @@ public sealed class PublicMenuSetting
 
     /// <summary>Public menu footer — Notes sheet body (plain text; may include line breaks).</summary>
     public string? CustomerMenuNotesText { get; set; }
-    public string StaffLoginPasscode { get; set; } = "er4124";
+    public string StaffLoginPasscode { get; set; } = string.Empty;
+
+    /// <summary>Sign-in ID for the read-only admin web portal (<c>/admin/</c>).</summary>
+    public string AdminWebSignInId { get; set; } = string.Empty;
+
+    /// <summary>PIN for the read-only admin web portal (synced to <see cref="Employee"/> role AdminWeb).</summary>
+    public string AdminWebPin { get; set; } = string.Empty;
     public string TicketFooterText { get; set; } = "MERCI / THANK YOU";
     public string TaxIdLegalInfo { get; set; } = string.Empty;
     public string DefaultCurrencyDisplayMode { get; set; } = "Dual";

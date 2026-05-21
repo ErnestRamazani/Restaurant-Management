@@ -23,9 +23,34 @@ public sealed record ServerCreateOrderRequest(
     decimal DiscountValue,
     string PaymentCurrencyCode,
     bool AppendToOpenCheck,
+    int? OpenOrderId,
+    string? NewCheckKind,
     string CustomerNotes,
     string AllergyNotes,
     IReadOnlyList<ServerOrderLineRequest> Lines);
+
+public sealed record ServerOpenCheckLineDto(
+    int ProductId,
+    string Name,
+    string Category,
+    int Quantity,
+    decimal LineTotalUsd);
+
+public sealed record ServerOpenCheckDto(
+    int OrderId,
+    string OrderCode,
+    string Status,
+    string CheckKind,
+    DateTime CreatedAt,
+    string CustomerNotes,
+    string AllergyNotes,
+    decimal SubtotalUsd,
+    decimal GrandTotalUsd,
+    IReadOnlyList<ServerOpenCheckLineDto> Lines);
+
+public sealed record ServerOpenChecksResponse(
+    int TableId,
+    IReadOnlyList<ServerOpenCheckDto> Checks);
 
 public sealed record ServerCreateOrderResponse(
     string Mode,
@@ -81,7 +106,9 @@ public sealed record ServerDraftDto(
     string Id,
     string Label,
     string SnapshotJson,
-    DateTime UpdatedAtUtc);
+    DateTime UpdatedAtUtc,
+    int TableId,
+    bool IsCustomerDraft);
 
 public sealed record ServerSaveDraftRequest(
     string Label,

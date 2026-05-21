@@ -30,6 +30,8 @@ public sealed class AdminSettingsApiClient(EliteApiClient? apiClient = null)
             settings.BusinessProfile.SocialMedia,
             settings.BusinessProfile.CustomerMenuTagline,
             settings.BusinessProfile.StaffLoginPasscode,
+            settings.BusinessProfile.AdminWebSignInId,
+            settings.BusinessProfile.AdminWebPin,
             settings.BusinessProfile.TicketFooterText,
             settings.BusinessProfile.TaxIdLegalInfo,
             settings.CurrencyPricing.DefaultCurrencyDisplayMode,

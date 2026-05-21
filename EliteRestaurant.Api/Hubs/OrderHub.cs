@@ -1,6 +1,7 @@
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Orders;
+using EliteRestaurant.Core.Staff;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -37,16 +38,19 @@ public sealed class OrderHub(IServiceScopeFactory scopeFactory) : Hub
         }
     }
 
+    /// <summary>Front desk — online delivery and pickup tracking (read-only).</summary>
+    public async Task JoinReception()
+    {
+        var role = Context.User?.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
+        if (StaffPortalAuthentication.IsReceptionRole(role))
+            await Groups.AddToGroupAsync(Context.ConnectionId, "Reception");
+    }
+
     public async Task JoinKitchen()
     {
         var role = Context.User?.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
-        if (role.Equals("Chef", StringComparison.OrdinalIgnoreCase)
-            || role.Equals("Barman", StringComparison.OrdinalIgnoreCase)
-            || role.Equals("Bartender", StringComparison.OrdinalIgnoreCase)
-            || role.Equals("Sous Chef", StringComparison.OrdinalIgnoreCase))
-        {
+        if (StaffPortalAuthentication.IsKitchenBarRole(role))
             await Groups.AddToGroupAsync(Context.ConnectionId, "Kitchen");
-        }
     }
 
     /// <summary>Cashier or admin releases a pending ticket to the kitchen (same rules as REST release).</summary>
@@ -83,7 +87,9 @@ public sealed class OrderHub(IServiceScopeFactory scopeFactory) : Hub
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var ops = new AdminOrderOperationsService(db);
         var hub = scope.ServiceProvider.GetRequiredService<IHubContext<OrderHub>>();
-        var result = ops.TryMarkKitchenReadyForCashier(orderId);
+        var portal = Context.User?.FindFirstValue("portal");
+        var prepStation = KitchenQueueKindFilter.IsPrepStationPortal(portal) ? portal : null;
+        var result = ops.TryMarkKitchenReadyForCashier(orderId, prepStation);
         if (!result.Ok)
             throw new HubException(result.ErrorMessage ?? "Cannot mark ready.");
 

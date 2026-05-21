@@ -96,9 +96,12 @@
                             Command="{Binding SetShiftFilterMorningCommand}"
                             Style="{StaticResource ShiftFilterButtonMorningStyle}"/>
                     <Button Content="Night shift"
-                            Margin="0"
                             Command="{Binding SetShiftFilterNightCommand}"
                             Style="{StaticResource ShiftFilterButtonNightStyle}"/>
+                    <Button Content="Full day"
+                            Margin="0"
+                            Command="{Binding SetShiftFilterFullDayCommand}"
+                            Style="{StaticResource ShiftFilterButtonStyle}"/>
                 </StackPanel>
                 <TextBox Grid.Row="2"
                          Margin="0,16,0,0"

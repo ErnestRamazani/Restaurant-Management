@@ -22,6 +22,8 @@
       --dash-card: #151f32;
       --dash-border: #2d3b50;
       --radius: 14px;
+      --radius-sm: 10px;
+      --border: rgba(255, 255, 255, 0.08);
       --chart-blue: #3b82f6;
       --accent-blue: #3b82f6;
       --accent-gold: #e8b84a;
@@ -34,7 +36,13 @@
     body { margin: 0; font-family: "Plus Jakarta Sans", system-ui, sans-serif; background: var(--navy-deep); color: var(--dash-text); }
     .layout { display: grid; grid-template-columns: 220px 1fr; grid-template-rows: 1fr; min-height: 100vh; }
     .sidebar { border-right: 1px solid var(--dash-border); padding: 14px; display: flex; flex-direction: column; gap: 6px; background: var(--navy); }
-    .brand { font-weight: 700; font-size: 15px; letter-spacing: 0.04em; color: var(--amber); }
+    .brand-wrap { margin-bottom: 6px; display: flex; flex-direction: column; align-items: stretch; }
+    .brand-logo {
+      width: 100%; height: 72px; max-height: 84px; object-fit: contain; object-position: center center;
+      display: block; margin: 0 auto 8px; padding: 8px; box-sizing: border-box;
+      border-radius: var(--radius); border: 1px solid var(--dash-border); background: #111c27;
+    }
+    .brand { font-weight: 700; font-size: 14px; letter-spacing: 0.04em; color: var(--amber); }
     .brand-sub { font-size: 11px; color: var(--text-muted); line-height: 1.4; margin-top: 6px; margin-bottom: 8px; }
     .nav-btn {
       width: 100%; text-align: left; padding: 10px 12px; min-height: 42px;
@@ -56,9 +64,18 @@
       overflow: auto;
     }
     #app > .main-area.main--orders { overflow: hidden; }
-    #loginWrap.main-area { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--navy); }
     .card { max-width: 420px; width: 100%; border: 1px solid var(--dash-border); border-radius: var(--radius); background: var(--dash-card); padding: 22px; color: var(--dash-text); }
-    #loginWrap h1 { margin: 0 0 8px; font-size: 1.3rem; }
+    .admin-login-screen {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      padding: 24px; background: var(--navy);
+    }
+    .admin-login { max-width: 420px; width: 100%; }
+    .admin-login__title { margin: 0 0 8px; font-size: 1.3rem; color: var(--amber); }
+    .admin-login__lead { margin: 0 0 20px; }
+    .admin-login__form label { margin-top: 4px; }
+    .admin-login__form input { margin-bottom: 14px; }
+    .admin-login__error { margin-bottom: 14px; }
+    .admin-login__error:empty { display: none !important; }
     .lead { color: var(--dash-muted); font-size: 14px; margin: 0 0 16px; }
     label { display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.12em; color: #64748b; margin-bottom: 6px; }
     input, select {
@@ -92,7 +109,38 @@
     .toolbar input { margin: 0; max-width: 160px; }
 
     /* General Reports */
-    #app > .main-area.main--reports { overflow: auto; }
+    #app > .main-area.main--reports { overflow: hidden; }
+    .reports-page {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .reports-hero,
+    .reports-tabs,
+    .reports-feed-title,
+    .reports-feed-summary,
+    .reports-day-picker {
+      flex-shrink: 0;
+    }
+    #app > .main-area.main--reports #reportsContent {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    #app > .main-area.main--reports #reportsContent:has(> .reports-day-panel) {
+      overflow: hidden;
+    }
+    #app > .main-area.main--reports #reportsContent > .reports-day-panel:not([hidden]) {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      margin-bottom: 0;
+    }
     .reports-hero {
       display: flex; flex-wrap: wrap; justify-content: space-between; gap: 20px; margin-bottom: 8px;
       align-items: flex-start;
@@ -157,10 +205,15 @@
     .reports-day-select { width: 100%; margin: 0; min-height: 42px; }
     .reports-day-panel.reports-day-block { margin-bottom: 16px; }
     .reports-day-inline-head {
+      flex-shrink: 0;
       padding: 12px 16px; background: rgba(0, 0, 0, 0.22); border-bottom: 1px solid var(--dash-border);
       display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; align-items: baseline;
     }
-    .reports-table-wrap { overflow: auto; max-height: min(62vh, 640px); }
+    .reports-table-wrap { overflow: auto; }
+    #app > .main-area.main--reports .reports-table-wrap {
+      flex: 1;
+      min-height: 0;
+    }
     .reports-table { width: 100%; border-collapse: collapse; font-size: 13px; }
     .reports-table th {
       text-align: left; padding: 10px 12px; font-size: 10px; text-transform: uppercase;
@@ -174,6 +227,9 @@
     .reports-cell-related { color: var(--dash-muted); font-size: 12px; max-width: min(300px, 28vw); line-height: 1.4; }
     .reports-cell-sub { margin-top: 6px; font-size: 11px; opacity: 0.92; }
     .reports-cell-metric { white-space: nowrap; color: var(--dash-text); }
+    .reports-table tr.reports-row-clock-in td:nth-child(2) { color: var(--accent-gold); font-weight: 600; }
+    .reports-table tr.reports-row-clock-out td:nth-child(2) { color: #8eb4d9; }
+    .reports-table tr.reports-row-absence td:nth-child(2) { color: #e8a87c; }
     .reports-entity-bar {
       display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; margin: 0 0 14px;
       padding: 14px; background: var(--dash-card); border: 1px solid var(--dash-border); border-radius: var(--radius);
@@ -483,6 +539,257 @@
       border: 1px solid var(--dash-border); border-radius: 10px;
       padding: 12px; margin: 0 0 14px; max-height: 340px; overflow: auto;
     }
+    /* Order detail — premium receipt-style modal (matches cashier) */
+    .modal-card-admin.order-detail-modal {
+      max-width: min(520px, 92vw);
+      width: 100%;
+      padding: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      max-height: min(90vh, 720px);
+      border: 1px solid rgba(232, 168, 56, 0.16);
+      background: linear-gradient(165deg, #151b27 0%, #10151e 100%);
+      box-shadow: 0 28px 70px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+    .od-modal-header {
+      flex-shrink: 0;
+      padding: 20px 22px 16px;
+      background: radial-gradient(100% 80% at 12% 0%, rgba(232, 168, 56, 0.14) 0%, transparent 52%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 100%);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .od-modal-header-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+    }
+    .od-modal-label {
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .od-modal-code {
+      font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #f8fafc;
+      line-height: 1.2;
+      word-break: break-word;
+    }
+    .od-status-pill {
+      flex-shrink: 0;
+      margin-top: 2px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #e2e8f0;
+      background: rgba(255, 255, 255, 0.05);
+      max-width: 160px;
+      text-align: center;
+      line-height: 1.25;
+    }
+    .od-status-pill--pending { color: #fde68a; background: rgba(232, 168, 56, 0.14); border-color: rgba(232, 168, 56, 0.35); }
+    .od-status-pill--wait { color: #bae6fd; background: rgba(56, 189, 248, 0.12); border-color: rgba(56, 189, 248, 0.3); }
+    .od-status-pill--kitchen { color: #fcd34d; background: rgba(251, 191, 36, 0.1); border-color: rgba(251, 191, 36, 0.28); }
+    .od-status-pill--ready { color: #6ee7b7; background: rgba(45, 212, 191, 0.12); border-color: rgba(45, 212, 191, 0.32); }
+    .od-status-pill--served { color: #c4b5fd; background: rgba(167, 139, 250, 0.12); border-color: rgba(167, 139, 250, 0.3); }
+    .od-modal-body {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 16px 22px 10px;
+      font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+      -webkit-overflow-scrolling: touch;
+    }
+    .od-section {
+      margin-bottom: 18px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .od-section:last-of-type {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+    .od-section-title {
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin: 0 0 10px;
+    }
+    .od-meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 14px;
+    }
+    @media (max-width: 400px) {
+      .od-meta-grid { grid-template-columns: 1fr; }
+    }
+    .od-meta-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--border);
+    }
+    .od-meta-k {
+      font-size: 0.65rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .od-meta-v {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: #e2e8f0;
+      word-break: break-word;
+    }
+    .od-items-table {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      background: rgba(0, 0, 0, 0.18);
+    }
+    .od-items-head,
+    .od-line-row {
+      display: grid;
+      grid-template-columns: 2.25rem minmax(0, 1fr) minmax(4.5rem, auto) minmax(4.5rem, auto);
+      gap: 8px 10px;
+      align-items: center;
+      padding: 8px 12px;
+      font-size: 0.8rem;
+    }
+    .od-items-head {
+      font-size: 0.65rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.03);
+      border-bottom: 1px solid var(--border);
+    }
+    .od-line-row {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      color: #e8eaef;
+    }
+    .od-line-row:last-child { border-bottom: none; }
+    .od-line-qty {
+      font-weight: 700;
+      color: var(--amber);
+      font-variant-numeric: tabular-nums;
+    }
+    .od-line-name { min-width: 0; line-height: 1.35; }
+    .od-num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      color: #cbd5e1;
+      font-size: 0.78rem;
+    }
+    .od-line-row .od-num:last-child {
+      font-weight: 600;
+      color: #f1f5f9;
+    }
+    .od-totals {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 4px 0;
+      background: rgba(0, 0, 0, 0.15);
+    }
+    .od-total-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      padding: 8px 14px;
+      font-size: 0.85rem;
+    }
+    .od-total-row span:first-child { color: var(--text-muted); }
+    .od-total-row span:last-child {
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      color: #e2e8f0;
+      text-align: right;
+      white-space: nowrap;
+    }
+    .od-total-row--grand {
+      margin-top: 4px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(232, 168, 56, 0.22);
+      background: linear-gradient(90deg, rgba(232, 168, 56, 0.06), transparent);
+    }
+    .od-total-row--grand span:first-child {
+      color: #fde68a;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-size: 0.72rem;
+    }
+    .od-total-row--grand span:last-child {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--amber);
+    }
+    .od-notes-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    @media (max-width: 480px) {
+      .od-notes-grid { grid-template-columns: 1fr; }
+    }
+    .od-note {
+      border: 1px solid rgba(232, 168, 56, 0.2);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      background: rgba(11, 14, 20, 0.45);
+      min-height: 72px;
+    }
+    .od-note--allergy {
+      border-color: rgba(251, 113, 133, 0.35);
+      background: rgba(127, 29, 29, 0.12);
+    }
+    .od-note-title {
+      font-size: 0.65rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    .od-note--allergy .od-note-title { color: #fca5a5; }
+    .od-note-body {
+      font-size: 0.88rem;
+      line-height: 1.45;
+      color: #e2e8f0;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .od-note-empty { color: var(--text-muted); font-style: italic; }
+    .od-modal-footer {
+      flex-shrink: 0;
+      padding: 14px 22px 18px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      display: flex;
+      justify-content: flex-end;
+      background: rgba(0, 0, 0, 0.2);
+    }
+    .od-modal-footer .btn { min-width: 100px; }
 
     /* Inventory / menu catalog (Admin Web) */
     .catalog-page { max-width: 1100px; margin: 0 auto; }
@@ -705,8 +1012,11 @@
       font-weight: 600; margin-bottom: 10px;
     }
     .money-kpi-val { font-size: 1.35rem; font-weight: 700; line-height: 1.35; }
-    .money-kpi-val.rev { color: var(--accent-green); }
-    .money-kpi-val.exp { color: var(--accent-red); }
+    .money-kpi-val.money-pos { color: var(--accent-green); }
+    .money-kpi-val.money-neg { color: var(--accent-red); }
+    .money-kpi-val .money-pos { color: var(--accent-green); }
+    .money-kpi-val .money-neg { color: var(--accent-red); }
+    .money-dual-sep { color: var(--dash-muted); font-weight: 500; }
     .money-toolbar {
       display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px;
       margin-bottom: 16px; padding: 12px 0; border-bottom: 1px solid var(--dash-border);
@@ -759,8 +1069,16 @@
       margin-bottom: 8px;
     }
     .money-side-card .fig { font-size: 1.15rem; font-weight: 700; line-height: 1.35; }
-    .money-side-card .fig.rev { color: var(--accent-green); }
-    .money-side-card .fig.exp { color: var(--accent-red); }
+    .money-side-card .fig.money-pos { color: var(--accent-green); }
+    .money-side-card .fig.money-neg { color: var(--accent-red); }
+    .money-side-card .fig .money-pos { color: var(--accent-green); }
+    .money-side-card .fig .money-neg { color: var(--accent-red); }
+    .money-summary-list dd.money-pos { color: var(--accent-green); }
+    .money-summary-list dd.money-neg { color: var(--accent-red); }
+    .money-summary-list dd .money-pos { color: var(--accent-green); }
+    .money-summary-list dd .money-neg { color: var(--accent-red); }
+    .money-ledger .cell-amt .money-pos { color: var(--accent-green); }
+    .money-ledger .cell-amt .money-neg { color: var(--accent-red); }
     .money-summary-list {
       background: var(--dash-card); border: 1px solid var(--dash-border); border-radius: var(--radius);
       padding: 14px 16px; font-size: 13px;
@@ -785,24 +1103,26 @@
   </style>
 </head>
 <body>
-  <div id="loginWrap" class="main-area">
-    <div class="card">
-      <h1>Admin (read-only)</h1>
-      <p class="lead">Owner / manager web view. Sign in with your <strong>AdminWeb</strong> staff ID and PIN.</p>
-      <div id="loginErr" class="danger hidden"></div>
-      <label for="staffId">Sign-in ID</label>
-      <input id="staffId" type="text" autocomplete="username" placeholder="er4124">
-      <label for="pin">PIN</label>
-      <input id="pin" type="password" autocomplete="current-password">
-      <button type="button" class="btn btn-primary btn-block" id="btnLogin">Sign in</button>
-      <p class="muted" style="margin-top:14px;">Uses same API host. JWT is stored in session storage for this tab only.</p>
+  <div id="adminLoginScreen" class="admin-login-screen">
+    <div class="admin-login card">
+      <h1 class="admin-login__title">Admin (read-only)</h1>
+      <p class="admin-login__lead lead">Owner / manager web view. Sign in with your AdminWeb staff ID and PIN.</p>
+      <div id="adminLoginError" class="admin-login__error danger hidden" role="alert"></div>
+      <form id="adminLoginForm" class="admin-login__form" autocomplete="off" novalidate>
+        <label for="adminLoginId">Sign-in ID</label>
+        <input id="adminLoginId" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Enter sign-in ID" value="">
+        <label for="adminLoginPin">PIN</label>
+        <input id="adminLoginPin" type="password" autocomplete="off" placeholder="Enter PIN" value="">
+        <button type="submit" class="btn btn-primary btn-block" id="adminLoginSubmit">Sign in</button>
+      </form>
     </div>
   </div>
 
   <div id="app" class="layout hidden">
     <aside class="sidebar">
-      <div>
-        <div class="brand">ELITE ADMIN</div>
+      <div class="brand-wrap">
+        <img id="brandLogo" class="brand-logo hidden" alt="Restaurant logo">
+        <div id="brandName" class="brand">Admin</div>
         <div class="brand-sub">Read-only mirrors: dashboard, operations snapshot, reports.</div>
       </div>
       <button type="button" class="nav-btn active" data-view="dashboard">Dashboard</button>
@@ -824,10 +1144,159 @@
   <script>
     const TOKEN_KEY = "eliteAdminWebJwt";
     const NAV_FILTER_KEY = "eliteAdminNavFilter";
+    const MONEY_COLOR_POS = "#4ade80";
+    const MONEY_COLOR_NEG = "#f87171";
     let token = sessionStorage.getItem(TOKEN_KEY) || "";
     let dashClockTimer = null;
+    let portalConfig = { restaurantName: "", restaurantLogoUrl: "" };
 
     function $(id) { return document.getElementById(id); }
+
+    function resetLoginForm() {
+      const form = $("adminLoginForm");
+      if (form) form.reset();
+      const err = $("adminLoginError");
+      if (err) {
+        err.textContent = "";
+        err.classList.add("hidden");
+      }
+    }
+
+    function revokeImgBlob(el) {
+      const s = el.getAttribute("src") || "";
+      if (s.startsWith("blob:")) {
+        URL.revokeObjectURL(s);
+        el.removeAttribute("src");
+      }
+    }
+
+    async function setAuthImage(el, path) {
+      revokeImgBlob(el);
+      if (!path || !token) {
+        el.classList.add("hidden");
+        return;
+      }
+      try {
+        const res = await fetch(path, { headers: { Authorization: "Bearer " + token } });
+        if (!res.ok) throw new Error("unauthorized or missing");
+        const blob = await res.blob();
+        el.src = URL.createObjectURL(blob);
+        el.classList.remove("hidden");
+        el.onerror = () => el.classList.add("hidden");
+      } catch {
+        el.classList.add("hidden");
+      }
+    }
+
+    async function loadPortalBranding() {
+      const cfg = await api("/api/admin/portal/config", "GET", null, true);
+      if (!cfg.ok) return false;
+      const body = cfg.body || {};
+      portalConfig = {
+        restaurantName: body.restaurantName ?? body.RestaurantName ?? "",
+        restaurantLogoUrl: body.restaurantLogoUrl ?? body.RestaurantLogoUrl ?? ""
+      };
+      const brandNameEl = $("brandName");
+      const brandLogoEl = $("brandLogo");
+      if (brandNameEl) {
+        brandNameEl.textContent = (portalConfig.restaurantName || "Admin").toUpperCase();
+      }
+      if (brandLogoEl) {
+        if (portalConfig.restaurantLogoUrl) {
+          await setAuthImage(brandLogoEl, portalConfig.restaurantLogoUrl);
+        } else {
+          revokeImgBlob(brandLogoEl);
+          brandLogoEl.classList.add("hidden");
+        }
+      }
+      return true;
+    }
+
+    function resetPortalBranding() {
+      const brandNameEl = $("brandName");
+      const brandLogoEl = $("brandLogo");
+      if (brandNameEl) brandNameEl.textContent = "Admin";
+      if (brandLogoEl) {
+        revokeImgBlob(brandLogoEl);
+        brandLogoEl.classList.add("hidden");
+      }
+      portalConfig = { restaurantName: "", restaurantLogoUrl: "" };
+    }
+
+    function parseMoneyUsdFromText(text) {
+      const m = String(text ?? "").match(/\$\s*(-?[\d,]+\.?\d*)/);
+      return m ? parseFloat(m[1].replace(/,/g, "")) : 0;
+    }
+
+    function parseMoneyFcFromText(text) {
+      const m = String(text ?? "").match(/FC\s*(-?[\d,]+)/i);
+      return m ? parseFloat(m[1].replace(/,/g, "")) : 0;
+    }
+
+    function splitDualCurrencyText(text) {
+      const raw = String(text ?? "").trim();
+      if (!raw) return { ledgerPrefix: "", segments: [] };
+      let ledgerPrefix = "";
+      let body = raw;
+      if (body.startsWith("+") || body.startsWith("-")) {
+        ledgerPrefix = body[0];
+        body = body.slice(1).trim();
+      }
+      const segments = body.split(/\s*\|\s*/).map(s => s.trim()).filter(Boolean);
+      return { ledgerPrefix, segments };
+    }
+
+    function signedAmountFromSegment(segment) {
+      return /FC/i.test(segment) ? parseMoneyFcFromText(segment) : parseMoneyUsdFromText(segment);
+    }
+
+    function moneyColorSigned(n) {
+      return Number(n) >= 0 ? MONEY_COLOR_POS : MONEY_COLOR_NEG;
+    }
+
+    /** mode: revenue | expense | net | ledger */
+    function colorForMoneySegment(segment, mode, ledgerPrefix) {
+      if (mode === "revenue") return MONEY_COLOR_POS;
+      if (mode === "expense") return MONEY_COLOR_NEG;
+      if (mode === "ledger") return ledgerPrefix === "-" ? MONEY_COLOR_NEG : MONEY_COLOR_POS;
+      return moneyColorSigned(signedAmountFromSegment(segment));
+    }
+
+    function renderMoneyAmountHtml(text, mode) {
+      const { ledgerPrefix, segments } = splitDualCurrencyText(text);
+      if (!segments.length) return esc(text || "—");
+      const html = [];
+      for (let i = 0; i < segments.length; i++) {
+        if (i > 0) html.push("<span class=\"money-dual-sep\"> | </span>");
+        const seg = segments[i];
+        const display = (i === 0 && ledgerPrefix ? ledgerPrefix : "") + seg;
+        const color = colorForMoneySegment(seg, mode, ledgerPrefix);
+        const cls = color === MONEY_COLOR_POS ? "money-pos" : "money-neg";
+        html.push("<span class=\"" + cls + "\">" + esc(display) + "</span>");
+      }
+      return html.join("");
+    }
+
+    function setMoneyAmountEl(el, text, mode) {
+      if (!el) return;
+      el.innerHTML = renderMoneyAmountHtml(text, mode);
+      el.classList.remove("money-pos", "money-neg");
+      el.style.color = "";
+    }
+
+    function moneyColorForLedgerAmountText(text) {
+      const t = String(text ?? "").trim();
+      if (t.startsWith("-")) return MONEY_COLOR_NEG;
+      if (t.startsWith("+")) return MONEY_COLOR_POS;
+      return moneyColorSigned(parseMoneyUsdFromText(t));
+    }
+
+    function applyMoneyColorEl(el, color) {
+      if (!el) return;
+      el.style.color = color;
+      el.classList.remove("money-pos", "money-neg");
+      el.classList.add(color === MONEY_COLOR_POS ? "money-pos" : "money-neg");
+    }
 
     async function api(path, method, body, useAuth) {
       const headers = {};
@@ -854,6 +1323,14 @@
 
     function esc(s) {
       return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]));
+    }
+
+    function formatApiError(r) {
+      const b = r && r.body;
+      const msg = b && (b.message || b.Message || b.title || b.detail || b.Detail);
+      if (msg) return "HTTP " + (r.status || "?") + ": " + msg;
+      if (b && b.raw) return "HTTP " + (r.status || "?") + ": " + String(b.raw).slice(0, 400);
+      return "HTTP " + (r.status || "?");
     }
 
     function formatApiError(status, body) {
@@ -896,6 +1373,102 @@
       const x = Number(n);
       if (!Number.isFinite(x)) return "$ 0.00";
       return "$ " + x.toFixed(2);
+    }
+
+    const usdFmt = n => "$ " + Number(n || 0).toFixed(2);
+    const fcFmt = n => "FC " + Number(n || 0).toFixed(0);
+
+    function orderDetailStatusPillClass(stRaw) {
+      const s = String(stRaw || "").toLowerCase();
+      if (s.includes("pending")) return "od-status-pill--pending";
+      if (s.includes("waiting")) return "od-status-pill--wait";
+      if (s.includes("kitchen")) return "od-status-pill--kitchen";
+      if (s.includes("ready")) return "od-status-pill--ready";
+      if (s.includes("served")) return "od-status-pill--served";
+      return "";
+    }
+
+    function orderDetailNoteInnerHtml(bodyRaw) {
+      const t = String(bodyRaw ?? "").trim();
+      if (!t || t === "-") return "<span class=\"od-note-empty\">None noted</span>";
+      return esc(t);
+    }
+
+    function renderAdminOrderDetailBody(d) {
+      const linesRaw = d.lines ?? d.Lines ?? [];
+      const sub = d.subtotalUsd ?? d.SubtotalUsd ?? 0;
+      const disc = d.discountAppliedUsd ?? d.DiscountAppliedUsd ?? 0;
+      const tax = d.taxUsd ?? d.TaxUsd ?? 0;
+      const svc = d.serviceUsd ?? d.ServiceUsd ?? 0;
+      const gusd = d.grandTotalUsd ?? d.GrandTotalUsd ?? 0;
+      const gfc = d.grandTotalFc ?? d.GrandTotalFc ?? 0;
+      const cn = d.customerNotes ?? d.CustomerNotes ?? "-";
+      const an = d.allergyNotes ?? d.AllergyNotes ?? "-";
+      const origin = d.orderOrigin ?? d.OrderOrigin ?? "";
+      const src = d.orderSource ?? d.OrderSource ?? "";
+      const pt = d.paymentTiming ?? d.PaymentTiming ?? "";
+      const dFee = Number(d.deliveryFeeUsd ?? d.DeliveryFeeUsd ?? 0);
+      const merch = Number(d.merchandiseGrandUsd ?? d.MerchandiseGrandUsd ?? 0);
+      const taxable = Number(d.taxableSubtotalUsd ?? d.TaxableSubtotalUsd ?? 0);
+      const tableLabel = d.tableLabel ?? d.TableLabel ?? "";
+      const serverName = d.serverName ?? d.ServerName ?? "";
+      const lineRows = linesRaw.map(l => {
+        const q = l.quantity ?? l.Quantity;
+        const name = esc(String(l.name ?? l.Name ?? ""));
+        const up = usdFmt(l.unitPrice ?? l.UnitPrice);
+        const lt = usdFmt(l.lineTotal ?? l.LineTotal);
+        return (
+          "<div class=\"od-line-row\" role=\"row\">" +
+          "<span class=\"od-line-qty\" role=\"cell\">" + esc(String(q)) + "</span>" +
+          "<span class=\"od-line-name\" role=\"cell\">" + name + "</span>" +
+          "<span class=\"od-num\" role=\"cell\">" + esc(up) + "</span>" +
+          "<span class=\"od-num\" role=\"cell\">" + esc(lt) + "</span>" +
+          "</div>"
+        );
+      }).join("");
+      const itemsBlock = linesRaw.length
+        ? (
+            "<div class=\"od-items-table\" role=\"table\">" +
+            "<div class=\"od-items-head\" role=\"row\"><span>Qty</span><span>Item</span><span class=\"od-num\">Unit</span><span class=\"od-num\">Line</span></div>" +
+            lineRows +
+            "</div>"
+          )
+        : "<div class=\"muted\" style=\"padding:12px 14px;font-size:13px;\">No line items.</div>";
+      const deliveryRow = dFee > 0
+        ? "<div class=\"od-total-row\"><span>Delivery fee (20%)</span><span>" + esc(usdFmt(dFee)) + "</span></div>"
+        : "";
+      const grandLine = esc(usdFmt(gusd) + " (" + fcFmt(gfc) + ")");
+      return (
+        "<section class=\"od-section\" aria-label=\"Order details\">" +
+        "<h4 class=\"od-section-title\">Details</h4>" +
+        "<div class=\"od-meta-grid\">" +
+        "<div class=\"od-meta-cell\"><span class=\"od-meta-k\">Table</span><span class=\"od-meta-v\">" + esc(String(tableLabel)) + "</span></div>" +
+        "<div class=\"od-meta-cell\"><span class=\"od-meta-k\">Server</span><span class=\"od-meta-v\">" + esc(String(serverName)) + "</span></div>" +
+        "<div class=\"od-meta-cell\"><span class=\"od-meta-k\">Origin</span><span class=\"od-meta-v\">" + esc(String(origin)) + "</span></div>" +
+        "<div class=\"od-meta-cell\"><span class=\"od-meta-k\">Source</span><span class=\"od-meta-v\">" + esc(String(src)) + "</span></div>" +
+        "<div class=\"od-meta-cell\" style=\"grid-column:1/-1;\"><span class=\"od-meta-k\">Payment timing</span><span class=\"od-meta-v\">" + esc(String(pt)) + "</span></div>" +
+        "</div></section>" +
+        "<section class=\"od-section\" aria-label=\"Line items\">" +
+        "<h4 class=\"od-section-title\">Line items</h4>" + itemsBlock + "</section>" +
+        "<section class=\"od-section\" aria-label=\"Totals\">" +
+        "<h4 class=\"od-section-title\">Totals</h4>" +
+        "<div class=\"od-totals\">" +
+        "<div class=\"od-total-row\"><span>Line subtotal</span><span>" + esc(usdFmt(sub)) + "</span></div>" +
+        "<div class=\"od-total-row\"><span>Taxable (after discount)</span><span>" + esc(usdFmt(taxable)) + "</span></div>" +
+        "<div class=\"od-total-row\"><span>Discount</span><span>" + esc(usdFmt(disc)) + "</span></div>" +
+        "<div class=\"od-total-row\"><span>Tax</span><span>" + esc(usdFmt(tax)) + "</span></div>" +
+        "<div class=\"od-total-row\"><span>Service</span><span>" + esc(usdFmt(svc)) + "</span></div>" +
+        "<div class=\"od-total-row\"><span>Merchandise total</span><span>" + esc(usdFmt(merch)) + "</span></div>" +
+        deliveryRow +
+        "<div class=\"od-total-row od-total-row--grand\"><span>Grand total</span><span>" + grandLine + "</span></div>" +
+        "</div></section>" +
+        "<section class=\"od-section\" aria-label=\"Notes and allergies\">" +
+        "<h4 class=\"od-section-title\">Notes &amp; allergies</h4>" +
+        "<div class=\"od-notes-grid\">" +
+        "<div class=\"od-note\"><div class=\"od-note-title\">Customer notes</div><div class=\"od-note-body\">" + orderDetailNoteInnerHtml(cn) + "</div></div>" +
+        "<div class=\"od-note od-note--allergy\"><div class=\"od-note-title\">Allergy</div><div class=\"od-note-body\">" + orderDetailNoteInnerHtml(an) + "</div></div>" +
+        "</div></section>"
+      );
     }
 
     function absPublicUrl(u) {
@@ -1050,30 +1623,44 @@
     function showLogin() {
       clearDashClock();
       $("app").classList.add("hidden");
-      $("loginWrap").classList.remove("hidden");
+      $("adminLoginScreen").classList.remove("hidden");
       token = "";
       sessionStorage.removeItem(TOKEN_KEY);
+      resetPortalBranding();
+      resetLoginForm();
     }
 
     function showApp() {
-      $("loginWrap").classList.add("hidden");
+      $("adminLoginScreen").classList.add("hidden");
       $("app").classList.remove("hidden");
     }
 
-    async function doLogin() {
-      $("loginErr").classList.add("hidden");
-      const staffId = ($("staffId").value || "").trim();
-      const pin = ($("pin").value || "").trim();
+    async function doLogin(ev) {
+      ev?.preventDefault?.();
+      const errEl = $("adminLoginError");
+      errEl.classList.add("hidden");
+      errEl.textContent = "";
+      const staffId = ($("adminLoginId")?.value || "").trim();
+      const pin = ($("adminLoginPin")?.value || "").trim();
+      if (!staffId || !pin) {
+        errEl.textContent = "Enter your sign-in ID and PIN.";
+        errEl.classList.remove("hidden");
+        return;
+      }
+      const submitBtn = $("adminLoginSubmit");
+      if (submitBtn) submitBtn.disabled = true;
       const r = await api("/api/auth/login", "POST", { staffId, pin, portal: "AdminWeb" }, false);
+      if (submitBtn) submitBtn.disabled = false;
       if (!r.ok || !r.body || !r.body.accessToken) {
-        $("loginErr").textContent = (r.body && r.body.message) || "Sign-in failed.";
-        $("loginErr").classList.remove("hidden");
+        errEl.textContent = (r.body && r.body.message) || "Sign-in failed.";
+        errEl.classList.remove("hidden");
         return;
       }
       token = r.body.accessToken;
       sessionStorage.setItem(TOKEN_KEY, token);
       $("sessionLabel").innerHTML = "<strong>" + esc(r.body.name) + "</strong><br><span class=\"muted\">" + esc(r.body.role) + "</span>";
       showApp();
+      await loadPortalBranding();
       navTo("dashboard");
     }
 
@@ -1295,12 +1882,17 @@
           "<select class=\"orders-day-select\" id=\"admPastDay\"></select>" +
           "<input type=\"search\" class=\"orders-search\" id=\"admSearchPast\" placeholder=\"Search past…\" autocomplete=\"off\">" +
           "<div class=\"orders-col-list\" id=\"admListPast\"></div></div></div></div>" +
-          "<div id=\"admOrdModal\" class=\"modal-backdrop hidden\">" +
-          "<div class=\"modal-card-admin\">" +
-          "<h3 id=\"admOrdTitle\">Order</h3>" +
-          "<pre id=\"admOrdBody\"></pre>" +
+          "<div id=\"admOrdModal\" class=\"modal-backdrop hidden\" role=\"presentation\">" +
+          "<div class=\"modal-card-admin order-detail-modal\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"detailOrderCode\">" +
+          "<header class=\"od-modal-header\">" +
+          "<div class=\"od-modal-header-row\">" +
+          "<div><div class=\"od-modal-label\">Order</div><div id=\"detailOrderCode\" class=\"od-modal-code\">—</div></div>" +
+          "<span id=\"detailStatusPill\" class=\"od-status-pill\" aria-live=\"polite\">—</span>" +
+          "</div></header>" +
+          "<div id=\"detailBodyScroll\" class=\"od-modal-body\"></div>" +
+          "<footer class=\"od-modal-footer\">" +
           "<button type=\"button\" class=\"btn btn-ghost\" id=\"admOrdClose\">Close</button>" +
-          "</div></div>";
+          "</footer></div></div>";
 
         function filterByNeedle(rows, needle) {
           if (!needle || !needle.trim()) return rows;
@@ -1308,16 +1900,27 @@
           return rows.filter(x => JSON.stringify(x).toLowerCase().includes(n));
         }
 
-        function openModal(row) {
-          const ts = row.createdAt ? new Date(row.createdAt).toLocaleString() : "";
-          $("admOrdTitle").textContent = row.orderId + " · " + row.status;
-          $("admOrdBody").textContent =
-            "Placed: " + ts + "\n" +
-            "Table: " + row.tableLabel + "\n" +
-            "Server: " + row.serverName + "\n\n" +
-            "Items:\n" + (row.itemsPreview || "—") + "\n\n" +
-            "Total: " + usdSp(row.grandTotal);
+        async function openModal(row) {
+          $("detailOrderCode").textContent = row.orderId || "—";
+          const pill = $("detailStatusPill");
+          pill.textContent = row.status || "—";
+          pill.className = "od-status-pill " + orderDetailStatusPillClass(row.status);
+          $("detailBodyScroll").innerHTML = "<p class=\"muted\" style=\"padding:12px 4px;margin:0;\">Loading order…</p>";
+          $("detailBodyScroll").scrollTop = 0;
           $("admOrdModal").classList.remove("hidden");
+          const r = await api("/api/admin/data/order-summaries/" + row.id + "/invoice", "GET", null, true);
+          if (!r.ok) {
+            $("detailBodyScroll").innerHTML = "<div class=\"danger\" style=\"margin:0;\">" + esc(formatApiError(r.status, r.body) || "Could not load order details.") + "</div>";
+            return;
+          }
+          const d = r.body;
+          const code = d.orderCode ?? d.OrderCode ?? row.orderId ?? "";
+          const st = d.status ?? d.Status ?? row.status ?? "";
+          $("detailOrderCode").textContent = code || "—";
+          pill.textContent = st || "—";
+          pill.className = "od-status-pill " + orderDetailStatusPillClass(st);
+          $("detailBodyScroll").innerHTML = renderAdminOrderDetailBody(d);
+          $("detailBodyScroll").scrollTop = 0;
         }
         function closeModal() {
           $("admOrdModal").classList.add("hidden");
@@ -2085,8 +2688,8 @@
             "<p class=\"money-dash-sub\">Daily revenue and expenses in real-time.</p>" +
             "</header>" +
             "<div class=\"money-dash-kpis\">" +
-            "<div class=\"money-kpi\"><div class=\"money-kpi-lbl\">Today revenue</div><div class=\"money-kpi-val rev\" id=\"moneyKpiRev\">—</div></div>" +
-            "<div class=\"money-kpi\"><div class=\"money-kpi-lbl\">Today expenses</div><div class=\"money-kpi-val exp\" id=\"moneyKpiExp\">—</div></div>" +
+            "<div class=\"money-kpi\"><div class=\"money-kpi-lbl\">Today revenue</div><div class=\"money-kpi-val\" id=\"moneyKpiRev\">—</div></div>" +
+            "<div class=\"money-kpi\"><div class=\"money-kpi-lbl\">Today expenses</div><div class=\"money-kpi-val\" id=\"moneyKpiExp\">—</div></div>" +
             "<div class=\"money-kpi\"><div class=\"money-kpi-lbl\">Today net</div><div class=\"money-kpi-val\" id=\"moneyKpiNet\">—</div></div>" +
             "</div>" +
             "<div class=\"money-toolbar\">" +
@@ -2114,8 +2717,8 @@
             "<tbody id=\"moneyLedgerBody\"><tr><td colspan=\"5\" class=\"muted\">Loading…</td></tr></tbody>" +
             "</table></div></div>" +
             "<aside class=\"money-sidebar\">" +
-            "<div class=\"money-side-card\"><div class=\"lbl\">Period revenue</div><div class=\"fig rev\" id=\"moneySideRev\">—</div></div>" +
-            "<div class=\"money-side-card\"><div class=\"lbl\">Period expenses</div><div class=\"fig exp\" id=\"moneySideExp\">—</div></div>" +
+            "<div class=\"money-side-card\"><div class=\"lbl\">Period revenue</div><div class=\"fig\" id=\"moneySideRev\">—</div></div>" +
+            "<div class=\"money-side-card\"><div class=\"lbl\">Period expenses</div><div class=\"fig\" id=\"moneySideExp\">—</div></div>" +
             "<div class=\"money-side-card\"><div class=\"lbl\">Period net</div><div class=\"fig\" id=\"moneySideNet\">—</div></div>" +
             "<div class=\"money-summary-list\">" +
             "<h3>Summary</h3><dl>" +
@@ -2150,27 +2753,29 @@
           const rev = snap.todayRevenueText ?? snap.TodayRevenueText ?? "";
           const exp = snap.todayExpensesText ?? snap.TodayExpensesText ?? "";
           const net = snap.todayNetProfitText ?? snap.TodayNetProfitText ?? "";
-          const netCol = snap.todayNetProfitColor ?? snap.TodayNetProfitColor ?? "#4ade80";
           const lbl = snap.selectedPeriodLabel ?? snap.SelectedPeriodLabel ?? "";
+          const periodRev = snap.totalRevenueText ?? snap.TotalRevenueText ?? "";
+          const periodExp = snap.totalExpensesText ?? snap.TotalExpensesText ?? "";
+          const periodNet = snap.netProfitText ?? snap.NetProfitText ?? "";
 
-          el.querySelector("#moneyKpiRev").textContent = rev || "—";
-          el.querySelector("#moneyKpiExp").textContent = exp || "—";
-          const netEl = el.querySelector("#moneyKpiNet");
-          netEl.textContent = net || "—";
-          netEl.style.color = netCol;
+          setMoneyAmountEl(el.querySelector("#moneyKpiRev"), rev, "revenue");
+          setMoneyAmountEl(el.querySelector("#moneyKpiExp"), exp, "expense");
+          setMoneyAmountEl(el.querySelector("#moneyKpiNet"), net, "net");
 
           el.querySelector("#moneyPeriodLabel").textContent = lbl || "—";
 
-          el.querySelector("#moneySideRev").textContent = snap.totalRevenueText ?? snap.TotalRevenueText ?? "—";
-          el.querySelector("#moneySideExp").textContent = snap.totalExpensesText ?? snap.TotalExpensesText ?? "—";
-          const sideNet = el.querySelector("#moneySideNet");
-          sideNet.textContent = snap.netProfitText ?? snap.NetProfitText ?? "—";
-          sideNet.style.color = snap.netProfitColor ?? snap.NetProfitColor ?? "#e8eef4";
+          setMoneyAmountEl(el.querySelector("#moneySideRev"), periodRev, "revenue");
+          setMoneyAmountEl(el.querySelector("#moneySideExp"), periodExp, "expense");
+          setMoneyAmountEl(el.querySelector("#moneySideNet"), periodNet, "net");
 
-          el.querySelector("#moneySumSales").textContent = snap.salesSummaryText ?? snap.SalesSummaryText ?? "—";
-          el.querySelector("#moneySumTips").textContent = snap.tipsSummaryText ?? snap.TipsSummaryText ?? "—";
-          el.querySelector("#moneySumDelivery").textContent = snap.deliveryFeesSummaryText ?? snap.DeliveryFeesSummaryText ?? "—";
-          el.querySelector("#moneySumPayroll").textContent = snap.payrollSummaryText ?? snap.PayrollSummaryText ?? "—";
+          const salesText = snap.salesSummaryText ?? snap.SalesSummaryText ?? "—";
+          setMoneyAmountEl(el.querySelector("#moneySumSales"), salesText, "revenue");
+
+          const tipsText = snap.tipsSummaryText ?? snap.TipsSummaryText ?? "—";
+          setMoneyAmountEl(el.querySelector("#moneySumTips"), tipsText, "revenue");
+
+          const deliveryText = snap.deliveryFeesSummaryText ?? snap.DeliveryFeesSummaryText ?? "—";
+          setMoneyAmountEl(el.querySelector("#moneySumDelivery"), deliveryText, "revenue");
 
           const hint = snap.originFilterLabel ?? snap.OriginFilterLabel;
           const hintEl = el.querySelector("#moneyOriginHint");
@@ -2195,8 +2800,7 @@
               const cat = String(row.category ?? row.Category ?? "");
               const jus = String(row.justification ?? row.Justification ?? "");
               const amt = String(row.amountText ?? row.AmountText ?? "");
-              const col = String(row.amountColor ?? row.AmountColor ?? "#e8eef4");
-              return "<tr><td>" + esc(fmtMoneyLedgerWhen(dt)) + "</td><td>" + esc(typ) + "</td><td>" + esc(cat) + "</td><td>" + esc(jus) + "</td><td class=\"cell-amt\" style=\"color:" + escAttr(col) + "\">" + esc(amt) + "</td></tr>";
+              return "<tr><td>" + esc(fmtMoneyLedgerWhen(dt)) + "</td><td>" + esc(typ) + "</td><td>" + esc(cat) + "</td><td>" + esc(jus) + "</td><td class=\"cell-amt\">" + renderMoneyAmountHtml(amt, "ledger") + "</td></tr>";
             }).join("");
           }
 
@@ -2259,7 +2863,7 @@
           "<div class=\"reports-hero\">" +
           "<div class=\"reports-hero-text\">" +
           "<h1>General Reports</h1>" +
-          "<p class=\"reports-hero-sub\">Day-grouped <strong>Daily</strong> and <strong>Orders</strong> reports for the date range below. For staff, tables, stock, and menu items, use the sidebar views. Excel exports still include all report types.</p>" +
+          "<p class=\"reports-hero-sub\">Day-grouped reporting: <strong>Daily</strong> includes each staff <strong>clock-in / sign-in</strong> (Attendance screen) with time and status; plus <strong>Orders</strong> and per-entity timelines for <strong>Employees</strong>, <strong>Tables</strong>, <strong>Inventory</strong>, and <strong>Menu</strong>. Date range applies to Daily and Orders; entity tabs show full history for the selected record. Tablet or web portal PIN logins are not listed here—only attendance clock-ins.</p>" +
           "</div>" +
           "<div class=\"reports-controls\">" +
           "<div class=\"field\"><label for=\"repStart\">Start date</label><input type=\"date\" id=\"repStart\" value=\"" + iso(start) + "\"></div>" +
@@ -2268,6 +2872,10 @@
           "<select id=\"repScopeSelect\">" +
           "<option value=\"daily\">Daily</option>" +
           "<option value=\"orders\">Orders</option>" +
+          "<option value=\"employees\">Employees</option>" +
+          "<option value=\"tables\">Tables</option>" +
+          "<option value=\"inventory\">Inventory</option>" +
+          "<option value=\"menu\">Menu</option>" +
           "</select></div>" +
           "<div class=\"reports-btn-row\">" +
           "<button type=\"button\" class=\"btn btn-ghost btn-sm\" id=\"btnReportsExport\">Export Excel</button>" +
@@ -2277,22 +2885,168 @@
           "<div class=\"reports-tabs\" id=\"reportsTabs\">" +
           "<button type=\"button\" class=\"reports-tab active\" data-rep-tab=\"daily\">Daily Report</button>" +
           "<button type=\"button\" class=\"reports-tab\" data-rep-tab=\"orders\">Orders</button>" +
+          "<button type=\"button\" class=\"reports-tab\" data-rep-tab=\"employees\">Employees</button>" +
+          "<button type=\"button\" class=\"reports-tab\" data-rep-tab=\"tables\">Tables</button>" +
+          "<button type=\"button\" class=\"reports-tab\" data-rep-tab=\"inventory\">Inventory</button>" +
+          "<button type=\"button\" class=\"reports-tab\" data-rep-tab=\"menu\">Menu</button>" +
           "</div>" +
           "<div class=\"reports-feed-title\" id=\"reportsFeedSectionTitle\">Chronological daily feed across all entities</div>" +
           "<div id=\"reportsContent\"><p class=\"muted\">Loading…</p></div>" +
           "</div>";
 
         let activeRepTab = "daily";
+        let reportListsCache = null;
+        const selectedEntityId = {
+          employees: null,
+          tables: null,
+          inventory: null,
+          menu: null
+        };
+
+        const ENTITY_TABS = ["employees", "tables", "inventory", "menu"];
+        const VALID_REP_TABS = ["daily", "orders"].concat(ENTITY_TABS);
 
         const tabTitles = {
           daily: "Chronological daily feed across all entities",
-          orders: "Order activity in range"
+          orders: "Order activity in range",
+          employees: "Employee activity timeline",
+          tables: "Table activity timeline",
+          inventory: "Inventory activity timeline",
+          menu: "Menu item activity timeline"
         };
 
         const exportTypeMap = {
           daily: "Daily",
-          orders: "Orders"
+          orders: "Orders",
+          employees: "Employees",
+          tables: "Tables",
+          inventory: "Inventory",
+          menu: "Menu"
         };
+
+        const entityListKeys = {
+          employees: ["employees", "Employees"],
+          tables: ["tables", "Tables"],
+          inventory: ["inventoryItems", "InventoryItems"],
+          menu: ["menuItems", "MenuItems"]
+        };
+
+        const entityDetailPaths = {
+          employees: id => "/api/admin/reports/employee/" + id,
+          tables: id => "/api/admin/reports/table/" + id,
+          inventory: id => "/api/admin/reports/inventory/" + id,
+          menu: id => "/api/admin/reports/menu/" + id
+        };
+
+        function isEntityTab(tab) {
+          return ENTITY_TABS.includes(tab);
+        }
+
+        function normalizeRepTab(tab) {
+          return VALID_REP_TABS.includes(tab) ? tab : "daily";
+        }
+
+        function getEntityList(tab) {
+          if (!reportListsCache) return [];
+          const keys = entityListKeys[tab] || [];
+          for (const k of keys) {
+            const list = reportListsCache[k];
+            if (Array.isArray(list)) return list;
+          }
+          return [];
+        }
+
+        function formatEntityOptionLabel(item) {
+          const name = item.name ?? item.Name ?? "—";
+          const uid = item.uniqueId ?? item.UniqueId ?? "";
+          const sub = item.subtitle ?? item.Subtitle ?? "";
+          let label = name;
+          if (uid) label += " (" + uid + ")";
+          if (sub) label += " — " + sub;
+          return label;
+        }
+
+        async function ensureReportLists() {
+          if (reportListsCache) return reportListsCache;
+          const r = await api("/api/admin/reports/lists", "GET", null, true);
+          if (!r.ok) throw new Error(formatApiError(r));
+          reportListsCache = r.body || {};
+          return reportListsCache;
+        }
+
+        function renderEntityPickerHtml(tab) {
+          const list = getEntityList(tab);
+          const selId = selectedEntityId[tab];
+          let html =
+            "<div class=\"reports-entity-bar\">" +
+            "<div class=\"field\"><label for=\"repEntitySelect\">" + esc(tabTitles[tab] || "Entity") + "</label>" +
+            "<select id=\"repEntitySelect\"><option value=\"\">— Select —</option>";
+          for (const item of list) {
+            const id = item.id ?? item.Id;
+            if (id == null) continue;
+            const selected = String(id) === String(selId) ? " selected" : "";
+            html +=
+              "<option value=\"" + esc(String(id)) + "\"" + selected + ">" +
+              esc(formatEntityOptionLabel(item)) +
+              "</option>";
+          }
+          html += "</select></div></div>";
+          return html;
+        }
+
+        function wireEntityPicker(host, tab) {
+          const sel = host.querySelector("#repEntitySelect");
+          if (!sel) return;
+          sel.addEventListener("change", () => {
+            const v = sel.value;
+            selectedEntityId[tab] = v ? Number(v) : null;
+            refreshContent();
+          });
+        }
+
+        function renderEntityMetaHtml(tab, body) {
+          const blocks = [];
+          if (tab === "employees") {
+            const notes = body.employeeNotes ?? body.EmployeeNotes ?? "-";
+            const payroll = body.employeePayrollHistory ?? body.EmployeePayrollHistory ?? "-";
+            blocks.push({ title: "Notes", text: notes });
+            blocks.push({ title: "Payroll history (USD)", text: payroll });
+          } else if (tab === "tables") {
+            const server = body.tableCurrentServer ?? body.TableCurrentServer ?? "-";
+            blocks.push({ title: "Current server", text: server });
+          } else if (tab === "inventory") {
+            const notes = body.inventoryNotes ?? body.InventoryNotes ?? "-";
+            blocks.push({ title: "Notes", text: notes });
+          } else if (tab === "menu") {
+            const ing = body.menuIngredientsSummary ?? body.MenuIngredientsSummary ?? "-";
+            blocks.push({ title: "Ingredients", text: ing });
+          }
+          const visible = blocks.filter(b => b.text && String(b.text).trim() && String(b.text).trim() !== "-");
+          if (!visible.length) return "";
+          return visible
+            .map(
+              b =>
+                "<div class=\"reports-entity-meta\"><strong>" +
+                esc(b.title) +
+                "</strong><br>" +
+                escDetailLines(b.text) +
+                "</div>"
+            )
+            .join("");
+        }
+
+        function detailToTimelineData(tab, body) {
+          const days = body.timelineDays ?? body.TimelineDays ?? [];
+          let summary = "";
+          if (tab === "employees")
+            summary = body.employeeSummary ?? body.EmployeeSummary ?? "";
+          else if (tab === "tables")
+            summary = body.tableSummary ?? body.TableSummary ?? "";
+          else if (tab === "inventory")
+            summary = body.inventorySummary ?? body.InventorySummary ?? "";
+          else if (tab === "menu") summary = body.menuSummary ?? body.MenuSummary ?? "";
+          return { summaryText: summary, days };
+        }
 
         function syncScopeSelect() {
           const sel = $("repScopeSelect");
@@ -2338,7 +3092,11 @@
             const sum = ent.summary ?? ent.Summary ?? "";
             const rel = ent.relatedInfo ?? ent.RelatedInfo ?? "";
             const ctx = ent.entityContext ?? ent.EntityContext ?? "";
-            rows += "<tr>";
+            let rowClass = "";
+            if (typ === "Clock in") rowClass = "reports-row-clock-in";
+            else if (typ === "Clock out") rowClass = "reports-row-clock-out";
+            else if (typ === "Absence") rowClass = "reports-row-absence";
+            rows += "<tr" + (rowClass ? " class=\"" + rowClass + "\"" : "") + ">";
             rows += "<td class=\"reports-cell-time\">" + esc(timeStr) + "</td>";
             rows += "<td>" + esc(typ) + "</td>";
             rows += "<td class=\"reports-cell-detail\">" + escDetailLines(sum) + "</td>";
@@ -2357,8 +3115,13 @@
           const useDayDropdown = opts.useDayDropdown === true;
           const summary = data.summaryText ?? data.SummaryText ?? "";
           const days = data.days ?? data.Days ?? [];
-          if (!days.length)
-            return "<p class=\"reports-placeholder\">No events in this range.</p>";
+          if (!days.length) {
+            const emptyMsg =
+              opts.emptyMessage ??
+              opts.EmptyMessage ??
+              "No events in this range.";
+            return "<p class=\"reports-placeholder\">" + esc(emptyMsg) + "</p>";
+          }
 
           let html = "";
           if (summary)
@@ -2421,6 +3184,50 @@
           show(sel.value || 0);
         }
 
+        async function refreshEntityTab(content, tab) {
+          try {
+            await ensureReportLists();
+          } catch (ex) {
+            content.innerHTML = "<div class='danger'>" + esc(String(ex.message || ex)) + "</div>";
+            return;
+          }
+
+          const entityId = selectedEntityId[tab];
+          let html = renderEntityPickerHtml(tab);
+
+          if (!entityId) {
+            html += "<p class=\"reports-placeholder\">Select an entity above, then click Refresh.</p>";
+            content.innerHTML = html;
+            wireEntityPicker(content, tab);
+            return;
+          }
+
+          const path = entityDetailPaths[tab](entityId);
+          const r = await api(path, "GET", null, true);
+          if (!r.ok) {
+            content.innerHTML =
+              html + "<div class='danger'>" + esc(formatApiError(r)) + "</div>";
+            wireEntityPicker(content, tab);
+            return;
+          }
+
+          const timelineData = detailToTimelineData(tab, r.body || {});
+          html += renderEntityMetaHtml(tab, r.body || {});
+          const entityEmptyLabel = {
+            employees: "employee",
+            tables: "table",
+            inventory: "inventory item",
+            menu: "menu item"
+          }[tab] || "record";
+          html += renderReportTimeline(timelineData, {
+            useDayDropdown: true,
+            emptyMessage: "No activity recorded for this " + entityEmptyLabel + "."
+          });
+          content.innerHTML = html;
+          wireEntityPicker(content, tab);
+          wireReportDayPicker(content);
+        }
+
         async function refreshContent() {
           const content = $("reportsContent");
           const qs = buildReportQueryString();
@@ -2431,7 +3238,7 @@
           if (activeRepTab === "daily") {
             const r = await api("/api/admin/reports/daily?" + qs, "GET", null, true);
             if (!r.ok) {
-              content.innerHTML = "<div class='danger'>HTTP " + r.status + "</div>";
+              content.innerHTML = "<div class='danger'>" + esc(formatApiError(r)) + "</div>";
               return;
             }
             content.innerHTML = renderReportTimeline(r.body, { useDayDropdown: true });
@@ -2442,7 +3249,7 @@
           if (activeRepTab === "orders") {
             const r = await api("/api/admin/reports/orders?" + qs, "GET", null, true);
             if (!r.ok) {
-              content.innerHTML = "<div class='danger'>HTTP " + r.status + "</div>";
+              content.innerHTML = "<div class='danger'>" + esc(formatApiError(r)) + "</div>";
               return;
             }
             content.innerHTML = renderReportTimeline(r.body, { useDayDropdown: true });
@@ -2450,16 +3257,32 @@
             return;
           }
 
+          if (isEntityTab(activeRepTab)) {
+            await refreshEntityTab(content, activeRepTab);
+            return;
+          }
+
           activeRepTab = "daily";
           syncScopeSelect();
           setActiveTabButtons();
-          content.innerHTML = "<p class=\"reports-placeholder\">Choose Daily or Orders above.</p>";
+          content.innerHTML = "<p class=\"reports-placeholder\">Choose a report tab above.</p>";
         }
 
-        function onTabClick(tab) {
-          activeRepTab = tab === "orders" ? "orders" : "daily";
+        async function onTabClick(tab) {
+          activeRepTab = normalizeRepTab(tab);
           syncScopeSelect();
           setActiveTabButtons();
+          if (isEntityTab(activeRepTab)) {
+            try {
+              await ensureReportLists();
+            } catch (ex) {
+              const content = $("reportsContent");
+              if (content)
+                content.innerHTML =
+                  "<div class='danger'>" + esc(String(ex.message || ex)) + "</div>";
+              return;
+            }
+          }
           refreshContent();
         }
 
@@ -2468,8 +3291,8 @@
         });
 
         $("repScopeSelect").addEventListener("change", () => {
-          const v = $("repScopeSelect").value || "daily";
-          activeRepTab = v === "orders" ? "orders" : "daily";
+          const v = normalizeRepTab($("repScopeSelect").value || "daily");
+          activeRepTab = v;
           setActiveTabButtons();
           refreshContent();
         });
@@ -2578,14 +3401,15 @@
       btn.addEventListener("click", () => navTo(btn.getAttribute("data-view")));
     });
 
-    $("btnLogin").addEventListener("click", doLogin);
+    $("adminLoginForm").addEventListener("submit", doLogin);
     $("btnLogout").addEventListener("click", showLogin);
 
     if (token) {
       showApp();
-      api("/api/admin/dashboard", "GET", null, true).then(r => {
+      api("/api/admin/dashboard", "GET", null, true).then(async r => {
         if (r.ok) {
           $("sessionLabel").innerHTML = "<span class=\"muted\">Signed in</span>";
+          await loadPortalBranding();
           navTo("dashboard");
         } else showLogin();
       });

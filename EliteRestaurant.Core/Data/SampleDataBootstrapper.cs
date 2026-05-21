@@ -560,15 +560,32 @@ internal static class SampleDataBootstrapper
                 if (alreadyExists)
                     continue;
 
-                var baseHour = shift.Equals("Morning", StringComparison.OrdinalIgnoreCase)
-                    ? 9
-                    : shift.Equals("Afternoon", StringComparison.OrdinalIgnoreCase)
-                        ? 13
-                        : 17;
+                int baseHour;
+                int workHours;
+                if (Utils.AttendanceScheduleHelper.IsFullDayShift(shift))
+                {
+                    baseHour = 9;
+                    workHours = 11;
+                }
+                else if (shift.Equals("Morning", StringComparison.OrdinalIgnoreCase))
+                {
+                    baseHour = 9;
+                    workHours = 8;
+                }
+                else if (shift.Equals("Afternoon", StringComparison.OrdinalIgnoreCase))
+                {
+                    baseHour = 13;
+                    workHours = 8;
+                }
+                else
+                {
+                    baseHour = 17;
+                    workHours = 8;
+                }
 
                 var minuteOffset = random.Next(0, 18);
                 var clockIn = date.Date.AddHours(baseHour).AddMinutes(minuteOffset);
-                var clockOut = clockIn.AddHours(8).AddMinutes(random.Next(-12, 16));
+                var clockOut = clockIn.AddHours(workHours).AddMinutes(random.Next(-12, 16));
                 var late = minuteOffset >= 10;
 
                 db.EmployeeAttendances.Add(new EmployeeAttendance

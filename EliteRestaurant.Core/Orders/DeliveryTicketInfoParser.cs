@@ -15,7 +15,7 @@ public static class DeliveryTicketInfoParser
         var address = string.Empty;
         var instructions = string.Empty;
 
-        foreach (var part in SplitNoteParts(order.CustomerNotes))
+        foreach (var part in OnlineOrderCustomerNotes.EnumerateStructuredNoteParts(order.CustomerNotes))
         {
             if (TryExtract(part, "Guest:", ref name))
                 continue;
@@ -28,21 +28,6 @@ public static class DeliveryTicketInfoParser
         }
 
         return new DeliveryTicketInfo(name, phone, address, instructions);
-    }
-
-    private static IEnumerable<string> SplitNoteParts(string? notes)
-    {
-        if (string.IsNullOrWhiteSpace(notes))
-            yield break;
-
-        foreach (var line in notes.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
-        {
-            foreach (var part in line.Split("·", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            {
-                if (part.Length > 0)
-                    yield return part;
-            }
-        }
     }
 
     private static bool TryExtract(string part, string prefix, ref string target)

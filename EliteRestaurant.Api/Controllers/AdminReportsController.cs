@@ -18,21 +18,48 @@ public sealed class AdminReportsController(AdminReportAggregationService reports
     public async Task<ActionResult<AdminReportRangeSummaryResponse>> Daily(
         [FromQuery] DateTime start,
         [FromQuery] DateTime end,
-        CancellationToken cancellationToken) =>
-        Ok(await reports.GetDailyAsync(start, end, cancellationToken));
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await reports.GetDailyAsync(start, end, cancellationToken));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Daily report failed.", detail = ex.Message });
+        }
+    }
 
     [HttpGet("orders")]
     public async Task<ActionResult<AdminReportRangeSummaryResponse>> Orders(
         [FromQuery] DateTime start,
         [FromQuery] DateTime end,
-        CancellationToken cancellationToken) =>
-        Ok(await reports.GetOrdersAsync(start, end, cancellationToken));
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await reports.GetOrdersAsync(start, end, cancellationToken));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Orders report failed.", detail = ex.Message });
+        }
+    }
 
     [HttpGet("employee/{employeeId:int}")]
     public async Task<ActionResult<AdminReportEmployeeDetailResponse>> Employee(
         int employeeId,
-        CancellationToken cancellationToken) =>
-        Ok(await reports.GetEmployeeDetailAsync(employeeId, cancellationToken));
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await reports.GetEmployeeDetailAsync(employeeId, cancellationToken));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Employee report failed.", detail = ex.Message });
+        }
+    }
 
     [HttpGet("table/{tableId:int}")]
     public async Task<ActionResult<AdminReportTableDetailResponse>> Table(

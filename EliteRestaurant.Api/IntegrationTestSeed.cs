@@ -64,6 +64,28 @@ public static class IntegrationTestSeed
                 JoinDate = DateTime.Today
             });
 
+            db.Employees.Add(new Employee
+            {
+                UniqueId = "EMP-BAR-INT",
+                SignInId = "barint",
+                Name = "Integration Barman",
+                Role = "Barman",
+                PinCode = EmployeePinHasher.HashForStorage("5201"),
+                EmploymentStatus = "Active",
+                JoinDate = DateTime.Today
+            });
+
+            db.Employees.Add(new Employee
+            {
+                UniqueId = "EMP-REC-INT",
+                SignInId = "recint",
+                Name = "Integration Front Desk",
+                Role = "Front desk",
+                PinCode = EmployeePinHasher.HashForStorage("5101"),
+                EmploymentStatus = "Active",
+                JoinDate = DateTime.Today
+            });
+
             db.SaveChanges();
         }
 
@@ -123,7 +145,9 @@ public static class IntegrationTestSeed
                 Address = "Test",
                 WebsiteDomain = "",
                 SocialMedia = "",
-                StaffLoginPasscode = "er4124",
+                StaffLoginPasscode = "staffgate",
+                AdminWebSignInId = AdminWebTestSignInId,
+                AdminWebPin = AdminWebTestPin,
                 TicketFooterText = "Thanks",
                 TaxIdLegalInfo = "",
                 DefaultCurrencyDisplayMode = "Dual",

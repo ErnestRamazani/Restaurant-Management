@@ -210,6 +210,18 @@
                                          Style="{StaticResource EliteTextBox}"/>
                             </StackPanel>
 
+                            <StackPanel Margin="0,10,0,0">
+                                <TextBlock Text="Admin web portal" Style="{StaticResource HeadingSmall}"/>
+                                <TextBlock Text="Read-only owner dashboard at /admin/ on your API host. Sign-in ID and PIN are pushed to the cloud and synced to the AdminWeb employee."
+                                           Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                <TextBlock Text="Sign-in ID" Style="{StaticResource BodyText}" Margin="0,0,0,4"/>
+                                <TextBox Text="{Binding AdminWebSignInId, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource EliteTextBox}"/>
+                                <TextBlock Text="PIN" Style="{StaticResource BodyText}" Margin="0,8,0,4"/>
+                                <TextBox Text="{Binding AdminWebPin, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource EliteTextBox}"/>
+                            </StackPanel>
+
                             <Button Content="Save Business Profile"
                                     Margin="0,14,0,0"
                                     Command="{Binding SaveBusinessProfileCommand}"
@@ -543,7 +555,7 @@
                                        Foreground="{StaticResource GoldAccentBrush}"
                                        FontSize="20"
                                        FontWeight="SemiBold"/>
-                            <TextBlock Text="Define shift windows (local time). Used for attendance labels, late clock-in grace, payroll scheduled hours, and auto-absence rules on this PC."
+                            <TextBlock Text="Define shift windows (local time). Morning and night set partial shifts; Full Day on an employee schedule uses morning start through night end. Used for attendance, late grace, payroll hours, and auto-absence on this PC."
                                        Style="{StaticResource BodyText}"
                                        TextWrapping="Wrap"
                                        Margin="0,4,0,12"/>

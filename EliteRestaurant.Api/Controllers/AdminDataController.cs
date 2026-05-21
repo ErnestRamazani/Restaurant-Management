@@ -1,6 +1,8 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using EliteRestaurant.Api.Dtos;
+using EliteRestaurant.Api.Orders;
 using EliteRestaurant.Contracts.Admin;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
@@ -112,7 +114,7 @@ public sealed class AdminDataController(AppDbContext db) : ControllerBase
 
         if (key is "orders" or "orderrecord")
         {
-            var orderItems = await ListOrdersJsonAsync(start, end, cancellationToken);
+            var orderItems = await ListOrdersJsonAsync(start, end, GetPrepStationPortal(), cancellationToken);
             return Ok(new AdminEntityListResponse(entityName, orderItems, snapshotAt));
         }
 
@@ -144,6 +146,21 @@ public sealed class AdminDataController(AppDbContext db) : ControllerBase
             return NotFound(new { message = $"Unsupported admin entity '{entityName}'." });
 
         return Ok(new AdminEntityListResponse(entityName, items, snapshotAt));
+    }
+
+    [HttpGet("order-summaries/{orderId:int}/invoice")]
+    public async Task<ActionResult<CashierOrderDetailDto>> GetOrderSummaryInvoice(int orderId, CancellationToken cancellationToken)
+    {
+        var order = await db.Orders.AsNoTracking()
+            .Include(o => o.Items)
+            .ThenInclude(i => i.Product)
+            .Include(o => o.Table)
+            .Include(o => o.Server)
+            .SingleOrDefaultAsync(o => o.Id == orderId, cancellationToken);
+        if (order is null)
+            return NotFound(new { message = "Order not found." });
+
+        return Ok(CashierOrderDetailBuilder.Build(order));
     }
 
     [HttpGet("bundles/create-order")]
@@ -311,9 +328,16 @@ public sealed class AdminDataController(AppDbContext db) : ControllerBase
     private async Task<IReadOnlyList<JsonElement>> ListOrdersJsonAsync(
         DateTime? start,
         DateTime? end,
+        string? prepStationPortal,
         CancellationToken cancellationToken)
     {
-        var q = db.Orders.AsNoTracking().Include(o => o.Items).AsSplitQuery();
+        var kitchenKdsOnly = prepStationPortal is not null;
+        var q = db.Orders.AsNoTracking()
+            .Include(o => o.Items)
+            .ThenInclude(i => i.Product)
+            .AsSplitQuery();
+        if (kitchenKdsOnly)
+            q = q.WhereKitchenKdsVisible();
         if (start is not null && end is not null)
         {
             var startDay = start.Value.Date;
@@ -329,14 +353,28 @@ public sealed class AdminDataController(AppDbContext db) : ControllerBase
                 .OrderByDescending(o => o.CreatedAt)
                 .Take(SnapshotReportRangeCap)
                 .ToListAsync(cancellationToken);
-            return list.Select(ToJsonElement).ToList();
+            return SerializeOrdersForPortal(list, kitchenKdsOnly, prepStationPortal);
         }
 
         var capped = await q
             .OrderByDescending(o => o.CreatedAt)
             .Take(SnapshotDefaultCap)
             .ToListAsync(cancellationToken);
-        return capped.Select(ToJsonElement).ToList();
+        return SerializeOrdersForPortal(capped, kitchenKdsOnly, prepStationPortal);
+    }
+
+    private static IReadOnlyList<JsonElement> SerializeOrdersForPortal(
+        IReadOnlyList<OrderRecord> list,
+        bool kitchenKdsOnly,
+        string? prepStationPortal)
+    {
+        if (!kitchenKdsOnly)
+            return list.Select(ToJsonElement).ToList();
+
+        var filtered = KitchenQueueKindFilter.FilterForPortal(prepStationPortal, list).ToList();
+        return filtered
+            .Select(o => ToJsonElement(KitchenOrderQueueMapper.ToQueueRow(o, prepStationPortal)))
+            .ToList();
     }
 
     /// <summary>Reservations: by default last 1000 by <see cref="ReservationBooking.ReservedFor"/>; with range, include updates or reserved slot in range.</summary>
@@ -400,6 +438,14 @@ public sealed class AdminDataController(AppDbContext db) : ControllerBase
     private bool IsAdminWebPortal() =>
         User.Identity?.IsAuthenticated == true
         && string.Equals(User.FindFirst("portal")?.Value, "AdminWeb", StringComparison.OrdinalIgnoreCase);
+
+    private string? GetPrepStationPortal()
+    {
+        if (User.Identity?.IsAuthenticated != true)
+            return null;
+        var portal = User.FindFirst("portal")?.Value;
+        return KitchenQueueKindFilter.IsPrepStationPortal(portal) ? portal : null;
+    }
 
     private ActionResult AdminWebForbidden() => StatusCode(StatusCodes.Status403Forbidden,
         new { message = "This dataset is not available to the read-only web admin role." });

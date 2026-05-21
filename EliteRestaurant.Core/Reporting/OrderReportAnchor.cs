@@ -1,4 +1,5 @@
 using EliteRestaurant.Core.Models;
+using System.Linq.Expressions;
 
 namespace EliteRestaurant.Core.Reporting;
 
@@ -7,9 +8,19 @@ namespace EliteRestaurant.Core.Reporting;
 /// </summary>
 public static class OrderReportAnchor
 {
+    /// <summary>EF-translatable anchor for SQL <c>ORDER BY</c> / filters (do not use <see cref="Anchor"/> in IQueryable).</summary>
+    public static Expression<Func<OrderRecord, DateTime>> AnchorExpression { get; } =
+        o => o.PaymentConfirmedAt ?? o.CompletedAt ?? o.CreatedAt;
+
     /// <summary>Same precedence as <see cref="Data.FinancialTransactionService"/> ledger dating.</summary>
     public static DateTime Anchor(OrderRecord o) =>
         o.PaymentConfirmedAt ?? o.CompletedAt ?? o.CreatedAt;
+
+    public static IOrderedQueryable<OrderRecord> OrderByAnchor(IQueryable<OrderRecord> source) =>
+        source.OrderBy(AnchorExpression);
+
+    public static IOrderedQueryable<OrderRecord> OrderByAnchorDescending(IQueryable<OrderRecord> source) =>
+        source.OrderByDescending(AnchorExpression);
 
     public static DateTime LocalCalendarDay(DateTime t) =>
         t.Kind switch

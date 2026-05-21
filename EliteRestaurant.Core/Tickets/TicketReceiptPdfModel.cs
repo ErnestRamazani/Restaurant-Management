@@ -1,6 +1,6 @@
 using EliteRestaurant.Core.Orders;
 
-namespace EliteRestaurantPro.Services;
+namespace EliteRestaurant.Core.Tickets;
 
 public sealed record TicketPdfLine(int Quantity, string Name, decimal UnitPrice, decimal LineTotal);
 

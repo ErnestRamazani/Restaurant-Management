@@ -125,7 +125,8 @@ public class AttendanceViewModel : AdminBaseViewModel
     {
         All,
         Morning,
-        Night
+        Night,
+        FullDay
     }
 
     private readonly AdminDataApiClient _data = new();
@@ -143,9 +144,12 @@ public class AttendanceViewModel : AdminBaseViewModel
 
     public bool ShiftFilterNightSelected => _shiftListFilter == ShiftListFilter.Night;
 
+    public bool ShiftFilterFullDaySelected => _shiftListFilter == ShiftListFilter.FullDay;
+
     public ICommand SetShiftFilterAllCommand { get; }
     public ICommand SetShiftFilterMorningCommand { get; }
     public ICommand SetShiftFilterNightCommand { get; }
+    public ICommand SetShiftFilterFullDayCommand { get; }
 
     public override string ActivePage => "Attendance";
 
@@ -239,6 +243,7 @@ public class AttendanceViewModel : AdminBaseViewModel
         SetShiftFilterAllCommand = new RelayCommand(_ => SetShiftListFilter(ShiftListFilter.All));
         SetShiftFilterMorningCommand = new RelayCommand(_ => SetShiftListFilter(ShiftListFilter.Morning));
         SetShiftFilterNightCommand = new RelayCommand(_ => SetShiftListFilter(ShiftListFilter.Night));
+        SetShiftFilterFullDayCommand = new RelayCommand(_ => SetShiftListFilter(ShiftListFilter.FullDay));
         RefreshShiftSettingsFromDisk();
         _ = LoadAttendanceAsync();
     }
@@ -414,8 +419,9 @@ public class AttendanceViewModel : AdminBaseViewModel
         var s = _shiftSchedule;
         var morning = s.FormatMorningRange().Replace("-", " - ");
         var night = s.FormatNightRange().Replace("-", " - ");
+        var fullDay = s.FormatFullDayRange().Replace("-", " - ");
         AttendanceShiftSummaryText =
-            $"Morning shift: {morning} | Night shift: {night} | Late window: {grace} min from shift start";
+            $"Morning: {morning} | Night: {night} | Full day: {fullDay} (morning start → night end) | Late grace: {grace} min";
     }
 
     private void SetShiftListFilter(ShiftListFilter filter)
@@ -426,6 +432,7 @@ public class AttendanceViewModel : AdminBaseViewModel
         OnPropertyChanged(nameof(ShiftFilterAllSelected));
         OnPropertyChanged(nameof(ShiftFilterMorningSelected));
         OnPropertyChanged(nameof(ShiftFilterNightSelected));
+        OnPropertyChanged(nameof(ShiftFilterFullDaySelected));
         ApplyListFilter();
     }
 
@@ -445,6 +452,9 @@ public class AttendanceViewModel : AdminBaseViewModel
                     !r.IsScheduledOff &&
                     (r.ShiftName.Contains("Night", StringComparison.OrdinalIgnoreCase) ||
                      r.ShiftName.Contains("Evening", StringComparison.OrdinalIgnoreCase))),
+                ShiftListFilter.FullDay => rows.Where(r =>
+                    !r.IsScheduledOff &&
+                    r.ShiftName.Contains("Full", StringComparison.OrdinalIgnoreCase)),
                 _ => rows
             };
             var list = q.Length == 0

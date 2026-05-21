@@ -15,6 +15,21 @@ public static class OrderRecordQueryExtensions
                           || o.Status == "Ready"
                           || o.Status == OrderWorkflow.Served));
 
+    /// <summary>Post–cashier-release kitchen pipeline only (translatable; matches <see cref="OrderWorkflow.IsKitchenKdsVisibleStatus"/>).</summary>
+    public static IQueryable<OrderRecord> WhereKitchenKdsVisible(this IQueryable<OrderRecord> query) =>
+        query.Where(o =>
+            o.Status.ToLower() == "waiting"
+            || o.Status.ToLower() == "in kitchen"
+            || o.Status.ToLower() == "ready");
+
+    /// <summary>Online guest pickup (<c>TakeOut</c>/<c>Pickup</c>) or delivery — EF-translatable (do not use <see cref="OrderOrigin.IsOnline"/> in LINQ).</summary>
+    public static IQueryable<OrderRecord> WhereOnlineDeliveryOrPickup(this IQueryable<OrderRecord> query) =>
+        query.Where(o =>
+            o.OrderOrigin == OrderOrigin.Online
+            && (o.OrderSource == "Delivery"
+                || o.OrderSource == "Pickup"
+                || o.OrderSource == "TakeOut"));
+
     /// <summary>Same cases as <see cref="OrderWorkflow.OccupiesTable"/> (lowercase compare — translatable to SQL).</summary>
     public static IQueryable<OrderRecord> WhereOccupiesTable(this IQueryable<OrderRecord> query) =>
         query.Where(o =>

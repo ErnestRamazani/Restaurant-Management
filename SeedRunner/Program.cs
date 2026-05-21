@@ -68,11 +68,13 @@ db.Database.ExecuteSqlRaw("""
     RESTART IDENTITY CASCADE;
     """);
 
-Console.WriteLine("Seeding requested staff (1 admin, 1 chef, 7 servers, 2 cashiers)...");
+Console.WriteLine("Seeding requested staff (1 admin, 1 chef, 1 barman, 1 front desk, 7 servers, 2 cashiers)...");
 var employees = new List<Employee>
 {
     CreateEmployee("Ernest Cole", "Admin", "ADM01", "1100", 32m, "Morning", "Morning", "Morning", "Morning", "Morning", "Off", "Off"),
     CreateEmployee("Marco Bellini", "Chef", "CHF01", "2200", 24m, "Morning", "Morning", "Morning", "Morning", "Morning", "Evening", "Off"),
+    CreateEmployee("Sofia Vega", "Barman", "BAR01", "5201", 20m, "Evening", "Evening", "Evening", "Evening", "Evening", "Morning", "Off"),
+    CreateEmployee("Hannah Reed", "Front desk", "REC01", "5101", 18m, "Morning", "Morning", "Morning", "Morning", "Morning", "Off", "Off"),
 
     CreateEmployee("Liam Foster", "Server", "SRV01", "3101", 16m, "Morning", "Morning", "Morning", "Morning", "Evening", "Off", "Off"),
     CreateEmployee("Emma Russo", "Server", "SRV02", "3102", 16m, "Evening", "Evening", "Evening", "Evening", "Morning", "Morning", "Off"),
@@ -206,8 +208,23 @@ for (var date = startDate; date <= DateTime.Today; date = date.AddDays(1))
         if (shift.Equals("Off", StringComparison.OrdinalIgnoreCase))
             continue;
 
-        var shiftStart = shift.Equals("Evening", StringComparison.OrdinalIgnoreCase) ? 17 : 10;
-        var shiftLength = shift.Equals("Evening", StringComparison.OrdinalIgnoreCase) ? 7 : 8;
+        int shiftStart;
+        int shiftLength;
+        if (EliteRestaurant.Core.Utils.AttendanceScheduleHelper.IsFullDayShift(shift))
+        {
+            shiftStart = 10;
+            shiftLength = 11;
+        }
+        else if (shift.Equals("Evening", StringComparison.OrdinalIgnoreCase))
+        {
+            shiftStart = 17;
+            shiftLength = 7;
+        }
+        else
+        {
+            shiftStart = 10;
+            shiftLength = 8;
+        }
         var minuteOffset = rng.Next(-5, 24);
         var clockIn = date.Date.AddHours(shiftStart).AddMinutes(minuteOffset);
         var clockOut = clockIn.AddHours(shiftLength).AddMinutes(rng.Next(-10, 15));
@@ -346,6 +363,8 @@ var seedPinBySignInId = new Dictionary<string, string>(StringComparer.OrdinalIgn
 {
     ["ADM01"] = "1100",
     ["CHF01"] = "2200",
+    ["BAR01"] = "5201",
+    ["REC01"] = "5101",
     ["SRV01"] = "3101",
     ["SRV02"] = "3102",
     ["SRV03"] = "3103",

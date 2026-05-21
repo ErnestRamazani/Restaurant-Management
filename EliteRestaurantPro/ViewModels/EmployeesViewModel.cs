@@ -61,11 +61,11 @@ public class EmployeesViewModel : AdminBaseViewModel
 
     public ObservableCollection<Employee> Employees { get; } = new();
     public ObservableCollection<string> Roles { get; } =
-        new(["Admin", "Manager", "Cashier", "Server", "Chef", "Barman", "Sous Chef"]);
+        new(["Admin", "Manager", "Cashier", "Server", "Chef", "Barman", "Sous Chef", "Front desk"]);
     public ObservableCollection<string> EmploymentStatuses { get; } =
         new(["Active", "On Leave", "Inactive"]);
     public ObservableCollection<string> ShiftOptions { get; } =
-        new(["Off", "Morning Shift", "Night Shift"]);
+        new(["Off", "Morning Shift", "Night Shift", "Full Day"]);
 
     public bool IsDialogOpen
     {
@@ -487,6 +487,7 @@ public class EmployeesViewModel : AdminBaseViewModel
 
         var isStaffPortalRole = normalizedRole.Equals("Server", StringComparison.OrdinalIgnoreCase)
                                 || normalizedRole.Equals("Cashier", StringComparison.OrdinalIgnoreCase)
+                                || normalizedRole.Equals("Front desk", StringComparison.OrdinalIgnoreCase)
                                 || normalizedRole.Equals("Chef", StringComparison.OrdinalIgnoreCase)
                                 || normalizedRole.Equals("Barman", StringComparison.OrdinalIgnoreCase)
                                 || normalizedRole.Equals("Bartender", StringComparison.OrdinalIgnoreCase)
@@ -494,7 +495,7 @@ public class EmployeesViewModel : AdminBaseViewModel
         if (isStaffPortalRole && string.IsNullOrWhiteSpace(normalizedSignIn))
         {
             MessageBox.Show(
-                "Server, Cashier, Chef, Barman, and Sous Chef need a Sign-in ID for tablet login (letters/numbers; easy to type).",
+                "Server, Cashier, Front desk, Chef, Barman, and Sous Chef need a Sign-in ID for tablet login (letters/numbers; easy to type).",
                 "Validation",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);

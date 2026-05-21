@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChefHat, CreditCard, LayoutDashboard, Map, MonitorCog, Utensils } from 'lucide-react'
+import { ChefHat, ConciergeBell, CreditCard, GlassWater, LayoutDashboard, Map, MonitorCog, Utensils } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { BrowserRouter, Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import { useCart } from './hooks/useCart'
@@ -95,7 +95,9 @@ function HubHome() {
       : []),
     { to: '/staff/server', title: 'Server', desc: 'Take table orders and manage pickup.', icon: MonitorCog },
     { to: '/staff/cashier', title: 'Cashier', desc: 'Release, complete, and manage checks.', icon: CreditCard },
-    { to: '/staff/kitchen', title: 'Kitchen', desc: 'Prep queue, receive tickets, mark ready — opens the kitchen portal.', icon: ChefHat },
+    { to: '/staff/reception', title: 'Reception / Front Desk', desc: 'Tables, walk-in reservations, delivery & pickup tracking, read-only menu.', icon: ConciergeBell },
+    { to: '/staff/kitchen', title: 'Kitchen', desc: 'Food prep queue — receive food tickets and mark ready.', icon: ChefHat },
+    { to: '/staff/bar', title: 'Bar / Drink', desc: 'Drink prep queue — receive drink tickets and mark ready.', icon: GlassWater },
     { to: '/staff/admin', title: 'Admin web', desc: 'Read-only owner dashboard (separate sign-in).', icon: LayoutDashboard },
   ]
 
@@ -456,10 +458,13 @@ export default function App() {
         <Route path="/staff" element={<HubHome />} />
         <Route path="/staff/server" element={<PortalRedirect path="/server/index.html" />} />
         <Route path="/staff/cashier" element={<PortalRedirect path="/cashier/index.html" />} />
+        <Route path="/staff/reception" element={<PortalRedirect path="/reception/index.html" />} />
         <Route path="/staff/kitchen" element={<PortalRedirect path="/kitchen/index.html" />} />
+        <Route path="/staff/bar" element={<PortalRedirect path="/bar/index.html" />} />
         <Route path="/staff/floor" element={<ReservationFloorScreen />} />
         <Route path="/staff/admin" element={<PortalRedirect path="/admin/index.html" />} />
         <Route path="/kitchen" element={<Navigate to="/staff/kitchen" replace />} />
+        <Route path="/bar" element={<Navigate to="/staff/bar" replace />} />
         <Route path="/reservation" element={<ReservationPage />} />
         <Route path="/login" element={<Navigate to="/staff" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />

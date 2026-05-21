@@ -66,7 +66,7 @@ public sealed class AdminReportAggregationService(AppDbContext db)
             endDay,
             "0 events | 0 orders | 0 items | 0 units");
         var summary =
-            $"Daily timeline {startDay:yyyy-MM-dd} → {endDay:yyyy-MM-dd}: {entries.Count} events (attendance, orders, reservations, menu, inventory, payroll records, salary advances, Money salary ledger).";
+            $"Daily timeline {startDay:yyyy-MM-dd} → {endDay:yyyy-MM-dd}: {entries.Count} events (clock-ins/sign-ins, orders, reservations, menu, inventory, payroll records, salary advances, Money salary ledger).";
         return new AdminReportRangeSummaryResponse(summary, days);
     }
 
@@ -79,13 +79,13 @@ public sealed class AdminReportAggregationService(AppDbContext db)
 
         var endExclusive = endDay.AddDays(1);
         var productsById = await LoadProductsByIdAsync(cancellationToken);
-        var orders = await db.Orders.AsNoTracking()
-            .Where(o =>
-                (o.PaymentConfirmedAt ?? o.CompletedAt ?? o.CreatedAt) >= startDay
-                && (o.PaymentConfirmedAt ?? o.CompletedAt ?? o.CreatedAt) < endExclusive)
-            .Include(o => o.Items)
-            .ThenInclude(i => i.Product)
-            .OrderBy(o => OrderReportAnchor.Anchor(o))
+        var orders = await OrderReportAnchor.OrderByAnchor(
+                db.Orders.AsNoTracking()
+                    .Where(o =>
+                        (o.PaymentConfirmedAt ?? o.CompletedAt ?? o.CreatedAt) >= startDay
+                        && (o.PaymentConfirmedAt ?? o.CompletedAt ?? o.CreatedAt) < endExclusive)
+                    .Include(o => o.Items)
+                    .ThenInclude(i => i.Product))
             .ToListAsync(cancellationToken);
 
         HydrateOrderItems(orders, productsById);
@@ -166,27 +166,26 @@ public sealed class AdminReportAggregationService(AppDbContext db)
 
         foreach (var row in attendanceRows)
         {
-            var clockIn = row.ClockInTime?.ToString("HH:mm") ?? "Not clocked in";
-            var clockOut = row.ClockOutTime?.ToString("HH:mm") ?? "Not clocked out";
-            var statusText = string.IsNullOrWhiteSpace(row.ClockInStatus) ? "Pending" : row.ClockInStatus;
-            var noteText = string.IsNullOrWhiteSpace(row.Justification) ? "-" : row.Justification;
-            entries.Add(new AdminReportTimeEntryDto(
-                row.ClockInTime ?? row.WorkDate.Date.AddHours(9),
-                "Attendance",
-                $"Clock In: {clockIn} ({statusText}) | Clock Out: {clockOut}",
-                $"Justification: {noteText}",
-                employee.Name,
-                0,
-                0,
-                0m));
+            foreach (var ev in AttendanceReportEntries.BuildForEmployeeDetail(row, employee.Name))
+            {
+                entries.Add(new AdminReportTimeEntryDto(
+                    ev.EventTime,
+                    ev.EventType,
+                    ev.Summary,
+                    ev.RelatedInfo,
+                    ev.EntityContext,
+                    0,
+                    0,
+                    0m));
+            }
         }
 
         var productsById = await LoadProductsByIdAsync(cancellationToken);
-        var servedOrders = await db.Orders.AsNoTracking()
-            .Where(o => o.ServerId == employee.Id)
-            .Include(o => o.Items)
-            .ThenInclude(i => i.Product)
-            .OrderByDescending(o => OrderReportAnchor.Anchor(o))
+        var servedOrders = await OrderReportAnchor.OrderByAnchorDescending(
+                db.Orders.AsNoTracking()
+                    .Where(o => o.ServerId == employee.Id)
+                    .Include(o => o.Items)
+                    .ThenInclude(i => i.Product))
             .Take(180)
             .ToListAsync(cancellationToken);
         HydrateOrderItems(servedOrders, productsById);
@@ -208,14 +207,16 @@ public sealed class AdminReportAggregationService(AppDbContext db)
         }
 
         var empMarker = $"| EMP:{employee.Id}|";
-        var salaryMoneyRows = await db.Transactions.AsNoTracking()
+        // Load salary ledger rows with EF-translatable predicates; filter marker/sort in memory (see daily report).
+        var salaryMoneyRows = (await db.Transactions.AsNoTracking()
+                .Where(t => t.Type == "Expense" && t.Category == "Salary" && t.Justification != null)
+                .ToListAsync(cancellationToken))
             .Where(t =>
                 MoneyTransactionReportHelper.IsSalaryExpense(t) &&
-                t.Justification != null &&
-                t.Justification.Contains(empMarker, StringComparison.Ordinal))
+                t.Justification!.Contains(empMarker, StringComparison.Ordinal))
             .OrderByDescending(t => MoneyTransactionReportHelper.ToLocalInstant(t.Date))
             .Take(48)
-            .ToListAsync(cancellationToken);
+            .ToList();
 
         foreach (var t in salaryMoneyRows)
         {
@@ -257,7 +258,7 @@ public sealed class AdminReportAggregationService(AppDbContext db)
 
         var days = ApplyDayGroups(entries);
         var summary =
-            $"Name: {employee.Name}\nID: {employee.UniqueId}\nRole: {employee.Role}\nStatus: {employee.EmploymentStatus}\nPhone: {employee.PhoneNumber}\nAttendance Events: {attendanceRows.Count}\nOrders Served: {servedOrders.Count}\nItems Served: {servedOrders.Sum(o => o.Items.Sum(i => i.Quantity))}";
+            $"Name: {employee.Name}\nID: {employee.UniqueId}\nRole: {employee.Role}\nStatus: {employee.EmploymentStatus}\nPhone: {employee.PhoneNumber}\nClock-in / sign-in events: {attendanceRows.Count}\nOrders Served: {servedOrders.Count}\nItems Served: {servedOrders.Sum(o => o.Items.Sum(i => i.Quantity))}";
 
         return new AdminReportEmployeeDetailResponse(summary, notes, payrollHistory, days);
     }
@@ -278,11 +279,11 @@ public sealed class AdminReportAggregationService(AppDbContext db)
 
         var entries = new List<AdminReportTimeEntryDto>();
         var productsById = await LoadProductsByIdAsync(cancellationToken);
-        var relatedOrders = await db.Orders.AsNoTracking()
-            .Where(o => o.TableId == table.Id)
-            .Include(o => o.Items)
-            .ThenInclude(i => i.Product)
-            .OrderByDescending(o => OrderReportAnchor.Anchor(o))
+        var relatedOrders = await OrderReportAnchor.OrderByAnchorDescending(
+                db.Orders.AsNoTracking()
+                    .Where(o => o.TableId == table.Id)
+                    .Include(o => o.Items)
+                    .ThenInclude(i => i.Product))
             .Take(220)
             .ToListAsync(cancellationToken);
         HydrateOrderItems(relatedOrders, productsById);
@@ -384,10 +385,10 @@ public sealed class AdminReportAggregationService(AppDbContext db)
             : string.Join(", ", ingredients.Select(i => $"{i.InventoryItem?.Name ?? "Unknown"} ({i.Quantity:0.##} {i.InventoryItem?.Unit ?? "unit"})"));
 
         var productsById = await LoadProductsByIdAsync(cancellationToken);
-        var allOrders = await db.Orders.AsNoTracking()
-            .Include(o => o.Items)
-            .ThenInclude(i => i.Product)
-            .OrderByDescending(o => OrderReportAnchor.Anchor(o))
+        var allOrders = await OrderReportAnchor.OrderByAnchorDescending(
+                db.Orders.AsNoTracking()
+                    .Include(o => o.Items)
+                    .ThenInclude(i => i.Product))
             .Take(800)
             .ToListAsync(cancellationToken);
         HydrateOrderItems(allOrders, productsById);
@@ -484,15 +485,18 @@ public sealed class AdminReportAggregationService(AppDbContext db)
         {
             employeesById.TryGetValue(row.EmployeeId, out var emp);
             var name = emp?.Name ?? "Unknown";
-            entries.Add(new AdminReportTimeEntryDto(
-                row.ClockInTime ?? row.WorkDate.Date.AddHours(9),
-                "Attendance",
-                $"{name} clocked {(row.ClockInTime.HasValue ? "in" : "scheduled")} ({DisplayOrFallback(row.ClockInStatus, "Pending")})",
-                $"Clock Out: {row.ClockOutTime?.ToString("HH:mm") ?? "Not clocked out"} | Justification: {DisplayOrFallback(row.Justification, "-")}",
-                $"Employee: {name}",
-                0,
-                0,
-                0m));
+            foreach (var ev in AttendanceReportEntries.Build(row, name))
+            {
+                entries.Add(new AdminReportTimeEntryDto(
+                    ev.EventTime,
+                    ev.EventType,
+                    ev.Summary,
+                    ev.RelatedInfo,
+                    ev.EntityContext,
+                    0,
+                    0,
+                    0m));
+            }
         }
 
         var productsById = await LoadProductsByIdAsync(cancellationToken);
@@ -868,13 +872,13 @@ public sealed class AdminReportAggregationService(AppDbContext db)
         if (reportType == "Orders")
         {
             var productsById = await LoadProductsByIdAsync(cancellationToken);
-            var orders = await db.Orders.AsNoTracking()
-                .Where(o =>
-                    (o.PaymentConfirmedAt ?? o.CompletedAt ?? o.CreatedAt) >= start
-                    && (o.PaymentConfirmedAt ?? o.CompletedAt ?? o.CreatedAt) < endExclusive)
-                .Include(o => o.Items)
-                .ThenInclude(i => i.Product)
-                .OrderBy(o => OrderReportAnchor.Anchor(o))
+            var orders = await OrderReportAnchor.OrderByAnchor(
+                    db.Orders.AsNoTracking()
+                        .Where(o =>
+                            (o.PaymentConfirmedAt ?? o.CompletedAt ?? o.CreatedAt) >= start
+                            && (o.PaymentConfirmedAt ?? o.CompletedAt ?? o.CreatedAt) < endExclusive)
+                        .Include(o => o.Items)
+                        .ThenInclude(i => i.Product))
                 .ToListAsync(cancellationToken);
             HydrateOrderItems(orders, productsById);
             return BuildOrderExportRows(orders);
@@ -904,12 +908,17 @@ public sealed class AdminReportAggregationService(AppDbContext db)
             foreach (var row in attendanceRows)
             {
                 employeesById.TryGetValue(row.EmployeeId, out var empAttach);
-                rows.Add(BuildAnalyticalRow(
-                    eventTime: row.ClockInTime ?? row.WorkDate.Date,
-                    eventType: "Attendance",
-                    employeeId: empAttach?.UniqueId ?? string.Empty,
-                    employeeName: empAttach?.Name ?? string.Empty,
-                    costOrPrice: string.Empty));
+                var empName = empAttach?.Name ?? string.Empty;
+                foreach (var ev in AttendanceReportEntries.Build(row, empName))
+                {
+                    rows.Add(BuildAnalyticalRow(
+                        eventTime: ev.EventTime,
+                        eventType: ev.EventType,
+                        employeeId: empAttach?.UniqueId ?? string.Empty,
+                        employeeName: empName,
+                        orderId: ev.Summary.Length > 120 ? ev.Summary[..120] + "…" : ev.Summary,
+                        costOrPrice: string.Empty));
+                }
             }
         }
 
@@ -995,13 +1004,13 @@ public sealed class AdminReportAggregationService(AppDbContext db)
         if (includeOrders)
         {
             var productsById = await LoadProductsByIdAsync(cancellationToken);
-            var ordersForLines = await db.Orders.AsNoTracking()
-                .Where(o =>
-                    (o.PaymentConfirmedAt ?? o.CompletedAt ?? o.CreatedAt) >= start
-                    && (o.PaymentConfirmedAt ?? o.CompletedAt ?? o.CreatedAt) < endExclusive)
-                .Include(o => o.Items)
-                .ThenInclude(i => i.Product)
-                .OrderBy(o => OrderReportAnchor.Anchor(o))
+            var ordersForLines = await OrderReportAnchor.OrderByAnchor(
+                    db.Orders.AsNoTracking()
+                        .Where(o =>
+                            (o.PaymentConfirmedAt ?? o.CompletedAt ?? o.CreatedAt) >= start
+                            && (o.PaymentConfirmedAt ?? o.CompletedAt ?? o.CreatedAt) < endExclusive)
+                        .Include(o => o.Items)
+                        .ThenInclude(i => i.Product))
                 .ToListAsync(cancellationToken);
             HydrateOrderItems(ordersForLines, productsById);
             var orderItems = ordersForLines

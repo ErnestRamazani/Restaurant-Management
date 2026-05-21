@@ -45,6 +45,14 @@ public readonly record struct AttendanceShiftSchedule(
     public string FormatNightRange()
         => $"{FormatTime12h(NightStart)}-{FormatTime12h(NightEnd)}";
 
+    /// <summary>Full Day spans morning start through night end (configured in appearance settings).</summary>
+    public string FormatFullDayRange()
+        => $"{FormatTime12h(MorningStart)}-{FormatTime12h(NightEnd)}";
+
+    public TimeSpan FullDayStart => MorningStart;
+
+    public TimeSpan FullDayEnd => NightEnd;
+
     private static string FormatTime12h(TimeSpan timeOfDay) =>
         DateTime.Today.Add(timeOfDay).ToString("h:mm tt", CultureInfo.CurrentCulture);
 }
@@ -73,6 +81,12 @@ public static class AttendanceScheduleHelper
         if (normalized.Equals("Off", StringComparison.OrdinalIgnoreCase))
             return new ShiftWindow("Off", schedule.MorningStart, schedule.MorningEnd, "Off day", IsOff: true);
 
+        if (IsFullDayShift(normalized))
+        {
+            var w = schedule.FormatFullDayRange().Replace("-", " - ", StringComparison.Ordinal);
+            return new ShiftWindow("Full Day", schedule.FullDayStart, schedule.FullDayEnd, w, IsOff: false);
+        }
+
         if (normalized.Contains("Night", StringComparison.OrdinalIgnoreCase) ||
             normalized.Contains("Evening", StringComparison.OrdinalIgnoreCase))
         {
@@ -91,6 +105,16 @@ public static class AttendanceScheduleHelper
             var w = $"{schedule.FormatMorningRange().Replace("-", " - ")}";
             return new ShiftWindow("Morning Shift", schedule.MorningStart, schedule.MorningEnd, w, IsOff: false);
         }
+    }
+
+    public static bool IsFullDayShift(string? configuredShift)
+    {
+        var n = (configuredShift ?? string.Empty).Trim();
+        if (n.Length == 0)
+            return false;
+
+        return n.Contains("Full", StringComparison.OrdinalIgnoreCase)
+               && n.Contains("Day", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

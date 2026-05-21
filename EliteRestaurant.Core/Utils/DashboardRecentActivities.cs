@@ -69,14 +69,14 @@ public static class DashboardRecentActivities
             .ToList();
         foreach (var item in inventoryWithNotes)
         {
-            var sortKey = ParseLatestInventoryNoteTimestampTicks(item.Notes);
+            var (latestLine, sortKey, _) = ResolveLatestInventoryNote(item.Notes);
             if (sortKey == 0)
                 sortKey = item.Id * 10_000_000L;
             activities.Add((sortKey, new ActivityItem
             {
                 Time = string.Empty,
                 Title = item.Name,
-                Description = item.Notes.Trim(),
+                Description = latestLine,
                 ActivityKind = "Inventory",
                 NavigationTarget = DashboardActivityNav.Inventory
             }));
@@ -89,19 +89,28 @@ public static class DashboardRecentActivities
             .ToList();
     }
 
-    private static long ParseLatestInventoryNoteTimestampTicks(string? notes)
+    /// <summary>
+    /// One dashboard line per stock item: the newest note line (by leading <c>yyyy-MM-dd HH:mm</c>),
+    /// or the last physical line when no timestamp is present.
+    /// </summary>
+    private static (string Line, long SortTicks, DateTime? At) ResolveLatestInventoryNote(string? notes)
     {
         if (string.IsNullOrWhiteSpace(notes))
-            return 0;
+            return (string.Empty, 0, null);
+
         var lines = notes.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (lines.Length == 0)
+            return (string.Empty, 0, null);
+
         for (var i = lines.Length - 1; i >= 0; i--)
         {
             var line = lines[i];
             if (line.Length >= 16 &&
                 DateTime.TryParseExact(line.AsSpan(0, 16), "yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
-                return dt.Ticks;
+                return (line, dt.Ticks, dt);
         }
 
-        return 0;
+        var last = lines[^1];
+        return (last, 0, null);
     }
 }

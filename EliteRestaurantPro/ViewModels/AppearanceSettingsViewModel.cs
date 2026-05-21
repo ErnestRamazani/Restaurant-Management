@@ -70,7 +70,9 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     private string _customerMenuAboutText = string.Empty;
     private string _customerMenuContactIntro = string.Empty;
     private string _customerMenuNotesText = string.Empty;
-    private string _staffLoginPasscode = "er4124";
+    private string _staffLoginPasscode = string.Empty;
+    private string _adminWebSignInId = string.Empty;
+    private string _adminWebPin = string.Empty;
     private string _onlinePromoTitle = string.Empty;
     private string _onlinePromoSubtitle = string.Empty;
     private string _onlinePromoCtaLabel = string.Empty;
@@ -341,6 +343,18 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     {
         get => _staffLoginPasscode;
         set => SetField(ref _staffLoginPasscode, value);
+    }
+
+    public string AdminWebSignInId
+    {
+        get => _adminWebSignInId;
+        set => SetField(ref _adminWebSignInId, value);
+    }
+
+    public string AdminWebPin
+    {
+        get => _adminWebPin;
+        set => SetField(ref _adminWebPin, value);
     }
 
     public string OnlinePromoTitle
@@ -829,9 +843,9 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         CustomerMenuAboutText = business.CustomerMenuAboutText ?? string.Empty;
         CustomerMenuContactIntro = business.CustomerMenuContactIntro ?? string.Empty;
         CustomerMenuNotesText = business.CustomerMenuNotesText ?? string.Empty;
-        StaffLoginPasscode = string.IsNullOrWhiteSpace(business.StaffLoginPasscode)
-            ? "er4124"
-            : business.StaffLoginPasscode.Trim();
+        StaffLoginPasscode = business.StaffLoginPasscode?.Trim() ?? string.Empty;
+        AdminWebSignInId = business.AdminWebSignInId?.Trim() ?? string.Empty;
+        AdminWebPin = business.AdminWebPin?.Trim() ?? string.Empty;
         OnlinePromoTitle = business.OnlinePromoTitle ?? string.Empty;
         OnlinePromoSubtitle = business.OnlinePromoSubtitle ?? string.Empty;
         OnlinePromoCtaLabel = business.OnlinePromoCtaLabel ?? string.Empty;
@@ -1199,9 +1213,9 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         _settings.BusinessProfile.CustomerMenuNotesText = string.IsNullOrWhiteSpace(CustomerMenuNotesText)
             ? null
             : CustomerMenuNotesText.Trim();
-        _settings.BusinessProfile.StaffLoginPasscode = string.IsNullOrWhiteSpace(StaffLoginPasscode)
-            ? "er4124"
-            : StaffLoginPasscode.Trim();
+        _settings.BusinessProfile.StaffLoginPasscode = (StaffLoginPasscode ?? string.Empty).Trim();
+        _settings.BusinessProfile.AdminWebSignInId = (AdminWebSignInId ?? string.Empty).Trim();
+        _settings.BusinessProfile.AdminWebPin = (AdminWebPin ?? string.Empty).Trim();
         _settings.BusinessProfile.OnlinePromoTitle = string.IsNullOrWhiteSpace(OnlinePromoTitle)
             ? null
             : OnlinePromoTitle.Trim();

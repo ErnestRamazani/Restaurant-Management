@@ -5,7 +5,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace EliteRestaurant.Core.Utils;
 
-public sealed record SharedDraftRow(string Id, string Label, string PayloadJson, DateTime UpdatedAtUtc);
+public sealed record SharedDraftRow(
+    string Id,
+    string Label,
+    string PayloadJson,
+    DateTime UpdatedAtUtc,
+    int TableId = 0,
+    bool IsCustomerDraft = false);
 
 public static class SharedOrderDraftStore
 {
@@ -29,6 +35,8 @@ public static class SharedOrderDraftStore
                 return b.GetInt32();
             if (root.TryGetProperty("tableId", out var c) && c.ValueKind == JsonValueKind.Number)
                 return c.GetInt32();
+            if (root.TryGetProperty("TableId", out var d) && d.ValueKind == JsonValueKind.Number)
+                return d.GetInt32();
         }
         catch
         {
@@ -38,7 +46,39 @@ public static class SharedOrderDraftStore
         return 0;
     }
 
-    /// <param name="selectedTableId">Table chosen in create-order / server UI. Customer drafts (EmployeeId 0) only list when <see cref="TableId"/> matches.</param>
+    /// <summary>Loads a server-portal draft by id (own draft or customer draft). Does not require the UI selected table to match.</summary>
+    public static SharedDraftRow? GetServerDraft(
+        int employeeId,
+        string draftUniqueId,
+        bool restrictCustomerToAssignedServer = false)
+    {
+        if (string.IsNullOrWhiteSpace(draftUniqueId))
+            return null;
+
+        using var db = new AppDbContext();
+        var row = db.SharedOrderDrafts.AsNoTracking()
+            .FirstOrDefault(d => d.Portal == ServerPortal && d.UniqueId == draftUniqueId);
+
+        if (row is null)
+            return null;
+
+        if (row.EmployeeId == employeeId)
+            return new SharedDraftRow(row.UniqueId, row.DraftLabel, row.PayloadJson, row.UpdatedAtUtc, row.TableId, false);
+
+        if (row.EmployeeId != 0)
+            return null;
+
+        if (restrictCustomerToAssignedServer)
+        {
+            var t = db.Tables.AsNoTracking().FirstOrDefault(x => x.Id == row.TableId);
+            if (t is not null && t.AssignedServerId.HasValue && t.AssignedServerId != employeeId)
+                return null;
+        }
+
+        return new SharedDraftRow(row.UniqueId, row.DraftLabel, row.PayloadJson, row.UpdatedAtUtc, row.TableId, true);
+    }
+
+    /// <param name="selectedTableId">Table chosen in create-order / server UI. When 0, customer drafts for all assigned tables are listed (Incoming Order tab). When &gt; 0, customer drafts only for that table.</param>
     /// <param name="restrictCustomerDraftToAssignedServer">When true (server tablet / web Server role), customer drafts are listed only for tables the employee is assigned to (or unassigned table).</param>
     public static IReadOnlyList<SharedDraftRow> ListServerDrafts(
         int employeeId,
@@ -46,8 +86,8 @@ public static class SharedOrderDraftStore
         bool restrictCustomerDraftToAssignedServer = false)
     {
         using var db = new AppDbContext();
-        // Own saved drafts: show for current table, or any table when row has TableId 0 (legacy or unknown).
-        // Customer drafts (0): only when TableId == selected table, optionally restricted by assignment.
+        // Own saved drafts: show for current table, or any table when selectedTableId is 0 (legacy or unknown).
+        // Customer drafts (EmployeeId 0): all assigned tables when selectedTableId is 0; otherwise match selected table.
         return db.SharedOrderDrafts
             .AsNoTracking()
             .Where(d =>
@@ -56,8 +96,8 @@ public static class SharedOrderDraftStore
                     (d.EmployeeId == employeeId
                      && (selectedTableId <= 0 || d.TableId == 0 || d.TableId == selectedTableId))
                     || (d.EmployeeId == 0
-                        && selectedTableId > 0
-                        && d.TableId == selectedTableId
+                        && d.TableId > 0
+                        && (selectedTableId <= 0 || d.TableId == selectedTableId)
                         && (!restrictCustomerDraftToAssignedServer
                             || db.Tables.Any(t =>
                                 t.Id == d.TableId
@@ -65,7 +105,13 @@ public static class SharedOrderDraftStore
                         )
                     )))
             .OrderByDescending(d => d.UpdatedAtUtc)
-            .Select(d => new SharedDraftRow(d.UniqueId, d.DraftLabel, d.PayloadJson, d.UpdatedAtUtc))
+            .Select(d => new SharedDraftRow(
+                d.UniqueId,
+                d.DraftLabel,
+                d.PayloadJson,
+                d.UpdatedAtUtc,
+                d.TableId,
+                d.EmployeeId == 0))
             .Take(50)
             .ToList();
     }
@@ -123,7 +169,13 @@ public static class SharedOrderDraftStore
 
         db.SaveChanges();
         EnforceMaxDraftsPerEmployeePortal(db, employeeId);
-        return new SharedDraftRow(entity.UniqueId, entity.DraftLabel, entity.PayloadJson, entity.UpdatedAtUtc);
+        return new SharedDraftRow(
+            entity.UniqueId,
+            entity.DraftLabel,
+            entity.PayloadJson,
+            entity.UpdatedAtUtc,
+            entity.TableId,
+            entity.EmployeeId == 0);
     }
 
     /// <param name="selectedTableId">When deleting a customer draft (EmployeeId 0), must match <see cref="SharedOrderDraft.TableId"/>.</param>

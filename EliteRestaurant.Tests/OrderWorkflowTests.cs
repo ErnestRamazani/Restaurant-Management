@@ -52,12 +52,12 @@ public class OrderWorkflowTests
 
     [Theory]
     [InlineData("Waiting", true)]
-    [InlineData("Pending approval", true)]
-    [InlineData("PendingApproval", true)]
-    [InlineData("Pending cashier", true)]
+    [InlineData("Pending approval", false)]
+    [InlineData("PendingApproval", false)]
+    [InlineData("Pending cashier", false)]
     [InlineData("In Kitchen", false)]
     [InlineData("Ready", false)]
-    public void IsKitchenIncomingColumn_MatchesWebKds(string status, bool expected) =>
+    public void IsKitchenIncomingColumn_WaitingOnly(string status, bool expected) =>
         Assert.Equal(expected, OrderWorkflow.IsKitchenIncomingColumn(status));
 
     [Theory]
@@ -67,4 +67,14 @@ public class OrderWorkflowTests
     [InlineData("Ready", false)]
     public void IsKitchenPreparingColumn_Normalizes(string status, bool expected) =>
         Assert.Equal(expected, OrderWorkflow.IsKitchenPreparingColumn(status));
+
+    [Theory]
+    [InlineData("Waiting", true)]
+    [InlineData("In Kitchen", true)]
+    [InlineData("Ready", true)]
+    [InlineData("Pending cashier", false)]
+    [InlineData("Pending approval", false)]
+    [InlineData("Served", false)]
+    public void IsKitchenKdsVisibleStatus_ExcludesPreCashierRelease(string status, bool expected) =>
+        Assert.Equal(expected, OrderWorkflow.IsKitchenKdsVisibleStatus(status));
 }

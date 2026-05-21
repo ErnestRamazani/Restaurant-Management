@@ -12,10 +12,13 @@ using EliteRestaurant.Api.Security;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Orders;
+using EliteRestaurant.Core.Staff;
 using EliteRestaurant.Core.Utils;
+using EliteRestaurant.Api.Hubs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -30,14 +33,15 @@ public sealed class ServerPortalController(
     TabletAuthService authService,
     IWebHostEnvironment environment,
     IOptions<CurrencyPricingOptions> currencyPricingOptions,
-    AppDbContext db) : ControllerBase
+    AppDbContext db,
+    IHubContext<OrderHub> orderHub) : ControllerBase
 {
     [HttpGet("config")]
     public ActionResult<ServerPortalConfigDto> GetConfig()
     {
         var session = RequireServerOrCashierSession();
         if (session is null)
-            return Unauthorized(new { message = "Missing/invalid token. Requires Server or Cashier portal login." });
+            return Unauthorized(new { message = "Missing/invalid token. Requires Server, Cashier, or Reception portal login." });
 
         var allSettings = SettingsManager.Load();
         var settings = allSettings.CurrencyPricing;
@@ -176,22 +180,9 @@ public sealed class ServerPortalController(
     [HttpGet("open-check")]
     public ActionResult GetOpenCheck([FromQuery] int tableId)
     {
-        var session = RequireServerOrCashierSession();
-        if (session is null)
-            return Unauthorized(new { message = "Missing/invalid token. Requires Server or Cashier portal login." });
-        if (tableId <= 0)
-            return BadRequest(new { message = "tableId is required." });
-
-        var table = db.Tables.AsNoTracking().SingleOrDefault(t => t.Id == tableId);
-        if (table is null)
-            return NotFound(new { message = "Table not found." });
-        if (session.Role.Equals("Server", StringComparison.OrdinalIgnoreCase))
-        {
-            if (table.AssignedServerId != session.EmployeeId)
-                return BadRequest(new { message = "This table is not assigned to the logged-in server." });
-        }
-        else if (table.AssignedServerId is null)
-            return BadRequest(new { message = "Table must have an assigned server for open checks." });
+        var err = TryAuthorizeTableForOpenChecks(tableId, out var table);
+        if (err is not null)
+            return err;
 
         var open = db.Orders.AsNoTracking()
             .WhereOpenCheckForTable(tableId)
@@ -212,6 +203,24 @@ public sealed class ServerPortalController(
         });
     }
 
+    [HttpGet("tables/{tableId:int}/open-checks")]
+    public ActionResult<ServerOpenChecksResponse> GetOpenChecksForTable(int tableId)
+    {
+        var err = TryAuthorizeTableForOpenChecks(tableId, out _);
+        if (err is not null)
+            return err;
+
+        var orders = db.Orders.AsNoTracking()
+            .Include(o => o.Items)
+            .ThenInclude(i => i.Product)
+            .WhereOpenCheckForTable(tableId)
+            .OrderByDescending(o => o.CreatedAt)
+            .ToList();
+
+        var checks = orders.Select(MapOpenCheckDto).ToList();
+        return Ok(new ServerOpenChecksResponse(tableId, checks));
+    }
+
     [HttpGet("drafts")]
     public ActionResult<IReadOnlyList<ServerDraftDto>> GetDrafts([FromQuery] int tableId = 0)
     {
@@ -223,9 +232,43 @@ public sealed class ServerPortalController(
         try
         {
             var rows = SharedOrderDraftStore.ListServerDrafts(session.EmployeeId, tableId, restrict)
-                .Select(d => new ServerDraftDto(d.Id, d.Label, d.PayloadJson, d.UpdatedAtUtc))
+                .Select(d => new ServerDraftDto(
+                    d.Id,
+                    d.Label,
+                    d.PayloadJson,
+                    d.UpdatedAtUtc,
+                    d.TableId,
+                    d.IsCustomerDraft))
                 .ToList();
             return Ok(rows);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Draft storage read failed.", detail = ex.Message });
+        }
+    }
+
+    [HttpGet("drafts/{draftId}")]
+    public ActionResult<ServerDraftDto> GetDraft(string draftId)
+    {
+        var session = RequireServerOrCashierSession();
+        if (session is null)
+            return Unauthorized(new { message = "Missing/invalid token. Requires Server or Cashier portal login." });
+
+        var restrict = session.Role.Equals("Server", StringComparison.OrdinalIgnoreCase);
+        try
+        {
+            var row = SharedOrderDraftStore.GetServerDraft(session.EmployeeId, draftId, restrict);
+            if (row is null)
+                return NotFound(new { message = "Draft not found for this server." });
+
+            return Ok(new ServerDraftDto(
+                row.Id,
+                row.Label,
+                row.PayloadJson,
+                row.UpdatedAtUtc,
+                row.TableId,
+                row.IsCustomerDraft));
         }
         catch (Exception ex)
         {
@@ -263,7 +306,13 @@ public sealed class ServerPortalController(
                 snapshot,
                 tableId);
 
-            return Ok(new ServerDraftDto(saved.Id, saved.Label, saved.PayloadJson, saved.UpdatedAtUtc));
+            return Ok(new ServerDraftDto(
+                saved.Id,
+                saved.Label,
+                saved.PayloadJson,
+                saved.UpdatedAtUtc,
+                saved.TableId,
+                saved.IsCustomerDraft));
         }
         catch (Exception ex)
         {
@@ -294,7 +343,7 @@ public sealed class ServerPortalController(
     }
 
     [HttpPost("orders")]
-    public ActionResult<ServerCreateOrderResponse> CreateOrAppendOrder([FromBody] ServerCreateOrderRequest request)
+    public async Task<ActionResult<ServerCreateOrderResponse>> CreateOrAppendOrder([FromBody] ServerCreateOrderRequest request)
     {
         var session = RequireServerOrCashierSession();
         if (session is null)
@@ -368,12 +417,63 @@ public sealed class ServerPortalController(
             .Where(e => e.EmploymentStatus == "Active")
             .ToList();
 
-        var openOrder = db.Orders.Include(o => o.Items)
-            .WhereOpenCheckForTable(table.Id)
-            .OrderByDescending(o => o.CreatedAt)
-            .FirstOrDefault();
+        OrderRecord? openOrder = null;
+        if (request.AppendToOpenCheck)
+        {
+            if (request.OpenOrderId is int openId && openId > 0)
+            {
+                openOrder = db.Orders.Include(o => o.Items)
+                    .ThenInclude(i => i.Product)
+                    .SingleOrDefault(o => o.Id == openId && o.TableId == table.Id);
+                if (openOrder is null || !OrderWorkflow.IsOpenCheckStatus(openOrder.Status))
+                    return BadRequest(new { message = "Selected open check was closed or moved. Refresh and try again." });
+            }
+            else
+            {
+                openOrder = db.Orders.Include(o => o.Items)
+                    .ThenInclude(i => i.Product)
+                    .WhereOpenCheckForTable(table.Id)
+                    .OrderByDescending(o => o.CreatedAt)
+                    .FirstOrDefault();
+            }
+        }
 
         var newItems = BuildOrderItems(normalizedLines, products, activeStaff);
+
+        if (request.AppendToOpenCheck && openOrder is not null)
+        {
+            var existingProducts = openOrder.Items
+                .Select(i => products.TryGetValue(i.ProductId, out var ep) ? ep : i.Product)
+                .Where(p => p is not null)
+                .Cast<Product>()
+                .ToList();
+            var checkKind = OpenCheckKindHelper.TryInferCheckKindFromProducts(existingProducts);
+            if (checkKind is null)
+                return BadRequest(new { message = "This open check mixes food and drinks. Start a new food or drink ticket instead." });
+
+            var kindErr = OpenCheckKindHelper.TryValidateLinesForCheckKind(
+                checkKind,
+                products,
+                normalizedLines.Select(l => (l.ProductId, l.Quantity)));
+            if (kindErr is not null)
+                return BadRequest(new { message = kindErr });
+        }
+        else if (!request.AppendToOpenCheck)
+        {
+            var newKind = OpenCheckKindHelper.NormalizeCheckKind(request.NewCheckKind)
+                ?? OpenCheckKindHelper.TryInferCheckKindFromLines(
+                    products,
+                    normalizedLines.Select(l => (l.ProductId, l.Quantity)));
+            if (newKind is null)
+                return BadRequest(new { message = "Choose Food or Drink for a new ticket, or send only food or only drink items." });
+
+            var newKindErr = OpenCheckKindHelper.TryValidateLinesForCheckKind(
+                newKind,
+                products,
+                normalizedLines.Select(l => (l.ProductId, l.Quantity)));
+            if (newKindErr is not null)
+                return BadRequest(new { message = newKindErr });
+        }
 
         IReadOnlyList<(int ProductId, int Quantity)> linesToValidate;
         OrderInventoryDeduction.InventoryValidationKind validationKind;
@@ -449,6 +549,12 @@ public sealed class ServerPortalController(
             DataReconciler.ReconcileTableStatusesWithOrders(db);
             db.SaveChanges();
 
+            if (OrderWorkflow.IsPendingCashier(openOrder.Status) || OrderWorkflow.IsPendingApproval(openOrder.Status))
+            {
+                await OrderHubBroadcasts.NotifyCashierOrderBoardChangedAsync(
+                    orderHub, db, openOrder.Id, "server-order-submitted");
+            }
+
             var code = string.IsNullOrWhiteSpace(openOrder.UniqueId) ? $"#{openOrder.Id:000}" : openOrder.UniqueId;
             return Ok(new ServerCreateOrderResponse(
                 Mode: "Append",
@@ -490,6 +596,9 @@ public sealed class ServerPortalController(
         table.Status = "Occupied";
         DataReconciler.ReconcileTableStatusesWithOrders(db);
         db.SaveChanges();
+
+        await OrderHubBroadcasts.NotifyCashierOrderBoardChangedAsync(
+            orderHub, db, order.Id, "server-order-submitted");
 
         return Ok(new ServerCreateOrderResponse(
             Mode: "Create",
@@ -615,7 +724,8 @@ public sealed class ServerPortalController(
         if (session is null)
             return null;
         if (session.Role.Equals("Server", StringComparison.OrdinalIgnoreCase)
-            || session.Role.Equals("Cashier", StringComparison.OrdinalIgnoreCase))
+            || session.Role.Equals("Cashier", StringComparison.OrdinalIgnoreCase)
+            || StaffPortalAuthentication.IsReceptionRole(session.Role))
             return session;
         return null;
     }
@@ -655,6 +765,68 @@ public sealed class ServerPortalController(
 
         var reservation = (order.ReservationGuestName ?? string.Empty).Trim();
         return reservation.Length > 0 ? reservation : null;
+    }
+
+    private ActionResult? TryAuthorizeTableForOpenChecks(int tableId, out Table? table)
+    {
+        table = null;
+        var session = RequireServerOrCashierSession();
+        if (session is null)
+            return Unauthorized(new { message = "Missing/invalid token. Requires Server or Cashier portal login." });
+        if (tableId <= 0)
+            return BadRequest(new { message = "tableId is required." });
+
+        table = db.Tables.AsNoTracking().SingleOrDefault(t => t.Id == tableId);
+        if (table is null)
+            return NotFound(new { message = "Table not found." });
+        if (session.Role.Equals("Server", StringComparison.OrdinalIgnoreCase))
+        {
+            if (table.AssignedServerId != session.EmployeeId)
+                return BadRequest(new { message = "This table is not assigned to the logged-in server." });
+        }
+        else if (table.AssignedServerId is null)
+            return BadRequest(new { message = "Table must have an assigned server for open checks." });
+
+        return null;
+    }
+
+    private static ServerOpenCheckDto MapOpenCheckDto(OrderRecord order)
+    {
+        var lines = order.Items
+            .OrderBy(i => i.Product?.Name ?? string.Empty)
+            .Select(i =>
+            {
+                var price = i.Product?.Price ?? 0m;
+                return new ServerOpenCheckLineDto(
+                    i.ProductId,
+                    string.IsNullOrWhiteSpace(i.Product?.Name) ? "Unknown" : i.Product.Name.Trim(),
+                    string.IsNullOrWhiteSpace(i.Product?.Category) ? string.Empty : i.Product.Category.Trim(),
+                    i.Quantity,
+                    price * i.Quantity);
+            })
+            .ToList();
+
+        var subtotal = lines.Sum(l => l.LineTotalUsd);
+        var totals = OrderTotalsHelper.ComputeTotals(subtotal, order.DiscountMode, order.DiscountValue);
+        var productsOnOrder = order.Items
+            .Select(i => i.Product)
+            .Where(p => p is not null)
+            .Cast<Product>();
+        var checkKind = OpenCheckKindHelper.TryInferCheckKindFromProducts(productsOnOrder)
+            ?? OpenCheckKindHelper.Food;
+        var orderLabel = string.IsNullOrWhiteSpace(order.UniqueId) ? $"#{order.Id:000}" : order.UniqueId;
+
+        return new ServerOpenCheckDto(
+            order.Id,
+            orderLabel,
+            order.Status,
+            checkKind,
+            order.CreatedAt,
+            (order.CustomerNotes ?? string.Empty).Trim(),
+            (order.AllergyNotes ?? string.Empty).Trim(),
+            subtotal,
+            totals.GrandTotal,
+            lines);
     }
 
     private static string ProductPhotoAssetKey(int productId) => $"product:{productId}";

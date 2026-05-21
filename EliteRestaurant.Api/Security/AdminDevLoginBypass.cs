@@ -1,7 +1,6 @@
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Contracts.Auth;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace EliteRestaurant.Api.Security;
@@ -9,19 +8,18 @@ namespace EliteRestaurant.Api.Security;
 internal static class AdminDevLoginBypass
 {
     /// <summary>
-    /// Desktop admin login: accept any credentials when Development or explicit opt-in is enabled.
+    /// Desktop admin login: accept any credentials only when <see cref="AuthDevOptions.DesktopAdminAcceptAnyCredentials"/> is explicitly enabled (never in Development by default).
     /// </summary>
     public static AuthenticatedStaffSession? TryCreateSession(
         CloudLoginRequest request,
         AppDbContext db,
-        IHostEnvironment environment,
         IOptions<AuthDevOptions> authDevOptions)
     {
         if (!string.Equals(request.Portal, "Admin", StringComparison.OrdinalIgnoreCase))
             return null;
 
         var opts = authDevOptions.Value;
-        if (!opts.DesktopAdminAcceptAnyCredentials && !environment.IsDevelopment())
+        if (!opts.DesktopAdminAcceptAnyCredentials)
             return null;
 
         var staffId = (request.StaffId ?? string.Empty).Trim();

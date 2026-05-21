@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using ModelTable = EliteRestaurant.Core.Models.Table;
 
 namespace EliteRestaurant.Api.Controllers;
@@ -25,7 +26,7 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
             : OrderPaymentTiming.Immediate;
 
     [HttpPost("create")]
-    public ActionResult<AdminCreateOrderResponse> Create(AdminCreateOrderRequest request)
+    public async Task<ActionResult<AdminCreateOrderResponse>> Create(AdminCreateOrderRequest request)
     {
         var lines = request.Lines
             .Where(l => l.ProductId > 0 && l.Quantity > 0)
@@ -54,7 +55,7 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
         if (request.AppendToOpenCheck && request.OpenOrderId is int openOrderId && table is not null)
             return AppendToExisting(request, openOrderId, table, lines, activeStaff, productById);
 
-        return CreateNew(request, table, lines, activeStaff, productById);
+        return await CreateNew(request, table, lines, activeStaff, productById);
     }
 
     private ActionResult<AdminCreateOrderResponse> AppendToExisting(
@@ -178,7 +179,7 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
         return Ok(new AdminCreateOrderResponse(true, "Create Order", $"Added {linesAdded} line(s) to check {code}.", code));
     }
 
-    private ActionResult<AdminCreateOrderResponse> CreateNew(
+    private async Task<ActionResult<AdminCreateOrderResponse>> CreateNew(
         AdminCreateOrderRequest request,
         ModelTable? table,
         IReadOnlyList<AdminOrderLineRequest> lines,
@@ -252,6 +253,9 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
                 table.Status = "Occupied";
             DataReconciler.ReconcileTableStatusesWithOrders(db);
             db.SaveChanges();
+
+            await OrderHubBroadcasts.NotifyCashierOrderBoardChangedAsync(
+                orderHub, db, order.Id, "admin-order-submitted");
 
             return Ok(new AdminCreateOrderResponse(
                 true,
@@ -327,7 +331,10 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
     {
         var r = _ops.TryReleasePendingToKitchen(orderId);
         if (r.Ok)
+        {
             await orderHub.Clients.Group("Kitchen").SendAsync("KitchenQueueChanged", new { reason = "release-pending", orderId });
+            await OrderHubBroadcasts.NotifyCashierOrderBoardChangedAsync(orderHub, db, orderId, "released-to-kitchen");
+        }
 
         return Ok(new AdminOrderReleasePendingResponse(r.Ok, r.ErrorMessage, r.ReleasedOrderCode));
     }
@@ -355,9 +362,10 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
     }
 
     [HttpPost("{orderId:int}/advance")]
-    public async Task<ActionResult<AdminOrderAdvanceResponse>> Advance(int orderId)
+    public async Task<ActionResult<AdminOrderAdvanceResponse>> Advance(int orderId, [FromBody] AdminOrderAdvanceRequest? request = null)
     {
-        var outcome = _ops.TryAdvanceOrderWithOutcome(orderId);
+        var portal = ResolvePrepStationPortal(request?.PrepStationPortal);
+        var outcome = _ops.TryAdvanceOrderWithOutcome(orderId, portal);
         if (outcome.Missing)
             return Ok(new AdminOrderAdvanceResponse("missing", null));
         if (outcome.Error is not null)
@@ -415,6 +423,15 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
                 PreparedByName = assignee.Name
             };
         }).ToList();
+    }
+
+    private string? ResolvePrepStationPortal(string? bodyPortal)
+    {
+        var claim = User.FindFirst("portal")?.Value;
+        if (KitchenQueueKindFilter.IsPrepStationPortal(claim))
+            return claim;
+        var fromBody = (bodyPortal ?? string.Empty).Trim();
+        return KitchenQueueKindFilter.IsPrepStationPortal(fromBody) ? fromBody : null;
     }
 
     private static void AppendNotes(OrderRecord order, string customerNotes, string allergyNotes)
