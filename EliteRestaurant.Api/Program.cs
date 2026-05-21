@@ -50,6 +50,7 @@ try
     builder.Services.Configure<CurrencyPricingOptions>(builder.Configuration.GetSection("CurrencyPricing"));
     builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
     builder.Services.Configure<AuthDevOptions>(builder.Configuration.GetSection("Auth"));
+    builder.Services.Configure<EliteRestaurant.Api.Options.SetupOptions>(builder.Configuration.GetSection("Setup"));
     builder.Services.Configure<LocalizationOptions>(builder.Configuration.GetSection("Localization"));
     builder.Services.AddSingleton<LocalizationService>();
     builder.Services.Configure<ForwardedHeadersOptions>(options =>
@@ -102,6 +103,7 @@ try
         builder.Services.AddSwaggerGen();
     }
 
+    builder.Services.AddScoped<SiteSetupService>();
     builder.Services.AddScoped<TabletAuthService>();
     builder.Services.AddSingleton<JwtTokenService>();
     var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>() ?? new JwtOptions();
@@ -179,6 +181,15 @@ try
                 _ => new FixedWindowRateLimiterOptions
                 {
                     PermitLimit = 10,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0
+                }));
+        options.AddPolicy("Setup", context =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                GetPartitionKey(context),
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 5,
                     Window = TimeSpan.FromMinutes(1),
                     QueueLimit = 0
                 }));

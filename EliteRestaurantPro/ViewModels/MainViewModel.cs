@@ -4,6 +4,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using EliteRestaurant.Core.Utils;
+using EliteRestaurantPro.ApiClients;
 using EliteRestaurantPro.Services;
 
 namespace EliteRestaurantPro.ViewModels;
@@ -80,12 +81,37 @@ public class MainViewModel : BaseViewModel
     {
         SettingsManager.SettingsChanged += OnSettingsChanged;
         CloudFirstSyncService.StatusChanged += OnSyncStatusChanged;
-        Navigate(new RoleSelectionViewModel(Navigate));
         _cloudStatusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
         _cloudStatusTimer.Tick += async (_, _) => await RefreshCloudStatusAsync();
+        Navigate(new RoleSelectionViewModel(Navigate));
         _cloudStatusTimer.Start();
+        _ = InitializeNavigationAsync();
         _ = RefreshCloudStatusAsync();
         OnSyncStatusChanged();
+    }
+
+    private async Task InitializeNavigationAsync()
+    {
+        try
+        {
+            var baseUrl = CloudEndpoints.NormalizeApiBaseUrl(SettingsManager.Load().CloudApi.BaseUrl);
+            var status = await new SetupApiClient().GetStatusAsync(baseUrl);
+            if (status?.SetupRequired == true)
+            {
+                var dispatcher = System.Windows.Application.Current?.Dispatcher;
+                if (dispatcher is not null && !dispatcher.CheckAccess())
+                    await dispatcher.InvokeAsync(() => Navigate(new FirstSiteSetupViewModel(Navigate)));
+                else
+                    Navigate(new FirstSiteSetupViewModel(Navigate));
+                return;
+            }
+        }
+        catch
+        {
+            /* offline or older API — fall through to normal login */
+        }
+
+        Navigate(new RoleSelectionViewModel(Navigate));
     }
 
     public void Navigate(BaseViewModel viewModel)

@@ -45,6 +45,7 @@ public sealed class TenantResolutionMiddleware(
 
     private static bool ShouldSkip(PathString path) =>
         path.StartsWithSegments("/api/health", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/api/setup", StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments("/swagger", StringComparison.OrdinalIgnoreCase);
 
     private static bool RequiresTenant(PathString path)

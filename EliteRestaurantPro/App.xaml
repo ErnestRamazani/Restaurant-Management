@@ -14,6 +14,10 @@
             <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
 
             <!-- ViewModel → View DataTemplate mapping -->
+            <DataTemplate DataType="{x:Type vm:FirstSiteSetupViewModel}">
+                <views:FirstSiteSetupView/>
+            </DataTemplate>
+
             <DataTemplate DataType="{x:Type vm:RoleSelectionViewModel}">
                 <views:RoleSelectionView/>
             </DataTemplate>

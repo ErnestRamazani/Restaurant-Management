@@ -13,29 +13,12 @@ public static class RestaurantTenantBootstrap
     public const string DefaultUniqueId = "REST-DEFAULT-001";
     public const string DefaultDomain = "etoilegourmandekin.com";
 
+    /// <summary>Backfills <see cref="IRestaurantScoped.RestaurantId"/> on legacy rows. Does not create tenants (use setup API).</summary>
     public static void EnsureDefaultRestaurant(AppDbContext db)
     {
-        var restaurant = db.Restaurants.IgnoreQueryFilters().FirstOrDefault();
+        var restaurant = db.Restaurants.IgnoreQueryFilters().OrderBy(r => r.Id).FirstOrDefault();
         if (restaurant is null)
-        {
-            var settings = db.PublicMenuSettings.IgnoreQueryFilters()
-                .FirstOrDefault(s => s.Key == "default");
-            var name = string.IsNullOrWhiteSpace(settings?.RestaurantName)
-                ? "Elite Restaurant"
-                : settings!.RestaurantName.Trim();
-
-            restaurant = new Restaurant
-            {
-                UniqueId = DefaultUniqueId,
-                Name = name,
-                Slug = DefaultSlug,
-                CustomDomain = DefaultDomain,
-                IsActive = true,
-                CreatedAtUtc = DateTime.UtcNow
-            };
-            db.Restaurants.Add(restaurant);
-            db.SaveChanges();
-        }
+            return;
 
         BackfillRestaurantId(db, restaurant.Id);
     }
