@@ -44,6 +44,17 @@ export async function validateStaffLoginCode(code, extra = {}) {
  * @param {object} payload
  * @returns {Promise<{ success: boolean; label?: string; message?: string; errors?: string[] }>}
  */
+/**
+ * @param {number} tableId
+ * @param {string} reasonCode bring_bill | refill_drink | pack_leftover | extra_cutlery | problem_food | other
+ */
+export async function callServer(tableId, reasonCode) {
+  return apiFetch(`${BASE}/call-server`, {
+    method: 'POST',
+    body: JSON.stringify({ tableId, reasonCode }),
+  })
+}
+
 export async function submitDraft(payload) {
   try {
     return await apiFetch(`${BASE}/draft`, {

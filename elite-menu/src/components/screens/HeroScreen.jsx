@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
+import { LanguageSwitcher } from '../LanguageSwitcher.jsx'
 import { BottomSheet } from '../ui/BottomSheet'
 import { ReservationOrderGatewayModal } from '../ui/ReservationOrderGatewayModal'
 import { GoldDivider } from '../ui/GoldDivider'
@@ -78,6 +80,7 @@ function formatWebsiteHref(raw) {
 }
 
 export function HeroScreen({ config, onEnterMenu, onOrderOnline, onReservation, onStaffLogin }) {
+  const { t } = useTranslation()
   const [info, setInfo] = useState(/** @type {null | 'about' | 'contact' | 'notes'} */ (null))
   const [gatewayOpen, setGatewayOpen] = useState(false)
 
@@ -170,7 +173,7 @@ export function HeroScreen({ config, onEnterMenu, onOrderOnline, onReservation, 
             <span className="pointer-events-none absolute right-[-3px] top-[-3px] h-3 w-3 border-r border-t border-gold/70" />
             <span className="pointer-events-none absolute bottom-[-3px] left-[-3px] h-3 w-3 border-b border-l border-gold/70" />
             <span className="pointer-events-none absolute bottom-[-3px] right-[-3px] h-3 w-3 border-b border-r border-gold/70" />
-            Explore our menu
+            {t('menu.browseMenu')}
           </button>
 
           <motion.div
@@ -188,7 +191,7 @@ export function HeroScreen({ config, onEnterMenu, onOrderOnline, onReservation, 
             className="relative mx-auto mt-16 min-h-[56px] w-full max-w-md rounded-2xl border border-champagne/28 bg-champagne/[0.06] px-6 py-3.5 text-center font-display text-[clamp(0.68rem,3vw,0.82rem)] font-semibold uppercase tracking-[0.16em] text-champagne/90 transition hover:border-gold/40 hover:text-gold active:scale-[0.98] sm:mt-20"
             style={{ fontFamily: '"Cinzel", "Playfair Display", serif' }}
           >
-            Reservation / Order
+            {t('menu.orderOnline')} / {t('menu.reservation')}
           </button>
         </motion.div>
 
@@ -198,13 +201,13 @@ export function HeroScreen({ config, onEnterMenu, onOrderOnline, onReservation, 
             aria-label="Footer"
           >
             <FooterLink href="#info-about" onSelect={() => setInfo('about')}>
-              About
+              {t('menu.about')}
             </FooterLink>
             <FooterLink href="#info-contact" onSelect={() => setInfo('contact')}>
-              Contact
+              {t('menu.contact')}
             </FooterLink>
             <FooterLink href="#info-notes" onSelect={() => setInfo('notes')}>
-              Notes
+              {t('menu.notes')}
             </FooterLink>
           </nav>
           <div className="mt-2 flex flex-col items-center text-center font-body text-[0.65rem] text-champagne/25">
@@ -214,7 +217,7 @@ export function HeroScreen({ config, onEnterMenu, onOrderOnline, onReservation, 
                 onClick={onStaffLogin}
                 className="rounded-full border border-champagne/10 px-3 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-champagne/40 transition hover:border-gold/40 hover:text-gold"
               >
-                Staff login
+                {t('menu.staffLogin')}
               </button>
             ) : null}
           </div>

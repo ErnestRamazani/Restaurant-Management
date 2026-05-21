@@ -178,6 +178,13 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<ReservationBooking>().HasIndex(r => r.Status);
         modelBuilder.Entity<PlacementUnit>().HasIndex(p => p.TableId).IsUnique();
         modelBuilder.Entity<PlacementUnit>().HasIndex(p => p.MergeClusterKey);
+        modelBuilder.Entity<ReservationEngagement>()
+            .Property(e => e.ConfirmationCode)
+            .HasMaxLength(6);
+        modelBuilder.Entity<ReservationEngagement>()
+            .HasIndex(e => e.ConfirmationCode)
+            .IsUnique()
+            .HasFilter("\"ConfirmationCode\" IS NOT NULL AND \"ConfirmationCode\" <> ''");
         modelBuilder.Entity<ReservationEngagement>().HasIndex(e => e.PlannedStartUtc);
         modelBuilder.Entity<ReservationEngagement>().HasIndex(e => e.Status);
         modelBuilder.Entity<ReservationEngagement>().HasIndex(e => e.PlacementUnitId);

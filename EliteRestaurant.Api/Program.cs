@@ -47,6 +47,8 @@ try
     builder.Services.Configure<CurrencyPricingOptions>(builder.Configuration.GetSection("CurrencyPricing"));
     builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
     builder.Services.Configure<AuthDevOptions>(builder.Configuration.GetSection("Auth"));
+    builder.Services.Configure<LocalizationOptions>(builder.Configuration.GetSection("Localization"));
+    builder.Services.AddSingleton<LocalizationService>();
     builder.Services.Configure<ForwardedHeadersOptions>(options =>
     {
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;

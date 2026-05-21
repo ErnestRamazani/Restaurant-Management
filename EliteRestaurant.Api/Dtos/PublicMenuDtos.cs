@@ -100,6 +100,21 @@ public sealed class PublicMenuDraftErrorDto
     public IReadOnlyList<string> Errors { get; set; } = Array.Empty<string>();
 }
 
+public sealed class PublicCallServerRequest
+{
+    public int TableId { get; set; }
+    /// <summary>bring_bill, refill_drink, pack_leftover, extra_cutlery, problem_food, other</summary>
+    public string ReasonCode { get; set; } = string.Empty;
+}
+
+public sealed class PublicCallServerResponse
+{
+    public bool Success { get; set; } = true;
+    public string Message { get; set; } = string.Empty;
+    /// <summary>Assigned server display name when known; null when routed to the service team.</summary>
+    public string? ServerName { get; set; }
+}
+
 /// <summary>Anonymous guest polling for order status (rate-limited).</summary>
 public sealed class PublicOrderStatusDto
 {

@@ -4,6 +4,7 @@ using EliteRestaurant.Contracts.Auth;
 using EliteRestaurant.Core.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace EliteRestaurant.Api.Controllers;
@@ -40,7 +41,7 @@ public sealed class AuthController(
     {
         if (AdminDevLoginBypass.TryCreateSession(request, db, authDevOptions) is { } devSession)
         {
-            var devJwt = jwtTokenService.CreateToken(devSession, out var devExpiresAtUtc);
+            var devJwt = jwtTokenService.CreateToken(devSession, out var devExpiresAtUtc, request.PreferredLanguage);
             return Ok(new CloudLoginResponse(
                 AccessToken: devJwt,
                 ExpiresAtUtc: devExpiresAtUtc,
@@ -56,7 +57,14 @@ public sealed class AuthController(
         if (outcome.Session is null)
             return Unauthorized(new { message = outcome.ErrorMessage ?? "Sign-in failed." });
 
-        var jwt = jwtTokenService.CreateToken(outcome.Session, out var expiresAtUtc);
+        var employeeLang = db.Employees.AsNoTracking()
+            .Where(e => e.Id == outcome.Session.EmployeeId)
+            .Select(e => e.PreferredLanguage)
+            .FirstOrDefault();
+        var jwt = jwtTokenService.CreateToken(
+            outcome.Session,
+            out var expiresAtUtc,
+            string.IsNullOrWhiteSpace(request.PreferredLanguage) ? employeeLang : request.PreferredLanguage);
         var responsePortal =
             string.Equals(outcome.Session.Portal, "Admin", StringComparison.OrdinalIgnoreCase)
             || string.Equals(outcome.Session.Portal, "AdminWeb", StringComparison.OrdinalIgnoreCase)

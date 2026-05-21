@@ -32,7 +32,7 @@
       background: var(--navy);
       color: #e8eef4;
     }
-    .layout { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+    .layout { display: grid; grid-template-columns: 220px 1fr; height: 100vh; min-height: 100vh; overflow: hidden; }
     .sidebar {
       border-right: 1px solid #1e293b;
       background: var(--navy);
@@ -62,7 +62,6 @@
       background: #111c27;
     }
     .brand { font-weight: 700; font-size: 14px; letter-spacing: 0.04em; color: var(--amber); }
-    .brand-sub { font-size: 11px; color: #94a3b8; line-height: 1.4; margin-top: 6px; }
     .nav-btn {
       width: 100%; text-align: left; padding: 12px 14px; min-height: 44px;
       border: none; border-radius: var(--radius); border-left: 3px solid transparent;
@@ -78,7 +77,9 @@
     }
     #app .main-area {
       padding: 16px 18px 24px;
-      min-height: 100vh;
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
       background: linear-gradient(165deg, var(--navy) 0%, #0d1219 45%, #0a0d12 100%);
       color: var(--text-dark);
       min-width: 0;
@@ -99,12 +100,14 @@
       padding: 22px; color: var(--text-dark);
       box-shadow: 0 24px 60px rgba(0,0,0,0.45);
     }
-    #loginWrap h1 { margin: 0 0 8px; font-size: 1.35rem; }
-    #loginWrap .lead { color: var(--text-muted); font-size: 14px; margin: 0 0 18px; line-height: 1.5; }
-    label { display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 6px; }
-    input {
-      width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
-      font-family: inherit; font-size: 15px; margin-bottom: 14px;
+    #loginWrap h1 { margin: 0 0 12px; font-size: 1.35rem; color: var(--text-dark); }
+    #loginWrap .login-stack { display: flex; flex-direction: column; gap: 14px; margin-top: 4px; }
+    #loginWrap #btnLogin { margin-top: 18px; }
+    #loginWrap .login-stack .login-field { display: flex; flex-direction: column; gap: 0; }
+    label.lbl { display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 6px; }
+    input.inp, input#staffId, input#pin {
+      width: 100%; min-height: 44px; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      font-family: inherit; font-size: 15px;
       background: var(--navy-elev); color: var(--text-dark);
     }
     .btn {
@@ -118,7 +121,7 @@
     .hidden { display: none !important; }
     .muted { color: var(--text-muted); font-size: 12px; }
     .danger { color: #fecaca; background: rgba(127, 29, 29, 0.35); border: 1px solid rgba(248, 113, 113, 0.35); padding: 10px 12px; border-radius: var(--radius-sm); font-size: 13px; margin-bottom: 12px; }
-    .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; flex-shrink: 0; }
     .toolbar-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-end; flex: 1; min-width: 200px; }
     .search-field {
       flex: 1; min-width: 160px; max-width: 360px; min-height: 44px; padding: 0 14px;
@@ -335,7 +338,7 @@
     .mono { font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
     .view-panel { flex: 1; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
     .nav-stack { display: flex; flex-direction: column; gap: 6px; }
-    .sort-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .sort-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; flex-shrink: 0; }
     .sort-bar .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
     .sort-btn {
       padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--navy-elev);
@@ -417,7 +420,14 @@
     .menu-card-ing-stock--low { color: #fbbf24; }
     .menu-card-ing-stock--out { color: #f87171; }
     .menu-card-hint { font-size: 10px; color: #64748b; margin: 0; }
-    .inv-list { display: flex; flex-direction: column; gap: 10px; max-height: min(72vh, 940px); overflow-y: auto; }
+    .inv-list,
+    .menu-list {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .inv-list { display: flex; flex-direction: column; gap: 10px; }
     .inv-card {
       background: var(--navy-elev); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px;
       display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: start; font-size: 13px;
@@ -538,15 +548,19 @@
 <body>
   <div id="loginWrap" class="main-area">
     <div class="card">
-      <h1>Bar / Drink</h1>
-      <p class="lead">Sign in with your bar station ID. Receive drink tickets into prep, then mark ready for server pickup.</p>
+      <h1>Bar/Drink</h1>
       <div id="loginErr" class="danger hidden"></div>
-      <label for="staffId">Sign-in ID</label>
-      <input id="staffId" type="text" autocomplete="username">
-      <label for="pin">PIN</label>
-      <input id="pin" type="password" autocomplete="current-password">
-      <button type="button" class="btn btn-primary btn-block" id="btnLogin">Sign in</button>
-      <p class="muted" style="margin-top:14px;">Use the same credentials as the desktop Bar / Drink role. Open this page from your API host so login can reach <span class="mono">/api</span>.</p>
+      <div class="login-stack">
+        <div class="login-field">
+          <label class="lbl" for="staffId">Sign-in ID</label>
+          <input class="inp" id="staffId" type="text" autocomplete="username">
+        </div>
+        <div class="login-field">
+          <label class="lbl" for="pin">PIN</label>
+          <input class="inp" id="pin" type="password" autocomplete="current-password">
+        </div>
+        <button type="button" class="btn btn-primary btn-block" id="btnLogin">Sign in</button>
+      </div>
     </div>
   </div>
 
@@ -555,7 +569,6 @@
       <div class="brand-wrap">
         <img id="brandLogo" class="brand-logo hidden" alt="Restaurant logo">
         <div id="brandName" class="brand">Bar / Drink</div>
-        <div class="brand-sub">Queue &amp; prep workspace — aligned with the desktop bar flow.</div>
       </div>
       <div class="nav-stack">
         <button type="button" class="nav-btn active" id="navQueue" data-view="queue">Queue</button>
@@ -641,8 +654,7 @@
             <button type="button" class="btn btn-ghost" id="btnRefreshMenu">Refresh</button>
           </div>
         </div>
-        <p class="muted" style="margin:0;">Full menu reference: prep time, menu ID, description, recipe ingredients with on-hand stock, and availability.</p>
-        <div id="menuBody"></div>
+        <div id="menuBody" class="menu-list"></div>
       </div>
 
       <div id="viewInventory" class="view-panel hidden">
@@ -659,7 +671,6 @@
           <button type="button" class="sort-btn" data-sort="expiration" id="sortExpiration">Expiration</button>
           <button type="button" class="sort-btn" data-sort="quantity" id="sortQuantity">Quantity</button>
         </div>
-        <p class="muted" style="margin:0;">Add or deduct stock with a justification (same audit trail as admin desktop).</p>
         <div id="invBody" class="inv-list"></div>
       </div>
     </main>
@@ -904,23 +915,10 @@
     return "Healthy";
   }
 
-  function expirationSortRank(status) {
-    switch (status) {
-      case "Expired": return 0;
-      case "Critical": return 1;
-      case "Bad": return 2;
-      case "Good": return 3;
-      default: return 4;
-    }
-  }
-
-  function quantitySortRank(status) {
-    switch (status) {
-      case "Out": return 0;
-      case "Critical": return 1;
-      case "Low": return 2;
-      default: return 3;
-    }
+  function invExpirationSortKey(item) {
+    const days = invDaysUntilExpiration(item);
+    if (days == null) return 999999;
+    return days;
   }
 
   function sortedInventoryCopy() {
@@ -928,17 +926,17 @@
     const mode = inventorySortMode;
     if (mode === "expiration") {
       return arr.sort((a, b) => {
-        const ra = expirationSortRank(invExpirationStatus(a));
-        const rb = expirationSortRank(invExpirationStatus(b));
-        if (ra !== rb) return ra - rb;
+        const ka = invExpirationSortKey(a);
+        const kb = invExpirationSortKey(b);
+        if (ka !== kb) return ka - kb;
         return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
       });
     }
     if (mode === "quantity") {
       return arr.sort((a, b) => {
-        const ra = quantitySortRank(invQuantityStatus(a));
-        const rb = quantitySortRank(invQuantityStatus(b));
-        if (ra !== rb) return ra - rb;
+        const qa = Number(a.stockQuantity) || 0;
+        const qb = Number(b.stockQuantity) || 0;
+        if (qa !== qb) return qa - qb;
         return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
       });
     }

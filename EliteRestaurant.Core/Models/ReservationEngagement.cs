@@ -7,6 +7,9 @@ public sealed class ReservationEngagement
 {
     public int Id { get; set; }
 
+    /// <summary>Guest-facing reference (6 uppercase letters, e.g. KQRTNP).</summary>
+    public string? ConfirmationCode { get; set; }
+
     public int PlacementUnitId { get; set; }
     public PlacementUnit? PlacementUnit { get; set; }
 

@@ -13,6 +13,7 @@ public sealed record ArrivedReservationDto(
 /// <summary>Floor reservation engagements for the cashier tablet (public /book pipeline).</summary>
 public sealed record CashierEngagementListRow(
     int Id,
+    string? ConfirmationCode,
     string Status,
     string GuestName,
     string GuestPhone,
@@ -24,6 +25,7 @@ public sealed record CashierEngagementListRow(
 
 public sealed record CashierEngagementDetailDto(
     int Id,
+    string? ConfirmationCode,
     string Status,
     string GuestName,
     string GuestPhone,
@@ -67,6 +69,7 @@ public sealed record CashierCreateWalkInEngagementRequest(
 
 public sealed record CashierCreateWalkInEngagementResponse(
     int EngagementId,
+    string ConfirmationCode,
     DateTime PlannedStartUtc,
     DateTime PlannedEndUtc);
 

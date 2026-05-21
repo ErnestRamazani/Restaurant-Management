@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace EliteRestaurant.Contracts.Auth;
 
-public sealed record CloudLoginRequest(string StaffId, string Pin, string Portal);
+public sealed record CloudLoginRequest(string StaffId, string Pin, string Portal, string? PreferredLanguage = null);
 
 /// <param name="Response">Set when the API returned 200 with a body.</param>
 /// <param name="ErrorMessage">API or transport detail when <see cref="Response"/> is null (e.g. invalid credentials).</param>

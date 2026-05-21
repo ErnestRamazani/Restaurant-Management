@@ -65,6 +65,7 @@ public sealed class CashierPortalController(
             return new CashierPendingOrderDto(
                 o.Id,
                 string.IsNullOrWhiteSpace(o.UniqueId) ? $"#{o.Id:000}" : o.UniqueId,
+                (o.ConfirmationCode ?? string.Empty).Trim(),
                 OrderRecordUiLabels.TableCaption(o),
                 OrderRecordUiLabels.ServerCaption(o),
                 o.CreatedAt,

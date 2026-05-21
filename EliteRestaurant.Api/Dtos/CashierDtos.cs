@@ -3,6 +3,7 @@ namespace EliteRestaurant.Api.Dtos;
 public sealed record CashierPendingOrderDto(
     int Id,
     string OrderCode,
+    string ConfirmationCode,
     string TableLabel,
     string ServerName,
     DateTime CreatedAt,
@@ -23,6 +24,7 @@ public sealed record CashierCompleteOrderRequest(
 public sealed record CashierOrderDetailDto(
     int Id,
     string OrderCode,
+    string ConfirmationCode,
     string TableLabel,
     string ServerName,
     string Status,

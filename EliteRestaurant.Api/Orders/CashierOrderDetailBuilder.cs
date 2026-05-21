@@ -26,6 +26,7 @@ public static class CashierOrderDetailBuilder
         return new CashierOrderDetailDto(
             order.Id,
             string.IsNullOrWhiteSpace(order.UniqueId) ? $"#{order.Id:000}" : order.UniqueId,
+            (order.ConfirmationCode ?? string.Empty).Trim(),
             OrderRecordUiLabels.TableCaption(order),
             OrderRecordUiLabels.ServerCaption(order),
             order.Status,

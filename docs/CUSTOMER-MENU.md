@@ -5,6 +5,7 @@
 1. The **public menu** is a React app built into `EliteRestaurant.Api/wwwroot/menu/`. The API serves it as static files at **`/menu/`** (same host and port as the API, e.g. `http://localhost:5223/menu/`).
 2. Guests open that URL, often from a **QR code** on the table (`?table={id}`). The app calls **unauthenticated** JSON endpoints under **`/api/public/menu/*`** for branding, products, and tables, then **POST `/api/public/menu/draft`** to create a `SharedOrderDraft` (`Portal = "Customer"`, `EmployeeId = 0`).
 3. Staff see new customer drafts in the server app; SignalR raises **`CustomerDraftArrived`** on group **`Server`** with draft id, label, table, and totals.
+4. QR guests can tap **Call your Server** (when `?table=` is set). **POST `/api/public/menu/call-server`** broadcasts **`ServerTableCall`** to group **`Server`** (assigned server only when `AssignedServerId` is set). The server portal plays a ring tone and shows a toast.
 
 **One source of truth:** Tax, service, currency, logo path, and business info come from **`SettingsManager`** (same as the WPF and server tools).
 

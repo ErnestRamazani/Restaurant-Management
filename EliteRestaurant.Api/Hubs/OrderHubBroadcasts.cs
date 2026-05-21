@@ -97,4 +97,43 @@ public static class OrderHubBroadcasts
                 .SendAsync("ServerReadyOrderArrived", serverNotification, cancellationToken);
         }
     }
+
+    /// <summary>Guest at a table tapped "Call your Server" on the QR menu.</summary>
+    public static async Task NotifyServerTableCallAsync(
+        IHubContext<OrderHub> hub,
+        Guid callId,
+        int tableId,
+        int tableNumber,
+        string tableName,
+        string reasonCode,
+        string reasonLabel,
+        int? assignedServerId,
+        string? assignedServerName,
+        CancellationToken cancellationToken = default)
+    {
+        var payload = new
+        {
+            callId,
+            tableId,
+            tableCode = tableNumber,
+            tableName = tableName.Trim(),
+            tableLabel = $"Table {tableNumber} · {tableName.Trim()}",
+            reasonCode,
+            reasonLabel,
+            serverId = assignedServerId ?? 0,
+            serverName = string.IsNullOrWhiteSpace(assignedServerName) ? null : assignedServerName.Trim(),
+            calledAtUtc = DateTime.UtcNow
+        };
+
+        await hub.Clients.Group("Server")
+            .SendAsync("ServerTableCall", payload, cancellationToken);
+    }
+
+    public static Task NotifyServerTableCallQueueChangedAsync(
+        IHubContext<OrderHub> hub,
+        string action,
+        Guid callId,
+        CancellationToken cancellationToken = default) =>
+        hub.Clients.Group("Server")
+            .SendAsync("ServerTableCallQueueChanged", new { action, callId }, cancellationToken);
 }

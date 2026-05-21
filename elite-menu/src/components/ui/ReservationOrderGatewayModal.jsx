@@ -72,11 +72,8 @@ export function ReservationOrderGatewayModal({ open, onClose, onBookTable, onOrd
             >
               How can we serve you?
             </h2>
-            <p className="mt-2 text-center font-body text-[0.78rem] leading-relaxed text-champagne/55">
-              Choose reservation or online ordering — both stay separate from browsing the menu.
-            </p>
 
-            <div className="mt-6 flex flex-col gap-3 sm:min-h-0">
+            <div className="mt-5 flex flex-col gap-3 sm:min-h-0">
               <button
                 type="button"
                 className="min-h-[56px] w-full rounded-2xl border border-champagne/20 bg-champagne/[0.06] px-4 font-display text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-champagne transition hover:border-gold/45 hover:text-gold active:scale-[0.99]"

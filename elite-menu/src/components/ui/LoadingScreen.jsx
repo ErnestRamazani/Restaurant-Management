@@ -1,6 +1,9 @@
 import { motion } from 'framer-motion'
 
+import { useTranslation } from 'react-i18next'
+
 export function LoadingScreen() {
+  const { t } = useTranslation()
   return (
     <div className="flex min-h-[100svh] flex-col items-center justify-center bg-midnight px-6">
       <motion.div
@@ -8,7 +11,7 @@ export function LoadingScreen() {
         animate={{ rotate: 360 }}
         transition={{ repeat: Infinity, duration: 0.9, ease: 'linear' }}
       />
-      <p className="mt-6 font-body text-sm text-[var(--text-muted)]">Preparing your experience…</p>
+      <p className="mt-6 font-body text-sm text-[var(--text-muted)]">{t('common.loading')}</p>
       {import.meta.env.DEV ? (
         <p className="mt-4 max-w-sm text-center font-body text-xs leading-relaxed text-champagne/40">
           Dev: the menu calls the API via <span className="text-champagne/55">/api</span> →{' '}

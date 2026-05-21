@@ -43,6 +43,29 @@
     return escapeHtml(t);
   }
 
+  function orderConfirmationCode(o) {
+    return String(o?.confirmationCode ?? o?.ConfirmationCode ?? "").trim();
+  }
+
+  function orderCardCodeHtml(o) {
+    const code = orderConfirmationCode(o);
+    if (!code) return "";
+    return "<div class='order-card__code'>Code <strong>" + escapeHtml(code) + "</strong></div>";
+  }
+
+  function setDetailConfirmationCode(code) {
+    const wrap = $("detailConfirmationWrap");
+    const val = $("detailConfirmationCode");
+    if (!wrap || !val) return;
+    if (code) {
+      val.textContent = code;
+      wrap.classList.remove("hidden");
+    } else {
+      val.textContent = "—";
+      wrap.classList.add("hidden");
+    }
+  }
+
   function absMediaUrl(u) {
     const t = (u || "").trim();
     if (!t) return "";
@@ -385,6 +408,7 @@
         "<div class='order-card'>" +
         "<button type='button' class='order-card__hit' data-open-p='" + id + "'>" +
         "<div><strong>" + escapeHtml(code) + "</strong> · " + escapeHtml(tbl) + "</div>" +
+        orderCardCodeHtml(o) +
         "<div class='muted'>Server: " + escapeHtml(srv) + " · " + escapeHtml(cat) + "</div>" +
         "<div class='muted'>" + escapeHtml(lines) + "</div><div>" + escapeHtml(gt) + "</div>" +
         "</button>" +
@@ -425,6 +449,7 @@
         "<div class='order-card'>" +
         "<button type='button' class='order-card__hit' data-open='" + id + "'>" +
         "<div><strong>" + escapeHtml(oid) + "</strong> <span class='muted'>" + escapeHtml(st) + "</span></div>" +
+        orderCardCodeHtml(o) +
         "<div class='muted'>" + escapeHtml(o.tableNumber ?? o.TableNumber ?? "") + "</div>" +
         "<div class='muted'>Server: " + escapeHtml(o.serverName ?? o.ServerName ?? "") + "</div>" +
         "<div class='muted'>" + escapeHtml(o.items ?? o.Items ?? "") + "</div>" +
@@ -502,6 +527,7 @@
         "<button type='button' class='order-card__hit' data-open-pt='" + id + "'>" +
         "<div class='muted' style='font-size:11px;margin-bottom:4px;'>Tap for details</div>" +
         "<div><strong>" + escapeHtml(oid) + "</strong> <span class='muted'>" + escapeHtml(st) + "</span> · " + escapeHtml(time) + "</div>" +
+        orderCardCodeHtml(o) +
         "<div class='muted'>" + tbl + " · " + fmtUsd(o.total ?? o.Total) + "</div>" +
         "</button>" +
         "<div class='order-card__actions'>" +
@@ -523,6 +549,7 @@
     const st = d.status ?? d.Status ?? "";
     detailOrderStatus = String(st);
     $("detailOrderCode").textContent = code || "—";
+    setDetailConfirmationCode(orderConfirmationCode(d));
     const pill = $("detailStatusPill");
     pill.textContent = st || "—";
     pill.className = "od-status-pill " + orderDetailStatusPillClass(st);
@@ -572,6 +599,9 @@
       "<section class=\"od-section\" aria-label=\"Order details\">" +
       "<h4 class=\"od-section-title\">Details</h4>" +
       "<div class=\"od-meta-grid\">" +
+      (orderConfirmationCode(d)
+        ? "<div class=\"od-meta-cell\" style=\"grid-column:1/-1;\"><span class=\"od-meta-k\">Confirmation code</span><span class=\"od-meta-v\" style=\"font-family:ui-monospace,monospace;font-size:1.15rem;font-weight:700;letter-spacing:0.14em;\">" + escapeHtml(orderConfirmationCode(d)) + "</span></div>"
+        : "") +
       "<div class=\"od-meta-cell\"><span class=\"od-meta-k\">Table</span><span class=\"od-meta-v\">" + escapeHtml(String(tableLabel)) + "</span></div>" +
       "<div class=\"od-meta-cell\"><span class=\"od-meta-k\">Server</span><span class=\"od-meta-v\">" + escapeHtml(String(serverName)) + "</span></div>" +
       "<div class=\"od-meta-cell\"><span class=\"od-meta-k\">Origin</span><span class=\"od-meta-v\">" + escapeHtml(String(origin)) + "</span></div>" +
@@ -604,6 +634,7 @@
 
   function closeOrderDetail() {
     $("orderDetailModal").classList.add("hidden");
+    setDetailConfirmationCode("");
     detailOrderId = 0;
     detailOrderStatus = "";
   }

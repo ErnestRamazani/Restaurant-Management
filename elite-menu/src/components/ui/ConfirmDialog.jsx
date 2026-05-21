@@ -47,8 +47,10 @@ export function ConfirmDialog({
             >
               {title}
             </h2>
-            <div className="mt-3 font-body text-[0.9rem] leading-relaxed text-champagne/85">{children}</div>
-            <div className="mt-6 flex flex-col gap-2 sm:flex-row-reverse sm:justify-end">
+            {children ? (
+              <div className="mt-3 font-body text-[0.9rem] leading-relaxed text-champagne/85">{children}</div>
+            ) : null}
+            <div className={`flex flex-col gap-2 sm:flex-row-reverse sm:justify-end ${children ? 'mt-6' : 'mt-5'}`}>
               <button
                 type="button"
                 onClick={onConfirm}

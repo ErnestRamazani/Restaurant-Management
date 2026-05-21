@@ -44,6 +44,7 @@ public sealed class CashierReservationsApiClient(EliteApiClient? apiClient = nul
 
 public sealed record CashierEngagementListRow(
     int Id,
+    string? ConfirmationCode,
     string Status,
     string GuestName,
     string GuestPhone,
@@ -55,6 +56,7 @@ public sealed record CashierEngagementListRow(
 
 public sealed record CashierEngagementDetailDto(
     int Id,
+    string? ConfirmationCode,
     string Status,
     string GuestName,
     string GuestPhone,

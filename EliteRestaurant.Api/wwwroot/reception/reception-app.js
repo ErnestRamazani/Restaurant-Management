@@ -13,6 +13,8 @@
   let resDetailCache = null;
   let tableDetailCache = null;
   let resScheduling = null;
+  let resCreateSuggestions = [];
+  let resCreateSuggestTimer = null;
   let deliveryPickupRows = [];
   let tableMenuLoadError = "";
   let orderHubConnection = null;
@@ -274,12 +276,46 @@
     const months = Number(raw.reservationMaxMonthsAhead ?? raw.ReservationMaxMonthsAhead ?? 6);
     const step = Number(raw.suggestionSlotStepMinutes ?? raw.SuggestionSlotStepMinutes ?? 30);
     const horizon = Number(raw.suggestionHorizonDays ?? raw.SuggestionHorizonDays ?? 14);
+    const duration = Number(raw.defaultDurationMinutes ?? raw.DefaultDurationMinutes ?? 105);
     return {
       reservationLeadDays: Number.isFinite(lead) ? Math.max(0, lead) : 0,
       reservationMaxMonthsAhead: Number.isFinite(months) ? Math.max(1, months) : 6,
       suggestionSlotStepMinutes: Number.isFinite(step) ? Math.max(5, step) : 30,
       suggestionHorizonDays: Number.isFinite(horizon) ? Math.max(1, horizon) : 14,
-      defaultDurationMinutes: Number(raw.defaultDurationMinutes ?? raw.DefaultDurationMinutes ?? 105) || 105
+      defaultDurationMinutes: Number.isFinite(duration) && duration > 0 ? duration : 105
+    };
+  }
+
+  function resCreatePartySize() {
+    const n = Number($("resCreateParty")?.value || 2);
+    if (!Number.isFinite(n)) return 2;
+    return Math.max(1, Math.min(99, Math.floor(n)));
+  }
+
+  function addMinutesToIso(iso, minutes) {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    d.setMinutes(d.getMinutes() + minutes);
+    return d.toISOString();
+  }
+
+  function apiErrorMessage(body, fallback) {
+    if (!body || typeof body !== "object") return fallback;
+    return String(body.message || body.title || body.detail || body.raw || fallback).trim() || fallback;
+  }
+
+  function tablesForPartySize(party) {
+    return tables.filter(t => {
+      const cap = Number(t.capacity);
+      return Number.isFinite(cap) && cap >= party;
+    });
+  }
+
+  function normalizePlacementSuggestion(raw) {
+    return {
+      placementUnitId: raw.placementUnitId ?? raw.PlacementUnitId,
+      tableId: raw.tableId ?? raw.TableId,
+      tableDisplayName: String(raw.tableDisplayName ?? raw.TableDisplayName ?? "")
     };
   }
 
@@ -288,7 +324,6 @@
     if (!r.ok) return false;
     resScheduling = normalizeResScheduling(r.body);
     applyResCreateWhenConstraints();
-    updateResCreateScheduleHint();
     return !!resScheduling;
   }
 
@@ -327,18 +362,14 @@
     return inp.min || toLocalDatetimeLocalValue(new Date().toISOString());
   }
 
-  function updateResCreateScheduleHint() {
-    const el = $("resCreateScheduleHint");
-    if (!el) return;
-    if (!resScheduling) {
-      el.textContent = "Loading booking window from restaurant settings…";
-      return;
-    }
-    const months = resScheduling.reservationMaxMonthsAhead;
-    const step = resScheduling.suggestionSlotStepMinutes;
-    el.textContent =
-      "Walk-in bookings from the front desk can be scheduled from the next available slot up to " +
-      months + " month(s) ahead. Time slots align every " + step + " minutes (same as online reservations).";
+  function snapResCreateWhenToSlot() {
+    const inp = $("resCreateWhen");
+    if (!inp || !inp.value) return;
+    const step = resScheduling?.suggestionSlotStepMinutes ?? 30;
+    const d = new Date(inp.value);
+    if (Number.isNaN(d.getTime())) return;
+    const snapped = roundLocalToSlotStep(d, step);
+    inp.value = toLocalDatetimeLocalValue(snapped.toISOString());
   }
 
   function validateResCreateWhenLocal(localValue) {
@@ -352,12 +383,160 @@
     if (d > max) {
       return "Reservations may be booked up to " + resScheduling.reservationMaxMonthsAhead + " month(s) ahead.";
     }
-    const step = resScheduling.suggestionSlotStepMinutes;
-    const rounded = roundLocalToSlotStep(d, step);
-    if (Math.abs(rounded.getTime() - d.getTime()) > 60 * 1000) {
-      return "Choose a time on " + step + "-minute boundaries (e.g. :00 or :30).";
-    }
     return null;
+  }
+
+  function updateResCreateTableHint(party) {
+    const el = $("resCreateTableHint");
+    if (!el) return;
+    const fitting = tablesForPartySize(party);
+    if (!tables.length) {
+      el.textContent = "";
+      return;
+    }
+    if (resCreateSuggestions.length > 0) {
+      el.textContent =
+        resCreateSuggestions.length + " table(s) available for party of " + party + " at this time.";
+      return;
+    }
+    if (!fitting.length) {
+      el.textContent = "No tables seat a party of " + party + ". Lower party size or leave table unassigned.";
+      return;
+    }
+    el.textContent =
+      fitting.length + " table(s) fit party of " + party +
+      (resCreateSuggestions.length === 0 && $("resCreateWhen")?.value
+        ? " — none free at this time; pick another slot or leave unassigned."
+        : ".");
+  }
+
+  function populateResCreateTableSelect() {
+    const sel = $("resCreateTable");
+    if (!sel) return;
+    const prev = sel.value;
+    const party = resCreatePartySize();
+    const useSuggestions = resCreateSuggestions.length > 0;
+    const source = useSuggestions
+      ? resCreateSuggestions.map(s => {
+          const t = tables.find(x => Number(x.id) === Number(s.tableId));
+          return {
+            id: s.tableId,
+            tableNumber: t?.tableNumber,
+            name: s.tableDisplayName || t?.name || "",
+            capacity: t?.capacity,
+            placementUnitId: s.placementUnitId
+          };
+        })
+      : tablesForPartySize(party);
+    const rows = source.slice().sort((a, b) => (Number(a.tableNumber) || 0) - (Number(b.tableNumber) || 0));
+    sel.innerHTML = '<option value="">No table assigned</option>' +
+      rows.map(t => {
+        const id = t.id;
+        const cap = t.capacity != null ? " · seats " + t.capacity : "";
+        const label = "Table " + (t.tableNumber ?? "") + (t.name ? " · " + t.name : "") + cap;
+        const pid = t.placementUnitId != null ? ' data-placement="' + escapeHtml(String(t.placementUnitId)) + '"' : "";
+        return '<option value="' + escapeHtml(String(id)) + '"' + pid + '>' + escapeHtml(label) + "</option>";
+      }).join("");
+    if (prev && rows.some(t => String(t.id) === prev)) sel.value = prev;
+    else if (prev) sel.value = "";
+    updateResCreateTableHint(party);
+  }
+
+  function renderResCreateSlots(slotRows) {
+    const wrap = $("resCreateSlotsWrap");
+    const el = $("resCreateSlots");
+    if (!wrap || !el) return;
+    if (!slotRows.length) {
+      wrap.classList.add("hidden");
+      el.innerHTML = "";
+      return;
+    }
+    wrap.classList.remove("hidden");
+    el.innerHTML = slotRows.map((s, i) => {
+      const st = s.startUtc ?? s.StartUtc;
+      if (!st) return "";
+      const label = new Date(st).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" });
+      return '<button type="button" class="btn btn-ghost btn-sm" data-res-slot-idx="' + i + '">' + escapeHtml(label) + "</button>";
+    }).join("");
+    el.querySelectorAll("[data-res-slot-idx]").forEach(btn => {
+      btn.onclick = () => {
+        const idx = Number(btn.getAttribute("data-res-slot-idx"));
+        const row = slotRows[idx];
+        const st = row?.startUtc ?? row?.StartUtc;
+        if (!st) return;
+        $("resCreateWhen").value = toLocalDatetimeLocalValue(st);
+        scheduleResCreateSuggestRefresh();
+      };
+    });
+  }
+
+  async function loadResCreateAvailabilitySlots() {
+    const sel = $("resCreateTable");
+    const whenLocal = $("resCreateWhen")?.value;
+    if (!sel || !whenLocal || !sel.value) {
+      renderResCreateSlots([]);
+      return;
+    }
+    const opt = sel.selectedOptions[0];
+    const placementId = opt?.getAttribute("data-placement");
+    if (!placementId) {
+      renderResCreateSlots([]);
+      return;
+    }
+    const startIso = new Date(whenLocal).toISOString();
+    if (!startIso) return;
+    const horizonDays = resScheduling?.suggestionHorizonDays ?? 14;
+    const rangeStart = new Date(startIso);
+    const rangeEnd = new Date(rangeStart);
+    rangeEnd.setDate(rangeEnd.getDate() + Math.min(horizonDays, 7));
+    const r = await api("/api/public/floor/availability", "POST", {
+      placementUnitId: Number(placementId),
+      partySize: resCreatePartySize(),
+      rangeStartUtc: rangeStart.toISOString(),
+      rangeEndUtc: rangeEnd.toISOString(),
+      maxSlots: 12
+    }, false);
+    if (!r.ok) {
+      renderResCreateSlots([]);
+      return;
+    }
+    renderResCreateSlots(Array.isArray(r.body) ? r.body : []);
+  }
+
+  async function refreshResCreateSuggestions() {
+    const whenLocal = $("resCreateWhen")?.value;
+    if (!whenLocal || !token) {
+      resCreateSuggestions = [];
+      populateResCreateTableSelect();
+      renderResCreateSlots([]);
+      return;
+    }
+    snapResCreateWhenToSlot();
+    const startIso = new Date($("resCreateWhen").value).toISOString();
+    if (!startIso) return;
+    const durationMin = resScheduling?.defaultDurationMinutes ?? 105;
+    const body = {
+      partySize: resCreatePartySize(),
+      plannedStartUtc: startIso,
+      plannedEndUtc: addMinutesToIso(startIso, durationMin)
+    };
+    const r = await api("/api/floor/suggest", "POST", body);
+    if (!r.ok) {
+      resCreateSuggestions = [];
+      populateResCreateTableSelect();
+      return;
+    }
+    resCreateSuggestions = Array.isArray(r.body) ? r.body.map(normalizePlacementSuggestion) : [];
+    populateResCreateTableSelect();
+    await loadResCreateAvailabilitySlots();
+  }
+
+  function scheduleResCreateSuggestRefresh() {
+    if (resCreateSuggestTimer) clearTimeout(resCreateSuggestTimer);
+    resCreateSuggestTimer = setTimeout(() => {
+      resCreateSuggestTimer = null;
+      void refreshResCreateSuggestions();
+    }, 350);
   }
 
   function openResCreateModal() {
@@ -368,9 +547,14 @@
     $("resCreateEmail").value = "";
     $("resCreateNotes").value = "";
     $("resCreateParty").value = "2";
+    resCreateSuggestions = [];
+    renderResCreateSlots([]);
     populateResCreateTableSelect();
-    $("resCreateWhen").value = defaultResCreateWhenValue();
-    void loadResScheduling();
+    void loadResScheduling().then(() => {
+      $("resCreateWhen").value = defaultResCreateWhenValue();
+      scheduleResCreateSuggestRefresh();
+    });
+    if (resScheduling) $("resCreateWhen").value = defaultResCreateWhenValue();
     $("resCreateModal").classList.remove("hidden");
     $("resCreateName").focus();
   }
@@ -379,20 +563,33 @@
     $("resCreateModal").classList.add("hidden");
     $("resCreateMsg").textContent = "";
     $("resCreateMsg").classList.remove("ok");
+    resCreateSuggestions = [];
+    renderResCreateSlots([]);
+    if (resCreateSuggestTimer) {
+      clearTimeout(resCreateSuggestTimer);
+      resCreateSuggestTimer = null;
+    }
   }
 
-  function populateResCreateTableSelect() {
-    const sel = $("resCreateTable");
-    if (!sel) return;
-    const prev = sel.value;
-    const rows = tables.slice().sort((a, b) => (Number(a.tableNumber) || 0) - (Number(b.tableNumber) || 0));
-    sel.innerHTML = '<option value="">No table assigned</option>' +
-      rows.map(t => {
-        const id = t.id;
-        const label = "Table " + (t.tableNumber ?? "") + (t.name ? " · " + t.name : "");
-        return '<option value="' + escapeHtml(String(id)) + '">' + escapeHtml(label) + "</option>";
-      }).join("");
-    if (prev) sel.value = prev;
+  function engagementConfirmationCode(row) {
+    return String(row?.confirmationCode ?? row?.ConfirmationCode ?? "").trim();
+  }
+
+  function engagementGuestRef(row) {
+    const code = engagementConfirmationCode(row);
+    if (code) return { primary: code, showInternalId: true };
+    const id = row?.id ?? row?.Id;
+    if (id != null && id !== "") return { primary: "#" + id, showInternalId: false };
+    return { primary: "—", showInternalId: false };
+  }
+
+  function engagementRefMetaHtml(row) {
+    const ref = engagementGuestRef(row);
+    const id = row?.id ?? row?.Id;
+    let html = "<span class='res-ref'>" + escapeHtml(ref.primary) + "</span>";
+    if (ref.showInternalId && id != null && id !== "")
+      html += "<span class='res-ref res-ref--internal'>#" + escapeHtml(String(id)) + "</span>";
+    return html;
   }
 
   function engagementStatusLabel(st) {
@@ -438,13 +635,16 @@
       ["Party size", String(d.partySize ?? d.PartySize ?? "—")],
       ["Table", String(d.tableLabel ?? d.TableLabel ?? "—")],
     ]);
+    const confirmCode = engagementConfirmationCode(d);
     const guest = resSectionHtml("Guest", [
+      ["Confirmation code", confirmCode || "—"],
       ["Phone", String(d.guestPhone ?? d.GuestPhone ?? "—")],
       ["Email", String(d.guestEmail ?? d.GuestEmail ?? "—")],
       ["Notes", String(d.userNotes ?? d.UserNotes ?? "—")],
     ]);
     const floor = resSectionHtml("Floor & record", [
       ["Status", engagementStatusLabel(stRaw)],
+      ["Record id", String(d.id ?? d.Id ?? "—")],
       ["Table id", String(d.tableId ?? d.TableId ?? "—")],
       ["Placement unit", String(d.placementUnitId ?? d.PlacementUnitId ?? "—")],
       ["Actual arrival", actS ? new Date(actS).toLocaleString() : "—"],
@@ -477,10 +677,9 @@
     const d = r.body;
     resDetailCache = d;
     const stRaw = String(d.status ?? d.Status ?? "");
-    const code = "#" + id;
     $("resDetailTitle").textContent = d.guestName || d.GuestName || "Guest";
     $("resDetailMeta").innerHTML =
-      "<span class='res-ref'>" + escapeHtml(code) + "</span>" +
+      engagementRefMetaHtml(d) +
       "<span class='res-pill " + engagementPillClass(stRaw) + "'>" + escapeHtml(engagementStatusLabel(stRaw)) + "</span>";
     $("resDetailBody").innerHTML = buildReservationDetailBody(d);
     const st = stRaw.toLowerCase();
@@ -555,6 +754,10 @@
       const start = x.plannedStartUtc ?? x.PlannedStartUtc;
       const when = start ? new Date(start).toLocaleString() : "";
       const sid = String(id);
+      const ref = engagementGuestRef(x);
+      const refLine = ref.primary === "—"
+        ? ""
+        : "<div class='res-eng-card__ref'>" + escapeHtml(ref.primary) + "</div>";
       return (
         "<div class='res-eng-card'>" +
         "<button type='button' class='res-eng-card__hit' data-res-open='" + sid + "'>" +
@@ -564,7 +767,7 @@
         "<span class='res-eng-card__name'>" + escapeHtml(name) + "</span>" +
         "<span class='res-pill " + pill + "'>" + escapeHtml(st) + "</span>" +
         "</div>" +
-        "<div class='res-eng-card__ref'>Ref · " + escapeHtml(sid) + "</div>" +
+        refLine +
         (when ? "<div class='res-eng-card__when'>" + escapeHtml(when) + "</div>" : "") +
         "<div class='res-eng-card__chips'>" +
         "<span class='res-chip'><strong>Table</strong> " + escapeHtml(tbl) + "</span>" +
@@ -933,9 +1136,9 @@
     const name = ($("resCreateName").value || "").trim();
     const phone = ($("resCreatePhone").value || "").trim();
     const email = ($("resCreateEmail").value || "").trim();
+    snapResCreateWhenToSlot();
     const whenLocal = $("resCreateWhen").value;
-    const party = Number($("resCreateParty").value || 2);
-    const tableId = $("resCreateTable").value ? Number($("resCreateTable").value) : null;
+    const party = resCreatePartySize();
     const notes = ($("resCreateNotes").value || "").trim();
     const msgEl = $("resCreateMsg");
     const btn = $("btnCreateReservation");
@@ -950,28 +1153,63 @@
       msgEl.textContent = whenErr;
       return;
     }
-    if (party < 1 || party > 99) {
-      msgEl.textContent = "Party size must be between 1 and 99.";
+    const startIso = new Date(whenLocal).toISOString();
+    if (!startIso) {
+      msgEl.textContent = "Invalid date and time.";
       return;
+    }
+    const durationMin = resScheduling?.defaultDurationMinutes ?? 105;
+    let placementUnitId = null;
+    let tableId = null;
+    const tableSel = $("resCreateTable");
+    if (tableSel?.value) {
+      const tid = Number(tableSel.value);
+      const opt = tableSel.selectedOptions[0];
+      const pidAttr = opt?.getAttribute("data-placement");
+      const sug = resCreateSuggestions.find(s => Number(s.tableId) === tid);
+      if (pidAttr) placementUnitId = Number(pidAttr);
+      else if (sug?.placementUnitId != null) placementUnitId = Number(sug.placementUnitId);
+      else tableId = tid;
+      const t = tables.find(x => Number(x.id) === tid);
+      const cap = t ? Number(t.capacity) : NaN;
+      if (Number.isFinite(cap) && cap < party) {
+        msgEl.textContent = "Party of " + party + " does not fit the selected table (seats " + cap + ").";
+        return;
+      }
     }
     const body = {
       guestName: name,
       guestPhone: phone,
       guestEmail: email || null,
-      plannedStartUtc: new Date(whenLocal).toISOString(),
+      plannedStartUtc: startIso,
+      plannedEndUtc: addMinutesToIso(startIso, durationMin),
       partySize: party,
-      tableId: tableId,
+      placementUnitId: placementUnitId,
+      tableId: placementUnitId ? null : tableId,
       userNotes: notes
     };
     btn.disabled = true;
-    const r = await api("/api/cashier/reservations/engagements", "POST", body);
-    btn.disabled = false;
-    if (!r.ok) {
-      msgEl.textContent = r.body?.message || "Could not create reservation.";
-      return;
+    try {
+      const r = await api("/api/cashier/reservations/engagements", "POST", body);
+      if (!r.ok) {
+        msgEl.textContent = apiErrorMessage(r.body, "Could not create reservation (" + r.status + ").");
+        if (placementUnitId && apiErrorMessage(r.body, "").toLowerCase().includes("conflict"))
+          void loadResCreateAvailabilitySlots();
+        return;
+      }
+      closeResCreateModal();
+      await loadReservations();
+      const newId = r.body?.engagementId ?? r.body?.EngagementId;
+      const newCode = String(r.body?.confirmationCode ?? r.body?.ConfirmationCode ?? "").trim();
+      if (newId != null && Number(newId) > 0)
+        await openReservationDetail(Number(newId));
+      else if (newCode)
+        alert("Reservation created. Guest confirmation code: " + newCode);
+    } catch (e) {
+      msgEl.textContent = "Could not create reservation. " + (e && e.message ? e.message : String(e));
+    } finally {
+      btn.disabled = false;
     }
-    closeResCreateModal();
-    await loadReservations();
   }
 
   function setView(v) {
@@ -1045,6 +1283,16 @@
   $("btnCreateReservation").onclick = () => { void submitWalkInReservation(); };
   $("btnResCreateCancel").onclick = closeResCreateModal;
   $("resCreateModal").addEventListener("click", e => { if (e.target.id === "resCreateModal") closeResCreateModal(); });
+  $("resCreateParty").addEventListener("change", () => {
+    populateResCreateTableSelect();
+    scheduleResCreateSuggestRefresh();
+  });
+  $("resCreateParty").addEventListener("input", () => {
+    populateResCreateTableSelect();
+    scheduleResCreateSuggestRefresh();
+  });
+  $("resCreateWhen").addEventListener("change", scheduleResCreateSuggestRefresh);
+  $("resCreateTable").addEventListener("change", () => { void loadResCreateAvailabilitySlots(); });
   $("btnRefreshTableMenu").onclick = () => { void refreshTableMenuView(); };
   $("btnRefreshMenu").onclick = () => loadMenu().catch(e => alert(e.message || String(e)));
   $("btnRefreshRes").onclick = () => loadReservations();

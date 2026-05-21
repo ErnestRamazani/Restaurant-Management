@@ -6,6 +6,7 @@ using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Reservations;
 using EliteRestaurant.Core.Staff;
+using EliteRestaurant.Core.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -109,9 +110,11 @@ public sealed class CashierReservationsController(
             }
         }
 
+        var confirmationCode = await ReservationConfirmationCodeGenerator.AllocateUniqueAsync(db, cancellationToken);
         var now = DateTime.UtcNow;
         var engagement = new ReservationEngagement
         {
+            ConfirmationCode = confirmationCode,
             PlacementUnitId = placement?.Id ?? 0,
             TableId = placement?.TableId ?? (request.TableId ?? 0),
             PlannedStartUtc = request.PlannedStartUtc,
@@ -135,6 +138,7 @@ public sealed class CashierReservationsController(
 
         return Ok(new CashierCreateWalkInEngagementResponse(
             engagement.Id,
+            confirmationCode,
             engagement.PlannedStartUtc,
             engagement.PlannedEndUtc));
     }
@@ -154,6 +158,7 @@ public sealed class CashierReservationsController(
             .Take(200)
             .Select(e => new CashierEngagementListRow(
                 e.Id,
+                e.ConfirmationCode,
                 e.Status,
                 e.GuestName,
                 e.GuestPhone,
@@ -188,6 +193,7 @@ public sealed class CashierReservationsController(
 
         return Ok(new CashierEngagementDetailDto(
             e.Id,
+            e.ConfirmationCode,
             e.Status,
             e.GuestName,
             e.GuestPhone,

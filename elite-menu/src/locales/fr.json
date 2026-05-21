@@ -1,0 +1,49 @@
+{
+  "common": {
+    "language": "Anglais",
+    "languageFr": "Français",
+    "switchLanguage": "Langue",
+    "close": "Fermer",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "loading": "Chargement…",
+    "tryAgain": "Réessayer",
+    "signIn": "Connexion",
+    "cloudOnline": "Cloud en ligne",
+    "cloudOffline": "Cloud hors ligne",
+    "checkingCloud": "Vérification du cloud"
+  },
+  "menu": {
+    "browseMenu": "Voir le menu",
+    "orderOnline": "Commander en ligne",
+    "reservation": "Réservation",
+    "staffLogin": "Personnel",
+    "cart": "Panier",
+    "placeOrder": "Envoyer la commande",
+    "orderConfirmed": "Commande confirmée"
+  },
+  "staff": {
+    "hubTitle": "Espace de travail",
+    "consumerMenu": "Menu client",
+    "server": "Serveur",
+    "cashier": "Caisse",
+    "reception": "Réception/Accueil",
+    "kitchen": "Cuisine",
+    "bar": "Bar/Boissons",
+    "adminWeb": "Admin web",
+    "openingPortal": "Ouverture du portail…",
+    "staffPasscode": "Code personnel",
+    "enterPasscode": "Entrez le code personnel"
+  },
+  "auth": {
+    "signInId": "Identifiant",
+    "pin": "PIN",
+    "enterSignInId": "Entrez l'identifiant",
+    "enterPin": "Entrez le PIN",
+    "signInFailed": "Échec de la connexion."
+  },
+  "errors": {
+    "networkError": "Erreur réseau. Veuillez réessayer.",
+    "loadFailed": "Impossible de charger les données."
+  }
+}

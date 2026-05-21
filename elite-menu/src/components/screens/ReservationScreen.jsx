@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ChevronLeft } from 'lucide-react'
 import { GoldDivider } from '../ui/GoldDivider'
 import { BottomSheet } from '../ui/BottomSheet'
-import { ConfirmScreen } from './ConfirmScreen'
+import { OnlineReservationConfirmScreen } from '../online/OnlineReservationConfirmScreen'
 import { publicAvailability, publicBookFloor, publicSuggestPlacements } from '../../utils/reservationApi'
 
 function toUtcIsoFromLocalInput(value) {
@@ -88,7 +88,7 @@ export function ReservationScreen({ config }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [bookingDone, setBookingDone] = useState(
-    /** @type {null | { engagementId: number | null; guestName: string; partySize: number; tableLabel: string; whenLabel: string; phone: string }} */
+    /** @type {null | { confirmationCode: string; ticket: Record<string, unknown> }} */
     (null),
   )
   const [tablePickerOpen, setTablePickerOpen] = useState(false)
@@ -212,24 +212,48 @@ export function ReservationScreen({ config }) {
         partySize: Number(partySize) || 2,
         userNotes: notes.trim(),
       })
-      const eidRaw = res?.engagementId ?? res?.EngagementId
-      const eid = eidRaw != null && eidRaw !== '' ? Number(eidRaw) : null
+      const confirmationCode = String(res?.confirmationCode ?? res?.ConfirmationCode ?? '').trim()
+      if (!confirmationCode) {
+        setError(
+          'Reservation was saved but no confirmation code was returned. Restart the API after migrations, then try again or call the restaurant.',
+        )
+        return
+      }
+      const tableFromApi = String(res?.tableDisplayName ?? res?.TableDisplayName ?? '').trim()
       const sel = suggestions.find((s) => {
         const id = s.placementUnitId ?? s.PlacementUnitId
         return id != null && Number(id) === Number(placementId)
       })
-      const tableLabel = String(sel?.tableDisplayName ?? sel?.TableDisplayName ?? 'Your table')
-      const whenLabel = localStart
-        ? new Date(localStart).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+      const tableLabel =
+        tableFromApi ||
+        String(sel?.tableDisplayName ?? sel?.TableDisplayName ?? 'Your table')
+      const startUtc = res?.plannedStartUtc ?? res?.PlannedStartUtc ?? startIso
+      const endUtc = res?.plannedEndUtc ?? res?.PlannedEndUtc ?? endIso
+      const arrivalLabel = startUtc
+        ? new Date(startUtc).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+        : localStart
+          ? new Date(localStart).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+          : ''
+      const endLabel = endUtc
+        ? new Date(endUtc).toLocaleTimeString(undefined, { timeStyle: 'short' })
         : ''
-      setBookingDone({
-        engagementId: Number.isFinite(eid) ? eid : null,
-        guestName: guestName.trim(),
-        partySize: Number(partySize) || 2,
+      const guest = String(res?.guestName ?? res?.GuestName ?? guestName).trim()
+      const phoneOnFile = String(res?.guestPhone ?? res?.GuestPhone ?? guestPhone).trim()
+      const size = Number(res?.partySize ?? res?.PartySize ?? partySize) || 2
+      const userNotes = String(res?.userNotes ?? res?.UserNotes ?? notes).trim()
+      const bookedAt = new Date()
+      const ticket = {
+        confirmationCode,
+        guestName: guest,
+        phone: phoneOnFile,
+        partySize: size,
         tableLabel,
-        whenLabel,
-        phone: guestPhone.trim(),
-      })
+        arrivalLabel,
+        endLabel,
+        userNotes: userNotes || undefined,
+        bookedAtLabel: bookedAt.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }),
+      }
+      setBookingDone({ confirmationCode, ticket })
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Booking failed.'
       setError(msg)
@@ -240,23 +264,12 @@ export function ReservationScreen({ config }) {
   }
 
   if (bookingDone) {
-    const refLabel = bookingDone.engagementId != null ? `#${bookingDone.engagementId}` : ''
     return (
-      <ConfirmScreen
-        accent="gold"
-        heading="We received it"
-        message={`Thanks, ${bookingDone.guestName}. Your table request is confirmed — we saved your visit and will expect you.`}
-        details={[
-          { label: 'Arrival', value: bookingDone.whenLabel || '—' },
-          { label: 'Party', value: `${bookingDone.partySize} guest${bookingDone.partySize === 1 ? '' : 's'}` },
-          { label: 'Table', value: bookingDone.tableLabel },
-          { label: 'Phone on file', value: bookingDone.phone },
-        ]}
-        label={refLabel}
-        estimatedPrepMinutes={null}
-        primaryCtaLabel="New reservation"
-        secondaryCtaLabel="Back to home"
-        onOrderMore={() => {
+      <OnlineReservationConfirmScreen
+        confirmationCode={bookingDone.confirmationCode}
+        ticket={bookingDone.ticket}
+        restaurantName={name || 'Restaurant'}
+        onNewReservation={() => {
           setBookingDone(null)
           setError('')
           setNotes('')

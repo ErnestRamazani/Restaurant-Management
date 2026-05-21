@@ -2,6 +2,8 @@
 
 After clone or cleanup, run `npm install` (or `npm ci` if `package-lock.json` is present) before `npm run dev`.
 
+**Languages:** English and French (`EN`/`FR` toggle). Strings are loaded from `GET /api/language/strings?lang=` (canonical files in `EliteRestaurant.Api/wwwroot/locales/`). Preference is stored in `localStorage` under `elite_lang`.
+
 ## Dev (Windows)
 
 From the repo: start the **API** in one terminal (`.\EliteRestaurant.Api\run-dev.ps1`) and the **customer menu** in another. Use **`.\elite-menu\run-dev.ps1`** (the `.\` is required) or, from the repo root, **`.\run-elite-menu-dev.ps1`**. That opens a **new** PowerShell for Vite; this one stays free. In the current window only: add **`-Foreground`**. Vite is set to open your browser to the app when the server is ready. URL: `http://localhost:5173/menu/` (proxies `/api` to the API on `:5223`).

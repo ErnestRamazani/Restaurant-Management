@@ -15,12 +15,15 @@ import { OnlineOrderCheckoutScreen } from './components/online/OnlineOrderChecko
 import { OnlineOrderLayout } from './components/online/OnlineOrderLayout'
 import { ReservationFloorScreen } from './components/screens/ReservationFloorScreen'
 import { ReservationScreen } from './components/screens/ReservationScreen'
+import { CallServerButton } from './components/ui/CallServerButton'
 import { ConfirmDialog } from './components/ui/ConfirmDialog'
 import { ErrorScreen } from './components/ui/ErrorScreen'
 import { LoadingScreen } from './components/ui/LoadingScreen'
 import { validateStaffLoginCode } from './utils/api'
 import { API_ORIGIN, pingApi } from './utils/apiClient'
 import { canAccessReservationFloorFromStoredToken } from './utils/staffAuth'
+import { LanguageSwitcher } from './components/LanguageSwitcher.jsx'
+import { useTranslation } from 'react-i18next'
 
 const spring = { type: 'spring', stiffness: 300, damping: 34 }
 /** @internal history.state key for in-app back (cart → menu → hero) */
@@ -50,6 +53,7 @@ function portalHref(path) {
 }
 
 function CloudStatus({ className = '' }) {
+  const { t } = useTranslation()
   const [online, setOnline] = useState(/** @type {boolean | null} */ (null))
 
   useEffect(() => {
@@ -75,7 +79,11 @@ function CloudStatus({ className = '' }) {
   }, [])
 
   const isOnline = online === true
-  const label = online == null ? 'Checking cloud' : isOnline ? 'Cloud online' : 'Cloud offline'
+  const label = online == null
+    ? t('common.checkingCloud')
+    : isOnline
+      ? t('common.cloudOnline')
+      : t('common.cloudOffline')
 
   return (
     <div className={`inline-flex items-center gap-2 rounded-full border border-champagne/10 bg-black/20 px-3 py-1.5 font-body text-[0.68rem] font-bold uppercase tracking-[0.14em] text-champagne/60 ${className}`}>
@@ -86,39 +94,38 @@ function CloudStatus({ className = '' }) {
 }
 
 function HubHome() {
+  const { t } = useTranslation()
   const showFloorCard = canAccessReservationFloorFromStoredToken()
 
   const cards = [
-    { to: '/', title: 'Consumer Menu', desc: 'Guests scan, browse, and send orders.', icon: Utensils },
+    { to: '/', title: t('staff.consumerMenu'), icon: Utensils },
     ...(showFloorCard
-      ? [{ to: '/staff/floor', title: 'Reservation floor', desc: 'Live tables, check-in, and merge (Admin & Cashier).', icon: Map }]
+      ? [{ to: '/staff/floor', title: t('reservation.reservationFloor'), icon: Map }]
       : []),
-    { to: '/staff/server', title: 'Server', desc: 'Take table orders and manage pickup.', icon: MonitorCog },
-    { to: '/staff/cashier', title: 'Cashier', desc: 'Release, complete, and manage checks.', icon: CreditCard },
-    { to: '/staff/reception', title: 'Reception / Front Desk', desc: 'Tables, walk-in reservations, delivery & pickup tracking, read-only menu.', icon: ConciergeBell },
-    { to: '/staff/kitchen', title: 'Kitchen', desc: 'Food prep queue — receive food tickets and mark ready.', icon: ChefHat },
-    { to: '/staff/bar', title: 'Bar / Drink', desc: 'Drink prep queue — receive drink tickets and mark ready.', icon: GlassWater },
-    { to: '/staff/admin', title: 'Admin web', desc: 'Read-only owner dashboard (separate sign-in).', icon: LayoutDashboard },
+    { to: '/staff/server', title: t('staff.server'), icon: MonitorCog },
+    { to: '/staff/cashier', title: t('staff.cashier'), icon: CreditCard },
+    { to: '/staff/reception', title: t('staff.reception'), icon: ConciergeBell },
+    { to: '/staff/kitchen', title: t('staff.kitchen'), icon: ChefHat },
+    { to: '/staff/bar', title: t('staff.bar'), icon: GlassWater },
+    { to: '/staff/admin', title: t('staff.adminWeb'), icon: LayoutDashboard },
   ]
 
   return (
     <main className="relative min-h-[100svh] bg-midnight px-5 py-8 text-champagne">
-      <CloudStatus className="absolute right-5 top-5" />
+      <div className="absolute right-5 top-5">
+        <LanguageSwitcher />
+      </div>
       <section className="mx-auto flex max-w-4xl flex-col gap-8">
         <div className="text-center">
           <p className="font-body text-xs font-bold uppercase tracking-[0.28em] text-gold/80">EliteRestaurant Staff</p>
-          <h1 className="mt-3 font-display text-4xl italic text-champagne">Choose your workspace</h1>
-          <p className="mx-auto mt-3 max-w-2xl font-body text-sm leading-relaxed text-champagne/65">
-            Staff areas require sign-in. The public website opens directly to the consumer menu.
-          </p>
+          <h1 className="mt-3 font-display text-4xl italic text-champagne">{t('staff.hubTitle')}</h1>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          {cards.map(({ to, title, desc, icon: Icon }) => {
+          {cards.map(({ to, title, icon: Icon }) => {
             const content = (
               <>
-                <Icon className="h-8 w-8 text-gold" />
-                <h2 className="mt-5 font-display text-2xl italic text-champagne">{title}</h2>
-                <p className="mt-2 font-body text-sm leading-relaxed text-champagne/60">{desc}</p>
+                <Icon className="h-8 w-8 text-gold" aria-hidden />
+                <h2 className="mt-4 font-display text-2xl italic text-champagne">{title}</h2>
               </>
             )
             const className = 'rounded-3xl border border-champagne/10 bg-midnight-2 p-5 shadow-[0_10px_30px_rgba(0,0,0,0.28)] transition hover:border-gold/50 hover:bg-midnight-3'
@@ -131,6 +138,7 @@ function HubHome() {
 }
 
 function PortalRedirect({ path }) {
+  const { t } = useTranslation()
   useEffect(() => {
     window.location.replace(portalHref(path))
   }, [path])
@@ -138,8 +146,9 @@ function PortalRedirect({ path }) {
   return (
     <main className="flex min-h-[100svh] items-center justify-center bg-midnight px-5 text-center text-champagne">
       <div>
+        <LanguageSwitcher className="mb-4" />
         <CloudStatus className="mb-5" />
-        <p className="font-body text-sm text-champagne/65">Opening staff portal...</p>
+        <p className="font-body text-sm text-champagne/65">{t('staff.openingPortal')}</p>
       </div>
     </main>
   )
@@ -380,13 +389,16 @@ function CustomerMenuApp() {
         {cart.sectionConflict?.message ?? ''}
       </ConfirmDialog>
 
+      {tableIdFromUrl != null && screen === 'menu' ? (
+        <CallServerButton tableId={tableIdFromUrl} />
+      ) : null}
+
       {staffLoginOpen ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 px-4 pb-6 backdrop-blur-sm sm:items-center sm:pb-0">
           <div className="w-full max-w-sm rounded-3xl border border-champagne/10 bg-midnight-2 p-5 text-champagne shadow-[0_22px_70px_rgba(0,0,0,0.45)]">
             <div className="text-center">
               <p className="font-body text-[0.66rem] font-bold uppercase tracking-[0.24em] text-gold/80">Staff access</p>
               <h2 className="mt-2 font-display text-2xl italic">Enter passcode</h2>
-              <p className="mt-2 font-body text-sm leading-relaxed text-champagne/60">Enter the venue passcode.</p>
             </div>
 
             <label className="mt-6 block font-body text-xs font-bold uppercase tracking-[0.16em] text-champagne/55" htmlFor="staffLoginCode">

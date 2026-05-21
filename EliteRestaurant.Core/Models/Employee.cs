@@ -34,6 +34,9 @@ public class Employee
     public string SaturdayShift { get; set; } = "Off";
     public string SundayShift { get; set; } = "Off";
 
+    /// <summary>UI language preference: <c>en</c> or <c>fr</c>.</summary>
+    public string PreferredLanguage { get; set; } = "en";
+
     [NotMapped]
     public int TotalOrdersServed { get; set; }
 

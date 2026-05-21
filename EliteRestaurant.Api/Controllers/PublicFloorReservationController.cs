@@ -27,7 +27,9 @@ public sealed class PublicFloorReservationController(
     [ProducesResponseType(typeof(PublicFloorConflictDto), 409)]
     public async Task<ActionResult> Book([FromBody] PublicBookFloorRequest request, CancellationToken cancellationToken)
     {
-        var placement = await db.PlacementUnits.FirstOrDefaultAsync(p => p.Id == request.PlacementUnitId, cancellationToken);
+        var placement = await db.PlacementUnits
+            .Include(p => p.Table)
+            .FirstOrDefaultAsync(p => p.Id == request.PlacementUnitId, cancellationToken);
         if (placement is null)
             return NotFound(new { message = "Table placement not found." });
 
@@ -59,9 +61,16 @@ public sealed class PublicFloorReservationController(
                 "That time conflicts with an existing reservation."));
         }
 
+        var confirmationCode = await ReservationConfirmationCodeGenerator.AllocateUniqueAsync(db, cancellationToken);
+
+        var tableDisplayName = placement.Table is { Name: var name } && !string.IsNullOrWhiteSpace(name)
+            ? name.Trim()
+            : $"Table #{placement.TableId}";
+
         var now = DateTime.UtcNow;
         var engagement = new ReservationEngagement
         {
+            ConfirmationCode = confirmationCode,
             PlacementUnitId = placement.Id,
             TableId = placement.TableId,
             PlannedStartUtc = request.PlannedStartUtc,
@@ -90,7 +99,16 @@ public sealed class PublicFloorReservationController(
             // booking succeeded; realtime is best-effort
         }
 
-        return Ok(new PublicBookFloorResponse(engagement.Id, engagement.PlannedStartUtc, engagement.PlannedEndUtc));
+        return Ok(new PublicBookFloorResponse(
+            engagement.Id,
+            confirmationCode,
+            engagement.PlannedStartUtc,
+            engagement.PlannedEndUtc,
+            tableDisplayName,
+            engagement.GuestName,
+            engagement.GuestPhone,
+            engagement.PartySize,
+            string.IsNullOrWhiteSpace(engagement.UserNotes) ? null : engagement.UserNotes));
     }
 
     [HttpPost("availability")]

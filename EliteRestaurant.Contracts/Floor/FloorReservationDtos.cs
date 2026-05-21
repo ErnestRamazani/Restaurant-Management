@@ -13,6 +13,7 @@ public sealed record FloorPlacementDto(
 
 public sealed record FloorEngagementDto(
     int Id,
+    string? ConfirmationCode,
     int PlacementUnitId,
     int TableId,
     string TableDisplayName,
@@ -40,7 +41,16 @@ public sealed record PublicBookFloorRequest(
     int PartySize,
     string? UserNotes);
 
-public sealed record PublicBookFloorResponse(int EngagementId, DateTime PlannedStartUtc, DateTime PlannedEndUtc);
+public sealed record PublicBookFloorResponse(
+    int EngagementId,
+    string ConfirmationCode,
+    DateTime PlannedStartUtc,
+    DateTime PlannedEndUtc,
+    string TableDisplayName,
+    string GuestName,
+    string GuestPhone,
+    int PartySize,
+    string? UserNotes);
 
 public sealed record PublicFloorConflictDto(
     bool HasConflict,

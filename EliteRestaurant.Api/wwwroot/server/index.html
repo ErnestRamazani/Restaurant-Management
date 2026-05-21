@@ -132,9 +132,11 @@
       box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
       margin: 0;
     }
-    #loginWrap h1 { margin: 0 0 8px; font-size: 1.35rem; }
-    #loginWrap .lead { color: var(--text-muted); font-size: 14px; margin: 0 0 18px; line-height: 1.5; }
-    #loginWrap label {
+    #loginWrap h1 { margin: 0 0 12px; font-size: 1.35rem; color: var(--text-dark); }
+    #loginWrap .login-stack { display: flex; flex-direction: column; gap: 14px; margin-top: 4px; }
+    #loginWrap #btnLogin { margin-top: 18px; }
+    #loginWrap .login-stack .login-field { display: flex; flex-direction: column; gap: 0; }
+    #loginWrap .lbl {
       display: block;
       font-size: 11px;
       font-weight: 600;
@@ -142,15 +144,14 @@
       color: var(--text-muted);
       margin-bottom: 6px;
     }
-    #loginWrap input {
+    #loginWrap .inp {
       width: 100%;
       min-height: 44px;
-      padding: 0 12px;
+      padding: 8px 12px;
       border: 1px solid var(--border);
       border-radius: var(--radius-sm);
       font-family: inherit;
       font-size: 15px;
-      margin-bottom: 14px;
       background: var(--navy-elev);
       color: var(--text-dark);
     }
@@ -427,6 +428,7 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 14px;
       align-content: start;
+      align-items: stretch;
     }
     @media (min-width: 640px) {
       .menu-catalog-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -447,6 +449,8 @@
       overflow: hidden;
       display: flex;
       flex-direction: column;
+      height: 100%;
+      min-height: 100%;
       box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
     }
     .menu-catalog-card--unavailable { opacity: 0.72; }
@@ -456,7 +460,8 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
-      flex: 1;
+      flex: 1 1 auto;
+      min-height: 0;
     }
     .menu-catalog-card__name {
       font-weight: 800;
@@ -502,7 +507,7 @@
       align-items: flex-end;
       justify-content: space-between;
       gap: 8px;
-      margin-top: 4px;
+      margin-top: auto;
       padding-top: 8px;
       border-top: 1px solid var(--border);
     }
@@ -619,6 +624,9 @@
     }
     .pos-column--setup .pos-zone-a {
       padding-right: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
     }
     .pos-zone-a .pos-fieldset {
       border: 1px solid #4b5563;
@@ -628,7 +636,46 @@
     }
     .pos-zone-a .pos-fieldset legend { color: #9ca3af; font-size: 11px; padding: 0 6px; }
     .pos-zone-a label { font-size: 13px; cursor: pointer; color: #e5e7eb; }
-    .pos-zone-a input[type="radio"] { width: 18px; height: 18px; accent-color: var(--amber); }
+    .choice-tiles {
+      display: grid;
+      gap: 8px;
+      margin-top: 6px;
+    }
+    .choice-tiles--2 { grid-template-columns: 1fr 1fr; }
+    .choice-tile {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 10px 12px;
+      border: 1px solid #4b5563;
+      border-radius: 10px;
+      background: #1f2937;
+      color: #e5e7eb;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      text-align: center;
+      line-height: 1.25;
+      user-select: none;
+    }
+    .choice-tile:hover { border-color: #6b7280; }
+    .choice-tile:has(input:checked) {
+      border-color: var(--amber);
+      box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.35);
+      background: #292419;
+      color: #fbbf24;
+    }
+    .choice-tile input {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+      pointer-events: none;
+    }
+    .choice-tile__text { pointer-events: none; }
     .pos-cart-controls {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -662,13 +709,13 @@
       font-weight: 600;
       cursor: pointer;
     }
-    .open-checks-panel { margin-top: 4px; }
+    .open-checks-panel { margin-top: 0; }
     .open-checks-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
     }
     .open-checks-head strong { font-size: 12px; color: #d1d5db; letter-spacing: 0.03em; }
     .open-checks-list {
@@ -677,7 +724,11 @@
       gap: 8px;
       max-height: 220px;
       overflow-y: auto;
-      margin-bottom: 8px;
+      margin-bottom: 0;
+    }
+    .pos-column--setup #openCheckInfo {
+      margin-top: 12px;
+      line-height: 1.4;
     }
     .open-check-card {
       text-align: left;
@@ -729,8 +780,14 @@
     .pos-draft-row {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
+      gap: 10px;
       align-items: center;
+      margin-top: 0;
+    }
+    .pos-column--setup #draftStatus {
+      margin: 0;
+      min-height: 1.25em;
+      line-height: 1.35;
     }
     .pos-draft-row select { flex: 1; min-width: 120px; }
     .pos-draft-row button {
@@ -753,8 +810,9 @@
       display: flex;
       flex-direction: row;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
       flex-wrap: nowrap;
+      margin-top: 0;
     }
     .discount-inline-row #discountMode {
       flex: 0 0 auto;
@@ -765,25 +823,23 @@
       min-width: 0;
     }
 
-    .notes-details {
-      border: none;
-      margin: 0;
-      padding: 0;
+    .pos-column--setup .pos-zone-a > .notes-block {
+      margin-top: 0;
     }
-    .notes-details summary {
-      list-style: none;
-      cursor: pointer;
-      font-size: 0.78rem;
-      color: #6b7280;
-      padding: 4px 0;
-      user-select: none;
+    .pos-column--setup .pos-zone-a > .notes-block:first-of-type {
+      margin-top: 4px;
     }
-    .notes-details summary::-webkit-details-marker { display: none; }
-    .notes-details:not([open]) .notes-sum-expanded { display: none; }
-    .notes-details[open] .notes-sum-collapsed { display: none; }
-    .notes-sum-collapsed::before { content: "> "; opacity: 0.65; }
-    .notes-sum-expanded::before { content: "v "; opacity: 0.65; }
-    .notes-details textarea { margin-top: 8px; }
+    .pos-column--setup .pos-zone-a > .notes-block + .notes-block {
+      margin-top: 0;
+    }
+    .notes-block__label {
+      display: block;
+      font-size: 12px;
+      color: #9ca3af;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    .notes-block textarea { margin-top: 0; }
 
     .pos-zone-b {
       flex: 1 1 auto;
@@ -1309,6 +1365,75 @@
       margin-top: 8px;
       line-height: 1.3;
     }
+    .customer-toast-host .server-table-call-toast { pointer-events: auto; }
+    .server-table-call-toast {
+      width: 100%;
+      background: var(--surface);
+      color: var(--text-dark);
+      border-radius: 12px;
+      border: 1px solid rgba(245, 158, 11, 0.45);
+      border-left: 4px solid #f59e0b;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+      padding: 12px 12px 10px;
+      font-size: 0.9rem;
+      line-height: 1.35;
+      animation: server-table-call-pulse 1.2s ease-in-out infinite, server-ready-toast-in 0.35s ease-out;
+    }
+    @keyframes server-table-call-pulse {
+      0%, 100% { box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45), 0 0 0 0 rgba(245, 158, 11, 0.25); }
+      50% { box-shadow: 0 12px 36px rgba(245, 158, 11, 0.35), 0 0 0 6px rgba(245, 158, 11, 0.12); }
+    }
+    .server-table-call-toast__head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .server-table-call-toast__title {
+      font-weight: 800;
+      color: var(--text-dark);
+      font-size: 0.95rem;
+    }
+    .server-table-call-toast__badge {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(245, 158, 11, 0.2);
+      color: #d97706;
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      vertical-align: middle;
+    }
+    .server-table-call-toast__dismiss {
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      line-height: 1;
+      cursor: pointer;
+      padding: 2px 6px;
+    }
+    .server-table-call-toast__reason {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin: 6px 0 8px;
+      line-height: 1.4;
+    }
+    .server-table-call-toast__cta {
+      width: 100%;
+      margin-top: 6px;
+      min-height: 40px;
+      border-radius: 10px;
+      border: none;
+      background: var(--amber);
+      color: #111827;
+      font-weight: 700;
+      font-size: 0.82rem;
+      cursor: pointer;
+    }
+    .server-table-call-toast__cta:hover { filter: brightness(1.05); }
     .customer-toast-host .server-ready-toast { pointer-events: auto; }
     .server-ready-toast {
       width: 100%;
@@ -1434,6 +1559,366 @@
       0%, 100% { background: rgba(74, 222, 128, 0.08); }
       50% { background: rgba(74, 222, 128, 0.2); }
     }
+    .nav-table-calls-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 1.25rem;
+      height: 1.25rem;
+      padding: 0 5px;
+      margin-left: 6px;
+      border-radius: 999px;
+      background: #d97706;
+      color: #111827;
+      font-size: 0.68rem;
+      font-weight: 800;
+      vertical-align: middle;
+    }
+    .nav-table-calls-badge.hidden { display: none; }
+    .nav-btn.has-table-calls-alert {
+      box-shadow: inset 3px 0 0 #f59e0b;
+      animation: table-calls-nav-pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes table-calls-nav-pulse {
+      0%, 100% { background: rgba(245, 158, 11, 0.08); }
+      50% { background: rgba(245, 158, 11, 0.22); }
+    }
+    #tableCallsTab .table-calls-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 14px;
+      margin-top: 12px;
+      align-content: start;
+    }
+    .table-call-card {
+      border: 1px solid var(--border);
+      border-left: 4px solid #f59e0b;
+      border-radius: 12px;
+      background: var(--surface);
+      padding: 14px 16px;
+    }
+    .table-call-card.is-accepted { border-left-color: #94a3b8; opacity: 0.72; }
+    .table-call-card__head {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: flex-start;
+    }
+    .table-call-card__title { font-weight: 800; font-size: 1.02rem; color: var(--text-dark); }
+    .table-call-card__reason {
+      margin-top: 6px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: #b45309;
+    }
+    .table-call-card__meta { margin-top: 4px; font-size: 0.8rem; color: var(--text-muted); }
+    .table-call-card__actions { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .table-call-card__orders-head {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #94a3b8;
+    }
+    .table-call-card__orders { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+    .table-call-order {
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.35);
+      cursor: pointer;
+      transition: background 0.12s ease, border-color 0.12s ease;
+    }
+    .table-call-order:hover {
+      background: rgba(37, 99, 235, 0.1);
+      border-color: rgba(59, 130, 246, 0.45);
+    }
+    .table-call-order__top {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: flex-start;
+    }
+    .table-call-order__code { font-weight: 800; font-size: 0.88rem; color: var(--text-dark); }
+    .table-call-order__total { font-weight: 700; font-size: 0.82rem; color: #e2e8f0; flex-shrink: 0; }
+    .table-call-order__status {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 0.65rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .table-call-order__lines {
+      margin-top: 6px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .table-call-card__orders-empty {
+      margin-top: 8px;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+    .table-calls-empty {
+      padding: 28px 20px;
+      text-align: center;
+      color: var(--text-muted);
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+    }
+    .nav-ongoing-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 1.25rem;
+      height: 1.25rem;
+      padding: 0 5px;
+      margin-left: 6px;
+      border-radius: 999px;
+      background: #2563eb;
+      color: #fff;
+      font-size: 0.68rem;
+      font-weight: 800;
+      vertical-align: middle;
+    }
+    .nav-ongoing-badge.hidden { display: none; }
+    #ongoingOrdersTab {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+    }
+    #ongoingOrdersTab .ongoing-shell {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+      gap: 12px;
+    }
+    .ongoing-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .ongoing-toolbar h2 { margin: 0; font-size: 1.15rem; font-weight: 800; }
+    .ongoing-kanban {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      flex: 1;
+      min-height: 0;
+      height: clamp(320px, calc(100vh - 200px), 720px);
+      align-items: stretch;
+    }
+    @media (max-width: 1200px) {
+      .ongoing-kanban { grid-template-columns: repeat(2, minmax(0, 1fr)); height: auto; }
+    }
+    @media (max-width: 640px) {
+      .ongoing-kanban { grid-template-columns: 1fr; }
+    }
+    .ongoing-col {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      display: flex;
+      flex-direction: column;
+      min-height: 200px;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+    }
+    .ongoing-col__head {
+      margin: 0;
+      padding: 11px 12px;
+      font-size: 0.7rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .ongoing-col__head span:first-child {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+    }
+    .ongoing-col__dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .ongoing-col__count {
+      font-size: 0.72rem;
+      font-weight: 800;
+      color: var(--text-dark);
+      background: rgba(148, 163, 184, 0.15);
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+    .ongoing-col__body {
+      flex: 1;
+      overflow-y: auto;
+      min-height: 0;
+      -webkit-overflow-scrolling: touch;
+    }
+    .ongoing-ticket {
+      padding: 12px 12px 11px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.12s ease;
+    }
+    .ongoing-ticket:hover { background: var(--surface-hover, rgba(255, 255, 255, 0.04)); }
+    .ongoing-ticket.is-selected {
+      background: rgba(37, 99, 235, 0.12);
+      border-left: 3px solid #3b82f6;
+      padding-left: 9px;
+    }
+    .ongoing-ticket__top {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: flex-start;
+    }
+    .ongoing-ticket__code { font-weight: 800; font-size: 0.92rem; color: var(--text-dark); }
+    .ongoing-ticket__time { font-size: 0.72rem; color: var(--text-muted); flex-shrink: 0; }
+    .ongoing-ticket__table { font-size: 0.8rem; color: #cbd5e1; margin-top: 3px; font-weight: 600; }
+    .ongoing-ticket__status {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 0.68rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .ongoing-ticket__lines {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 6px;
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .ongoing-col__empty {
+      padding: 22px 14px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+    }
+    .ongoing-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 1200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(2, 6, 23, 0.72);
+      backdrop-filter: blur(4px);
+    }
+    .ongoing-modal.hidden { display: none; }
+    .ongoing-modal__panel {
+      width: min(520px, 100%);
+      max-height: min(88vh, 720px);
+      overflow: auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
+      padding: 18px 18px 16px;
+    }
+    .ongoing-modal__head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .ongoing-modal__head h3 { margin: 0; font-size: 1.05rem; font-weight: 800; }
+    .ongoing-modal__close {
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 1.4rem;
+      line-height: 1;
+      cursor: pointer;
+      padding: 2px 8px;
+    }
+    .ongoing-modal__status-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .ongoing-modal__status-pill {
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #0f172a;
+    }
+    .ongoing-modal__table { font-size: 0.88rem; color: #94a3b8; }
+    .ongoing-modal__lines {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+    .ongoing-modal__line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+    }
+    .ongoing-modal__line:last-child { border-bottom: none; }
+    .ongoing-modal__line img {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      object-fit: cover;
+      background: #1e293b;
+    }
+    .ongoing-modal__line-name { font-weight: 600; font-size: 0.9rem; flex: 1; }
+    .ongoing-modal__line-qty { font-size: 0.82rem; color: var(--text-muted); }
+    .ongoing-modal__foot {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+    .ongoing-modal__total { font-weight: 800; font-size: 1.05rem; }
     #incomingOrderTab .incoming-drafts-grid {
       display: grid;
       grid-template-columns: repeat(1, minmax(0, 1fr));
@@ -1526,18 +2011,20 @@
   <div id="customerToastHost" class="customer-toast-host" aria-live="polite" aria-atomic="true"></div>
   <div id="loginWrap" class="main-area">
     <div class="card">
-      <h1>Server Portal</h1>
-      <p class="lead">Sign in with your server staff ID and PIN to take orders, view the menu, and serve ready tickets.</p>
-      <p id="loginFileWarning" class="danger hidden">This page was opened as a local file. Login will not work until you open it from the API site (for example <span class="mono">https://starfish-app-owtoz.ondigitalocean.app/server/</span>).</p>
-      <div id="loginMessage" class="muted" style="min-height:1.25em;white-space:pre-wrap;margin-bottom:12px;"></div>
-      <label for="staffId">Sign-in ID</label>
-      <input id="staffId" type="text" autocomplete="username" placeholder="SignInId or EMP UniqueId">
-      <label for="pin">PIN</label>
-      <input id="pin" type="password" autocomplete="current-password" placeholder="PIN">
-      <button type="button" class="btn btn-primary btn-block" id="btnLogin">Sign in</button>
-      <p class="muted" style="margin-top:14px;">After <span class="mono">SeedRunner</span> defaults: e.g. <strong class="mono">SRV01</strong> / PIN <strong class="mono">3101</strong>.</p>
-      <p class="muted">This portal is server-only. No reservation flow in this phase.</p>
-      <p class="muted">Cashiers: <a href="/cashier.html" style="color:var(--amber);">open Cashier Portal</a> | <a href="/cashier-order.html" style="color:var(--amber);">compact order screen</a></p>
+      <h1>Server</h1>
+      <p id="loginFileWarning" class="danger hidden">This page was opened as a local file. Login will not work until you open it from the API site.</p>
+      <div id="loginMessage" class="danger hidden" style="white-space:pre-wrap;"></div>
+      <div class="login-stack">
+        <div class="login-field">
+          <label class="lbl" for="staffId">Sign-in ID</label>
+          <input class="inp" id="staffId" type="text" autocomplete="username">
+        </div>
+        <div class="login-field">
+          <label class="lbl" for="pin">PIN</label>
+          <input class="inp" id="pin" type="password" autocomplete="current-password">
+        </div>
+        <button type="button" class="btn btn-primary btn-block" id="btnLogin">Sign in</button>
+      </div>
     </div>
   </div>
 
@@ -1550,7 +2037,9 @@
       <button type="button" class="nav-btn active" data-tab="incomingOrderTab">Incoming Order<span id="incomingNavBadge" class="nav-incoming-badge hidden" aria-label="New customer drafts count"></span></button>
       <button type="button" class="nav-btn" data-tab="takeOrder">Take Order</button>
       <button type="button" class="nav-btn" data-tab="menuTab">Menu</button>
+      <button type="button" class="nav-btn" data-tab="ongoingOrdersTab">Ongoing Orders<span id="ongoingNavBadge" class="nav-ongoing-badge hidden" aria-label="Active orders count"></span></button>
       <button type="button" class="nav-btn" data-tab="pickupTab">Pick Up &amp; Serve<span id="pickupNavBadge" class="nav-pickup-badge hidden" aria-label="Ready orders count"></span></button>
+      <button type="button" class="nav-btn" data-tab="tableCallsTab">Table Calls<span id="tableCallsNavBadge" class="nav-table-calls-badge hidden" aria-label="Pending table calls"></span></button>
       <button type="button" id="btnRefreshAll" class="nav-btn">Refresh Data</button>
       <div class="who">
         <div class="who-top">
@@ -1568,7 +2057,6 @@
       <section id="incomingOrderTab" class="tab">
         <div class="card">
           <h2>Incoming Order</h2>
-          <p class="muted">Customer &ldquo;Explore our Menu&rdquo; drafts for your assigned tables. Load a draft to open Take Order with the table and items filled in.</p>
           <button type="button" id="btnRefreshIncoming">Refresh drafts</button>
           <div id="incomingDraftsList" class="incoming-drafts-grid" role="list" aria-live="polite"></div>
         </div>
@@ -1619,26 +2107,30 @@
               </div>
               <fieldset class="pos-fieldset">
                 <legend>Send as (this table)</legend>
-                <label style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;">
-                  <input type="radio" name="ticketMode" id="ticketModeAppend" value="append" checked>
-                  <span><strong>Same ticket</strong> - add lines to the selected open check below</span>
-                </label>
-                <label style="display:flex;gap:8px;align-items:flex-start;">
-                  <input type="radio" name="ticketMode" id="ticketModeNew" value="new">
-                  <span><strong>New ticket</strong> - separate food or drink check on this table</span>
-                </label>
+                <div class="choice-tiles choice-tiles--2" role="radiogroup" aria-label="Send as">
+                  <label class="choice-tile" for="ticketModeAppend">
+                    <input type="radio" name="ticketMode" id="ticketModeAppend" value="append" checked>
+                    <span class="choice-tile__text">Same ticket</span>
+                  </label>
+                  <label class="choice-tile" for="ticketModeNew">
+                    <input type="radio" name="ticketMode" id="ticketModeNew" value="new">
+                    <span class="choice-tile__text">New ticket</span>
+                  </label>
+                </div>
                 <p id="ticketModeHint" class="muted" style="margin:10px 0 0;font-size:12px;line-height:1.35;color:#94a3b8;"></p>
               </fieldset>
               <fieldset id="newCheckKindFieldset" class="pos-fieldset hidden">
                 <legend>New ticket type</legend>
-                <label style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;">
-                  <input type="radio" name="newCheckKind" id="newCheckKindFood" value="Food" checked>
-                  <span><strong>Food</strong> - kitchen items only on this check</span>
-                </label>
-                <label style="display:flex;gap:8px;align-items:flex-start;">
-                  <input type="radio" name="newCheckKind" id="newCheckKindDrink" value="Drink">
-                  <span><strong>Drink</strong> - bar/beverage items only on this check</span>
-                </label>
+                <div class="choice-tiles choice-tiles--2" role="radiogroup" aria-label="New ticket type">
+                  <label class="choice-tile" for="newCheckKindFood">
+                    <input type="radio" name="newCheckKind" id="newCheckKindFood" value="Food" checked>
+                    <span class="choice-tile__text">Food</span>
+                  </label>
+                  <label class="choice-tile" for="newCheckKindDrink">
+                    <input type="radio" name="newCheckKind" id="newCheckKindDrink" value="Drink">
+                    <span class="choice-tile__text">Drink</span>
+                  </label>
+                </div>
               </fieldset>
               <div class="open-checks-panel">
                 <div class="open-checks-head">
@@ -1654,7 +2146,7 @@
                 <button type="button" id="btnSaveDraft">Save</button>
                 <button type="button" id="btnDeleteDraft">Delete</button>
               </div>
-              <div id="draftStatus" class="muted">Drafts are synced with backend.</div>
+              <div id="draftStatus" class="muted"></div>
               <div class="discount-inline-row">
                 <select id="discountMode">
                   <option value="None">None</option>
@@ -1663,20 +2155,14 @@
                 </select>
                 <input id="discountValue" type="number" step="0.01" min="0" placeholder="Discount">
               </div>
-              <details class="notes-details">
-                <summary>
-                  <span class="notes-sum-collapsed">Add customer notes</span>
-                  <span class="notes-sum-expanded">Customer notes</span>
-                </summary>
+              <div class="notes-block">
+                <label class="notes-block__label" for="customerNotes">Customer notes</label>
                 <textarea id="customerNotes" placeholder="Customer notes"></textarea>
-              </details>
-              <details class="notes-details">
-                <summary>
-                  <span class="notes-sum-collapsed">Add allergy notes</span>
-                  <span class="notes-sum-expanded">Allergy notes</span>
-                </summary>
+              </div>
+              <div class="notes-block">
+                <label class="notes-block__label" for="allergyNotes">Allergy notes</label>
                 <textarea id="allergyNotes" placeholder="Allergy notes"></textarea>
-              </details>
+              </div>
             </div>
           </aside>
         </div>
@@ -1685,23 +2171,49 @@
       <section id="menuTab" class="tab hidden">
         <div class="card">
           <h2>Menu Catalog</h2>
-          <p class="muted">Full menu with photos, pricing, and item details.</p>
           <label class="visually-hidden" for="menuSearch">Search menu</label>
           <input type="search" id="menuSearch" class="menu-search" placeholder="Search name or ID…" autocomplete="off">
           <div id="menuCatalog" class="menu-catalog-grid" role="list"></div>
         </div>
       </section>
 
+      <section id="ongoingOrdersTab" class="tab hidden">
+        <div class="ongoing-shell">
+          <div class="ongoing-toolbar">
+            <h2>Ongoing Orders</h2>
+            <button type="button" id="btnRefreshOngoing" class="btn btn-primary btn-sm">Refresh</button>
+          </div>
+          <div id="ongoingKanban" class="ongoing-kanban" role="region" aria-label="Order status board"></div>
+        </div>
+      </section>
+
       <section id="pickupTab" class="tab hidden">
         <div class="card">
           <h2>Pick Up & Serve</h2>
-          <p class="muted">Shows Ready orders assigned to this server.</p>
           <button type="button" id="btnRefreshReady">Refresh Ready Orders</button>
           <div id="readyOrders" class="ready-orders-grid" role="list" aria-live="polite"></div>
         </div>
       </section>
 
+      <section id="tableCallsTab" class="tab hidden">
+        <div class="card">
+          <h2>Table Calls</h2>
+          <button type="button" id="btnRefreshTableCalls">Refresh</button>
+          <div id="tableCallsList" class="table-calls-list" role="list" aria-live="polite"></div>
+        </div>
+      </section>
+
     </main>
+  </div>
+
+  <div id="ongoingOrderModal" class="ongoing-modal hidden" role="dialog" aria-modal="true" aria-labelledby="ongoingModalTitle">
+    <div class="ongoing-modal__panel">
+      <div class="ongoing-modal__head">
+        <h3 id="ongoingModalTitle">Order detail</h3>
+        <button type="button" class="ongoing-modal__close" id="ongoingModalClose" aria-label="Close">&times;</button>
+      </div>
+      <div id="ongoingModalBody"></div>
+    </div>
   </div>
 
   <script>
@@ -1710,8 +2222,11 @@
     let tables = [];
     let products = [];
     let readyOrders = [];
+    let ongoingOrders = [];
+    let selectedOngoingOrderId = 0;
     let readyOrderPollTimer = null;
     let highlightedReadyOrderIds = new Set();
+    let tableCallsBoard = { tables: [], pendingCallCount: 0 };
     let drafts = [];
     let incomingDrafts = [];
     let openChecks = [];
@@ -1858,8 +2373,13 @@
     function setLoginMessage(text, kind) {
       const el = document.getElementById("loginMessage");
       if (!el) return;
-      el.textContent = text || "";
-      el.className = "muted" + (kind === "error" ? " danger" : kind === "ok" ? " ok" : "");
+      const msg = text || "";
+      el.textContent = msg;
+      if (!msg) {
+        el.className = "danger hidden";
+        return;
+      }
+      el.className = "danger" + (kind === "ok" ? " ok" : "");
     }
 
     if (window.location.protocol === "file:") {
@@ -2218,7 +2738,6 @@
         el.innerHTML = `
           <div class="ready-orders-empty" role="status">
             <strong>No ready orders</strong>
-            <p class="muted" style="margin:0;">When the kitchen marks your tickets Ready, they appear here as cards.</p>
           </div>`;
         updatePickupNavBadge();
         return;
@@ -2271,6 +2790,174 @@
       readyOrders = r.ok && Array.isArray(r.body) ? r.body : [];
       renderReadyOrders();
       return r.ok;
+    }
+
+    const ONGOING_COLUMNS = [
+      { key: "cooking", label: "Cooking", dot: "#FF9800" },
+      { key: "ready", label: "Ready", dot: "#4CAF50" },
+      { key: "served", label: "Served", dot: "#9C27B0" },
+      { key: "completed", label: "Completed", dot: "#64748b" }
+    ];
+
+    function ongoingOrderField(o, camel, pascal) {
+      if (!o) return "";
+      const v = o[camel] ?? o[pascal];
+      return v == null ? "" : v;
+    }
+
+    function ongoingColumnKey(o) {
+      const k = String(ongoingOrderField(o, "kitchenStatusKey", "KitchenStatusKey") || "").toLowerCase();
+      if (k === "ready") return "ready";
+      if (k === "served") return "served";
+      if (String(ongoingOrderField(o, "status", "Status") || "").toLowerCase() === "completed") return "completed";
+      return "cooking";
+    }
+
+    function updateOngoingNavBadge() {
+      const badge = document.getElementById("ongoingNavBadge");
+      if (!badge) return;
+      const active = ongoingOrders.filter(o => ongoingColumnKey(o) !== "completed").length;
+      if (active > 0) {
+        badge.textContent = String(active);
+        badge.classList.remove("hidden");
+      } else {
+        badge.textContent = "";
+        badge.classList.add("hidden");
+      }
+    }
+
+    function renderOngoingKanban() {
+      const host = document.getElementById("ongoingKanban");
+      if (!host) return;
+      const buckets = Object.fromEntries(ONGOING_COLUMNS.map(c => [c.key, []]));
+      ongoingOrders.forEach(o => {
+        const col = ongoingColumnKey(o);
+        if (buckets[col]) buckets[col].push(o);
+      });
+      host.innerHTML = ONGOING_COLUMNS.map(col => {
+        const items = buckets[col.key] || [];
+        const tickets = items.length
+          ? items.map(o => {
+              const id = Number(o.id ?? o.Id) || 0;
+              const selected = id === selectedOngoingOrderId ? " is-selected" : "";
+              const code = esc(String(ongoingOrderField(o, "orderId", "OrderId") || "#?"));
+              const table = esc(String(ongoingOrderField(o, "tableLabel", "TableLabel") || "-"));
+              const time = esc(String(ongoingOrderField(o, "timeText", "TimeText") || ""));
+              const display = esc(String(ongoingOrderField(o, "displayStatus", "DisplayStatus") || ongoingOrderField(o, "status", "Status")));
+              const color = esc(String(ongoingOrderField(o, "statusColor", "StatusColor") || "#94a3b8"));
+              const summary = esc(String(ongoingOrderField(o, "itemsSummary", "ItemsSummary") || ""));
+              return (
+                "<article class=\"ongoing-ticket" + selected + "\" data-ongoing-id=\"" + id + "\" role=\"button\" tabindex=\"0\">" +
+                "<div class=\"ongoing-ticket__top\"><span class=\"ongoing-ticket__code\">" + code + "</span><span class=\"ongoing-ticket__time\">" + time + "</span></div>" +
+                "<div class=\"ongoing-ticket__table\">" + table + "</div>" +
+                "<span class=\"ongoing-ticket__status\" style=\"background:" + color + "22;color:" + color + ";border-color:" + color + "55\">" + display + "</span>" +
+                "<div class=\"ongoing-ticket__lines\">" + summary + "</div>" +
+                "</article>"
+              );
+            }).join("")
+          : "<div class=\"ongoing-col__empty\">No orders</div>";
+        return (
+          "<section class=\"ongoing-col ongoing-col--" + col.key + "\" aria-label=\"" + esc(col.label) + "\">" +
+          "<h3 class=\"ongoing-col__head\"><span><span class=\"ongoing-col__dot\" style=\"background:" + col.dot + "\"></span>" + esc(col.label) + "</span>" +
+          "<span class=\"ongoing-col__count\">" + items.length + "</span></h3>" +
+          "<div class=\"ongoing-col__body\">" + tickets + "</div></section>"
+        );
+      }).join("");
+      host.querySelectorAll("[data-ongoing-id]").forEach(el => {
+        const open = () => {
+          const id = Number(el.getAttribute("data-ongoing-id") || "0") || 0;
+          if (id > 0) openOngoingOrderDetail(id);
+        };
+        el.onclick = open;
+        el.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
+      });
+      updateOngoingNavBadge();
+    }
+
+    function ongoingOrderDetailLinesHtml(o) {
+      const lines = o.lines || o.Lines;
+      if (Array.isArray(lines) && lines.length) {
+        return lines.map(line => {
+          const name = esc(line.name || line.Name || "Unknown");
+          const qty = Number(line.quantity ?? line.Quantity) || 0;
+          const photo = line.photoUrl || line.PhotoUrl;
+          const img = photo
+            ? `<img src="${escAttr(photo)}" alt="" loading="lazy">`
+            : `<span style="width:40px;height:40px;border-radius:8px;background:#1e293b;display:inline-block"></span>`;
+          return `<div class="ongoing-modal__line">${img}<span class="ongoing-modal__line-name">${name}</span><span class="ongoing-modal__line-qty">×${qty}</span></div>`;
+        }).join("");
+      }
+      const summary = esc(String(ongoingOrderField(o, "itemsSummary", "ItemsSummary") || "-"));
+      return `<div class="ongoing-modal__line"><span class="ongoing-modal__line-name">${summary}</span></div>`;
+    }
+
+    function openOngoingOrderDetail(orderId) {
+      const o = ongoingOrders.find(x => Number(x.id ?? x.Id) === orderId);
+      if (!o) return;
+      selectedOngoingOrderId = orderId;
+      renderOngoingKanban();
+      openOrderDetailModal(o);
+    }
+
+    function openOrderDetailModal(o) {
+      if (!o) return;
+      const orderId = Number(o.id ?? o.Id) || 0;
+      const modal = document.getElementById("ongoingOrderModal");
+      const body = document.getElementById("ongoingModalBody");
+      const title = document.getElementById("ongoingModalTitle");
+      if (!modal || !body || !title) return;
+      const code = String(ongoingOrderField(o, "orderId", "OrderId") || "Order");
+      const table = String(ongoingOrderField(o, "tableLabel", "TableLabel") || "-");
+      const display = String(ongoingOrderField(o, "displayStatus", "DisplayStatus") || ongoingOrderField(o, "status", "Status"));
+      const color = String(ongoingOrderField(o, "statusColor", "StatusColor") || "#94a3b8");
+      const total = Number(o.totalUsd ?? o.TotalUsd) || 0;
+      const guest = String(ongoingOrderField(o, "guestCustomerName", "GuestCustomerName") || "").trim();
+      const canServe = o.canMarkServed === true || o.CanMarkServed === true;
+      const notes = ongoingOrderField(o, "customerNotes", "CustomerNotes");
+      const allergy = ongoingOrderField(o, "allergyNotes", "AllergyNotes");
+      title.textContent = code;
+      const noteBlocks = [];
+      if (notes) noteBlocks.push(`<div class="ready-order-card__detail-block"><span class="ready-order-card__detail-label">Customer notes</span>${esc(notes)}</div>`);
+      if (allergy) noteBlocks.push(`<div class="ready-order-card__detail-block ready-order-card__detail-block--allergy"><span class="ready-order-card__detail-label">Allergy info</span>${esc(allergy)}</div>`);
+      body.innerHTML =
+        "<div class=\"ongoing-modal__status-row\">" +
+        "<span class=\"ongoing-modal__status-pill\" style=\"background:" + esc(color) + "33;color:" + esc(color) + "\">" + esc(display) + "</span>" +
+        "<span class=\"ongoing-modal__table\">" + esc(table) + (guest ? " · Guest " + esc(guest) : "") + "</span></div>" +
+        "<div class=\"ongoing-modal__lines\">" + ongoingOrderDetailLinesHtml(o) + "</div>" +
+        (noteBlocks.length ? "<div class=\"ready-order-card__details\">" + noteBlocks.join("") + "</div>" : "") +
+        "<div class=\"ongoing-modal__foot\"><span class=\"ongoing-modal__total\">" + esc(fmtUsd(total)) + "</span>" +
+        (canServe ? "<button type=\"button\" class=\"btn btn-primary btn-sm\" id=\"ongoingModalServeBtn\">Mark Served</button>" : "") +
+        "</div>";
+      const serveBtn = document.getElementById("ongoingModalServeBtn");
+      if (serveBtn) {
+        serveBtn.onclick = async () => {
+          const r = await api("/api/server/orders/" + orderId + "/serve", "POST");
+          setOut("Mark served from ongoing", r);
+          if (r.ok) {
+            closeOngoingOrderModal();
+            await loadOngoingOrders();
+            await loadReadyOrders();
+            await loadTableCalls();
+          }
+        };
+      }
+      modal.classList.remove("hidden");
+    }
+
+    function closeOngoingOrderModal() {
+      const modal = document.getElementById("ongoingOrderModal");
+      if (modal) modal.classList.add("hidden");
+      selectedOngoingOrderId = 0;
+      renderOngoingKanban();
+    }
+
+    async function loadOngoingOrders() {
+      if (!token) return false;
+      const r = await api("/api/server/ongoing-orders");
+      if (!r.ok) return false;
+      ongoingOrders = Array.isArray(r.body) ? r.body : [];
+      renderOngoingKanban();
+      return true;
     }
 
     function getTicketMode() {
@@ -2601,7 +3288,7 @@
       const el = document.getElementById("incomingDraftsList");
       if (!el) return;
       if (!incomingDrafts.length) {
-        el.innerHTML = `<div class="incoming-drafts-empty" role="status"><strong>No incoming drafts</strong><br>When guests submit Explore our Menu on your tables, drafts appear here.</div>`;
+        el.innerHTML = `<div class="incoming-drafts-empty" role="status"><strong>No incoming drafts</strong></div>`;
         return;
       }
       el.innerHTML = incomingDrafts.map(d => {
@@ -2974,6 +3661,39 @@
       } catch { /* ignore */ }
     }
 
+    function playServerTableCallRing() {
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        const ctx = new Ctx();
+        const playTone = (freq, start, dur, vol) => {
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.type = "sine";
+          o.frequency.value = freq;
+          o.connect(g);
+          g.connect(ctx.destination);
+          g.gain.setValueAtTime(0.0001, start);
+          g.gain.exponentialRampToValueAtTime(vol, start + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+          o.start(start);
+          o.stop(start + dur + 0.02);
+        };
+        let t0 = ctx.currentTime;
+        for (let round = 0; round < 3; round++) {
+          playTone(740, t0, 0.14, 0.11);
+          playTone(988, t0 + 0.18, 0.14, 0.11);
+          playTone(1175, t0 + 0.36, 0.2, 0.1);
+          t0 += 0.62;
+        }
+        void ctx.resume().finally(() => {
+          setTimeout(() => {
+            try { ctx.close(); } catch { /* ignore */ }
+          }, 2200);
+        });
+      } catch { /* ignore */ }
+    }
+
     function markReadyOrderHighlighted(orderId) {
       const id = Number(orderId) || 0;
       if (!id) return;
@@ -3035,6 +3755,231 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       host.prepend(el);
     }
 
+    function isTableCallsTabActive() {
+      const tab = document.getElementById("tableCallsTab");
+      return tab && !tab.classList.contains("hidden");
+    }
+
+    function updateTableCallsNavBadge() {
+      const pending = Number(tableCallsBoard.pendingCallCount ?? tableCallsBoard.PendingCallCount) || 0;
+      const badge = document.getElementById("tableCallsNavBadge");
+      const navBtn = document.querySelector('.nav-btn[data-tab="tableCallsTab"]');
+      if (!badge || !navBtn) return;
+      if (pending > 0) {
+        badge.textContent = pending > 99 ? "99+" : String(pending);
+        badge.classList.remove("hidden");
+        badge.setAttribute("aria-hidden", "false");
+        navBtn.classList.add("has-table-calls-alert");
+      } else {
+        badge.textContent = "";
+        badge.classList.add("hidden");
+        badge.setAttribute("aria-hidden", "true");
+        navBtn.classList.remove("has-table-calls-alert");
+      }
+    }
+
+    function formatCallTime(iso) {
+      if (!iso) return "—";
+      try {
+        const d = new Date(iso);
+        return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+      } catch {
+        return String(iso);
+      }
+    }
+
+    function tableCallHeadline(tableCode, tableName) {
+      const name = String(tableName ?? "").trim();
+      if (tableCode != null && name) return "Table " + String(tableCode) + " : " + name + " Calling";
+      if (tableCode != null) return "Table " + String(tableCode) + " Calling";
+      return "Table Calling";
+    }
+
+    function tableCallOrdersHtml(orders) {
+      const list = Array.isArray(orders) ? orders : [];
+      if (!list.length) {
+        return "<div class=\"table-call-card__orders-empty\">No open orders on this table yet.</div>";
+      }
+      return list.map(o => {
+        const orderId = Number(o.id ?? o.Id) || 0;
+        const code = esc(String(o.orderId ?? o.OrderId ?? "#?"));
+        const display = esc(String(o.displayStatus ?? o.DisplayStatus ?? o.status ?? o.Status ?? ""));
+        const color = esc(String(o.statusColor ?? o.StatusColor ?? "#94a3b8"));
+        const total = esc(fmtUsd(Number(o.totalUsd ?? o.TotalUsd) || 0));
+        const summary = esc(String(o.itemsSummary ?? o.ItemsSummary ?? ""));
+        const kind = esc(String(o.checkKind ?? o.CheckKind ?? ""));
+        return (
+          "<button type=\"button\" class=\"table-call-order\" data-table-order-id=\"" + orderId + "\">" +
+          "<div class=\"table-call-order__top\"><span class=\"table-call-order__code\">" + code + "</span><span class=\"table-call-order__total\">" + total + "</span></div>" +
+          "<span class=\"table-call-order__status\" style=\"background:" + color + "22;color:" + color + ";border:1px solid " + color + "44\">" + display + (kind ? " · " + kind : "") + "</span>" +
+          "<div class=\"table-call-order__lines\">" + summary + "</div>" +
+          "</button>"
+        );
+      }).join("");
+    }
+
+    function renderTableCalls() {
+      const list = document.getElementById("tableCallsList");
+      if (!list) return;
+      const tables = tableCallsBoard.tables ?? tableCallsBoard.Tables ?? [];
+      if (!tables.length) {
+        list.innerHTML = "<div class=\"table-calls-empty\">No table calls or open orders on your tables.</div>";
+        return;
+      }
+      list.innerHTML = tables.map(row => {
+        const tableId = Number(row.tableId ?? row.TableId ?? 0) || 0;
+        const num = row.tableNumber ?? row.TableNumber;
+        const name = String(row.tableName ?? row.TableName ?? "").trim();
+        const orders = row.orders ?? row.Orders ?? [];
+        const call = row.pendingCall ?? row.PendingCall ?? null;
+        const tableTitle = esc("Table " + String(num) + (name ? " : " + name : ""));
+        let callHtml = "";
+        if (call) {
+          const id = String(call.id ?? call.Id ?? "");
+          const reason = esc(String(call.reasonLabel ?? call.ReasonLabel ?? "Call server"));
+          const when = formatCallTime(call.calledAtUtc ?? call.CalledAtUtc);
+          const callTitle = esc(tableCallHeadline(num, name));
+          callHtml =
+            "<div class=\"table-call-card__call\" data-call-id=\"" + esc(id) + "\">" +
+            "<div class=\"table-call-card__head\"><div class=\"table-call-card__title\">" + callTitle + "<span class=\"server-table-call-toast__badge\" style=\"margin-left:6px\">CALL</span></div>" +
+            "<span class=\"pill\" style=\"font-size:11px;padding:4px 10px;border-radius:999px;border:1px solid #f59e0b;color:#b45309;\">Pending</span></div>" +
+            "<div class=\"table-call-card__reason\">" + reason + "</div>" +
+            "<div class=\"table-call-card__meta\">" + esc(when) + "</div>" +
+            "<div class=\"table-call-card__actions\"><button type=\"button\" class=\"btn btn-primary btn-sm\" data-accept-call data-call-id=\"" + esc(id) + "\" data-table-id=\"" + tableId + "\">Accept</button></div>" +
+            "</div>";
+        }
+        return (
+          "<article class=\"table-call-card\" data-table-id=\"" + tableId + "\">" +
+          "<div class=\"table-call-card__head\"><div class=\"table-call-card__title\">" + tableTitle + "</div></div>" +
+          callHtml +
+          "<div class=\"table-call-card__orders-head\">Orders at this table</div>" +
+          "<div class=\"table-call-card__orders\">" + tableCallOrdersHtml(orders) + "</div>" +
+          "</article>"
+        );
+      }).join("");
+      list.querySelectorAll("[data-accept-call]").forEach(btn => {
+        btn.onclick = () => {
+          const callId = btn.getAttribute("data-call-id");
+          const tableId = Number(btn.getAttribute("data-table-id") || "0") || 0;
+          if (callId) void acceptTableCall(callId, tableId, false);
+        };
+      });
+      list.querySelectorAll("[data-table-order-id]").forEach(btn => {
+        btn.onclick = () => {
+          const orderId = Number(btn.getAttribute("data-table-order-id") || "0") || 0;
+          const order = findTableCallOrder(orderId);
+          if (order) openOrderDetailModal(order);
+        };
+      });
+    }
+
+    function findTableCallOrder(orderId) {
+      const tables = tableCallsBoard.tables ?? tableCallsBoard.Tables ?? [];
+      for (const row of tables) {
+        const orders = row.orders ?? row.Orders ?? [];
+        const hit = orders.find(o => Number(o.id ?? o.Id) === orderId);
+        if (hit) return hit;
+      }
+      const fromOngoing = ongoingOrders.find(o => Number(o.id ?? o.Id) === orderId);
+      return fromOngoing || null;
+    }
+
+    async function loadTableCalls() {
+      if (!token) return false;
+      const r = await api("/api/server/table-calls");
+      if (!r.ok) return false;
+      if (r.body && (r.body.tables || r.body.Tables)) {
+        tableCallsBoard = {
+          tables: r.body.tables ?? r.body.Tables ?? [],
+          pendingCallCount: Number(r.body.pendingCallCount ?? r.body.PendingCallCount) || 0
+        };
+      } else if (Array.isArray(r.body)) {
+        tableCallsBoard = {
+          tables: r.body.map(c => ({
+            tableId: c.tableId ?? c.TableId,
+            tableNumber: c.tableNumber ?? c.TableNumber,
+            tableName: c.tableName ?? c.TableName,
+            pendingCall: c,
+            orders: []
+          })),
+          pendingCallCount: r.body.filter(c => String(c.status ?? c.Status ?? "").toLowerCase() === "pending").length
+        };
+      } else {
+        tableCallsBoard = { tables: [], pendingCallCount: 0 };
+      }
+      renderTableCalls();
+      updateTableCallsNavBadge();
+      return true;
+    }
+
+    async function acceptTableCall(callId, tableId, goTakeOrder) {
+      if (!callId) return;
+      const r = await api("/api/server/table-calls/" + encodeURIComponent(callId) + "/accept", "POST");
+      if (!r.ok) {
+        setOut("Accept call failed", r);
+        return;
+      }
+      await loadTableCalls();
+      if (goTakeOrder && tableId > 0) {
+        const btn = document.querySelector('.nav-btn[data-tab="takeOrder"]');
+        if (btn) btn.click();
+        const sel = document.getElementById("tableSelect");
+        if (sel) {
+          sel.value = String(tableId);
+          sel.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+      }
+    }
+
+    function showServerTableCallToast(payload) {
+      const host = document.getElementById("customerToastHost");
+      if (!host || !payload) return;
+      const tableCode = payload.tableCode ?? payload.TableCode;
+      const tableName = String(payload.tableName ?? payload.TableName ?? "").trim();
+      const reasonLabel = String(payload.reasonLabel ?? payload.ReasonLabel ?? "").trim() || "Call server";
+      const headline = tableCallHeadline(tableCode, tableName);
+      const el = document.createElement("div");
+      el.className = "server-table-call-toast";
+      el.innerHTML =
+        "<div class=\"server-table-call-toast__head\">" +
+        "<div class=\"server-table-call-toast__title\">" + esc(headline) + "<span class=\"server-table-call-toast__badge\">CALL</span></div>" +
+        "<button type=\"button\" class=\"server-table-call-toast__dismiss\" aria-label=\"Dismiss\">&times;</button>" +
+        "</div>" +
+        "<div class=\"server-table-call-toast__reason\">" + esc(reasonLabel) + "</div>" +
+        "<div class=\"server-table-call-toast__countdown\" data-cd>Closing in 25s</div>" +
+        "<button type=\"button\" class=\"server-table-call-toast__cta\" data-accept-call>Accept</button>";
+      const tickRef = { t: null };
+      let countSec = 25;
+      const close = () => removeCustomerDraftToastEl(el, tickRef);
+      el.querySelector(".server-table-call-toast__dismiss").onclick = close;
+      const cd = el.querySelector("[data-cd]");
+      tickRef.t = setInterval(() => {
+        countSec -= 1;
+        if (countSec <= 0) { close(); return; }
+        if (cd) cd.textContent = "Closing in " + countSec + "s";
+      }, 1000);
+      el.querySelector("[data-accept-call]").onclick = () => {
+        const callId = String(payload.callId ?? payload.CallId ?? "");
+        const tableId = Number(payload.tableId ?? payload.TableId ?? 0) || 0;
+        close();
+        void acceptTableCall(callId, tableId, true);
+      };
+      host.prepend(el);
+    }
+
+    function handleServerTableCall(payload) {
+      if (!payload || typeof payload !== "object") return;
+      const serverId = Number(payload.serverId ?? payload.ServerId) || 0;
+      const myId = myServerEmployeeId();
+      if (myId > 0 && serverId > 0 && serverId !== myId) return;
+      unlockServerAudioFromUserGesture();
+      playServerTableCallRing();
+      void loadTableCalls().then(() => {
+        showServerTableCallToast(payload);
+        if (!isTableCallsTabActive()) updateTableCallsNavBadge();
+      });
+    }
+
     async function handleServerReadyOrderArrived(payload) {
       if (!payload || typeof payload !== "object") return;
       const serverId = Number(payload.serverId ?? payload.ServerId) || 0;
@@ -3048,6 +3993,7 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
 
       try {
         await loadReadyOrders();
+        await loadOngoingOrders();
       } catch { /* ignore */ }
 
       if (!isPickupTabActive()) updatePickupNavBadge();
@@ -3122,6 +4068,17 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       });
       conn.on("ServerReadyOrderArrived", p => {
         void handleServerReadyOrderArrived(p);
+      });
+      conn.on("ServerTableCall", p => {
+        handleServerTableCall(p);
+      });
+      conn.on("ServerTableCallQueueChanged", () => {
+        void loadTableCalls();
+      });
+      conn.on("CashierOrderBoardChanged", () => {
+        void loadOngoingOrders();
+        void loadReadyOrders();
+        void loadTableCalls();
       });
       try {
         await conn.start();
@@ -3245,9 +4202,17 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
         updateIncomingNavBadge();
         void loadIncomingDrafts();
       }
+      if (tab === "ongoingOrdersTab") {
+        updateOngoingNavBadge();
+        void loadOngoingOrders();
+      }
       if (tab === "pickupTab") {
         updatePickupNavBadge();
         void loadReadyOrders();
+      }
+      if (tab === "tableCallsTab") {
+        updateTableCallsNavBadge();
+        void loadTableCalls();
       }
     });
 
@@ -3304,6 +4269,8 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       const ok = await loadPortalData();
       await loadDrafts();
       await loadIncomingDrafts();
+      await loadTableCalls();
+      await loadOngoingOrders();
       navigateToIncomingTab();
       void startOrderHub();
       startDraftListPolling();
@@ -3313,7 +4280,8 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
 
     document.getElementById("btnLogout").onclick = () => {
       stopOrderHubAndPolling();
-      token = ""; me = null; tables = []; products = []; readyOrders = []; drafts = []; incomingDrafts = []; cart.clear();
+      token = ""; me = null; tables = []; products = []; readyOrders = []; ongoingOrders = []; drafts = []; incomingDrafts = []; tableCallsBoard = { tables: [], pendingCallCount: 0 }; cart.clear();
+      closeOngoingOrderModal();
       document.getElementById("brandName").textContent = "ELITE SERVER PORTAL";
       revokeImgBlob(document.getElementById("brandLogo"));
       document.getElementById("brandLogo").classList.add("hidden");
@@ -3328,13 +4296,18 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       const ok = await loadPortalData();
       const draftOk = await loadDrafts();
       const incomingOk = await loadIncomingDrafts();
+      const tableCallsOk = await loadTableCalls();
+      const ongoingOk = await loadOngoingOrders();
       setOut("Refresh data", {
         ok,
         draftOk,
         incomingOk,
+        tableCallsOk,
+        ongoingOk,
         tables: tables.length,
         products: products.length,
         readyOrders: readyOrders.length,
+        ongoingOrders: ongoingOrders.length,
         drafts: drafts.length,
         incomingDrafts: incomingDrafts.length
       });
@@ -3343,9 +4316,21 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       const ok = await loadIncomingDrafts();
       setOut("Refresh incoming drafts", { ok, incomingDrafts: incomingDrafts.length });
     };
+    document.getElementById("btnRefreshTableCalls").onclick = async () => {
+      const ok = await loadTableCalls();
+      setOut("Refresh table calls", { ok, tables: (tableCallsBoard.tables ?? []).length, pending: tableCallsBoard.pendingCallCount });
+    };
     document.getElementById("btnRefreshReady").onclick = async () => {
       const ok = await loadReadyOrders();
       setOut("Refresh ready orders", { ok, readyOrders: readyOrders.length });
+    };
+    document.getElementById("btnRefreshOngoing").onclick = async () => {
+      const ok = await loadOngoingOrders();
+      setOut("Refresh ongoing orders", { ok, ongoingOrders: ongoingOrders.length });
+    };
+    document.getElementById("ongoingModalClose").onclick = closeOngoingOrderModal;
+    document.getElementById("ongoingOrderModal").onclick = e => {
+      if (e.target && e.target.id === "ongoingOrderModal") closeOngoingOrderModal();
     };
     document.getElementById("btnRefreshOpenChecks").onclick = () => { void loadOpenChecks(); };
     document.getElementById("ticketModeAppend").addEventListener("change", () => { syncNewCheckKindVisibility(); updateTicketModeHint(); });

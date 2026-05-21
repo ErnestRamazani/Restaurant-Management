@@ -10,10 +10,11 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options)
 {
     private readonly JwtOptions _options = options.Value;
 
-    public string CreateToken(AuthenticatedStaffSession session, out DateTime expiresAtUtc)
+    public string CreateToken(AuthenticatedStaffSession session, out DateTime expiresAtUtc, string? preferredLanguage = null)
     {
         expiresAtUtc = DateTime.UtcNow.AddHours(Math.Max(1, _options.ExpirationHours));
         var credentials = new SigningCredentials(GetSigningKey(), SecurityAlgorithms.HmacSha256);
+        var lang = Services.LocalizationService.NormalizeLanguage(preferredLanguage);
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, session.EmployeeId.ToString()),
@@ -24,7 +25,8 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options)
             new("employeeId", session.EmployeeId.ToString()),
             new("employeeUniqueId", session.EmployeeUniqueId),
             new("portal", session.Portal),
-            new("signInId", session.SignInId)
+            new("signInId", session.SignInId),
+            new("lang", lang)
         };
 
         var token = new JwtSecurityToken(

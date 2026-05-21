@@ -9,6 +9,7 @@
 using EliteRestaurant.Api.Branding;
 using EliteRestaurant.Api.Dtos;
 using EliteRestaurant.Api.Security;
+using EliteRestaurant.Api.Services;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Orders;
@@ -608,6 +609,121 @@ public sealed class ServerPortalController(
             CreatedAtUtc: DateTime.UtcNow));
     }
 
+    [HttpGet("table-calls")]
+    public ActionResult<ServerTableCallsBoardDto> GetTableCalls()
+    {
+        var session = RequireServerSession();
+        if (session is null)
+            return Unauthorized(new { message = "Missing/invalid token or non-server role." });
+
+        var pendingCalls = TableServerCallQueue.ListForServer(session.EmployeeId, pendingOnly: true);
+        var pendingByTable = pendingCalls
+            .GroupBy(c => c.TableId)
+            .ToDictionary(
+                g => g.Key,
+                g => ToTableCallRow(g.OrderByDescending(c => c.CalledAtUtc).First()));
+
+        var assignedTables = db.Tables.AsNoTracking()
+            .Where(t => t.AssignedServerId == session.EmployeeId)
+            .OrderBy(t => t.TableNumber)
+            .Select(t => new { t.Id, t.TableNumber, Name = t.Name ?? string.Empty })
+            .ToList();
+
+        var tableIds = assignedTables.Select(t => t.Id).ToList();
+        var ordersByTable = new Dictionary<int, List<OrderRecord>>();
+        if (tableIds.Count > 0)
+        {
+            var orders = db.Orders.AsNoTracking()
+                .Include(o => o.Items)
+                .ThenInclude(i => i.Product)
+                .Where(o => o.TableId != null && tableIds.Contains(o.TableId.Value))
+                .Where(o => o.ServerId == session.EmployeeId)
+                .Where(o =>
+                    o.Status == OrderWorkflow.PendingCashier
+                    || o.Status == OrderWorkflow.PendingApproval
+                    || o.Status == "Waiting"
+                    || o.Status == "In Kitchen"
+                    || o.Status == "Ready"
+                    || o.Status == OrderWorkflow.Served)
+                .OrderByDescending(o => o.CreatedAt)
+                .ToList();
+
+            ordersByTable = orders
+                .GroupBy(o => o.TableId!.Value)
+                .ToDictionary(g => g.Key, g => g.ToList());
+        }
+
+        var mappedByTable = MapTableCallOrdersByTable(ordersByTable);
+
+        var boardRows = new List<ServerTableBoardRowDto>();
+        foreach (var table in assignedTables)
+        {
+            pendingByTable.TryGetValue(table.Id, out var pendingCall);
+            mappedByTable.TryGetValue(table.Id, out var tableOrders);
+            var orders = tableOrders ?? [];
+            if (pendingCall is null && orders.Count == 0)
+                continue;
+
+            boardRows.Add(new ServerTableBoardRowDto(
+                table.Id,
+                table.TableNumber,
+                table.Name.Trim(),
+                pendingCall,
+                orders));
+        }
+
+        return Ok(new ServerTableCallsBoardDto(boardRows, pendingCalls.Count));
+    }
+
+    [HttpPost("table-calls/{callId:guid}/accept")]
+    public async Task<ActionResult<ServerTableCallAcceptResponse>> AcceptTableCall(Guid callId)
+    {
+        var session = RequireServerSession();
+        if (session is null)
+            return Unauthorized(new { message = "Missing/invalid token or non-server role." });
+        if (callId == Guid.Empty)
+            return BadRequest(new { message = "callId is required." });
+
+        if (!TableServerCallQueue.TryGet(callId, out var existing) || existing is null)
+            return NotFound(new { message = "Call not found." });
+        if (existing.AssignedServerId is > 0 && existing.AssignedServerId != session.EmployeeId)
+            return Forbid();
+
+        if (!TableServerCallQueue.TryAccept(callId, session.EmployeeId, out var accepted) || accepted is null)
+            return BadRequest(new { message = "This call was already accepted." });
+
+        await OrderHubBroadcasts.NotifyServerTableCallQueueChangedAsync(orderHub, "accepted", callId);
+
+        return Ok(new ServerTableCallAcceptResponse(true, "Call accepted.", callId));
+    }
+
+    [HttpGet("ongoing-orders")]
+    public ActionResult<IReadOnlyList<ServerOngoingOrderDto>> GetOngoingOrders()
+    {
+        var session = RequireServerSession();
+        if (session is null)
+            return Unauthorized(new { message = "Missing/invalid token or non-server role." });
+
+        var completedSince = DateTime.UtcNow.AddHours(-24);
+        var orders = db.Orders
+            .AsNoTracking()
+            .Include(o => o.Items)
+            .ThenInclude(i => i.Product)
+            .Where(o => o.ServerId == session.EmployeeId)
+            .Where(o =>
+                o.Status == "Waiting"
+                || o.Status == "In Kitchen"
+                || o.Status == "Ready"
+                || o.Status == OrderWorkflow.Served
+                || o.Status == OrderWorkflow.PendingCashier
+                || o.Status == OrderWorkflow.PendingApproval
+                || (o.Status == "Completed" && (o.CompletedAt ?? o.CreatedAt) >= completedSince))
+            .OrderByDescending(o => o.CreatedAt)
+            .ToList();
+
+        return Ok(MapOngoingOrders(orders));
+    }
+
     [HttpGet("ready-orders")]
     public ActionResult<IReadOnlyList<ServerReadyOrderDto>> GetReadyOrders()
     {
@@ -623,59 +739,28 @@ public sealed class ServerPortalController(
             .OrderBy(o => o.CreatedAt)
             .ToList();
 
-        var productIds = orders
-            .SelectMany(o => o.Items)
-            .Select(i => i.ProductId)
-            .Distinct()
-            .ToList();
-        var photoKeys = productIds.Select(ProductPhotoAssetKey).ToList();
-        var photoKeyPresent = photoKeys.Count == 0
-            ? new HashSet<string>()
-            : db.PublicMenuAssets.AsNoTracking()
-                .Where(a => photoKeys.Contains(a.Key) && a.Content.Length > 0)
-                .Select(a => a.Key)
-                .ToHashSet();
-
-        var rows = orders.Select(o =>
-        {
-            var subtotal = o.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
-            var totals = OrderTotalsHelper.ComputeTotals(subtotal, o.DiscountMode, o.DiscountValue);
-            var guestName = ResolveGuestCustomerName(o);
-            var lines = o.Items
-                .OrderBy(i => i.Product?.Name ?? string.Empty)
-                .Select(i =>
-                {
-                    var photoUrl = photoKeyPresent.Contains(ProductPhotoAssetKey(i.ProductId))
-                        ? $"/api/public/menu/assets/product/{i.ProductId}"
-                        : null;
-                    return new ServerReadyOrderLineDto(
-                        i.ProductId,
-                        string.IsNullOrWhiteSpace(i.Product?.Name) ? "Unknown" : i.Product.Name.Trim(),
-                        i.Quantity,
-                        photoUrl);
-                })
-                .ToList();
-            return new ServerReadyOrderDto(
+        var rows = MapOngoingOrders(orders)
+            .Select(o => new ServerReadyOrderDto(
                 o.Id,
-                string.IsNullOrWhiteSpace(o.UniqueId) ? $"#{o.Id:000}" : o.UniqueId,
-                o.TableId ?? 0,
-                OrderRecordUiLabels.TableCaption(o),
-                string.IsNullOrWhiteSpace(o.ServerName) ? "-" : o.ServerName,
+                o.OrderId,
+                o.TableId,
+                o.TableLabel,
+                o.ServerName,
                 o.Status,
-                string.Join(", ", o.Items.Select(i => $"{i.Product?.Name ?? "Unknown"} x{i.Quantity}")),
-                o.Items.Sum(i => i.Quantity),
-                totals.GrandTotal,
-                CurrencyHelper.ConvertUsdToFc(totals.GrandTotal),
+                o.ItemsSummary,
+                o.ItemCount,
+                o.TotalUsd,
+                o.TotalFc,
                 o.CreatedAt,
-                o.CreatedAt.ToString("HH:mm"),
-                (o.CustomerNotes ?? string.Empty).Trim(),
-                (o.AllergyNotes ?? string.Empty).Trim(),
-                guestName,
-                o.OrderOrigin ?? OrderOrigin.InStore,
-                o.OrderSource ?? "WalkIn",
-                OrderOrigin.IsOnline(o.OrderOrigin),
-                lines);
-        }).ToList();
+                o.TimeText,
+                o.CustomerNotes,
+                o.AllergyNotes,
+                o.GuestCustomerName,
+                o.OrderOrigin,
+                o.OrderSource,
+                o.IsOnlineMenuOrder,
+                o.Lines))
+            .ToList();
 
         return Ok(rows);
     }
@@ -829,7 +914,149 @@ public sealed class ServerPortalController(
             lines);
     }
 
+    private static ServerTableCallRowDto ToTableCallRow(TableServerCallEntry c) =>
+        new(
+            c.Id,
+            c.TableId,
+            c.TableNumber,
+            c.TableName,
+            c.ReasonCode,
+            c.ReasonLabel,
+            c.IsPending ? "Pending" : "Accepted",
+            c.CalledAtUtc,
+            c.AcceptedAtUtc,
+            c.AssignedServerId,
+            c.AssignedServerName);
+
     private static string ProductPhotoAssetKey(int productId) => $"product:{productId}";
+
+    private List<ServerOngoingOrderDto> MapOngoingOrders(IReadOnlyList<OrderRecord> orders)
+    {
+        if (orders.Count == 0)
+            return [];
+
+        var productIds = orders
+            .SelectMany(o => o.Items)
+            .Select(i => i.ProductId)
+            .Distinct()
+            .ToList();
+        var photoKeys = productIds.Select(ProductPhotoAssetKey).ToList();
+        var photoKeyPresent = photoKeys.Count == 0
+            ? new HashSet<string>()
+            : db.PublicMenuAssets.AsNoTracking()
+                .Where(a => photoKeys.Contains(a.Key) && a.Content.Length > 0)
+                .Select(a => a.Key)
+                .ToHashSet();
+
+        return orders.Select(o =>
+        {
+            var subtotal = o.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
+            var totals = OrderTotalsHelper.ComputeTotals(subtotal, o.DiscountMode, o.DiscountValue);
+            var guestName = ResolveGuestCustomerName(o);
+            var lines = o.Items
+                .OrderBy(i => i.Product?.Name ?? string.Empty)
+                .Select(i =>
+                {
+                    var photoUrl = photoKeyPresent.Contains(ProductPhotoAssetKey(i.ProductId))
+                        ? $"/api/public/menu/assets/product/{i.ProductId}"
+                        : null;
+                    return new ServerReadyOrderLineDto(
+                        i.ProductId,
+                        string.IsNullOrWhiteSpace(i.Product?.Name) ? "Unknown" : i.Product.Name.Trim(),
+                        i.Quantity,
+                        photoUrl);
+                })
+                .ToList();
+            var status = o.Status ?? string.Empty;
+            var kitchenKey = OrderWorkflow.KitchenStatusKey(status);
+            return new ServerOngoingOrderDto(
+                o.Id,
+                string.IsNullOrWhiteSpace(o.UniqueId) ? $"#{o.Id:000}" : o.UniqueId,
+                o.TableId ?? 0,
+                OrderRecordUiLabels.TableCaption(o),
+                string.IsNullOrWhiteSpace(o.ServerName) ? "-" : o.ServerName,
+                status,
+                kitchenKey,
+                AdminOrdersViewMapper.GetStatusColor(status),
+                ServerOngoingDisplayStatus(status, kitchenKey),
+                string.Join(", ", o.Items.Select(i => $"{i.Product?.Name ?? "Unknown"} x{i.Quantity}")),
+                o.Items.Sum(i => i.Quantity),
+                totals.GrandTotal,
+                CurrencyHelper.ConvertUsdToFc(totals.GrandTotal),
+                o.CreatedAt,
+                o.CreatedAt.ToString("HH:mm"),
+                (o.CustomerNotes ?? string.Empty).Trim(),
+                (o.AllergyNotes ?? string.Empty).Trim(),
+                guestName,
+                o.OrderOrigin ?? OrderOrigin.InStore,
+                o.OrderSource ?? "WalkIn",
+                OrderOrigin.IsOnline(o.OrderOrigin),
+                OrderWorkflow.IsReady(status),
+                lines);
+        }).ToList();
+    }
+
+    private Dictionary<int, List<ServerTableCallOrderDto>> MapTableCallOrdersByTable(
+        Dictionary<int, List<OrderRecord>> ordersByTable)
+    {
+        if (ordersByTable.Count == 0)
+            return [];
+
+        var allOrders = ordersByTable.Values.SelectMany(v => v).ToList();
+        var ongoing = MapOngoingOrders(allOrders);
+        var result = new Dictionary<int, List<ServerTableCallOrderDto>>();
+        foreach (var order in ongoing)
+        {
+            if (order.TableId <= 0)
+                continue;
+            if (!result.TryGetValue(order.TableId, out var list))
+            {
+                list = [];
+                result[order.TableId] = list;
+            }
+
+            var source = allOrders.FirstOrDefault(o => o.Id == order.Id);
+            var checkKind = source is null
+                ? OpenCheckKindHelper.Food
+                : OpenCheckKindHelper.TryInferCheckKindFromProducts(
+                    source.Items.Select(i => i.Product).Where(p => p is not null).Cast<Product>())
+                  ?? OpenCheckKindHelper.Food;
+
+            list.Add(new ServerTableCallOrderDto(
+                order.Id,
+                order.OrderId,
+                order.TableId,
+                order.TableLabel,
+                order.Status,
+                order.DisplayStatus,
+                order.StatusColor,
+                checkKind,
+                order.CreatedAt,
+                order.TimeText,
+                order.CustomerNotes,
+                order.AllergyNotes,
+                order.TotalUsd,
+                order.ItemCount,
+                order.ItemsSummary,
+                order.CanMarkServed,
+                order.Lines));
+        }
+
+        return result;
+    }
+
+    private static string ServerOngoingDisplayStatus(string status, string kitchenKey) =>
+        kitchenKey switch
+        {
+            "waiting" => "Waiting",
+            "inKitchen" => "Cooking",
+            "ready" => "Ready",
+            "served" => "Served",
+            "pendingCashier" => "Pending cashier",
+            "pendingApproval" => "Pending approval",
+            _ when string.Equals(status, "Completed", StringComparison.OrdinalIgnoreCase) => "Completed",
+            _ => string.IsNullOrWhiteSpace(status) ? "Unknown" : status.Trim()
+        };
 
     private static List<OrderItem> BuildOrderItems(
         IReadOnlyList<ServerOrderLineRequest> lines,

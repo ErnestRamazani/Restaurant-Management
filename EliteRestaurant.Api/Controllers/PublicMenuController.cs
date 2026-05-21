@@ -4,6 +4,7 @@ using EliteRestaurant.Api.Branding;
 using EliteRestaurant.Api.Dtos;
 using EliteRestaurant.Api.Hubs;
 using EliteRestaurant.Api.Security;
+using EliteRestaurant.Api.Services;
 using EliteRestaurant.Contracts.PublicMenu;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
@@ -524,6 +525,73 @@ public sealed class PublicMenuController(
             Label = label,
             Message = "Your order has been sent to your server.",
             EstimatedPrepMinutes = estimatedPrep
+        });
+    }
+
+    /// <summary>QR table guest requests server attention; notifies assigned server via SignalR.</summary>
+    [HttpPost("call-server")]
+    [EnableRateLimiting("PublicMenuDraft")]
+    [ProducesResponseType(typeof(PublicCallServerResponse), 200)]
+    [ProducesResponseType(typeof(PublicMenuDraftErrorDto), 400)]
+    public async Task<IActionResult> PostCallServer([FromBody] PublicCallServerRequest? body)
+    {
+        var errors = new List<string>();
+        if (body is null || body.TableId <= 0)
+            errors.Add("A valid table is required.");
+        var reasonCode = (body?.ReasonCode ?? string.Empty).Trim();
+        if (!TableServerCallReasons.TryGetLabel(reasonCode, out var reasonLabel))
+            errors.Add("Please choose what you need from your server.");
+
+        if (errors.Count > 0)
+            return BadRequest(new PublicMenuDraftErrorDto { Errors = DeduplicateErrors(errors) });
+
+        var table = await db.Tables.AsNoTracking()
+            .Include(t => t.AssignedServer)
+            .FirstOrDefaultAsync(t => t.Id == body!.TableId);
+        if (table is null)
+            return BadRequest(new PublicMenuDraftErrorDto { Errors = ["Table not found."] });
+        if (string.Equals(table.Status, "Maintenance", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new PublicMenuDraftErrorDto { Errors = ["This table is not available."] });
+
+        if (!TableCallCooldown.TryAcquire(body!.TableId, out var retryAfterSeconds))
+        {
+            return BadRequest(new PublicMenuDraftErrorDto
+            {
+                Errors = [$"Please wait {retryAfterSeconds} seconds before calling again."]
+            });
+        }
+
+        var serverName = table.AssignedServer is { } srv && !string.IsNullOrWhiteSpace(srv.Name)
+            ? srv.Name.Trim()
+            : null;
+
+        var entry = TableServerCallQueue.Enqueue(
+            table.Id,
+            table.TableNumber,
+            table.Name,
+            reasonCode,
+            reasonLabel,
+            table.AssignedServerId,
+            serverName);
+
+        await OrderHubBroadcasts.NotifyServerTableCallAsync(
+            hubContext,
+            entry.Id,
+            table.Id,
+            table.TableNumber,
+            table.Name,
+            reasonCode,
+            reasonLabel,
+            table.AssignedServerId,
+            serverName);
+
+        return Ok(new PublicCallServerResponse
+        {
+            Success = true,
+            ServerName = serverName,
+            Message = serverName is not null
+                ? $"We notified {serverName}."
+                : "We notified the service team for your table."
         });
     }
 

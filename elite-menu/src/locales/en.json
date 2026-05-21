@@ -1,0 +1,49 @@
+{
+  "common": {
+    "language": "English",
+    "languageFr": "French",
+    "switchLanguage": "Language",
+    "close": "Close",
+    "save": "Save",
+    "cancel": "Cancel",
+    "loading": "Loading…",
+    "tryAgain": "Try again",
+    "signIn": "Sign in",
+    "cloudOnline": "Cloud online",
+    "cloudOffline": "Cloud offline",
+    "checkingCloud": "Checking cloud"
+  },
+  "menu": {
+    "browseMenu": "View menu",
+    "orderOnline": "Order online",
+    "reservation": "Reservation",
+    "staffLogin": "Staff",
+    "cart": "Cart",
+    "placeOrder": "Place order",
+    "orderConfirmed": "Order confirmed"
+  },
+  "staff": {
+    "hubTitle": "Workspace",
+    "consumerMenu": "Consumer Menu",
+    "server": "Server",
+    "cashier": "Cashier",
+    "reception": "Reception/Front Desk",
+    "kitchen": "Kitchen",
+    "bar": "Bar/Drink",
+    "adminWeb": "Admin web",
+    "openingPortal": "Opening staff portal…",
+    "staffPasscode": "Staff passcode",
+    "enterPasscode": "Enter staff passcode"
+  },
+  "auth": {
+    "signInId": "Sign-in ID",
+    "pin": "PIN",
+    "enterSignInId": "Enter sign-in ID",
+    "enterPin": "Enter PIN",
+    "signInFailed": "Sign-in failed."
+  },
+  "errors": {
+    "networkError": "Network error. Please try again.",
+    "loadFailed": "Could not load data."
+  }
+}

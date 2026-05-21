@@ -1,0 +1,1 @@
+Full write access enabled for localization feature implementation. Complete refactor of static portals (server, cashier, kitchen, bar, reception, admin) to support full English/French translation. Refactor to extract all UI strings, implement proper event handling, and ensure all screens are fully localizable.

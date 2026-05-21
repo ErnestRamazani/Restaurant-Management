@@ -57,6 +57,7 @@ public sealed class FloorSnapshotBuilder(AppDbContext db)
 
         return new FloorEngagementDto(
             e.Id,
+            e.ConfirmationCode,
             e.PlacementUnitId,
             e.TableId,
             name,

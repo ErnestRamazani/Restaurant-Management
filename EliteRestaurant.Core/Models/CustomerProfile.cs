@@ -12,4 +12,7 @@ public class CustomerProfile
     public int NoShowCount { get; set; }
     public int CompletedReservationCount { get; set; }
     public DateTime? LastVisitAt { get; set; }
+
+    /// <summary>UI language preference: <c>en</c> or <c>fr</c>.</summary>
+    public string PreferredLanguage { get; set; } = "en";
 }

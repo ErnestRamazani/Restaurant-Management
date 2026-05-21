@@ -95,6 +95,32 @@ public sealed record ServerReadyOrderDto(
     bool IsOnlineMenuOrder,
     IReadOnlyList<ServerReadyOrderLineDto> Lines);
 
+/// <summary>Server's dine-in pipeline for assigned tables (Waiting → Completed).</summary>
+public sealed record ServerOngoingOrderDto(
+    int Id,
+    string OrderId,
+    int TableId,
+    string TableLabel,
+    string ServerName,
+    string Status,
+    string KitchenStatusKey,
+    string StatusColor,
+    string DisplayStatus,
+    string ItemsSummary,
+    int ItemCount,
+    decimal TotalUsd,
+    decimal TotalFc,
+    DateTime CreatedAt,
+    string TimeText,
+    string CustomerNotes,
+    string AllergyNotes,
+    string? GuestCustomerName,
+    string OrderOrigin,
+    string OrderSource,
+    bool IsOnlineMenuOrder,
+    bool CanMarkServed,
+    IReadOnlyList<ServerReadyOrderLineDto> Lines);
+
 public sealed record ServerMarkServedResponse(
     bool Ok,
     string Message,
@@ -109,6 +135,54 @@ public sealed record ServerDraftDto(
     DateTime UpdatedAtUtc,
     int TableId,
     bool IsCustomerDraft);
+
+public sealed record ServerTableCallRowDto(
+    Guid Id,
+    int TableId,
+    int TableNumber,
+    string TableName,
+    string ReasonCode,
+    string ReasonLabel,
+    string Status,
+    DateTime CalledAtUtc,
+    DateTime? AcceptedAtUtc,
+    int? AssignedServerId,
+    string? AssignedServerName);
+
+public sealed record ServerTableCallOrderDto(
+    int Id,
+    string OrderId,
+    int TableId,
+    string TableLabel,
+    string Status,
+    string DisplayStatus,
+    string StatusColor,
+    string CheckKind,
+    DateTime CreatedAt,
+    string TimeText,
+    string CustomerNotes,
+    string AllergyNotes,
+    decimal TotalUsd,
+    int ItemCount,
+    string ItemsSummary,
+    bool CanMarkServed,
+    IReadOnlyList<ServerReadyOrderLineDto> Lines);
+
+public sealed record ServerTableBoardRowDto(
+    int TableId,
+    int TableNumber,
+    string TableName,
+    ServerTableCallRowDto? PendingCall,
+    IReadOnlyList<ServerTableCallOrderDto> Orders);
+
+public sealed record ServerTableCallsBoardDto(
+    IReadOnlyList<ServerTableBoardRowDto> Tables,
+    int PendingCallCount);
+
+public sealed record ServerTableCallAcceptResponse(
+    bool Success,
+    string Message,
+    Guid CallId);
 
 public sealed record ServerSaveDraftRequest(
     string Label,
