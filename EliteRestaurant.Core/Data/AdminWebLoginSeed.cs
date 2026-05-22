@@ -21,7 +21,9 @@ public static class AdminWebLoginSeed
         signInId = signInId.Trim();
         pin = pin.Trim();
 
-        var existing = db.Employees.FirstOrDefault(e => e.UniqueId == SeedUniqueId);
+        var employees = db.Employees.IgnoreQueryFilters();
+
+        var existing = employees.FirstOrDefault(e => e.UniqueId == SeedUniqueId);
         if (existing is not null)
         {
             if (SyncSeedRow(existing, signInId, pin))
@@ -29,11 +31,11 @@ public static class AdminWebLoginSeed
             return;
         }
 
-        var lower = signInId.ToLowerInvariant();
-        var signInConflict = db.Employees.FirstOrDefault(e =>
-            !string.IsNullOrWhiteSpace(e.SignInId)
-            && e.SignInId.Trim().ToLowerInvariant() == lower
-            && e.UniqueId != SeedUniqueId);
+        // Compare in memory: PostgreSQL provider does not translate Trim().ToLowerInvariant().
+        var signInConflict = employees
+            .Where(e => e.UniqueId != SeedUniqueId && !string.IsNullOrWhiteSpace(e.SignInId))
+            .AsEnumerable()
+            .FirstOrDefault(e => string.Equals(e.SignInId.Trim(), signInId, StringComparison.OrdinalIgnoreCase));
         if (signInConflict is not null)
         {
             if (SyncSeedRow(signInConflict, signInId, pin))
@@ -41,8 +43,11 @@ public static class AdminWebLoginSeed
             return;
         }
 
+        var restaurantId = db.Restaurants.IgnoreQueryFilters().OrderBy(r => r.Id).Select(r => r.Id).FirstOrDefault();
+
         db.Employees.Add(new Employee
         {
+            RestaurantId = restaurantId,
             UniqueId = SeedUniqueId,
             SignInId = signInId,
             Name = "Web Admin (settings)",
