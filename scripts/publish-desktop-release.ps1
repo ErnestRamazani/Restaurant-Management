@@ -1,19 +1,23 @@
-# Builds ONE self-contained .exe for sharing online (no folder of DLLs).
-# Output: dist/EliteRestaurantPro.exe  (~80–120 MB, includes .NET 8 runtime)
+# Builds the public desktop installer package (fresh settings, not dev %LocalAppData%).
+# Output: dist/EliteRestaurantPro-Setup.zip  (one file to upload)
 param(
-    [string]$OutputDir = "$PSScriptRoot\..\dist"
+    [string]$OutputDir = "$PSScriptRoot\..\dist",
+    [string]$ZipName = "EliteRestaurantPro-Setup.zip"
 )
 
 $ErrorActionPreference = "Stop"
 $root = Resolve-Path "$PSScriptRoot\.."
 $proj = Join-Path $root "EliteRestaurantPro\EliteRestaurantPro.csproj"
+$staging = Join-Path $OutputDir "setup-staging"
+$freshSettings = Join-Path $PSScriptRoot "app-settings.fresh.json"
+$installScript = Join-Path $PSScriptRoot "installer\Install-EliteRestaurantPro.ps1"
 
 if (Test-Path $OutputDir) {
     Get-ChildItem $OutputDir -Force | Remove-Item -Recurse -Force
 }
-New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
+New-Item -ItemType Directory -Path $staging -Force | Out-Null
 
-Write-Host "Publishing single-file Windows x64 build (self-contained)..."
+Write-Host "Publishing release build (isolated settings folder)..."
 dotnet publish $proj `
     -c Release `
     -r win-x64 `
@@ -21,18 +25,44 @@ dotnet publish $proj `
     -p:PublishSingleFile=true `
     -p:EnableCompressionInSingleFile=true `
     -p:IncludeNativeLibrariesForSelfExtract=true `
+    -p:RELEASE_DISTRIBUTION=true `
     -p:DebugType=none `
     -p:DebugSymbols=false `
-    -o $OutputDir
+    -o $staging
 
-# Remove stray artifacts; keep only the main executable for upload.
-Get-ChildItem $OutputDir -File | Where-Object { $_.Extension -ne ".exe" } | Remove-Item -Force
+Get-ChildItem $staging -File | Where-Object { $_.Extension -ne ".exe" } | Remove-Item -Force
 
-$exe = Get-Item (Join-Path $OutputDir "EliteRestaurantPro.exe")
-$mb = [math]::Round($exe.Length / 1MB, 1)
+Copy-Item $freshSettings (Join-Path $staging "app-settings.json") -Force
+Copy-Item $installScript (Join-Path $staging "Install-EliteRestaurantPro.ps1") -Force
+
+@"
+Elite Restaurant Pro — Setup
+============================
+
+1. Extract this ZIP anywhere (Downloads is fine).
+2. Right-click Install-EliteRestaurantPro.ps1 -> Run with PowerShell.
+   (If blocked: open PowerShell here and run: .\Install-EliteRestaurantPro.ps1)
+3. Launch from the new desktop shortcut "Elite Restaurant Pro".
+
+This install uses a NEW settings folder:
+  %LocalAppData%\Elite Restaurant Pro\settings\
+It does NOT read your dev profile at:
+  %LocalAppData%\EliteRestaurantPro\settings\
+
+Restaurant data (menu, orders) still comes from the cloud API after you sign in.
+For a blank cloud site, complete the first-time setup wizard when prompted.
+"@ | Set-Content (Join-Path $staging "README-INSTALL.txt") -Encoding UTF8
+
+$zipPath = Join-Path $OutputDir $ZipName
+if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
+Compress-Archive -Path (Join-Path $staging "*") -DestinationPath $zipPath -Force
+Remove-Item $staging -Recurse -Force
+
+$zip = Get-Item $zipPath
+$mb = [math]::Round($zip.Length / 1MB, 1)
 Write-Host ""
-Write-Host "Ready to upload:"
-Write-Host "  $($exe.FullName)"
+Write-Host "Upload this ONE file:"
+Write-Host "  $($zip.FullName)"
 Write-Host "  Size: $mb MB"
 Write-Host ""
-Write-Host "Users: download EliteRestaurantPro.exe, run it (Windows 10/11 x64). No installer folder."
+Write-Host "Customers: extract ZIP -> run Install-EliteRestaurantPro.ps1 -> use desktop shortcut."

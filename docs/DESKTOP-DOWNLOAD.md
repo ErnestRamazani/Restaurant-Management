@@ -1,8 +1,26 @@
 # Elite Restaurant Pro — desktop download
 
-## Build the shareable file (one `.exe`)
+## Why the old `.exe` showed logo, background, and old data
 
-From the repo root in PowerShell:
+Double-clicking only `EliteRestaurantPro.exe` on **your dev PC** loaded settings from:
+
+```text
+%LocalAppData%\EliteRestaurantPro\settings\app-settings.json
+```
+
+That folder is from earlier development runs (logo paths, background image, tokens). The `.exe` did not bundle that data — Windows reused it.
+
+Published **release** builds now use a **separate** folder:
+
+```text
+%LocalAppData%\Elite Restaurant Pro\settings\
+```
+
+so installs stay empty on your machine too.
+
+## Build the file to put online (one ZIP)
+
+From the repo root:
 
 ```powershell
 .\scripts\publish-desktop-release.ps1
@@ -11,28 +29,35 @@ From the repo root in PowerShell:
 Output:
 
 ```text
-dist/EliteRestaurantPro.exe
+dist/EliteRestaurantPro-Setup.zip
 ```
 
-Upload **only that file** to your website, Google Drive, Dropbox, or DigitalOcean Spaces. Customers download and double-click — no zip of DLLs, no installer wizard.
+Upload **that ZIP** (one download). Do not upload a lone `.exe` unless you tell users to run the installer script inside the ZIP.
 
-| Item | Detail |
-|------|--------|
-| OS | Windows 10/11, 64-bit |
-| Size | ~80–120 MB (includes .NET 8 runtime) |
-| Install | None — run the `.exe` directly |
-| Settings | Stored under `%LocalAppData%\EliteRestaurantPro\settings\` after first run |
+## What customers do (install steps)
+
+1. Download `EliteRestaurantPro-Setup.zip`.
+2. Extract the ZIP.
+3. Right-click **`Install-EliteRestaurantPro.ps1`** → **Run with PowerShell**.
+4. Open the desktop shortcut **Elite Restaurant Pro**.
+
+The installer copies the app to `%LocalAppData%\Programs\Elite Restaurant Pro\` and writes a **blank** `app-settings.json`.
 
 ## First launch
 
-1. Run `EliteRestaurantPro.exe`.
-2. If the cloud database is empty, the **first-time setup** wizard runs (restaurant name, domain, admin PIN).
-3. Otherwise sign in with your admin credentials.
+- Local profile: empty (no logo/background until they configure Appearance).
+- Cloud: if the database is empty, the **first-time setup** wizard runs.
+- If they sign in to an existing cloud site, menu/staff data loads from the API (expected).
 
 ## Rebuild after code changes
 
-Run the script again, then replace the file on your download host.
+Run the script again and replace the ZIP on your download host.
 
-## Old publish folders (removed)
+## Developers
 
-Do not use `publish/EliteRestaurantPro-first-run` or `publish/EliteRestaurantPro-win-x64` — those were dev/test folder publishes. Use `dist/EliteRestaurantPro.exe` instead.
+| Profile | Settings path |
+|--------|----------------|
+| Debug / dev runs | `%LocalAppData%\EliteRestaurantPro\settings\` |
+| Installed release build | `%LocalAppData%\Elite Restaurant Pro\settings\` |
+
+To test a release build without installing, extract the ZIP and run `Install-EliteRestaurantPro.ps1` once.

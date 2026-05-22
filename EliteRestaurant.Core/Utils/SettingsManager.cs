@@ -132,9 +132,16 @@ public static class SettingsManager
         if (portableDir is not null)
             return portableDir;
 
+        // Published installer builds use a separate folder so dev profiles on the same PC are not reused.
+        var appFolderName =
+#if RELEASE_DISTRIBUTION
+            "Elite Restaurant Pro";
+#else
+            "EliteRestaurantPro";
+#endif
         return Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "EliteRestaurantPro",
+            appFolderName,
             "settings");
     }
 

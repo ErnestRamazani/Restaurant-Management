@@ -1,0 +1,35 @@
+{
+  "businessProfile": {
+    "restaurantName": "",
+    "phone": "",
+    "address": "",
+    "websiteDomain": "",
+    "socialMedia": "",
+    "logoPath": "",
+    "homepageBackgroundImagePath": "",
+    "publicMenuBaseUrl": "https://etoilegourmandekin.com",
+    "staffLoginPasscode": "",
+    "adminWebSignInId": "",
+    "adminWebPin": "",
+    "ticketFooterText": "MERCI / THANK YOU"
+  },
+  "ticketReceipt": {
+    "headerLogoPath": "",
+    "socialMediaRows": []
+  },
+  "cloudApi": {
+    "baseUrl": "https://etoilegourmandekin.com",
+    "accessToken": "",
+    "tokenExpiresAtUtc": null
+  },
+  "database": {
+    "provider": "PostgreSql",
+    "postgreSqlHost": "",
+    "postgreSqlPort": 5432,
+    "postgreSqlDatabase": "",
+    "postgreSqlUsername": "",
+    "postgreSqlPasswordProtected": ""
+  },
+  "firstSiteSetupCompleted": false,
+  "setupPlatformSecret": ""
+}
