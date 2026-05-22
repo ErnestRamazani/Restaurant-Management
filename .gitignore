@@ -207,6 +207,9 @@ DocProject/Help/html
 # Click-Once directory
 publish/
 
+# Desktop single-file release output (upload dist/EliteRestaurantPro.exe manually)
+dist/
+
 # Publish Web Output
 *.[Pp]ublish.xml
 *.azurePubxml

@@ -24,7 +24,7 @@ When prompted, type `WIPE` in the tool after `WIPE_ALL_DATA` in the script.
 
 1. Restart the API app on App Platform (or wait for next deploy).
 2. Check: `GET https://etoilegourmandekin.com/api/setup/status` → `"setupRequired": true`
-3. Run `publish\EliteRestaurantPro-first-run\EliteRestaurantPro.exe`
+3. Run `dist\EliteRestaurantPro.exe` (build with `.\scripts\publish-desktop-release.ps1`)
 4. Cloud API URL: `https://etoilegourmandekin.com` (or starfish URL)
 5. Custom domain: `etoilegourmandekin.com`
 6. **Create first site & sign in** (not “add new restaurant” — DB is empty)
@@ -33,7 +33,7 @@ When prompted, type `WIPE` in the tool after `WIPE_ALL_DATA` in the script.
 
 Delete or reset portable settings so the wizard opens again:
 
-- `publish\EliteRestaurantPro-first-run\app-settings.json` → `"firstSiteSetupCompleted": false`
+- For a fresh wizard on the same PC, delete `%LocalAppData%\EliteRestaurantPro\settings\app-settings.json` or set `"firstSiteSetupCompleted": false` there
 - Or delete `%LocalAppData%\EliteRestaurantPro\settings\app-settings.json` if not using the portable build
 
 ## What is not wiped
