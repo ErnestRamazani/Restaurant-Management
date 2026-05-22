@@ -20,14 +20,36 @@ public sealed class SetupApiClient
         return await response.Content.ReadFromJsonAsync<SetupStatusDto>(JsonOptions, cancellationToken);
     }
 
-    public async Task<SiteSetupOutcome> CreateFirstSiteAsync(
+    public Task<SiteSetupOutcome> CreateFirstSiteAsync(
         string apiBaseUrl,
         SiteSetupRequest request,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        PostSetupAsync(apiBaseUrl, "api/setup/first-site", request, setupSecret: null, cancellationToken);
+
+    public Task<SiteSetupOutcome> CreateNewSiteAsync(
+        string apiBaseUrl,
+        SiteSetupRequest request,
+        string setupPlatformSecret,
+        CancellationToken cancellationToken = default) =>
+        PostSetupAsync(apiBaseUrl, "api/setup/new-site", request, setupPlatformSecret, cancellationToken);
+
+    private static async Task<SiteSetupOutcome> PostSetupAsync(
+        string apiBaseUrl,
+        string path,
+        SiteSetupRequest request,
+        string? setupSecret,
+        CancellationToken cancellationToken)
     {
         var root = CloudEndpoints.NormalizeApiBaseUrl(apiBaseUrl).TrimEnd('/');
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-        using var response = await http.PostAsJsonAsync($"{root}/api/setup/first-site", request, JsonOptions, cancellationToken);
+        using var message = new HttpRequestMessage(HttpMethod.Post, $"{root}/{path.TrimStart('/')}")
+        {
+            Content = JsonContent.Create(request, options: JsonOptions)
+        };
+        if (!string.IsNullOrWhiteSpace(setupSecret))
+            message.Headers.TryAddWithoutValidation("X-Setup-Secret", setupSecret.Trim());
+
+        using var response = await http.SendAsync(message, cancellationToken);
         if (response.IsSuccessStatusCode)
         {
             var body = await response.Content.ReadFromJsonAsync<SiteSetupResponse>(JsonOptions, cancellationToken);
@@ -47,6 +69,25 @@ public sealed class SetupApiClient
             var err = await response.Content.ReadFromJsonAsync<SiteSetupErrorDto>(JsonOptions, cancellationToken);
             if (err?.Errors is { Count: > 0 })
                 return err.Errors;
+        }
+        catch (JsonException)
+        {
+            /* ignore */
+        }
+
+        try
+        {
+            var raw = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (string.IsNullOrWhiteSpace(raw))
+                return null;
+
+            using var doc = JsonDocument.Parse(raw);
+            if (doc.RootElement.TryGetProperty("message", out var message))
+            {
+                var text = message.GetString();
+                if (!string.IsNullOrWhiteSpace(text))
+                    return [text];
+            }
         }
         catch (JsonException)
         {

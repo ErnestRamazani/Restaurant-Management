@@ -18,10 +18,13 @@ public sealed class FirstSiteSetupViewModel : BaseViewModel
     private string _adminSignInId = "admin";
     private string _adminPin = string.Empty;
     private string _confirmPin = string.Empty;
+    private string _setupPlatformSecret = string.Empty;
     private string _statusMessage = "Connect to your cloud API and create the first restaurant site.";
     private string _errorMessage = string.Empty;
     private bool _hasError;
     private bool _isBusy;
+    private bool _cloudNeedsFirstSite = true;
+    private string _createButtonText = "Create site & sign in";
 
     public string CloudApiUrl
     {
@@ -86,6 +89,20 @@ public sealed class FirstSiteSetupViewModel : BaseViewModel
         set => SetField(ref _isBusy, value);
     }
 
+    public string SetupPlatformSecret
+    {
+        get => _setupPlatformSecret;
+        set => SetField(ref _setupPlatformSecret, value);
+    }
+
+    public string CreateButtonText
+    {
+        get => _createButtonText;
+        private set => SetField(ref _createButtonText, value);
+    }
+
+    public bool ShowSetupSecretField => !_cloudNeedsFirstSite;
+
     public ICommand TestConnectionCommand { get; }
     public ICommand CreateSiteCommand { get; }
     public ICommand SkipCommand { get; }
@@ -97,10 +114,24 @@ public sealed class FirstSiteSetupViewModel : BaseViewModel
         CloudApiUrl = string.IsNullOrWhiteSpace(settings.CloudApi.BaseUrl)
             ? CloudEndpoints.ProductionApiBaseUrl
             : settings.CloudApi.BaseUrl;
+        SetupPlatformSecret = settings.SetupPlatformSecret?.Trim() ?? string.Empty;
 
         TestConnectionCommand = new RelayCommand(async _ => await TestConnectionAsync(), _ => !IsBusy);
         CreateSiteCommand = new RelayCommand(async _ => await CreateSiteAsync(), _ => !IsBusy);
-        SkipCommand = new RelayCommand(_ => _navigate(new RoleSelectionViewModel(_navigate)), _ => !IsBusy);
+        SkipCommand = new RelayCommand(_ => SkipToRoleSelection(), _ => !IsBusy);
+        _ = TestConnectionAsync();
+    }
+
+    private void SkipToRoleSelection()
+    {
+        if (SettingsManager.IsPortableInstall())
+        {
+            var settings = SettingsManager.Load();
+            settings.FirstSiteSetupCompleted = true;
+            SettingsManager.Save(settings);
+        }
+
+        _navigate(new RoleSelectionViewModel(_navigate));
     }
 
     private async Task TestConnectionAsync()
@@ -118,9 +149,15 @@ public sealed class FirstSiteSetupViewModel : BaseViewModel
                 return;
             }
 
+            _cloudNeedsFirstSite = status.SetupRequired;
+            OnPropertyChanged(nameof(ShowSetupSecretField));
+            CreateButtonText = status.SetupRequired
+                ? "Create first site & sign in"
+                : "Add new restaurant & sign in";
+
             StatusMessage = status.SetupRequired
                 ? $"Cloud API is online. Ready to create the first site ({status.RestaurantCount} restaurants now)."
-                : $"Cloud API is online. Setup is not required ({status.RestaurantCount} restaurant(s) already exist). You can skip to sign in.";
+                : $"Cloud API already has {status.RestaurantCount} restaurant(s) (e.g. Étoile). Enter the Setup Platform Secret from DigitalOcean to add another site, or skip to sign in to the existing one.";
         }
         finally
         {
@@ -159,7 +196,25 @@ public sealed class FirstSiteSetupViewModel : BaseViewModel
                 null,
                 "en");
 
-            var outcome = await _setupApi.CreateFirstSiteAsync(normalizedUrl, request);
+            SiteSetupOutcome outcome;
+            if (_cloudNeedsFirstSite)
+            {
+                outcome = await _setupApi.CreateFirstSiteAsync(normalizedUrl, request);
+            }
+            else
+            {
+                var secret = SetupPlatformSecret.Trim();
+                if (secret.Length == 0)
+                {
+                    HasError = true;
+                    ErrorMessage =
+                        "This cloud database already has a restaurant. Set Setup__PlatformSecret on DigitalOcean, paste it in Setup platform secret above, then try again — or use Skip to sign in to the existing site.";
+                    return;
+                }
+
+                outcome = await _setupApi.CreateNewSiteAsync(normalizedUrl, request, secret);
+            }
+
             if (outcome.Response is null)
             {
                 HasError = true;
@@ -171,6 +226,7 @@ public sealed class FirstSiteSetupViewModel : BaseViewModel
 
             var settings = SettingsManager.Load();
             settings.CloudApi.BaseUrl = normalizedUrl;
+            settings.SetupPlatformSecret = SetupPlatformSecret.Trim();
             settings.CloudApi.AccessToken = outcome.Response.AccessToken;
             settings.CloudApi.TokenExpiresAtUtc = outcome.Response.ExpiresAtUtc;
             settings.BusinessProfile.RestaurantName = RestaurantName.Trim();
@@ -178,6 +234,7 @@ public sealed class FirstSiteSetupViewModel : BaseViewModel
             settings.BusinessProfile.WebsiteDomain = string.IsNullOrWhiteSpace(CustomDomain)
                 ? settings.BusinessProfile.WebsiteDomain
                 : CustomDomain.Trim();
+            settings.FirstSiteSetupCompleted = true;
             SettingsManager.Save(settings);
 
             if (!StaffPortalAuthentication.IsAdminDesktopRole(outcome.Response.Role))

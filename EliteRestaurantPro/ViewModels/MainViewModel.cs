@@ -83,7 +83,10 @@ public class MainViewModel : BaseViewModel
         CloudFirstSyncService.StatusChanged += OnSyncStatusChanged;
         _cloudStatusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
         _cloudStatusTimer.Tick += async (_, _) => await RefreshCloudStatusAsync();
-        Navigate(new RoleSelectionViewModel(Navigate));
+        if (SettingsManager.IsPortableInstall() && !SettingsManager.Load().FirstSiteSetupCompleted)
+            Navigate(new FirstSiteSetupViewModel(Navigate));
+        else
+            Navigate(new RoleSelectionViewModel(Navigate));
         _cloudStatusTimer.Start();
         _ = InitializeNavigationAsync();
         _ = RefreshCloudStatusAsync();
@@ -92,17 +95,17 @@ public class MainViewModel : BaseViewModel
 
     private async Task InitializeNavigationAsync()
     {
+        var settings = SettingsManager.Load();
+        if (SettingsManager.IsPortableInstall() && !settings.FirstSiteSetupCompleted)
+            return;
+
         try
         {
-            var baseUrl = CloudEndpoints.NormalizeApiBaseUrl(SettingsManager.Load().CloudApi.BaseUrl);
+            var baseUrl = CloudEndpoints.NormalizeApiBaseUrl(settings.CloudApi.BaseUrl);
             var status = await new SetupApiClient().GetStatusAsync(baseUrl);
             if (status?.SetupRequired == true)
             {
-                var dispatcher = System.Windows.Application.Current?.Dispatcher;
-                if (dispatcher is not null && !dispatcher.CheckAccess())
-                    await dispatcher.InvokeAsync(() => Navigate(new FirstSiteSetupViewModel(Navigate)));
-                else
-                    Navigate(new FirstSiteSetupViewModel(Navigate));
+                NavigateToFirstSiteSetup();
                 return;
             }
         }
@@ -111,7 +114,17 @@ public class MainViewModel : BaseViewModel
             /* offline or older API — fall through to normal login */
         }
 
-        Navigate(new RoleSelectionViewModel(Navigate));
+        if (CurrentViewModel is FirstSiteSetupViewModel)
+            Navigate(new RoleSelectionViewModel(Navigate));
+    }
+
+    private void NavigateToFirstSiteSetup()
+    {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher is not null && !dispatcher.CheckAccess())
+            dispatcher.Invoke(() => Navigate(new FirstSiteSetupViewModel(Navigate)));
+        else
+            Navigate(new FirstSiteSetupViewModel(Navigate));
     }
 
     public void Navigate(BaseViewModel viewModel)

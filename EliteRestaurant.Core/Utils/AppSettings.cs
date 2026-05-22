@@ -52,6 +52,12 @@ public sealed class AppSettings
 
     /// <summary>Admin-defined menu type → category (Product.Category) → subcategory (Product.SubCategory) structure.</summary>
     public MenuTaxonomySettings? MenuTaxonomy { get; set; }
+
+    /// <summary>Set true after <c>POST /api/setup/first-site</c> (or portable wizard) so the desktop app does not reopen setup.</summary>
+    public bool FirstSiteSetupCompleted { get; set; }
+
+    /// <summary>Matches API <c>Setup__PlatformSecret</c> — required for <c>POST /api/setup/new-site</c> when a tenant already exists.</summary>
+    public string SetupPlatformSecret { get; set; } = string.Empty;
 }
 
 /// <summary>Restaurant shift boundaries (local time of day). Serialized to app-settings.json.</summary>

@@ -25,6 +25,9 @@ public static class SettingsManager
 
     public static event Action? SettingsChanged;
 
+    /// <summary>True when <see cref="SettingsFileName"/> or <see cref="PortableMarkerFileName"/> lives next to the .exe.</summary>
+    public static bool IsPortableInstall() => TryGetPortableSettingsDirectory() is not null;
+
     public static AppSettings Load()
     {
         try
@@ -119,11 +122,52 @@ public static class SettingsManager
 
     private static string GetSettingsPath() => Path.Combine(GetStorageDirectory(), SettingsFileName);
 
+    /// <summary>
+    /// Portable installs keep <see cref="SettingsFileName"/> (and optional <c>.elite-portable</c>) next to the .exe
+    /// so a published test build does not reuse %LocalAppData% from a dev machine.
+    /// </summary>
     private static string GetStorageDirectory()
     {
+        var portableDir = TryGetPortableSettingsDirectory();
+        if (portableDir is not null)
+            return portableDir;
+
         return Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "EliteRestaurantPro",
             "settings");
+    }
+
+    private static string? TryGetPortableSettingsDirectory()
+    {
+        var exeDir = GetExecutableDirectory();
+        if (exeDir is null)
+            return null;
+
+        var settingsPath = Path.Combine(exeDir, SettingsFileName);
+        var markerPath = Path.Combine(exeDir, PortableMarkerFileName);
+        if (File.Exists(settingsPath) || File.Exists(markerPath))
+            return exeDir;
+
+        return null;
+    }
+
+    private const string PortableMarkerFileName = ".elite-portable";
+
+    private static string? GetExecutableDirectory()
+    {
+        try
+        {
+            var processPath = Environment.ProcessPath;
+            if (string.IsNullOrWhiteSpace(processPath))
+                return null;
+
+            var dir = Path.GetDirectoryName(processPath);
+            return string.IsNullOrEmpty(dir) ? null : dir;
+        }
+        catch
+        {
+            return null;
+        }
     }
 }

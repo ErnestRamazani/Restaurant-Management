@@ -21,6 +21,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EliteRestaurant.Contracts",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EliteRestaurant.Core.Tests", "EliteRestaurant.Core.Tests\EliteRestaurant.Core.Tests.csproj", "{3646987F-DD97-4A9E-8B9F-863CB733DFE9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ResetCloudDatabase", "Tools\ResetCloudDatabase\ResetCloudDatabase.csproj", "{C49BF808-0F07-4CC5-BC9E-A6095F9B1D97}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -62,8 +64,13 @@ Global
 		{3646987F-DD97-4A9E-8B9F-863CB733DFE9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3646987F-DD97-4A9E-8B9F-863CB733DFE9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3646987F-DD97-4A9E-8B9F-863CB733DFE9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C49BF808-0F07-4CC5-BC9E-A6095F9B1D97}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C49BF808-0F07-4CC5-BC9E-A6095F9B1D97}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C49BF808-0F07-4CC5-BC9E-A6095F9B1D97}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C49BF808-0F07-4CC5-BC9E-A6095F9B1D97}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{E4B37FCF-E0CC-4C51-931E-E8230B40ECC2} = {F5CA5593-D5FA-4208-A95C-9534B5D41A3D}
+		{C49BF808-0F07-4CC5-BC9E-A6095F9B1D97} = {F5CA5593-D5FA-4208-A95C-9534B5D41A3D}
 	EndGlobalSection
 EndGlobal

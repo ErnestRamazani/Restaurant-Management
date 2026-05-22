@@ -46,6 +46,19 @@ public sealed class SetupController(
             () => setupService.CreateFirstSiteAsync(ToCore(body), cancellationToken));
     }
 
+    [HttpPost("wipe-all-data")]
+    [EnableRateLimiting("Setup")]
+    [ProducesResponseType(typeof(SetupStatusDto), 200)]
+    [ProducesResponseType(401)]
+    public async Task<ActionResult<SetupStatusDto>> PostWipeAllData(CancellationToken cancellationToken)
+    {
+        if (!IsAuthorizedForNewSite())
+            return Unauthorized(new { message = "Missing or invalid X-Setup-Secret header." });
+
+        var status = await setupService.WipeAllTenantDataAsync(cancellationToken);
+        return Ok(new SetupStatusDto(status.SetupRequired, status.RestaurantCount, status.Message));
+    }
+
     [HttpPost("new-site")]
     [EnableRateLimiting("Setup")]
     [ProducesResponseType(typeof(SiteSetupResponse), 200)]

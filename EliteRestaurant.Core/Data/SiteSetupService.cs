@@ -38,6 +38,41 @@ public sealed class SiteSetupService(AppDbContext db)
         return await CreateSiteCoreAsync(request, isFirstSite: false, cancellationToken);
     }
 
+    /// <summary>Removes all tenant rows; schema and migrations are kept.</summary>
+    public async Task<SetupStatus> WipeAllTenantDataAsync(CancellationToken cancellationToken = default)
+    {
+        const string truncateSql = """
+            TRUNCATE TABLE
+                "OrderItems",
+                "Orders",
+                "ProductIngredients",
+                "Products",
+                "InventoryItems",
+                "Tables",
+                "EmployeeAttendances",
+                "SalaryAdvances",
+                "PayrollPaymentRecords",
+                "Employees",
+                "Transactions",
+                "CustomerProfiles",
+                "ReservationEngagements",
+                "Reservations",
+                "PlacementUnits",
+                "WaitlistEntries",
+                "SharedOrderDrafts",
+                "TabletSessions",
+                "SyncOutbox",
+                "PublicMenuAssets",
+                "PublicMenuSettings",
+                "AttendanceDayValidations",
+                "Restaurants"
+            RESTART IDENTITY CASCADE;
+            """;
+
+        await db.Database.ExecuteSqlRawAsync(truncateSql, cancellationToken);
+        return await GetStatusAsync(cancellationToken);
+    }
+
     private async Task<SiteSetupResult> CreateSiteCoreAsync(
         SiteSetupCommand request,
         bool isFirstSite,
@@ -69,19 +104,34 @@ public sealed class SiteSetupService(AppDbContext db)
 
         if (db.Database.IsRelational())
         {
-            await using var tx = await db.Database.BeginTransactionAsync(cancellationToken);
-            try
-            {
-                var created = await PersistSiteAsync(
-                    request, slug, domain, signInId, adminName, lang, uniqueSuffix, isFirstSite, cancellationToken);
-                await tx.CommitAsync(cancellationToken);
-                return SiteSetupResult.Ok(created);
-            }
-            catch
-            {
-                await tx.RollbackAsync(cancellationToken);
-                throw;
-            }
+            return await DatabaseResilientTransaction.ExecuteAsync(
+                db,
+                (request, slug, domain, signInId, adminName, lang, uniqueSuffix, isFirstSite),
+                async (context, state, ct) =>
+                {
+                    await using var tx = await context.Database.BeginTransactionAsync(ct);
+                    try
+                    {
+                        var created = await PersistSiteAsync(
+                            state.request,
+                            state.slug,
+                            state.domain,
+                            state.signInId,
+                            state.adminName,
+                            state.lang,
+                            state.uniqueSuffix,
+                            state.isFirstSite,
+                            ct);
+                        await tx.CommitAsync(ct);
+                        return SiteSetupResult.Ok(created);
+                    }
+                    catch
+                    {
+                        await tx.RollbackAsync(ct);
+                        throw;
+                    }
+                },
+                cancellationToken);
         }
 
         var site = await PersistSiteAsync(
