@@ -125,6 +125,12 @@ Steps:
 
 Vite at `http://localhost:5173` proxies `/api` → `http://localhost:8080`.
 
+## Tables vs online reservations
+
+The customer reservation page books **`PlacementUnits`**, not `Tables` directly. When you add a table in Elite Pro, the API now creates/updates a matching placement row automatically on sync. On API startup, any older tables without placements are backfilled once.
+
+If a new table still does not appear online, re-save the table in Elite Pro (or restart the local API after pulling latest code) and refresh the reservation page.
+
 ## Quick checklist
 
 - [ ] Postgres running, `elite_restaurant` exists

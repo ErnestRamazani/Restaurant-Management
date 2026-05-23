@@ -1,3 +1,4 @@
+using EliteRestaurant.Core.Reservations;
 using EliteRestaurant.Core.Utils;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -32,6 +33,7 @@ public static class DatabaseInitializer
         using var db = new AppDbContext(options);
         RestaurantTenantBootstrap.EnsureDefaultRestaurant(db);
         AdminWebLoginSeed.EnsureSeeded(db);
+        PlacementUnitProvisioner.EnsureAllTablesHavePlacementsAsync(db).GetAwaiter().GetResult();
         SampleDataBootstrapper.SeedIfEnabled(db);
         SharedOrderDraftStore.PurgeDraftsOlderThan(TimeSpan.FromDays(30));
     }

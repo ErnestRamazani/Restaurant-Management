@@ -3,6 +3,7 @@ using System.Text.Json;
 using EliteRestaurant.Contracts.Admin;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Reservations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -60,10 +61,24 @@ public sealed class AdminSyncController(AppDbContext db) : ControllerBase
 
             try
             {
+                var isTable = string.Equals(operation.EntityName, nameof(Table), StringComparison.OrdinalIgnoreCase);
+
                 if (operation.Operation.Equals("Delete", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (isTable)
+                    {
+                        var incoming = operation.Payload.Deserialize(typeof(Table), JsonOptions) as Table;
+                        var existingTable = await FindExistingAsync(typeof(Table), incoming!, cancellationToken) as Table;
+                        if (existingTable is not null)
+                            await PlacementUnitProvisioner.RemoveForTableAsync(db, existingTable.Id, cancellationToken);
+                    }
+
                     await DeleteAsync(entityType, operation.Payload, cancellationToken);
+                }
                 else
+                {
                     await UpsertAsync(entityType, operation.Payload, cancellationToken);
+                }
 
                 db.SyncOutbox.Add(new SyncOutbox
                 {
@@ -79,6 +94,19 @@ public sealed class AdminSyncController(AppDbContext db) : ControllerBase
                 });
 
                 await db.SaveChangesAsync(cancellationToken);
+
+                if (isTable && !operation.Operation.Equals("Delete", StringComparison.OrdinalIgnoreCase))
+                {
+                    var incoming = operation.Payload.Deserialize(typeof(Table), JsonOptions) as Table
+                                   ?? throw new InvalidOperationException("Payload could not be read.");
+                    var syncedTable = await FindExistingAsync(typeof(Table), incoming, cancellationToken) as Table;
+                    if (syncedTable is not null)
+                    {
+                        await PlacementUnitProvisioner.EnsureForTableAsync(db, syncedTable, cancellationToken);
+                        await db.SaveChangesAsync(cancellationToken);
+                    }
+                }
+
                 results.Add(Success(operation, "Applied."));
             }
             catch (Exception ex)
