@@ -510,7 +510,8 @@ public class AppDbContext : DbContext
             ? appSettingsConnection
             : null;
 
-        if (DatabaseSettingsResolver.TryNormalizePostgreSqlConnectionString(defaultConnection, out connectionString))
+        if (!string.IsNullOrWhiteSpace(defaultConnection)
+            && DatabaseSettingsResolver.TryNormalizePostgreSqlConnectionString(defaultConnection, out connectionString))
             return true;
 
         DatabaseSettings settings;

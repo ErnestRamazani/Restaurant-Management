@@ -42,6 +42,11 @@ try
     QuestPDF.Settings.License = LicenseType.Community;
 
     var builder = WebApplication.CreateBuilder(args);
+    if (builder.Environment.IsDevelopment())
+    {
+        builder.Configuration.AddJsonFile("appsettings.Development.local.json", optional: true, reloadOnChange: true);
+    }
+
     builder.Host.UseSerilog();
 
     if (!builder.Environment.IsEnvironment("Testing") && !EF.IsDesignTime)

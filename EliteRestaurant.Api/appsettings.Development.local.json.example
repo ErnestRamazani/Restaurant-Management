@@ -1,0 +1,5 @@
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=127.0.0.1;Port=5432;Database=elite_restaurant;Username=postgres;Password=YOUR_PASSWORD_HERE;SSL Mode=Prefer"
+  }
+}
