@@ -4,11 +4,12 @@ using EliteRestaurant.Core.Tenancy;
 namespace EliteRestaurant.Api.Middleware;
 
 /// <summary>Resolves the current restaurant from the request host (custom domain) or dev headers.</summary>
-public sealed class TenantResolutionMiddleware(
-    RequestDelegate next,
-    RestaurantTenantResolver resolver)
+public sealed class TenantResolutionMiddleware(RequestDelegate next)
 {
-    public async Task InvokeAsync(HttpContext context, ITenantContext tenant)
+    public async Task InvokeAsync(
+        HttpContext context,
+        ITenantContext tenant,
+        RestaurantTenantResolver resolver)
     {
         if (ShouldSkip(context.Request.Path))
         {
