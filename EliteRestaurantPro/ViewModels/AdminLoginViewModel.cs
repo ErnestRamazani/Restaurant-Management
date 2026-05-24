@@ -2,6 +2,7 @@ using System.Windows.Input;
 using EliteRestaurant.Core.Staff;
 using EliteRestaurant.Core.Utils;
 using EliteRestaurantPro.ApiClients;
+using EliteRestaurantPro.Services;
 
 namespace EliteRestaurantPro.ViewModels;
 
@@ -78,6 +79,10 @@ public class AdminLoginViewModel : BaseViewModel
         }
 
         AppSession.SetAdminLoginProfile(auth.Response.Name, null);
+        var settings = SettingsManager.Load();
+        CloudConnectionSettings.ApplyRestaurantIdFromAccessToken(settings, auth.Response.AccessToken);
+        await CloudConnectionSettings.PullPublicBrandingAsync(settings);
+        SettingsManager.Save(settings);
         HasError = false;
         ErrorMessage = string.Empty;
         _navigate(new AdminDashboardViewModel(_navigate));

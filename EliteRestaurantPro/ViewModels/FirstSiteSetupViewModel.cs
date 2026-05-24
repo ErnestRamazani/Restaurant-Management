@@ -3,6 +3,7 @@ using EliteRestaurant.Contracts.Setup;
 using EliteRestaurant.Core.Staff;
 using EliteRestaurant.Core.Utils;
 using EliteRestaurantPro.ApiClients;
+using EliteRestaurantPro.Services;
 
 namespace EliteRestaurantPro.ViewModels;
 
@@ -25,6 +26,7 @@ public sealed class FirstSiteSetupViewModel : BaseViewModel
     private bool _isBusy;
     private bool _cloudNeedsFirstSite = true;
     private string _createButtonText = "Create site & sign in";
+    private string _signInToExistingSiteButtonText = "Continue to sign-in";
 
     public string CloudApiUrl
     {
@@ -101,11 +103,20 @@ public sealed class FirstSiteSetupViewModel : BaseViewModel
         private set => SetField(ref _createButtonText, value);
     }
 
+    public string SignInToExistingSiteButtonText
+    {
+        get => _signInToExistingSiteButtonText;
+        private set => SetField(ref _signInToExistingSiteButtonText, value);
+    }
+
     public bool ShowSetupSecretField => !_cloudNeedsFirstSite;
+
+    /// <summary>Only when the cloud database already has an admin (setup completed on the server).</summary>
+    public bool CanSignInToExistingSite => !_cloudNeedsFirstSite;
 
     public ICommand TestConnectionCommand { get; }
     public ICommand CreateSiteCommand { get; }
-    public ICommand SkipCommand { get; }
+    public ICommand SignInToExistingSiteCommand { get; }
 
     public FirstSiteSetupViewModel(Action<BaseViewModel> navigate)
     {
@@ -118,21 +129,51 @@ public sealed class FirstSiteSetupViewModel : BaseViewModel
 
         TestConnectionCommand = new RelayCommand(async _ => await TestConnectionAsync(), _ => !IsBusy);
         CreateSiteCommand = new RelayCommand(async _ => await CreateSiteAsync(), _ => !IsBusy);
-        SkipCommand = new RelayCommand(_ => SkipToRoleSelection(), _ => !IsBusy);
+        SignInToExistingSiteCommand = new RelayCommand(async _ => await ContinueToSignInAsync(), _ => !IsBusy && CanSignInToExistingSite);
         _ = TestConnectionAsync();
     }
 
-    private void SkipToRoleSelection()
+    private async Task ContinueToSignInAsync()
     {
-        var settings = SettingsManager.Load();
-        settings.FirstSiteSetupCompleted = true;
-        if (!string.IsNullOrWhiteSpace(CloudApiUrl))
-            settings.CloudApi.BaseUrl = CloudEndpoints.NormalizeApiBaseUrl(CloudApiUrl);
-        SettingsManager.Save(settings);
+        IsBusy = true;
+        HasError = false;
+        ErrorMessage = string.Empty;
+        try
+        {
+            var normalizedUrl = CloudEndpoints.NormalizeApiBaseUrl(CloudApiUrl);
+            var status = await _setupApi.GetStatusAsync(normalizedUrl);
+            if (status is null)
+            {
+                HasError = true;
+                ErrorMessage = "Could not reach the cloud API. Check the URL and try again.";
+                return;
+            }
 
-        StatusMessage =
-            "Skipped setup. Sign in with the admin or staff ID and PIN already on your cloud site (not a new PIN from this form).";
-        _navigate(new RoleSelectionViewModel(_navigate));
+            ApplyStatus(status);
+            if (status.SetupRequired)
+            {
+                HasError = true;
+                ErrorMessage =
+                    "This cloud database has no admin yet. Use Create first site & sign in above — you cannot sign in until that finishes.";
+                return;
+            }
+
+            var settings = SettingsManager.Load();
+            CloudConnectionSettings.ApplyFromSetupStatus(settings, normalizedUrl, status);
+            settings.FirstSiteSetupCompleted = true;
+            settings.SetupPlatformSecret = SetupPlatformSecret.Trim();
+            await CloudConnectionSettings.PullPublicBrandingAsync(settings);
+            SettingsManager.Save(settings);
+
+            StatusMessage = string.IsNullOrWhiteSpace(settings.BusinessProfile.RestaurantName)
+                ? "Connected to your cloud site. Sign in with your existing admin or staff ID and PIN."
+                : $"Connected to {settings.BusinessProfile.RestaurantName}. Sign in with your cloud admin or staff credentials.";
+            _navigate(new RoleSelectionViewModel(_navigate));
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     private async Task TestConnectionAsync()
@@ -151,21 +192,39 @@ public sealed class FirstSiteSetupViewModel : BaseViewModel
                 return;
             }
 
-            _cloudNeedsFirstSite = status.SetupRequired;
-            OnPropertyChanged(nameof(ShowSetupSecretField));
-            CreateButtonText = status.SetupRequired
-                ? "Create first site & sign in"
-                : "Add new restaurant & sign in";
+            ApplyStatus(status);
 
-            StatusMessage = status.SetupRequired
-                ? $"Cloud API is online. Ready to create the first site ({status.RestaurantCount} restaurants now)."
-                : $"Your cloud site already exists ({status.RestaurantCount} restaurant). Use Sign in below with your existing admin ID and PIN — do not create a new site.";
-
+            var settings = SettingsManager.Load();
+            CloudConnectionSettings.ApplyFromSetupStatus(settings, normalizedUrl, status);
+            SettingsManager.Save(settings);
         }
         finally
         {
             IsBusy = false;
         }
+    }
+
+    private void ApplyStatus(SetupStatusDto status)
+    {
+        _cloudNeedsFirstSite = status.SetupRequired;
+        OnPropertyChanged(nameof(ShowSetupSecretField));
+        OnPropertyChanged(nameof(CanSignInToExistingSite));
+
+        CreateButtonText = status.SetupRequired
+            ? "Create first site & sign in"
+            : "Add new restaurant & sign in";
+
+        SignInToExistingSiteButtonText = status.SetupRequired
+            ? "Sign-in available after first site is created"
+            : "Continue to sign-in (existing cloud site)";
+
+        StatusMessage = status.SetupRequired
+            ? status.RestaurantCount == 0
+                ? "Cloud API is online. Create the first restaurant site below."
+                : $"Cloud API is online. Finish first-site setup to create an admin ({status.RestaurantCount} restaurant placeholder in database)."
+            : !string.IsNullOrWhiteSpace(status.PrimaryRestaurantName)
+                ? $"Cloud site “{status.PrimaryRestaurantName}” is ready. Continue to sign-in with your existing ID and PIN."
+                : $"Your cloud site already exists ({status.RestaurantCount} restaurant). Continue to sign-in with your existing admin ID and PIN.";
     }
 
     private async Task CreateSiteAsync()
@@ -211,7 +270,7 @@ public sealed class FirstSiteSetupViewModel : BaseViewModel
                 {
                     HasError = true;
                     ErrorMessage =
-                        "This cloud database already has a restaurant. Set Setup__PlatformSecret on DigitalOcean, paste it in Setup platform secret above, then try again — or use Skip to sign in to the existing site.";
+                        "This cloud database already has a restaurant. Set Setup__PlatformSecret on DigitalOcean, paste it above, then try again — or use Continue to sign-in if you only need your existing site.";
                     return;
                 }
 
@@ -228,16 +287,15 @@ public sealed class FirstSiteSetupViewModel : BaseViewModel
             }
 
             var settings = SettingsManager.Load();
-            settings.CloudApi.BaseUrl = normalizedUrl;
+            CloudConnectionSettings.ApplyFromSiteSetup(settings, normalizedUrl, outcome.Response);
             settings.SetupPlatformSecret = SetupPlatformSecret.Trim();
-            settings.CloudApi.AccessToken = outcome.Response.AccessToken;
-            settings.CloudApi.TokenExpiresAtUtc = outcome.Response.ExpiresAtUtc;
             settings.BusinessProfile.RestaurantName = RestaurantName.Trim();
             settings.BusinessProfile.PublicMenuBaseUrl = BuildPublicMenuUrl(normalizedUrl, CustomDomain);
             settings.BusinessProfile.WebsiteDomain = string.IsNullOrWhiteSpace(CustomDomain)
                 ? settings.BusinessProfile.WebsiteDomain
                 : CustomDomain.Trim();
             settings.FirstSiteSetupCompleted = true;
+            await CloudConnectionSettings.PullPublicBrandingAsync(settings);
             SettingsManager.Save(settings);
 
             if (!StaffPortalAuthentication.IsAdminDesktopRole(outcome.Response.Role))

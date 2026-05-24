@@ -2,6 +2,7 @@ using System.Windows.Input;
 using EliteRestaurant.Core.Staff;
 using EliteRestaurant.Core.Utils;
 using EliteRestaurantPro.ApiClients;
+using EliteRestaurantPro.Services;
 
 namespace EliteRestaurantPro.ViewModels;
 
@@ -134,6 +135,11 @@ public sealed class StaffLoginViewModel : BaseViewModel
         }
 
         HasError = false;
+        var settings = SettingsManager.Load();
+        CloudConnectionSettings.ApplyRestaurantIdFromAccessToken(settings, login.AccessToken);
+        await CloudConnectionSettings.PullPublicBrandingAsync(settings);
+        SettingsManager.Save(settings);
+
         if (Kind == StaffPortalKind.Server)
         {
             AppSession.BeginServerSession(login.EmployeeId, login.Name);

@@ -56,6 +56,8 @@ try
     builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
     builder.Services.Configure<AuthDevOptions>(builder.Configuration.GetSection("Auth"));
     builder.Services.Configure<EliteRestaurant.Api.Options.SetupOptions>(builder.Configuration.GetSection("Setup"));
+    builder.Services.Configure<EliteRestaurant.Api.Options.TenancyOptions>(
+        builder.Configuration.GetSection(EliteRestaurant.Api.Options.TenancyOptions.SectionName));
     builder.Services.Configure<LocalizationOptions>(builder.Configuration.GetSection("Localization"));
     builder.Services.AddSingleton<LocalizationService>();
     builder.Services.Configure<ForwardedHeadersOptions>(options =>

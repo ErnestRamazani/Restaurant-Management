@@ -23,7 +23,13 @@ public sealed class SetupController(
     public async Task<ActionResult<SetupStatusDto>> GetStatus(CancellationToken cancellationToken)
     {
         var status = await setupService.GetStatusAsync(cancellationToken);
-        return Ok(new SetupStatusDto(status.SetupRequired, status.RestaurantCount, status.Message));
+        return Ok(new SetupStatusDto(
+            status.SetupRequired,
+            status.RestaurantCount,
+            status.Message,
+            status.PrimaryRestaurantId,
+            status.PrimaryRestaurantSlug,
+            status.PrimaryRestaurantName));
     }
 
     [HttpPost("first-site")]
@@ -68,7 +74,13 @@ public sealed class SetupController(
             return Unauthorized(new { message = "Missing or invalid X-Setup-Secret header." });
 
         var status = await setupService.WipeAllTenantDataAsync(cancellationToken);
-        return Ok(new SetupStatusDto(status.SetupRequired, status.RestaurantCount, status.Message));
+        return Ok(new SetupStatusDto(
+            status.SetupRequired,
+            status.RestaurantCount,
+            status.Message,
+            status.PrimaryRestaurantId,
+            status.PrimaryRestaurantSlug,
+            status.PrimaryRestaurantName));
     }
 
     [HttpPost("new-site")]

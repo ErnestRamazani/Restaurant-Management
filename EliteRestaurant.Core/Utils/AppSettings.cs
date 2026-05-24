@@ -110,6 +110,10 @@ public sealed class CloudApiSettings
     public string BaseUrl { get; set; } = CloudEndpoints.ProductionApiBaseUrl;
     public string AccessToken { get; set; } = string.Empty;
     public DateTime? TokenExpiresAtUtc { get; set; }
+    /// <summary>Sent as <c>X-Restaurant-Id</c> when using the shared App Platform API host.</summary>
+    public int? RestaurantId { get; set; }
+    /// <summary>Sent as <c>X-Restaurant-Slug</c> when restaurant id is not set.</summary>
+    public string RestaurantSlug { get; set; } = string.Empty;
 }
 
 public sealed class BusinessProfileSettings

@@ -106,10 +106,11 @@ public class MainViewModel : BaseViewModel
                 return;
             }
 
+            CloudConnectionSettings.ApplyFromSetupStatus(settings, baseUrl, status);
+
             if (status.SetupRequired)
             {
                 settings.FirstSiteSetupCompleted = false;
-                settings.CloudApi.BaseUrl = baseUrl;
                 SettingsManager.Save(settings);
                 NavigateToFirstSiteSetup();
                 return;
@@ -118,8 +119,9 @@ public class MainViewModel : BaseViewModel
             if (!settings.FirstSiteSetupCompleted)
             {
                 settings.FirstSiteSetupCompleted = true;
-                SettingsManager.Save(settings);
             }
+
+            SettingsManager.Save(settings);
 
             if (CurrentViewModel is FirstSiteSetupViewModel)
                 Navigate(new RoleSelectionViewModel(Navigate));

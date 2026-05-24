@@ -5,7 +5,10 @@ namespace EliteRestaurant.Contracts.Setup;
 public sealed record SetupStatusDto(
     [property: JsonPropertyName("setupRequired")] bool SetupRequired,
     [property: JsonPropertyName("restaurantCount")] int RestaurantCount,
-    [property: JsonPropertyName("message")] string Message);
+    [property: JsonPropertyName("message")] string Message,
+    [property: JsonPropertyName("primaryRestaurantId")] int? PrimaryRestaurantId = null,
+    [property: JsonPropertyName("primaryRestaurantSlug")] string? PrimaryRestaurantSlug = null,
+    [property: JsonPropertyName("primaryRestaurantName")] string? PrimaryRestaurantName = null);
 
 public sealed record SiteSetupRequest(
     [property: JsonPropertyName("restaurantName")] string RestaurantName,

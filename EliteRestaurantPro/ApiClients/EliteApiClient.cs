@@ -50,6 +50,12 @@ public sealed class EliteApiClient
             : new AuthenticationHeaderValue("Bearer", token);
     }
 
+    private static void ApplyTenantHeaders(HttpRequestMessage request)
+    {
+        var cloud = SettingsManager.Load().CloudApi;
+        PublicMenuApiClient.ApplyTenantHeaders(request, cloud.RestaurantId, cloud.RestaurantSlug);
+    }
+
     public async Task<T?> GetAsync<T>(string path, CancellationToken cancellationToken = default)
     {
         using var response = await SendWithRetryAsync(
@@ -57,6 +63,7 @@ public sealed class EliteApiClient
                 {
                     var r = new HttpRequestMessage(HttpMethod.Get, BuildRequestUri(path));
                     ApplyBearer(r, _bearerToken);
+                    ApplyTenantHeaders(r);
                     return r;
                 },
                 cancellationToken)
@@ -72,6 +79,7 @@ public sealed class EliteApiClient
                 {
                     var r = new HttpRequestMessage(HttpMethod.Delete, BuildRequestUri(path));
                     ApplyBearer(r, _bearerToken);
+                    ApplyTenantHeaders(r);
                     return r;
                 },
                 cancellationToken)
@@ -95,6 +103,7 @@ public sealed class EliteApiClient
                 {
                     var r = new HttpRequestMessage(HttpMethod.Get, BuildRequestUri("api/admin/data/bundles/create-order"));
                     ApplyBearer(r, _bearerToken);
+                    ApplyTenantHeaders(r);
                     return r;
                 },
                 cancellationToken)
@@ -128,6 +137,7 @@ public sealed class EliteApiClient
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, BuildRequestUri("api/health"));
             ApplyBearer(request, _bearerToken);
+            ApplyTenantHeaders(request);
             using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
             return response.IsSuccessStatusCode;
         }
@@ -158,6 +168,7 @@ public sealed class EliteApiClient
                         Content = JsonContent.Create(payload, options: JsonOptions)
                     };
                     ApplyBearer(r, _bearerToken);
+                    ApplyTenantHeaders(r);
                     return r;
                 },
                 cancellationToken)
@@ -183,6 +194,7 @@ public sealed class EliteApiClient
                         Content = JsonContent.Create(payload, options: JsonOptions)
                     };
                     ApplyBearer(r, _bearerToken);
+                    ApplyTenantHeaders(r);
                     return r;
                 },
                 cancellationToken)
@@ -211,10 +223,18 @@ public sealed class EliteApiClient
     /// </summary>
     public async Task<TResponse?> PostWithoutBearerAsync<TRequest, TResponse>(string path, TRequest payload, CancellationToken cancellationToken = default)
     {
-        using var http = CreateUnauthenticatedClient();
-        using var response = await SendWithRetryDelegateAsync(
-            () => http.PostAsJsonAsync(Normalize(path), payload, JsonOptions, cancellationToken),
-            cancellationToken).ConfigureAwait(false);
+        using var response = await SendWithRetryAsync(
+                () =>
+                {
+                    var r = new HttpRequestMessage(HttpMethod.Post, BuildRequestUri(path))
+                    {
+                        Content = JsonContent.Create(payload, options: JsonOptions)
+                    };
+                    ApplyTenantHeaders(r);
+                    return r;
+                },
+                cancellationToken)
+            .ConfigureAwait(false);
         await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
         return await response.Content.ReadFromJsonAsync<TResponse>(JsonOptions, cancellationToken).ConfigureAwait(false);
     }

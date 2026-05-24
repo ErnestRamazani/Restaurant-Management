@@ -1,12 +1,15 @@
+using EliteRestaurant.Api.Options;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Tenancy;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace EliteRestaurant.Api.Tenancy;
 
-public sealed class RestaurantTenantResolver(AppDbContext db)
+public sealed class RestaurantTenantResolver(AppDbContext db, IOptions<TenancyOptions> tenancyOptions)
 {
+    private readonly TenancyOptions _tenancy = tenancyOptions.Value;
     public const string TenantHeader = "X-Restaurant-Id";
     public const string SlugHeader = "X-Restaurant-Slug";
 
@@ -49,6 +52,15 @@ public sealed class RestaurantTenantResolver(AppDbContext db)
                 .FirstOrDefaultAsync(r => r.Id == restaurantId && r.IsActive, cancellationToken);
         }
 
+        if (!string.IsNullOrEmpty(normalizedHost) && IsPlatformApiHost(normalizedHost))
+        {
+            return await db.Restaurants.IgnoreQueryFilters()
+                .AsNoTracking()
+                .Where(r => r.IsActive)
+                .OrderBy(r => r.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
         if (allowDevelopmentFallback)
         {
             return await db.Restaurants.IgnoreQueryFilters()
@@ -59,6 +71,19 @@ public sealed class RestaurantTenantResolver(AppDbContext db)
         }
 
         return null;
+    }
+
+    private bool IsPlatformApiHost(string normalizedHost)
+    {
+        foreach (var entry in _tenancy.PlatformApiHosts)
+        {
+            var platformHost = RestaurantHostNormalizer.NormalizeHost(entry);
+            if (!string.IsNullOrEmpty(platformHost)
+                && string.Equals(platformHost, normalizedHost, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
     }
 
     private Task<Restaurant?> FindBySlugAsync(string slug, CancellationToken cancellationToken) =>

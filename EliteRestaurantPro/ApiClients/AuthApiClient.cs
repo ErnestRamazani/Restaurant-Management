@@ -2,6 +2,7 @@ using System.Net.Http;
 using System.Text.Json;
 using EliteRestaurant.Contracts.Auth;
 using EliteRestaurant.Core.Utils;
+using EliteRestaurantPro.Services;
 
 namespace EliteRestaurantPro.ApiClients;
 
@@ -27,7 +28,9 @@ public sealed class AuthApiClient(EliteApiClient? apiClient = null)
                 var settings = SettingsManager.Load();
                 settings.CloudApi.AccessToken = response.AccessToken;
                 settings.CloudApi.TokenExpiresAtUtc = response.ExpiresAtUtc;
+                CloudConnectionSettings.ApplyRestaurantIdFromAccessToken(settings, response.AccessToken);
                 SettingsManager.Save(settings);
+                _apiClient.ReloadFromSettings();
             }
 
             return new CloudAuthResult(response, response is null ? "Login returned an empty response." : null);

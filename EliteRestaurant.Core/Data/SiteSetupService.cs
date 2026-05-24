@@ -13,6 +13,12 @@ public sealed class SiteSetupService(AppDbContext db)
         var count = await db.Restaurants.IgnoreQueryFilters().CountAsync(cancellationToken);
         var hasDesktopAdmin = await HasActiveDesktopAdminAsync(cancellationToken);
         var setupRequired = !hasDesktopAdmin;
+        var primary = await db.Restaurants.IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(r => r.IsActive)
+            .OrderBy(r => r.Id)
+            .Select(r => new { r.Id, r.Slug, r.Name })
+            .FirstOrDefaultAsync(cancellationToken);
         return new SetupStatus(
             SetupRequired: setupRequired,
             RestaurantCount: count,
@@ -20,7 +26,10 @@ public sealed class SiteSetupService(AppDbContext db)
                 ? count == 0
                     ? "No restaurant site exists yet. Run first-site setup."
                     : "No admin account exists yet. Run first-site setup to create one."
-                : "At least one restaurant site is configured.");
+                : "At least one restaurant site is configured.",
+            PrimaryRestaurantId: primary?.Id,
+            PrimaryRestaurantSlug: primary?.Slug,
+            PrimaryRestaurantName: primary?.Name);
     }
 
     public async Task<SiteSetupResult> CreateFirstSiteAsync(
@@ -427,7 +436,13 @@ public sealed record SiteSetupCommand(
     string? AdminName,
     string? PreferredLanguage);
 
-public sealed record SetupStatus(bool SetupRequired, int RestaurantCount, string Message);
+public sealed record SetupStatus(
+    bool SetupRequired,
+    int RestaurantCount,
+    string Message,
+    int? PrimaryRestaurantId = null,
+    string? PrimaryRestaurantSlug = null,
+    string? PrimaryRestaurantName = null);
 
 public sealed record CreatedSite(
     int RestaurantId,
