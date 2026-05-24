@@ -34,12 +34,23 @@ dist/EliteRestaurantPro-Setup.zip
 
 Upload **that ZIP** (one download). Do not upload a lone `.exe` unless you tell users to run the installer script inside the ZIP.
 
-## What customers do (install steps)
+## What customers do
+
+### First install (once per computer)
 
 1. Download `EliteRestaurantPro-Setup.zip`.
 2. Extract the ZIP.
 3. Right-click **`Install-EliteRestaurantPro.ps1`** → **Run with PowerShell**.
 4. Open the desktop shortcut **Elite Restaurant Pro**.
+
+### Updates (new version you send them)
+
+1. Download the **new** ZIP (you must build and send a new file each release).
+2. Extract it.
+3. Double-click **`Update-EliteRestaurantPro.bat`** (no PowerShell, no wiping data).
+4. Open the same desktop shortcut **Elite Restaurant Pro**.
+
+Customers should **not** run `EliteRestaurantPro.exe` from inside the ZIP folder. The shortcut points to the installed copy under `%LocalAppData%\Programs\Elite Restaurant Pro\`.
 
 The installer copies the app to `%LocalAppData%\Programs\Elite Restaurant Pro\`.
 

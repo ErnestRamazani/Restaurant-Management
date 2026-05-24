@@ -34,15 +34,23 @@ Get-ChildItem $staging -File | Where-Object { $_.Extension -ne ".exe" } | Remove
 
 Copy-Item $freshSettings (Join-Path $staging "app-settings.json") -Force
 Copy-Item $installScript (Join-Path $staging "Install-EliteRestaurantPro.ps1") -Force
+Copy-Item (Join-Path $PSScriptRoot "installer\Update-EliteRestaurantPro.bat") (Join-Path $staging "Update-EliteRestaurantPro.bat") -Force
 
 @"
 Elite Restaurant Pro — Setup
 ============================
 
-1. Extract this ZIP anywhere (Downloads is fine).
-2. Right-click Install-EliteRestaurantPro.ps1 -> Run with PowerShell.
-   (If blocked: open PowerShell here and run: .\Install-EliteRestaurantPro.ps1)
-3. Launch from the new desktop shortcut "Elite Restaurant Pro".
+FIRST INSTALL (once per PC):
+1. Extract this ZIP.
+2. Double-click Install-EliteRestaurantPro.ps1 (Run with PowerShell).
+3. Use the desktop shortcut "Elite Restaurant Pro".
+
+UPDATES (when you send a new version):
+1. Extract the new ZIP.
+2. Double-click Update-EliteRestaurantPro.bat
+3. Open the app from the same desktop shortcut.
+
+Do NOT run EliteRestaurantPro.exe directly from the ZIP folder — use the shortcut after install/update.
 
 Settings folder:
   %LocalAppData%\Elite Restaurant Pro\settings\
