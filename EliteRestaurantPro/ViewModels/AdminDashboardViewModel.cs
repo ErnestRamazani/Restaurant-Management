@@ -77,8 +77,8 @@ public class AdminDashboardViewModel : AdminBaseViewModel
     public string ChartLinePoints { get; private set; } = "0,160 145,160 290,160 435,160 580,160";
     public string WeeklyChartMaxLabel { get; private set; } = "$1000";
 
-    public string HourlyChartAreaPoints { get; private set; } = string.Empty;
-    public string HourlyChartLinePoints { get; private set; } = string.Empty;
+    public string HourlyChartAreaPoints { get; private set; } = "0,140 640,140 640,140 0,140";
+    public string HourlyChartLinePoints { get; private set; } = "0,140 640,140";
     public string HourlyChartMaxLabel { get; private set; } = "$0";
 
     public ObservableCollection<DashboardInventoryRowItem> InventoryDashboardRows { get; } = [];
@@ -636,8 +636,12 @@ public class AdminDashboardViewModel : AdminBaseViewModel
             {
                 DatabaseConnected = false;
                 DatabaseStatusText = "Cloud API · Error";
+                BuildHourlyChart(new decimal[24]);
                 OnPropertyChanged(nameof(DatabaseConnected));
                 OnPropertyChanged(nameof(DatabaseStatusText));
+                OnPropertyChanged(nameof(HourlyChartAreaPoints));
+                OnPropertyChanged(nameof(HourlyChartLinePoints));
+                OnPropertyChanged(nameof(HourlyChartMaxLabel));
                 RecentActivities.Clear();
                 RecentActivities.Add(new ActivityItem
                 {
@@ -689,14 +693,18 @@ public class AdminDashboardViewModel : AdminBaseViewModel
     {
         const double w = 640;
         const double h = 140;
-        var max = Math.Max(hourly24.DefaultIfEmpty().Max(), 1m);
-        HourlyChartMaxLabel = $"${max:N0}";
+        var max = hourly24.Length > 0 ? hourly24.Max() : 0m;
+        var hasData = max > 0m;
+        var scaleMax = hasData ? max : 1m;
+        HourlyChartMaxLabel = hasData ? $"${max:N0}" : "$0";
         var linePoints = new List<string>();
         for (var hour = 0; hour < 24; hour++)
         {
             var x = hour * (w / 23d);
-            var val = hourly24[hour];
-            var y = h - (double)(val / max) * (h - 4);
+            var val = hour < hourly24.Length ? hourly24[hour] : 0m;
+            var y = hasData
+                ? h - (double)(val / scaleMax) * (h - 4)
+                : h;
             linePoints.Add($"{x:0.##},{Math.Clamp(y, 2d, h):0.##}");
         }
 

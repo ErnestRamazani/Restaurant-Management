@@ -334,7 +334,7 @@
                                                Foreground="{StaticResource TextMutedBrush}" FontSize="9"/>
                                     <TextBlock Grid.Column="0" Text="$0" VerticalAlignment="Bottom" HorizontalAlignment="Right" Margin="0,0,6,0"
                                                Foreground="{StaticResource TextMutedBrush}" FontSize="9"/>
-                                    <Viewbox Grid.Column="1" Stretch="Fill" Height="140" VerticalAlignment="Top">
+                                    <Viewbox Grid.Column="1" Stretch="Uniform" Height="140" VerticalAlignment="Top">
                                         <Grid Width="640" Height="140">
                                             <Polygon Points="{Binding HourlyChartAreaPoints, Mode=OneWay}" StrokeThickness="0">
                                                 <Polygon.Fill>

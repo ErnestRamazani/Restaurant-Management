@@ -194,7 +194,7 @@ public sealed class AdminSyncController(AppDbContext db) : ControllerBase
     {
         foreach (var property in source.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public))
         {
-            if (!property.CanRead || !property.CanWrite || property.Name == "Id")
+            if (!property.CanRead || !property.CanWrite || property.Name is "Id" or "RestaurantId")
                 continue;
             if (property.GetIndexParameters().Length > 0)
                 continue;
