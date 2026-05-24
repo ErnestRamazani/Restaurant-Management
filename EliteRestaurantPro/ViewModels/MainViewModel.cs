@@ -106,22 +106,23 @@ public class MainViewModel : BaseViewModel
                 return;
             }
 
-            if (!status.SetupRequired)
+            if (status.SetupRequired)
             {
-                if (!settings.FirstSiteSetupCompleted)
-                {
-                    settings.FirstSiteSetupCompleted = true;
-                    SettingsManager.Save(settings);
-                }
-
-                if (CurrentViewModel is FirstSiteSetupViewModel)
-                    Navigate(new RoleSelectionViewModel(Navigate));
+                settings.FirstSiteSetupCompleted = false;
+                settings.CloudApi.BaseUrl = baseUrl;
+                SettingsManager.Save(settings);
+                NavigateToFirstSiteSetup();
                 return;
             }
 
-            // Empty cloud database only — first restaurant not created yet.
             if (!settings.FirstSiteSetupCompleted)
-                NavigateToFirstSiteSetup();
+            {
+                settings.FirstSiteSetupCompleted = true;
+                SettingsManager.Save(settings);
+            }
+
+            if (CurrentViewModel is FirstSiteSetupViewModel)
+                Navigate(new RoleSelectionViewModel(Navigate));
         }
         catch
         {

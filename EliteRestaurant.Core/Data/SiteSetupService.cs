@@ -10,11 +10,15 @@ public sealed class SiteSetupService(AppDbContext db)
     public async Task<SetupStatus> GetStatusAsync(CancellationToken cancellationToken = default)
     {
         var count = await db.Restaurants.IgnoreQueryFilters().CountAsync(cancellationToken);
+        var hasDesktopAdmin = await HasActiveDesktopAdminAsync(cancellationToken);
+        var setupRequired = !hasDesktopAdmin;
         return new SetupStatus(
-            SetupRequired: count == 0,
+            SetupRequired: setupRequired,
             RestaurantCount: count,
-            Message: count == 0
-                ? "No restaurant site exists yet. Run first-site setup."
+            Message: setupRequired
+                ? count == 0
+                    ? "No restaurant site exists yet. Run first-site setup."
+                    : "No admin account exists yet. Run first-site setup to create one."
                 : "At least one restaurant site is configured.");
     }
 
@@ -22,10 +26,112 @@ public sealed class SiteSetupService(AppDbContext db)
         SiteSetupCommand request,
         CancellationToken cancellationToken = default)
     {
-        if (await db.Restaurants.IgnoreQueryFilters().AnyAsync(cancellationToken))
+        if (await HasActiveDesktopAdminAsync(cancellationToken))
             return SiteSetupResult.Fail(["Setup has already been completed. Use new-site setup to add another restaurant."]);
 
+        var placeholder = await db.Restaurants.IgnoreQueryFilters()
+            .OrderBy(r => r.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (placeholder is not null)
+            return await CompleteFirstSiteOnPlaceholderAsync(request, placeholder, cancellationToken);
+
         return await CreateSiteCoreAsync(request, isFirstSite: true, cancellationToken);
+    }
+
+    private Task<bool> HasActiveDesktopAdminAsync(CancellationToken cancellationToken) =>
+        db.Employees.IgnoreQueryFilters()
+            .AnyAsync(
+                e => e.EmploymentStatus == "Active"
+                     && (e.Role == "Admin" || e.Role == "Manager"),
+                cancellationToken);
+
+    private async Task<SiteSetupResult> CompleteFirstSiteOnPlaceholderAsync(
+        SiteSetupCommand request,
+        Restaurant placeholder,
+        CancellationToken cancellationToken)
+    {
+        var errors = Validate(request);
+        if (errors.Count > 0)
+            return SiteSetupResult.Fail(errors);
+
+        var slug = RestaurantSlug.Normalize(request.Slug, request.RestaurantName);
+        if (!RestaurantSlug.IsValid(slug))
+            return SiteSetupResult.Fail(["Slug must be 2–64 characters: lowercase letters, numbers, and hyphens only."]);
+
+        var domain = NormalizeOptionalDomain(request.CustomDomain);
+        if (domain is not null && await DomainInUseAsync(domain, excludeRestaurantId: placeholder.Id, cancellationToken))
+            return SiteSetupResult.Fail(["That custom domain is already registered to another restaurant."]);
+
+        if (await SlugInUseAsync(slug, excludeRestaurantId: placeholder.Id, cancellationToken))
+            return SiteSetupResult.Fail(["That slug is already in use."]);
+
+        var signInId = request.AdminSignInId.Trim();
+        if (await db.Employees.IgnoreQueryFilters()
+                .AnyAsync(e => e.SignInId == signInId, cancellationToken))
+            return SiteSetupResult.Fail(["That sign-in ID is already in use."]);
+
+        var adminName = string.IsNullOrWhiteSpace(request.AdminName)
+            ? $"{request.RestaurantName.Trim()} Admin"
+            : request.AdminName.Trim();
+        var lang = NormalizeLanguage(request.PreferredLanguage);
+
+        placeholder.Name = request.RestaurantName.Trim();
+        placeholder.Slug = slug;
+        placeholder.CustomDomain = domain;
+        placeholder.IsActive = true;
+
+        var menu = await db.PublicMenuSettings.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(s => s.RestaurantId == placeholder.Id, cancellationToken);
+        if (menu is null)
+        {
+            db.PublicMenuSettings.Add(new PublicMenuSetting
+            {
+                RestaurantId = placeholder.Id,
+                Key = "default",
+                RestaurantName = placeholder.Name,
+                WebsiteDomain = domain ?? string.Empty,
+                AdminWebSignInId = signInId,
+                AdminWebPin = request.AdminPin.Trim(),
+                UpdatedAtUtc = DateTime.UtcNow
+            });
+        }
+        else
+        {
+            menu.RestaurantName = placeholder.Name;
+            menu.WebsiteDomain = domain ?? string.Empty;
+            menu.AdminWebSignInId = signInId;
+            menu.AdminWebPin = request.AdminPin.Trim();
+            menu.UpdatedAtUtc = DateTime.UtcNow;
+        }
+
+        var admin = new Employee
+        {
+            RestaurantId = placeholder.Id,
+            UniqueId = "EMP-SETUP-ADMIN-001",
+            SignInId = signInId,
+            Name = adminName,
+            Role = "Admin",
+            PinCode = EmployeePinHasher.HashForStorage(request.AdminPin),
+            EmploymentStatus = "Active",
+            JoinDate = DateTime.UtcNow,
+            PreferredLanguage = lang,
+            ProfileImagePath = string.Empty,
+            PhoneNumber = string.Empty,
+            Notes = "Created by first-site setup (placeholder tenant)."
+        };
+        db.Employees.Add(admin);
+        await db.SaveChangesAsync(cancellationToken);
+
+        return SiteSetupResult.Ok(new CreatedSite(
+            placeholder.Id,
+            placeholder.UniqueId,
+            placeholder.Slug,
+            placeholder.CustomDomain,
+            admin.Id,
+            admin.UniqueId,
+            admin.Name,
+            admin.SignInId,
+            admin.Role));
     }
 
     public async Task<SiteSetupResult> CreateNewSiteAsync(
@@ -87,10 +193,10 @@ public sealed class SiteSetupService(AppDbContext db)
             return SiteSetupResult.Fail(["Slug must be 2–64 characters: lowercase letters, numbers, and hyphens only."]);
 
         var domain = NormalizeOptionalDomain(request.CustomDomain);
-        if (domain is not null && await DomainInUseAsync(domain, cancellationToken))
+        if (domain is not null && await DomainInUseAsync(domain, excludeRestaurantId: null, cancellationToken))
             return SiteSetupResult.Fail(["That custom domain is already registered to another restaurant."]);
 
-        if (await SlugInUseAsync(slug, cancellationToken))
+        if (await SlugInUseAsync(slug, excludeRestaurantId: null, cancellationToken))
             return SiteSetupResult.Fail(["That slug is already in use."]);
 
         var signInId = request.AdminSignInId.Trim();
@@ -249,14 +355,17 @@ public sealed class SiteSetupService(AppDbContext db)
         return l is "fr" or "en" ? l : "en";
     }
 
-    private Task<bool> SlugInUseAsync(string slug, CancellationToken cancellationToken) =>
+    private Task<bool> SlugInUseAsync(string slug, int? excludeRestaurantId, CancellationToken cancellationToken) =>
         db.Restaurants.IgnoreQueryFilters()
-            .AnyAsync(r => r.Slug == slug, cancellationToken);
+            .AnyAsync(
+                r => r.Slug == slug && (excludeRestaurantId == null || r.Id != excludeRestaurantId),
+                cancellationToken);
 
-    private async Task<bool> DomainInUseAsync(string domain, CancellationToken cancellationToken)
+    private async Task<bool> DomainInUseAsync(string domain, int? excludeRestaurantId, CancellationToken cancellationToken)
     {
         var rows = await db.Restaurants.IgnoreQueryFilters()
-            .Where(r => r.CustomDomain != null && r.CustomDomain != "")
+            .Where(r => r.CustomDomain != null && r.CustomDomain != ""
+                        && (excludeRestaurantId == null || r.Id != excludeRestaurantId))
             .Select(r => r.CustomDomain!)
             .ToListAsync(cancellationToken);
         return rows.Any(d => RestaurantHostNormalizer.NormalizeHost(d) == domain);

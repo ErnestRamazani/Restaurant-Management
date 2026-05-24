@@ -161,14 +161,6 @@ public sealed class FirstSiteSetupViewModel : BaseViewModel
                 ? $"Cloud API is online. Ready to create the first site ({status.RestaurantCount} restaurants now)."
                 : $"Your cloud site already exists ({status.RestaurantCount} restaurant). Use Sign in below with your existing admin ID and PIN — do not create a new site.";
 
-            if (!status.SetupRequired)
-            {
-                var settings = SettingsManager.Load();
-                settings.FirstSiteSetupCompleted = true;
-                settings.CloudApi.BaseUrl = normalizedUrl;
-                SettingsManager.Save(settings);
-                _navigate(new RoleSelectionViewModel(_navigate));
-            }
         }
         finally
         {
