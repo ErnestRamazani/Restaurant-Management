@@ -42,6 +42,18 @@ public sealed class SetupController(
         if (!status.SetupRequired)
             return Conflict(new SiteSetupErrorDto(["First-site setup is not available — a restaurant already exists."]));
 
+        try
+        {
+            jwtTokenService.EnsureSigningKeyConfigured();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return StatusCode(500, new SiteSetupErrorDto([
+                ex.Message,
+                "On DigitalOcean: App → Settings → add JWT__SigningKey (at least 32 random characters), then redeploy."
+            ]));
+        }
+
         return await CompleteSetupAsync(
             () => setupService.CreateFirstSiteAsync(ToCore(body), cancellationToken));
     }
@@ -97,7 +109,16 @@ public sealed class SetupController(
 
     private async Task<IActionResult> CompleteSetupAsync(Func<Task<SiteSetupResult>> create)
     {
-        var result = await create();
+        SiteSetupResult result;
+        try
+        {
+            result = await create();
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new SiteSetupErrorDto([$"Setup failed: {ex.GetBaseException().Message}"]));
+        }
+
         if (!result.Success || result.Site is null)
             return BadRequest(new SiteSetupErrorDto(result.Errors));
 
@@ -113,8 +134,10 @@ public sealed class SetupController(
             Portal: "Admin",
             ExpiresAtUtc: DateTime.UtcNow);
 
-        var jwt = jwtTokenService.CreateToken(session, out var expiresAtUtc, preferredLanguage: null);
-        return Ok(new SiteSetupResponse(
+        try
+        {
+            var jwt = jwtTokenService.CreateToken(session, out var expiresAtUtc, preferredLanguage: null);
+            return Ok(new SiteSetupResponse(
             site.RestaurantId,
             site.RestaurantUniqueId,
             site.Slug,
@@ -125,6 +148,14 @@ public sealed class SetupController(
             site.Name,
             site.SignInId,
             site.Role));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return StatusCode(500, new SiteSetupErrorDto([
+                ex.Message,
+                "The site may have been created. Try signing in with your admin ID and PIN, or set JWT__SigningKey on the API and run setup again."
+            ]));
+        }
     }
 
     private static SiteSetupCommand ToCore(Contracts.Setup.SiteSetupRequest dto) =>

@@ -2,6 +2,7 @@ using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Tenancy;
 using EliteRestaurant.Core.Utils;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace EliteRestaurant.Core.Data;
 
@@ -67,8 +68,8 @@ public sealed class SiteSetupService(AppDbContext db)
 
         var signInId = request.AdminSignInId.Trim();
         if (await db.Employees.IgnoreQueryFilters()
-                .AnyAsync(e => e.SignInId == signInId, cancellationToken))
-            return SiteSetupResult.Fail(["That sign-in ID is already in use."]);
+                .AnyAsync(e => e.SignInId == signInId && e.RestaurantId != placeholder.Id, cancellationToken))
+            return SiteSetupResult.Fail(["That sign-in ID is already in use on another site."]);
 
         var adminName = string.IsNullOrWhiteSpace(request.AdminName)
             ? $"{request.RestaurantName.Trim()} Admin"
@@ -104,23 +105,52 @@ public sealed class SiteSetupService(AppDbContext db)
             menu.UpdatedAtUtc = DateTime.UtcNow;
         }
 
-        var admin = new Employee
+        var existingAdmin = await db.Employees.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(
+                e => e.RestaurantId == placeholder.Id
+                     && (e.UniqueId == "EMP-SETUP-ADMIN-001" || e.SignInId == signInId),
+                cancellationToken);
+
+        Employee admin;
+        if (existingAdmin is not null)
         {
-            RestaurantId = placeholder.Id,
-            UniqueId = "EMP-SETUP-ADMIN-001",
-            SignInId = signInId,
-            Name = adminName,
-            Role = "Admin",
-            PinCode = EmployeePinHasher.HashForStorage(request.AdminPin),
-            EmploymentStatus = "Active",
-            JoinDate = DateTime.UtcNow,
-            PreferredLanguage = lang,
-            ProfileImagePath = string.Empty,
-            PhoneNumber = string.Empty,
-            Notes = "Created by first-site setup (placeholder tenant)."
-        };
-        db.Employees.Add(admin);
-        await db.SaveChangesAsync(cancellationToken);
+            admin = existingAdmin;
+            admin.SignInId = signInId;
+            admin.Name = adminName;
+            admin.Role = "Admin";
+            admin.PinCode = EmployeePinHasher.HashForStorage(request.AdminPin);
+            admin.EmploymentStatus = "Active";
+            admin.PreferredLanguage = lang;
+            admin.RestaurantId = placeholder.Id;
+        }
+        else
+        {
+            admin = new Employee
+            {
+                RestaurantId = placeholder.Id,
+                UniqueId = "EMP-SETUP-ADMIN-001",
+                SignInId = signInId,
+                Name = adminName,
+                Role = "Admin",
+                PinCode = EmployeePinHasher.HashForStorage(request.AdminPin),
+                EmploymentStatus = "Active",
+                JoinDate = DateTime.UtcNow,
+                PreferredLanguage = lang,
+                ProfileImagePath = string.Empty,
+                PhoneNumber = string.Empty,
+                Notes = "Created by first-site setup (placeholder tenant)."
+            };
+            db.Employees.Add(admin);
+        }
+
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex)
+        {
+            return SiteSetupResult.Fail(DescribeSaveFailure(ex));
+        }
 
         return SiteSetupResult.Ok(new CreatedSite(
             placeholder.Id,
@@ -132,6 +162,22 @@ public sealed class SiteSetupService(AppDbContext db)
             admin.Name,
             admin.SignInId,
             admin.Role));
+    }
+
+    private static IReadOnlyList<string> DescribeSaveFailure(DbUpdateException ex)
+    {
+        var detail = ex.InnerException?.Message ?? ex.Message;
+        if (detail.Contains("duplicate key", StringComparison.OrdinalIgnoreCase)
+            || ex.InnerException is PostgresException { SqlState: "23505" })
+        {
+            return
+            [
+                "Setup could not save because a sign-in ID, slug, or domain is already in use.",
+                "If you already ran setup once, use Sign in with that admin ID and PIN instead of creating again."
+            ];
+        }
+
+        return [$"Database error during setup: {detail}"];
     }
 
     public async Task<SiteSetupResult> CreateNewSiteAsync(

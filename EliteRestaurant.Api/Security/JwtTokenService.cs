@@ -10,6 +10,9 @@ public sealed class JwtTokenService(IOptions<JwtOptions> options)
 {
     private readonly JwtOptions _options = options.Value;
 
+    /// <summary>Throws <see cref="InvalidOperationException"/> when <see cref="JwtOptions.SigningKey"/> is missing or too short.</summary>
+    public void EnsureSigningKeyConfigured() => _ = GetSigningKey();
+
     public string CreateToken(AuthenticatedStaffSession session, out DateTime expiresAtUtc, string? preferredLanguage = null)
     {
         expiresAtUtc = DateTime.UtcNow.AddHours(Math.Max(1, _options.ExpirationHours));

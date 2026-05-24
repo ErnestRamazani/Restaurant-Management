@@ -57,7 +57,15 @@ public sealed class SetupApiClient
         }
 
         var errors = await TryReadErrorsAsync(response, cancellationToken);
-        return new SiteSetupOutcome(null, errors ?? [$"Setup failed ({(int)response.StatusCode})."]);
+        if (errors is null)
+        {
+            var raw = await response.Content.ReadAsStringAsync(cancellationToken);
+            errors = string.IsNullOrWhiteSpace(raw)
+                ? [$"Setup failed (HTTP {(int)response.StatusCode})."]
+                : [raw.Trim()];
+        }
+
+        return new SiteSetupOutcome(null, errors);
     }
 
     private static async Task<IReadOnlyList<string>?> TryReadErrorsAsync(
