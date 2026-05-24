@@ -33,7 +33,7 @@ public static class RestaurantTenantBootstrap
 
         db.Database.ExecuteSqlRaw("""UPDATE "Employees" SET "RestaurantId" = {0} WHERE "RestaurantId" = 0 OR "RestaurantId" IS NULL""", restaurantId);
         db.Database.ExecuteSqlRaw("""UPDATE "Products" SET "RestaurantId" = {0} WHERE "RestaurantId" = 0 OR "RestaurantId" IS NULL""", restaurantId);
-        db.Database.ExecuteSqlRaw("""UPDATE "Tables" SET "RestaurantId" = {0} WHERE "RestaurantId" = 0 OR "RestaurantId" IS NULL""", restaurantId);
+        BackfillTablesRestaurantId(db, restaurantId);
         db.Database.ExecuteSqlRaw("""UPDATE "Orders" SET "RestaurantId" = {0} WHERE "RestaurantId" = 0 OR "RestaurantId" IS NULL""", restaurantId);
         db.Database.ExecuteSqlRaw("""UPDATE "InventoryItems" SET "RestaurantId" = {0} WHERE "RestaurantId" = 0 OR "RestaurantId" IS NULL""", restaurantId);
         db.Database.ExecuteSqlRaw("""UPDATE "CustomerProfiles" SET "RestaurantId" = {0} WHERE "RestaurantId" = 0 OR "RestaurantId" IS NULL""", restaurantId);
@@ -52,7 +52,7 @@ public static class RestaurantTenantBootstrap
     {
         StampIfUnset(db.Employees.IgnoreQueryFilters(), restaurantId);
         StampIfUnset(db.Products.IgnoreQueryFilters(), restaurantId);
-        StampIfUnset(db.Tables.IgnoreQueryFilters(), restaurantId);
+        BackfillTablesRestaurantId(db, restaurantId);
         StampIfUnset(db.Orders.IgnoreQueryFilters(), restaurantId);
         StampIfUnset(db.InventoryItems.IgnoreQueryFilters(), restaurantId);
         StampIfUnset(db.CustomerProfiles.IgnoreQueryFilters(), restaurantId);
@@ -73,5 +73,42 @@ public static class RestaurantTenantBootstrap
     {
         foreach (var row in query.Where(e => e.RestaurantId == 0).ToList())
             row.RestaurantId = restaurantId;
+    }
+
+    /// <summary>
+    /// Legacy rows may have <c>RestaurantId = 0</c> while another row already uses the same
+    /// <see cref="Table.TableNumber"/> for the target restaurant — a bulk UPDATE would violate
+    /// <c>IX_Tables_RestaurantId_TableNumber</c>.
+    /// </summary>
+    private static void BackfillTablesRestaurantId(AppDbContext db, int restaurantId)
+    {
+        var orphans = db.Tables.IgnoreQueryFilters()
+            .Where(t => t.RestaurantId == 0)
+            .OrderBy(t => t.Id)
+            .ToList();
+        if (orphans.Count == 0)
+            return;
+
+        var used = db.Tables.IgnoreQueryFilters()
+            .Where(t => t.RestaurantId == restaurantId)
+            .Select(t => t.TableNumber)
+            .ToHashSet();
+
+        var next = used.Count == 0 ? 1 : used.Max() + 1;
+
+        foreach (var table in orphans)
+        {
+            if (table.TableNumber <= 0 || !used.Add(table.TableNumber))
+            {
+                while (!used.Add(next))
+                    next++;
+                table.TableNumber = next;
+                next++;
+            }
+
+            table.RestaurantId = restaurantId;
+        }
+
+        db.SaveChanges();
     }
 }
