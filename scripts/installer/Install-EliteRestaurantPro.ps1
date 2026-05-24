@@ -16,10 +16,24 @@ New-Item -ItemType Directory -Path $programDir -Force | Out-Null
 New-Item -ItemType Directory -Path $settingsDir -Force | Out-Null
 
 Copy-Item $exeSource (Join-Path $programDir "EliteRestaurantPro.exe") -Force
-if (Test-Path $freshSettings) {
+
+# Upgrades: never overwrite an existing release profile (cloud URL, tokens, branding).
+$legacySettings = Join-Path $env:LOCALAPPDATA "EliteRestaurantPro\settings\app-settings.json"
+if (Test-Path $settingsPath) {
+    Write-Host "Keeping existing settings:"
+    Write-Host "  $settingsPath"
+} elseif (Test-Path $legacySettings) {
+    Copy-Item $legacySettings $settingsPath -Force
+    Write-Host "Migrated settings from dev profile:"
+    Write-Host "  $legacySettings"
+} elseif (Test-Path $freshSettings) {
     Copy-Item $freshSettings $settingsPath -Force
+    Write-Host "Created fresh settings:"
+    Write-Host "  $settingsPath"
 } else {
     @'{"firstSiteSetupCompleted":false,"cloudApi":{"baseUrl":"https://etoilegourmandekin.com"}}'@ | Set-Content $settingsPath -Encoding UTF8
+    Write-Host "Created default settings:"
+    Write-Host "  $settingsPath"
 }
 
 $desktop = [Environment]::GetFolderPath("Desktop")

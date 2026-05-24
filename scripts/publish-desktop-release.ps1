@@ -44,13 +44,15 @@ Elite Restaurant Pro — Setup
    (If blocked: open PowerShell here and run: .\Install-EliteRestaurantPro.ps1)
 3. Launch from the new desktop shortcut "Elite Restaurant Pro".
 
-This install uses a NEW settings folder:
+Settings folder:
   %LocalAppData%\Elite Restaurant Pro\settings\
-It does NOT read your dev profile at:
+
+Upgrades: re-running the installer keeps your existing app-settings.json.
+First install on a dev PC may copy from:
   %LocalAppData%\EliteRestaurantPro\settings\
 
-Restaurant data (menu, orders) still comes from the cloud API after you sign in.
-For a blank cloud site, complete the first-time setup wizard when prompted.
+Restaurant data (menu, orders) lives in the cloud — upgrades do not wipe the database.
+For a blank cloud site only, complete the first-time setup wizard when prompted.
 "@ | Set-Content (Join-Path $staging "README-INSTALL.txt") -Encoding UTF8
 
 $zipPath = Join-Path $OutputDir $ZipName

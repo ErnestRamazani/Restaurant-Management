@@ -108,6 +108,13 @@ public class MainViewModel : BaseViewModel
                 NavigateToFirstSiteSetup();
                 return;
             }
+
+            // Cloud already has a restaurant — do not force first-site wizard on upgrades/reinstalls.
+            if (!settings.FirstSiteSetupCompleted)
+            {
+                settings.FirstSiteSetupCompleted = true;
+                SettingsManager.Save(settings);
+            }
         }
         catch
         {

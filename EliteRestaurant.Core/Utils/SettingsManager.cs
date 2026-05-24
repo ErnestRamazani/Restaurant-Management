@@ -30,6 +30,7 @@ public static class SettingsManager
 
     public static AppSettings Load()
     {
+        TryMigrateLegacyDevSettingsIfNeeded();
         try
         {
             var path = GetSettingsPath();
@@ -177,4 +178,67 @@ public static class SettingsManager
             return null;
         }
     }
+
+#if RELEASE_DISTRIBUTION
+    /// <summary>
+    /// First install of the release build on a dev machine: copy the old
+    /// <c>%LocalAppData%\EliteRestaurantPro\settings</c> profile when the release folder is empty.
+    /// </summary>
+    private static void TryMigrateLegacyDevSettingsIfNeeded()
+    {
+        try
+        {
+            if (TryGetPortableSettingsDirectory() is not null)
+                return;
+
+            var releaseDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Elite Restaurant Pro",
+                "settings");
+            var releasePath = Path.Combine(releaseDir, SettingsFileName);
+            var legacyPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "EliteRestaurantPro",
+                "settings",
+                SettingsFileName);
+
+            if (!File.Exists(legacyPath))
+                return;
+
+            if (File.Exists(releasePath) && !LooksLikeFreshInstallProfile(releasePath))
+                return;
+
+            Directory.CreateDirectory(releaseDir);
+            File.Copy(legacyPath, releasePath, overwrite: true);
+        }
+        catch
+        {
+            // Non-fatal — user can sign in manually.
+        }
+    }
+
+    private static bool LooksLikeFreshInstallProfile(string settingsPath)
+    {
+        try
+        {
+            var json = File.ReadAllText(settingsPath);
+            var profile = JsonSerializer.Deserialize<AppSettings>(json, LoadAppSettingsOptions) ?? new AppSettings();
+            profile.CloudApi ??= new CloudApiSettings();
+            profile.BusinessProfile ??= new BusinessProfileSettings();
+
+            var hasToken = !string.IsNullOrWhiteSpace(profile.CloudApi.AccessToken);
+            var hasBranding = !string.IsNullOrWhiteSpace(profile.BusinessProfile.RestaurantName);
+            var completed = profile.FirstSiteSetupCompleted;
+            return !hasToken && !hasBranding && !completed;
+        }
+        catch
+        {
+            return true;
+        }
+    }
+#else
+    private static void TryMigrateLegacyDevSettingsIfNeeded()
+    {
+    }
+#endif
 }

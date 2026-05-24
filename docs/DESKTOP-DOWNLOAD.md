@@ -41,7 +41,11 @@ Upload **that ZIP** (one download). Do not upload a lone `.exe` unless you tell 
 3. Right-click **`Install-EliteRestaurantPro.ps1`** → **Run with PowerShell**.
 4. Open the desktop shortcut **Elite Restaurant Pro**.
 
-The installer copies the app to `%LocalAppData%\Programs\Elite Restaurant Pro\` and writes a **blank** `app-settings.json`.
+The installer copies the app to `%LocalAppData%\Programs\Elite Restaurant Pro\`.
+
+**Upgrades:** if `app-settings.json` already exists under `%LocalAppData%\Elite Restaurant Pro\settings\`, the installer **does not overwrite it** (cloud URL, sign-in tokens, branding stay).
+
+**First install:** creates a blank profile, or copies from `%LocalAppData%\EliteRestaurantPro\settings\` if you used the dev build on the same PC.
 
 ## First launch
 

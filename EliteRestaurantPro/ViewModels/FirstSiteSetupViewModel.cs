@@ -124,13 +124,14 @@ public sealed class FirstSiteSetupViewModel : BaseViewModel
 
     private void SkipToRoleSelection()
     {
-        if (SettingsManager.IsPortableInstall())
-        {
-            var settings = SettingsManager.Load();
-            settings.FirstSiteSetupCompleted = true;
-            SettingsManager.Save(settings);
-        }
+        var settings = SettingsManager.Load();
+        settings.FirstSiteSetupCompleted = true;
+        if (!string.IsNullOrWhiteSpace(CloudApiUrl))
+            settings.CloudApi.BaseUrl = CloudEndpoints.NormalizeApiBaseUrl(CloudApiUrl);
+        SettingsManager.Save(settings);
 
+        StatusMessage =
+            "Skipped setup. Sign in with the admin or staff ID and PIN already on your cloud site (not a new PIN from this form).";
         _navigate(new RoleSelectionViewModel(_navigate));
     }
 
