@@ -322,7 +322,7 @@ public static class AdminWebDashboardAggregator
             inventoryAlerts,
             topDishDtos,
             hourlySales.ToList(),
-            hourlyMax <= 0m ? 1m : hourlyMax,
+            hourlyMax > 0.005m ? hourlyMax : 0m,
             staffRoster,
             activityDtos);
     }

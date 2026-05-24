@@ -653,6 +653,9 @@ public class AdminDashboardViewModel : AdminBaseViewModel
         }
     }
 
+    private static string ChartPoint(double x, double y) =>
+        string.Format(CultureInfo.InvariantCulture, "{0:0.##},{1:0.##}", x, y);
+
     private void BuildChart(IReadOnlyList<decimal> values)
     {
         var pointsX = new[] { 0, 145, 290, 435, 580 };
@@ -665,11 +668,11 @@ public class AdminDashboardViewModel : AdminBaseViewModel
         {
             var value = i < values.Count ? values[i] : 0m;
             var y = 160d - ((double)(value / max) * 157d);
-            linePoints.Add($"{pointsX[i]},{Math.Clamp(y, 3d, 160d):0.##}");
+            linePoints.Add(ChartPoint(pointsX[i], Math.Clamp(y, 3d, 160d)));
         }
 
         ChartLinePoints = string.Join(" ", linePoints);
-        ChartAreaPoints = $"{ChartLinePoints} 580,160 0,160";
+        ChartAreaPoints = $"{ChartLinePoints} {ChartPoint(580, 160)} {ChartPoint(0, 160)}";
     }
 
     private void BuildSparkline(IReadOnlyList<decimal> values)
@@ -683,20 +686,23 @@ public class AdminDashboardViewModel : AdminBaseViewModel
             var x = values.Count <= 1 ? 0 : i * (w / (values.Count - 1));
             var val = values[i];
             var y = h - (double)(val / max) * (h - 2);
-            pts.Add($"{x:0.##},{Math.Clamp(y, 1d, h):0.##}");
+            pts.Add(ChartPoint(x, Math.Clamp(y, 1d, h)));
         }
 
-        SparklinePoints = pts.Count > 0 ? string.Join(" ", pts) : $"0,{h} {w},{h}";
+        SparklinePoints = pts.Count > 0 ? string.Join(" ", pts) : $"{ChartPoint(0, h)} {ChartPoint(w, h)}";
     }
 
     private void BuildHourlyChart(decimal[] hourly24)
     {
         const double w = 640;
         const double h = 140;
+        var total = hourly24.Sum();
         var max = hourly24.Length > 0 ? hourly24.Max() : 0m;
-        var hasData = max > 0m;
-        var scaleMax = hasData ? max : 1m;
-        HourlyChartMaxLabel = hasData ? $"${max:N0}" : "$0";
+        var hasData = total > 0.005m;
+        var scaleMax = hasData ? Math.Max(max, 0.01m) : 1m;
+        HourlyChartMaxLabel = hasData
+            ? $"${max.ToString("N0", CultureInfo.InvariantCulture)}"
+            : "$0";
         var linePoints = new List<string>();
         for (var hour = 0; hour < 24; hour++)
         {
@@ -705,11 +711,11 @@ public class AdminDashboardViewModel : AdminBaseViewModel
             var y = hasData
                 ? h - (double)(val / scaleMax) * (h - 4)
                 : h;
-            linePoints.Add($"{x:0.##},{Math.Clamp(y, 2d, h):0.##}");
+            linePoints.Add(ChartPoint(x, Math.Clamp(y, 2d, h)));
         }
 
         HourlyChartLinePoints = string.Join(" ", linePoints);
-        HourlyChartAreaPoints = $"{HourlyChartLinePoints} {w},{h} 0,{h}";
+        HourlyChartAreaPoints = $"{HourlyChartLinePoints} {ChartPoint(w, h)} {ChartPoint(0, h)}";
     }
 
     private static string DrilldownAccentForQuantityBand(string band) =>

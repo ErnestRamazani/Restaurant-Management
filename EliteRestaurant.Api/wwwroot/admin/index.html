@@ -1570,13 +1570,16 @@
       let hourly = Array.isArray(hourlyRaw) ? hourlyRaw.map(x => Math.max(0, Number(x) || 0)) : [];
       if (hourly.length !== 24)
         hourly = Array(24).fill(0);
+      const hourlyTotal = hourly.reduce((sum, v) => sum + v, 0);
+      const hasHourlyData = hourlyTotal > 0.005;
       const maxReported = Number(pick(d, "hourlyRevenueChartMax", "HourlyRevenueChartMax")) || 0;
-      const max = Math.max(maxReported, ...hourly, 1);
+      const max = hasHourlyData ? Math.max(maxReported, ...hourly, 0.01) : 1;
       const w = 640, h = 200, padL = 40, padR = 14, padT = 14, padB = 30;
       const innerW = w - padL - padR;
       const innerH = h - padT - padB;
+      const yBase = h - padB;
       const gx = i => padL + (i / 23) * innerW;
-      const gy = v => padT + innerH * (1 - v / max);
+      const gy = v => hasHourlyData ? padT + innerH * (1 - v / max) : yBase;
       let grid = "";
       for (let g = 0; g <= 4; g++) {
         const y = padT + (g / 4) * innerH;
@@ -1585,8 +1588,8 @@
       const pts = hourly.map((v, i) => gx(i).toFixed(1) + "," + gy(v).toFixed(1)).join(" ");
       const xLast = gx(23).toFixed(1);
       const xFirst = gx(0).toFixed(1);
-      const yBase = (h - padB).toFixed(1);
-      const areaPts = pts + " " + xLast + "," + yBase + " " + xFirst + "," + yBase;
+      const yBaseStr = yBase.toFixed(1);
+      const areaPts = pts + " " + xLast + "," + yBaseStr + " " + xFirst + "," + yBaseStr;
       let hits = "";
       for (let hour = 0; hour < 24; hour++) {
         hits += "<rect class=\"chart-hit\" x=\"" + (gx(hour) - 13) + "\" y=\"" + padT + "\" width=\"26\" height=\"" + innerH + "\" data-hour=\"" + hour + "\" />";
