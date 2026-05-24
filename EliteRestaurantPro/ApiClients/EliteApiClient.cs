@@ -65,6 +65,24 @@ public sealed class EliteApiClient
         return await response.Content.ReadFromJsonAsync<T>(JsonOptions, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<bool> DeleteAsync(string path, CancellationToken cancellationToken = default)
+    {
+        using var response = await SendWithRetryAsync(
+                () =>
+                {
+                    var r = new HttpRequestMessage(HttpMethod.Delete, BuildRequestUri(path));
+                    ApplyBearer(r, _bearerToken);
+                    return r;
+                },
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return false;
+
+        await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
     /// <summary>
     /// Load-order bundle is absent on older API hosts; those may incorrectly return SPA HTML (200) for unknown routes.
     /// Returns null when the route is missing or the body is not JSON — callers should fall back to legacy list calls.

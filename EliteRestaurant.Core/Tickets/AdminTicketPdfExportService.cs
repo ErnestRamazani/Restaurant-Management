@@ -19,51 +19,53 @@ public static class AdminTicketPdfExportService
     private const float ColQtyPt = 16f;
     private const float ColUnitPricePt = 44f;
     private const float ColLineTotalPt = 50f;
+    private const string ReceiptFont = "Arial";
+    private static readonly string ReceiptBlack = Colors.Black;
+
+    private static float MmToPt(double mm) => (float)(mm * (72.0 / 25.4));
+
+    private static TextStyle ReceiptTextStyle(float size, bool bold = false)
+    {
+        var style = TextStyle.Default.FontFamily(ReceiptFont).FontSize(size).FontColor(ReceiptBlack);
+        return bold ? style.Bold() : style.SemiBold();
+    }
 
     private static string FormatReceiptUsd(decimal amount) =>
         "$ " + amount.ToString("0.00", CultureInfo.InvariantCulture);
 
-    private static TextStyle ReceiptBaseStyle()
-        => TextStyle.Default.FontFamily("Courier New").FontSize(FontBody).FontColor(Colors.Black);
+    private static TextStyle ReceiptBaseStyle() => ReceiptTextStyle(FontBody);
 
     private static void ReceiptDashRule(ColumnDescriptor column) =>
         column.Item()
             .PaddingVertical(3)
             .AlignCenter()
             .Text("------------------------------------------------")
-            .FontFamily("Courier New")
-            .FontSize(FontSmall)
-            .FontColor(Colors.Grey.Medium);
+            .Style(ReceiptTextStyle(FontSmall));
 
     private static void ReceiptTotalRow(ColumnDescriptor column, string label, string amountText, bool muted = false)
     {
         column.Item().Row(row =>
         {
-            row.RelativeItem().Text(label).FontFamily("Courier New").FontSize(FontBody)
-                .FontColor(muted ? Colors.Grey.Darken2 : Colors.Black);
-            row.ConstantItem(ColLineTotalPt + 8).AlignRight().Text(amountText).FontFamily("Courier New").FontSize(FontBody)
-                .FontColor(muted ? Colors.Grey.Darken2 : Colors.Black);
+            row.RelativeItem().Text(label).Style(ReceiptTextStyle(FontBody));
+            row.ConstantItem(ColLineTotalPt + 8).AlignRight().Text(amountText).Style(ReceiptTextStyle(FontBody));
         });
     }
 
     private static void ReceiptMoneyCell(IContainer cell, string amountText) =>
         cell.AlignTop().AlignRight().PaddingVertical(1)
             .Text(amountText)
-            .FontFamily("Courier New")
-            .FontSize(FontBody)
-            .FontColor(Colors.Black);
+            .Style(ReceiptTextStyle(FontBody));
 
     private static void CenterMutedLine(ColumnDescriptor column, string text)
     {
         if (string.IsNullOrWhiteSpace(text))
             return;
-        column.Item().AlignCenter().Text(text).FontFamily("Courier New").FontSize(FontSmall).FontColor(Colors.Grey.Darken2)
-            .LineHeight(1.15f);
+        column.Item().AlignCenter().Text(text).Style(ReceiptTextStyle(FontSmall)).LineHeight(1.15f);
     }
 
     private static void CenterBodyLine(ColumnDescriptor column, string text)
     {
-        column.Item().AlignCenter().Text(text).FontFamily("Courier New").FontSize(FontBody).FontColor(Colors.Black);
+        column.Item().AlignCenter().Text(text).Style(ReceiptTextStyle(FontBody));
     }
 
     private static void CenteredInlineRow(ColumnDescriptor column, Action<RowDescriptor> composeInlineRow)
@@ -125,9 +127,7 @@ public static class AdminTicketPdfExportService
 
             row.AutoItem().AlignMiddle()
                 .Text(caption)
-                .FontFamily("Courier New")
-                .FontSize(FontSmall)
-                .FontColor(Colors.Black);
+                .Style(ReceiptTextStyle(FontSmall));
         });
     }
 
@@ -154,10 +154,7 @@ public static class AdminTicketPdfExportService
 
         column.Item().AlignCenter()
             .Text(m.RestaurantTitle)
-            .FontFamily("Courier New")
-            .FontSize(FontTitle)
-            .Bold()
-            .FontColor(Colors.Black);
+            .Style(ReceiptTextStyle(FontTitle, bold: true));
 
         if (!string.IsNullOrWhiteSpace(m.RestaurantPhone))
             CenterBodyLine(column, $"Phone: {m.RestaurantPhone.Trim()}");
@@ -166,11 +163,8 @@ public static class AdminTicketPdfExportService
         {
             column.Item().PaddingTop(4).AlignCenter()
                 .Text(m.TicketConfirmationCode.Trim())
-                .FontFamily("Courier New")
-                .FontSize(FontConfirmationCode)
-                .Bold()
-                .LetterSpacing(0.08f)
-                .FontColor(Colors.Black);
+                .Style(ReceiptTextStyle(FontConfirmationCode, bold: true))
+                .LetterSpacing(0.08f);
             CenterBodyLine(column, "CONFIRMATION CODE");
         }
 
@@ -200,20 +194,20 @@ public static class AdminTicketPdfExportService
 
             table.Header(header =>
             {
-                header.Cell().Text("QTY").Bold().FontColor(Colors.Black);
-                header.Cell().Text("ITEM").Bold().FontColor(Colors.Black);
-                header.Cell().AlignTop().AlignRight().Text("P.U").Bold().FontColor(Colors.Black);
-                header.Cell().AlignTop().AlignRight().Text("TOTAL").Bold().FontColor(Colors.Black);
+                header.Cell().Text("QTY").Style(ReceiptTextStyle(FontBody, bold: true));
+                header.Cell().Text("ITEM").Style(ReceiptTextStyle(FontBody, bold: true));
+                header.Cell().AlignTop().AlignRight().Text("P.U").Style(ReceiptTextStyle(FontBody, bold: true));
+                header.Cell().AlignTop().AlignRight().Text("TOTAL").Style(ReceiptTextStyle(FontBody, bold: true));
             });
 
             foreach (var line in m.Lines)
             {
                 table.Cell().AlignTop().PaddingVertical(1)
-                    .Text(line.Quantity.ToString(CultureInfo.InvariantCulture));
+                    .Text(line.Quantity.ToString(CultureInfo.InvariantCulture))
+                    .Style(ReceiptTextStyle(FontBody));
                 table.Cell().AlignTop().PaddingVertical(1)
                     .Text(line.Name)
-                    .FontFamily("Courier New")
-                    .FontSize(FontBody)
+                    .Style(ReceiptTextStyle(FontBody))
                     .LineHeight(1.05f);
                 table.Cell().Element(c => ReceiptMoneyCell(c, FormatReceiptUsd(line.UnitPrice)));
                 table.Cell().Element(c => ReceiptMoneyCell(c, FormatReceiptUsd(line.LineTotal)));
@@ -226,13 +220,10 @@ public static class AdminTicketPdfExportService
         if (m.TicketDiscountAmount > 0m && !string.IsNullOrWhiteSpace(m.TicketDiscountLineText))
             column.Item().Row(row =>
             {
-                row.RelativeItem().Text("Discount:").FontFamily("Courier New").FontSize(FontBody)
-                    .FontColor(Colors.Red.Darken3);
+                row.RelativeItem().Text("Discount:").Style(ReceiptTextStyle(FontBody));
                 row.ConstantItem(86).AlignRight()
                     .Text($"-$ {m.TicketDiscountAmount:N2}")
-                    .FontFamily("Courier New")
-                    .FontSize(FontBody)
-                    .FontColor(Colors.Red.Darken3);
+                    .Style(ReceiptTextStyle(FontBody));
             });
         else
             ReceiptTotalRow(column, "Discount:", FormatReceiptUsd(0m), muted: true);
@@ -244,34 +235,26 @@ public static class AdminTicketPdfExportService
 
         column.Item().PaddingTop(4).AlignRight()
             .Text("GRAND TOTAL USD")
-            .FontFamily("Courier New")
-            .FontSize(FontGrandLabel)
-            .Bold()
-            .FontColor(Colors.Black);
+            .Style(ReceiptTextStyle(FontGrandLabel, bold: true));
         column.Item().AlignRight()
             .Text(FormatReceiptUsd(m.TicketGrandTotal))
-            .FontFamily("Courier New")
-            .FontSize(FontGrandAmount)
-            .Bold()
-            .FontColor(Colors.Black);
+            .Style(ReceiptTextStyle(FontGrandAmount, bold: true));
 
         column.Item().AlignRight().PaddingTop(2)
             .Text($"Equivalent FC: {m.TicketEquivalentFcText}")
-            .FontFamily("Courier New")
-            .FontSize(FontBody)
-            .FontColor(Colors.Black);
+            .Style(ReceiptTextStyle(FontBody));
 
         if (includePaymentSection)
         {
             column.Item().PaddingTop(4).AlignRight()
                 .Text($"Collected: {m.TicketPaymentText}")
-                .FontFamily("Courier New").FontSize(FontBody).FontColor(Colors.Grey.Darken2);
+                .Style(ReceiptTextStyle(FontBody));
             column.Item().AlignRight()
                 .Text(m.TicketPaidBreakdownText)
-                .FontFamily("Courier New").FontSize(FontSmall).FontColor(Colors.Grey.Darken2);
+                .Style(ReceiptTextStyle(FontSmall));
             column.Item().AlignRight()
                 .Text(m.TicketChangeBreakdownText)
-                .FontFamily("Courier New").FontSize(FontSmall).FontColor(Colors.Grey.Darken2);
+                .Style(ReceiptTextStyle(FontSmall));
         }
 
         column.Item().PaddingTop(16);
@@ -279,10 +262,7 @@ public static class AdminTicketPdfExportService
         var thankYou = string.IsNullOrWhiteSpace(m.FooterText) ? "MERCI / THANK YOU" : m.FooterText.Trim();
         column.Item().AlignCenter()
             .Text(thankYou)
-            .FontFamily("Courier New")
-            .FontSize(FontThankYou)
-            .Bold()
-            .FontColor(Colors.Black);
+            .Style(ReceiptTextStyle(FontThankYou, bold: true));
 
         column.Item().PaddingTop(12);
 
@@ -305,23 +285,14 @@ public static class AdminTicketPdfExportService
             foreach (var part in m.LegalInfo.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
                 CenterMutedLine(column, part);
         }
-
-        if (includePaymentSection && !string.IsNullOrWhiteSpace(m.TicketVerification))
-        {
-            column.Item().PaddingTop(8).AlignCenter()
-                .Text($"Verification: {m.TicketVerification}")
-                .FontFamily("Courier New")
-                .FontSize(FontSmall)
-                .FontColor(Colors.Grey.Darken2);
-        }
     }
 
     private static void ConfigureReceiptPage(PageDescriptor page)
     {
-        const double mm = 72.0 / 25.4;
-        page.ContinuousSize((float)(72 * mm));
-        page.MarginHorizontal((float)(3 * mm));
-        page.MarginVertical((float)(4 * mm));
+        page.ContinuousSize(MmToPt(76));
+        page.MarginHorizontal(MmToPt(3));
+        page.MarginTop(MmToPt(4));
+        page.MarginBottom(0);
         page.PageColor(Colors.White);
         page.DefaultTextStyle(ReceiptBaseStyle());
     }
@@ -332,7 +303,9 @@ public static class AdminTicketPdfExportService
             container.Page(page =>
             {
                 ConfigureReceiptPage(page);
-                page.Content().Column(c => ComposeReceiptBody(c, m, includePaymentSection: true));
+                page.Content()
+                    .ShrinkVertical()
+                    .Column(c => ComposeReceiptBody(c, m, includePaymentSection: true));
             });
         }).GeneratePdf();
 
@@ -342,7 +315,9 @@ public static class AdminTicketPdfExportService
             container.Page(page =>
             {
                 ConfigureReceiptPage(page);
-                page.Content().Column(c => ComposeReceiptBody(c, m, includePaymentSection: false));
+                page.Content()
+                    .ShrinkVertical()
+                    .Column(c => ComposeReceiptBody(c, m, includePaymentSection: false));
             });
         }).GeneratePdf();
 

@@ -163,6 +163,104 @@ public sealed class AdminDataController(AppDbContext db) : ControllerBase
         return Ok(CashierOrderDetailBuilder.Build(order));
     }
 
+    /// <summary>Server/create-order drafts stored in cloud DB (desktop cloud-only mode).</summary>
+    [HttpGet("order-drafts")]
+    public ActionResult<IReadOnlyList<AdminOrderDraftDto>> ListOrderDrafts(
+        [FromQuery] int employeeId,
+        [FromQuery] int tableId = 0,
+        [FromQuery] bool restrictCustomer = false)
+    {
+        if (employeeId <= 0)
+            return BadRequest(new { message = "employeeId is required." });
+
+        try
+        {
+            var rows = SharedOrderDraftStore.ListServerDrafts(employeeId, tableId, restrictCustomer)
+                .Select(d => new AdminOrderDraftDto(
+                    d.Id,
+                    d.Label,
+                    d.PayloadJson,
+                    d.UpdatedAtUtc,
+                    d.TableId,
+                    d.IsCustomerDraft))
+                .ToList();
+            return Ok(rows);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Draft storage read failed.", detail = ex.Message });
+        }
+    }
+
+    [HttpPost("order-drafts")]
+    public ActionResult<AdminOrderDraftDto> SaveOrderDraft([FromBody] AdminSaveOrderDraftRequest? request)
+    {
+        if (request is null || request.EmployeeId <= 0)
+            return BadRequest(new { message = "EmployeeId and payload are required." });
+
+        var snapshot = request.SnapshotJson?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(snapshot))
+            return BadRequest(new { message = "SnapshotJson is required." });
+
+        try
+        {
+            using var _ = JsonDocument.Parse(snapshot);
+        }
+        catch
+        {
+            return BadRequest(new { message = "SnapshotJson must be valid JSON." });
+        }
+
+        try
+        {
+            var tableId = SharedOrderDraftStore.ParseTableIdFromSnapshotJson(snapshot);
+            var saved = SharedOrderDraftStore.SaveServerDraft(
+                request.EmployeeId,
+                request.EmployeeName ?? string.Empty,
+                request.Label ?? string.Empty,
+                snapshot,
+                tableId);
+
+            return Ok(new AdminOrderDraftDto(
+                saved.Id,
+                saved.Label,
+                saved.PayloadJson,
+                saved.UpdatedAtUtc,
+                saved.TableId,
+                saved.IsCustomerDraft));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Draft save failed.", detail = ex.Message });
+        }
+    }
+
+    [HttpDelete("order-drafts/{draftId}")]
+    public ActionResult DeleteOrderDraft(
+        string draftId,
+        [FromQuery] int employeeId,
+        [FromQuery] int tableId = 0,
+        [FromQuery] bool restrictCustomer = false)
+    {
+        if (employeeId <= 0)
+            return BadRequest(new { message = "employeeId is required." });
+        if (string.IsNullOrWhiteSpace(draftId))
+            return BadRequest(new { message = "draftId is required." });
+
+        try
+        {
+            var deleted = SharedOrderDraftStore.DeleteServerDraft(employeeId, draftId, tableId, restrictCustomer);
+            if (!deleted)
+                return NotFound(new { message = "Draft not found." });
+
+            return Ok(new { ok = true, id = draftId });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Draft delete failed.", detail = ex.Message });
+        }
+    }
+
     [HttpGet("bundles/create-order")]
     public async Task<ActionResult<AdminCreateOrderCatalogBundleResponse>> CreateOrderCatalogBundle(CancellationToken cancellationToken)
     {

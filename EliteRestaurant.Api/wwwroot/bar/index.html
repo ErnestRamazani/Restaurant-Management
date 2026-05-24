@@ -711,6 +711,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.7/dist/browser/signalr.min.js" crossorigin="anonymous"></script>
+  <script src="/js/elite-portal-session.js"></script>
   <script>
 (function () {
   let token = "";
@@ -2194,7 +2195,11 @@
 
   async function tryRestoreBarSession() {
     const savedToken = sessionStorage.getItem(KITCHEN_TOKEN_KEY);
-    if (!savedToken) return;
+    if (!savedToken || (window.ElitePortalSession && !window.ElitePortalSession.isJwtUsable(savedToken))) {
+      sessionStorage.removeItem(KITCHEN_TOKEN_KEY);
+      sessionStorage.removeItem(KITCHEN_ME_KEY);
+      return;
+    }
     token = savedToken;
     try {
       const raw = sessionStorage.getItem(KITCHEN_ME_KEY);
@@ -2205,11 +2210,20 @@
     $("sessionLabel").textContent = me
       ? (me.name || "") + " (" + (me.signInId || me.employeeUniqueId || "") + ")"
       : "Bar session";
-    $("roleChip").textContent = (me && me.role) || "Kitchen";
+    $("roleChip").textContent = (me && me.role) || "Bar";
     $("loginWrap").classList.add("hidden");
     $("app").classList.remove("hidden");
     setView("queue");
-    void loadPortalBranding();
+    const brandingOk = await loadPortalBranding();
+    if (!brandingOk) {
+      sessionStorage.removeItem(KITCHEN_TOKEN_KEY);
+      sessionStorage.removeItem(KITCHEN_ME_KEY);
+      token = "";
+      me = null;
+      $("loginWrap").classList.remove("hidden");
+      $("app").classList.add("hidden");
+      return;
+    }
     try {
       await loadQueue();
     } catch (e) {

@@ -46,6 +46,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     private string _restaurantWebsiteDomain = string.Empty;
     private string _restaurantSocialMedia = string.Empty;
     private string _ticketHeaderLogoPath = string.Empty;
+    private string _receiptPrinterName = string.Empty;
     private string _restaurantLogoPath = string.Empty;
     private string _homepageBackgroundImagePath = string.Empty;
     private string _ticketFooterText = string.Empty;
@@ -280,6 +281,14 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         get => _ticketHeaderLogoPath;
         set => SetField(ref _ticketHeaderLogoPath, value);
     }
+
+    public string ReceiptPrinterName
+    {
+        get => _receiptPrinterName;
+        set => SetField(ref _receiptPrinterName, value);
+    }
+
+    public ObservableCollection<string> InstalledPrinterNames { get; } = new();
 
     public string RestaurantLogoPath
     {
@@ -616,6 +625,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     public ICommand ApplyPickerToTokenCommand { get; }
     public ICommand SaveBusinessProfileCommand { get; }
     public ICommand SaveTicketReceiptLayoutCommand { get; }
+    public ICommand RefreshInstalledPrintersCommand { get; }
     public ICommand BrowseTicketHeaderLogoCommand { get; }
     public ICommand BrowseTicketSocialIconCommand { get; }
     public ICommand AddTicketSocialRowCommand { get; }
@@ -651,6 +661,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         ApplyPickerToTokenCommand = new RelayCommand(_ => ApplyPickerToToken());
         SaveBusinessProfileCommand = new RelayCommand(_ => _ = SaveBusinessProfileAsync());
         SaveTicketReceiptLayoutCommand = new RelayCommand(_ => SaveTicketReceiptLayout());
+        RefreshInstalledPrintersCommand = new RelayCommand(_ => RefreshInstalledPrinters());
         BrowseTicketHeaderLogoCommand = new RelayCommand(_ => BrowseTicketHeaderLogo());
         BrowseTicketSocialIconCommand = new RelayCommand(o => BrowseTicketSocialIcon(o));
         AddTicketSocialRowCommand = new RelayCommand(_ => TicketSocialMediaRows.Add(new TicketSocialMediaRowViewModel()));
@@ -872,9 +883,26 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     {
         _settings.TicketReceipt ??= new TicketReceiptSettings();
         TicketHeaderLogoPath = _settings.TicketReceipt.HeaderLogoPath ?? string.Empty;
+        ReceiptPrinterName = _settings.TicketReceipt.ReceiptPrinterName ?? string.Empty;
+        RefreshInstalledPrinters();
+        if (string.IsNullOrWhiteSpace(ReceiptPrinterName))
+        {
+            var auto = InstalledPrinterNames.FirstOrDefault(n =>
+                n.Contains("EliteRestaurant", StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(auto))
+                ReceiptPrinterName = auto;
+        }
+
         TicketSocialMediaRows.Clear();
         foreach (var r in _settings.TicketReceipt.SocialMediaRows)
             TicketSocialMediaRows.Add(new TicketSocialMediaRowViewModel(r.PlatformName, r.UserText, r.IconPath));
+    }
+
+    private void RefreshInstalledPrinters()
+    {
+        InstalledPrinterNames.Clear();
+        foreach (var name in ReceiptTicketPrintService.GetInstalledPrinterNames())
+            InstalledPrinterNames.Add(name);
     }
 
     private void LoadAttendanceSettings()
@@ -1346,6 +1374,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     {
         _settings.TicketReceipt ??= new TicketReceiptSettings();
         _settings.TicketReceipt.HeaderLogoPath = (TicketHeaderLogoPath ?? string.Empty).Trim();
+        _settings.TicketReceipt.ReceiptPrinterName = (ReceiptPrinterName ?? string.Empty).Trim();
         _settings.TicketReceipt.SocialMediaRows = TicketSocialMediaRows
             .Select(vm => new TicketSocialMediaRowSettings
             {

@@ -270,6 +270,7 @@ try
                 "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
                 "style-src 'self' 'unsafe-inline'; " +
                 "img-src 'self' blob: data:; " +
+                "frame-src 'self' blob:; " +
                 $"connect-src 'self' {ProductionOrigin};";
         }
 

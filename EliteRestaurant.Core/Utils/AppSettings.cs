@@ -169,6 +169,9 @@ public sealed class TicketReceiptSettings
     /// <summary>Optional logo image shown above the restaurant name on printed/PDF tickets only.</summary>
     public string HeaderLogoPath { get; set; } = string.Empty;
 
+    /// <summary>Windows printer queue name for POS receipts (e.g. EliteRestaurant_Printer). Does not need to be the system default.</summary>
+    public string ReceiptPrinterName { get; set; } = string.Empty;
+
     public List<TicketSocialMediaRowSettings> SocialMediaRows { get; set; } = [];
 }
 

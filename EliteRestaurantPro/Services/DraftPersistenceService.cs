@@ -47,18 +47,18 @@ public sealed class DraftPersistenceService
     }
 
     public SharedDraftRow Save(int employeeId, string employeeName, CreateOrderDraftPayload payload) =>
-        SharedOrderDraftStore.SaveServerDraft(employeeId, employeeName, payload.DraftLabel, Serialize(payload), payload.SelectedTableId);
+        OrderDraftGateway.Save(employeeId, employeeName, payload.DraftLabel, Serialize(payload), payload.SelectedTableId);
 
     public static IReadOnlyList<SharedDraftRow> ListForEmployee(int employeeId, int selectedTableId, bool restrictCustomerDraftToAssignedServer) =>
-        SharedOrderDraftStore.ListServerDrafts(employeeId, selectedTableId, restrictCustomerDraftToAssignedServer);
+        OrderDraftGateway.List(employeeId, selectedTableId, restrictCustomerDraftToAssignedServer);
 
     public static bool TryGetPayload(int employeeId, string draftUniqueId, int selectedTableId, bool restrictCustomerDraftToAssignedServer, out SharedDraftRow? row)
     {
-        row = SharedOrderDraftStore.ListServerDrafts(employeeId, selectedTableId, restrictCustomerDraftToAssignedServer)
+        row = OrderDraftGateway.List(employeeId, selectedTableId, restrictCustomerDraftToAssignedServer)
             .FirstOrDefault(d => string.Equals(d.Id, draftUniqueId, StringComparison.Ordinal));
         return row is not null;
     }
 
     public static bool Delete(int employeeId, string draftUniqueId, int selectedTableId, bool restrictCustomerDeleteToAssignedServer) =>
-        SharedOrderDraftStore.DeleteServerDraft(employeeId, draftUniqueId, selectedTableId, restrictCustomerDeleteToAssignedServer);
+        OrderDraftGateway.Delete(employeeId, draftUniqueId, selectedTableId, restrictCustomerDeleteToAssignedServer);
 }

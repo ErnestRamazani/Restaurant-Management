@@ -487,6 +487,9 @@ public class AppDbContext : DbContext
         });
     }
 
+    /// <summary>True when this machine has a configured local PostgreSQL connection (desktop offline DB).</summary>
+    public static bool LocalDatabaseConfigured => TryGetPostgreSqlConnectionString(out _);
+
     public static bool TryGetPostgreSqlConnectionString(out string connectionString, string? defaultConnection = null)
     {
         connectionString = string.Empty;

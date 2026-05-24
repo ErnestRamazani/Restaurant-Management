@@ -1,4 +1,5 @@
 (function () {
+  const PORTAL_ID = "Reception";
   let token = "";
   let me = null;
   let tables = [];
@@ -1248,6 +1249,7 @@
     }
     token = res.body.accessToken;
     me = res.body;
+    if (window.ElitePortalSession) window.ElitePortalSession.save(PORTAL_ID, token, me);
     $("sessionLabel").textContent = (me.name || "") + " (" + (me.signInId || me.employeeUniqueId || "") + ")";
     $("loginWrap").classList.add("hidden");
     $("app").classList.remove("hidden");
@@ -1259,8 +1261,9 @@
     startPolling();
   };
 
-  $("btnLogout").onclick = () => {
+  function clearReceptionSession() {
     stopHubAndPoll();
+    if (window.ElitePortalSession) window.ElitePortalSession.clear(PORTAL_ID);
     token = "";
     me = null;
     tables = [];
@@ -1272,7 +1275,32 @@
     $("app").classList.add("hidden");
     $("loginWrap").classList.remove("hidden");
     setHubPill("off");
-  };
+  }
+
+  $("btnLogout").onclick = () => clearReceptionSession();
+
+  async function tryRestoreReceptionSession() {
+    if (!window.ElitePortalSession) return;
+    const saved = window.ElitePortalSession.load(PORTAL_ID);
+    if (!saved.token) return;
+    token = saved.token;
+    me = saved.me;
+    $("sessionLabel").textContent = me
+      ? (me.name || "") + " (" + (me.signInId || me.employeeUniqueId || "") + ")"
+      : "Reception session";
+    $("loginWrap").classList.add("hidden");
+    $("app").classList.remove("hidden");
+    const ok = await loadPortalData();
+    if (!ok) {
+      clearReceptionSession();
+      return;
+    }
+    renderTableMenuList();
+    void loadResScheduling();
+    setView("tableMenu");
+    void startOrderHub();
+    startPolling();
+  }
 
   $("navTableMenu").onclick = () => setView("tableMenu");
   $("navMenu").onclick = () => setView("menu");
@@ -1317,5 +1345,7 @@
   if (window.location.protocol === "file:") {
     $("loginErr").textContent = "Open this page from the API site (e.g. http://localhost:8080/reception/) so login works.";
     $("loginErr").classList.remove("hidden");
+  } else {
+    void tryRestoreReceptionSession();
   }
 })();

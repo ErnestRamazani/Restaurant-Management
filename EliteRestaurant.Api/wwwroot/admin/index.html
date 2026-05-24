@@ -1150,12 +1150,18 @@
     <main class="main-area" id="main"></main>
   </div>
 
+  <script src="/js/elite-portal-session.js"></script>
   <script>
     const TOKEN_KEY = "eliteAdminWebJwt";
+    const PORTAL_ID = "AdminWeb";
     const NAV_FILTER_KEY = "eliteAdminNavFilter";
     const MONEY_COLOR_POS = "#4ade80";
     const MONEY_COLOR_NEG = "#f87171";
     let token = sessionStorage.getItem(TOKEN_KEY) || "";
+    if (token && window.ElitePortalSession && !window.ElitePortalSession.isJwtUsable(token)) {
+      token = "";
+      sessionStorage.removeItem(TOKEN_KEY);
+    }
     let dashClockTimer = null;
     let portalConfig = { restaurantName: "", restaurantLogoUrl: "" };
 

@@ -582,7 +582,9 @@
     </main>
   </div>
 
+  <script src="/js/elite-portal-session.js"></script>
   <script>
+    const PORTAL_ID = "Cashier";
     let token = "";
     let me = null;
     let tables = [];
@@ -1058,6 +1060,7 @@
       setLoginMessage("");
       token = res.body.accessToken;
       me = res.body;
+      if (window.ElitePortalSession) window.ElitePortalSession.save(PORTAL_ID, token, me);
       document.getElementById("sessionLabel").textContent = `${me.name} (${me.signInId || me.employeeUniqueId})`;
       document.getElementById("loginWrap").classList.add("hidden");
       document.getElementById("app").classList.remove("hidden");
@@ -1065,7 +1068,8 @@
       setOut("Cashier order login", { login: res, loaded: ok });
     };
 
-    document.getElementById("btnLogout").onclick = () => {
+    function clearCashierOrderSession() {
+      if (window.ElitePortalSession) window.ElitePortalSession.clear(PORTAL_ID);
       token = ""; me = null; tables = []; products = []; cart.clear();
       document.getElementById("brandName").textContent = "ELITE CASHIER ORDER";
       revokeImgBlob(document.getElementById("brandLogo"));
@@ -1075,7 +1079,28 @@
       document.getElementById("app").classList.add("hidden");
       document.getElementById("loginWrap").classList.remove("hidden");
       setOut("Logged out", { ok: true });
-    };
+    }
+
+    document.getElementById("btnLogout").onclick = () => clearCashierOrderSession();
+
+    async function tryRestoreCashierOrderSession() {
+      if (!window.ElitePortalSession) return;
+      const saved = window.ElitePortalSession.load(PORTAL_ID);
+      if (!saved.token) return;
+      token = saved.token;
+      me = saved.me;
+      document.getElementById("sessionLabel").textContent = me
+        ? `${me.name} (${me.signInId || me.employeeUniqueId})`
+        : "Cashier session";
+      document.getElementById("loginWrap").classList.add("hidden");
+      document.getElementById("app").classList.remove("hidden");
+      const ok = await loadPortalData();
+      if (!ok) {
+        clearCashierOrderSession();
+        return;
+      }
+      setOut("Session restored", { ok: true });
+    }
 
     document.getElementById("btnRefreshAll").onclick = async () => {
       const ok = await loadPortalData();
@@ -1131,6 +1156,10 @@
       clearCurrentOrder();
       await loadPortalData();
     };
+
+    if (window.location.protocol !== "file:") {
+      void tryRestoreCashierOrderSession();
+    }
   </script>
 </body>
 </html>

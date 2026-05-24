@@ -1,4 +1,5 @@
 (function () {
+  const PORTAL_ID = "Cashier";
   let token = "";
   let me = null;
   let activeOrderRows = [];
@@ -89,34 +90,62 @@
     const st = String(orderStatus || "").trim();
     const usePayment = st.toLowerCase() === "completed";
     const variant = usePayment ? "payment" : "client";
-    const url = "/api/cashier/orders/" + orderId + "/ticket.pdf?variant=" + encodeURIComponent(variant);
+    const url =
+      "/api/cashier/orders/" +
+      encodeURIComponent(orderId) +
+      "/ticket.html?variant=" +
+      encodeURIComponent(variant);
     try {
       const res = await fetch(url, { headers: { Authorization: "Bearer " + token } });
       if (!res.ok) {
-        let msg = "Could not load ticket PDF.";
-        try {
-          const j = await res.json();
-          msg = j.message || j.title || msg;
-        } catch (_) {
-          const t = await res.text();
-          if (t) msg = t.slice(0, 200);
-        }
-        alert(msg);
+        console.warn("Ticket print: server returned", res.status);
         return;
       }
-      const blob = await res.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const w = window.open(blobUrl, "_blank", "noopener");
-      if (w) {
-        w.addEventListener("load", () => {
-          try { w.focus(); w.print(); } catch (_) {}
-        }, { once: true });
-      } else {
-        alert("Allow pop-ups to print the ticket PDF.");
+      const html = await res.text();
+      if (!html || html.length < 20) {
+        console.warn("Ticket print: empty receipt");
+        return;
       }
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 120000);
+
+      const iframe = document.createElement("iframe");
+      iframe.setAttribute("title", "Receipt print");
+      iframe.style.cssText =
+        "position:fixed;left:0;top:0;width:0;height:0;border:0;visibility:hidden";
+      document.body.appendChild(iframe);
+
+      const win = iframe.contentWindow;
+      if (!win) {
+        iframe.remove();
+        return;
+      }
+
+      let cleaned = false;
+      const cleanup = () => {
+        if (cleaned) return;
+        cleaned = true;
+        iframe.remove();
+      };
+      win.addEventListener("afterprint", cleanup, { once: true });
+
+      const doc = win.document;
+      doc.open();
+      doc.write(html);
+      doc.close();
+      doc.title = " ";
+
+      setTimeout(() => {
+        try {
+          win.focus();
+          win.print();
+        } catch (err) {
+          console.warn("Ticket print failed", err);
+          cleanup();
+        }
+      }, 400);
+
+      setTimeout(cleanup, 60000);
     } catch (e) {
-      alert(e.message || "Print failed");
+      console.warn("Ticket print failed", e);
     }
   }
 
@@ -1038,6 +1067,7 @@
     }
     token = res.body.accessToken;
     me = res.body;
+    if (window.ElitePortalSession) window.ElitePortalSession.save(PORTAL_ID, token, me);
     $("sessionLabel").textContent = (me.name || "") + " (" + (me.signInId || me.employeeUniqueId || "") + ")";
     $("loginWrap").classList.add("hidden");
     $("app").classList.remove("hidden");
@@ -1049,8 +1079,9 @@
     startPolling();
   };
 
-  $("btnLogout").onclick = () => {
+  function clearCashierSession() {
     stopHubAndPoll();
+    if (window.ElitePortalSession) window.ElitePortalSession.clear(PORTAL_ID);
     token = "";
     me = null;
     revokeImgBlob($("brandLogo"));
@@ -1060,7 +1091,31 @@
     $("app").classList.add("hidden");
     $("loginWrap").classList.remove("hidden");
     setHubPill("off");
-  };
+  }
+
+  $("btnLogout").onclick = () => clearCashierSession();
+
+  async function tryRestoreCashierSession() {
+    if (!window.ElitePortalSession) return;
+    const saved = window.ElitePortalSession.load(PORTAL_ID);
+    if (!saved.token) return;
+    token = saved.token;
+    me = saved.me;
+    $("sessionLabel").textContent = me
+      ? (me.name || "") + " (" + (me.signInId || me.employeeUniqueId || "") + ")"
+      : "Cashier session";
+    $("loginWrap").classList.add("hidden");
+    $("app").classList.remove("hidden");
+    const ok = await loadPortalData();
+    if (!ok) {
+      clearCashierSession();
+      return;
+    }
+    await loadOrdersTab();
+    setView("orders");
+    void startOrderHub();
+    startPolling();
+  }
 
   $("btnRefreshAll").onclick = async () => {
     await loadPortalData();
@@ -1144,5 +1199,7 @@
   if (window.location.protocol === "file:") {
     $("loginErr").textContent = "Open this page from the API site (e.g. http://localhost:8080/cashier/) so login works.";
     $("loginErr").classList.remove("hidden");
+  } else {
+    void tryRestoreCashierSession();
   }
 })();

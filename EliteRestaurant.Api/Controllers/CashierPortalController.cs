@@ -226,10 +226,46 @@ public sealed class CashierPortalController(
             ? AdminTicketPdfExportService.GeneratePaymentReceiptPdfBytes(model)
             : AdminTicketPdfExportService.GenerateClientTicketPdfBytes(model);
 
-        var code = AdminTicketPdfExportService.SanitizeFileName(
-            string.IsNullOrWhiteSpace(order.UniqueId) ? $"order-{order.Id}" : order.UniqueId);
-        var suffix = usePayment ? "payment" : "client";
-        return File(pdfBytes, "application/pdf", $"{code}-{suffix}.pdf");
+        Response.Headers.ContentDisposition = "inline; filename=\"receipt.pdf\"";
+        return File(pdfBytes, "application/pdf");
+    }
+
+    /// <summary>Browser-printable receipt HTML (opens system print dialog; no PDF download).</summary>
+    [HttpGet("orders/{orderId:int}/ticket.html")]
+    public ContentResult GetOrderTicketHtml(int orderId, [FromQuery] string? variant = null)
+    {
+        var session = RequireCashierSession();
+        if (session is null)
+            return Content("<p>Unauthorized</p>", "text/html; charset=utf-8");
+
+        var order = db.Orders
+            .AsNoTracking()
+            .Include(o => o.Items)
+            .ThenInclude(i => i.Product)
+            .Include(o => o.Table)
+            .Include(o => o.Server)
+            .SingleOrDefault(o => o.Id == orderId);
+        if (order is null)
+            return Content("<p>Order not found.</p>", "text/html; charset=utf-8");
+        if (order.Items.Count == 0)
+            return Content("<p>Order has no line items.</p>", "text/html; charset=utf-8");
+
+        var usePayment = variant switch
+        {
+            "payment" or "receipt" => true,
+            "client" or "ticket" => false,
+            _ => OrderTicketPdfBuilder.UsePaymentReceiptVariant(order)
+        };
+
+        var settings = SettingsManager.Load();
+        var headerBytes = TicketBrandingImageResolver.ResolveHeaderLogoBytes(settings, db, env);
+        var model = OrderTicketPdfBuilder.Build(order, settings, headerBytes);
+        var html = usePayment
+            ? OrderTicketHtmlBuilder.BuildPaymentReceiptHtml(model)
+            : OrderTicketHtmlBuilder.BuildClientTicketHtml(model);
+
+        Response.Headers.CacheControl = "no-store";
+        return Content(html, "text/html; charset=utf-8");
     }
 
     [HttpPost("orders/{orderId:int}/complete")]

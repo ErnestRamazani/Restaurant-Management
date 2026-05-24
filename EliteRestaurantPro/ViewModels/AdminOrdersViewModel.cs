@@ -10,7 +10,6 @@ using EliteRestaurant.Core.Orders;
 using EliteRestaurant.Core.Utils;
 using EliteRestaurant.Core.Tickets;
 using EliteRestaurantPro.Services;
-using Microsoft.Win32;
 
 namespace EliteRestaurantPro.ViewModels;
 
@@ -34,8 +33,8 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
         CancelOrderCommand = new RelayCommand(order => CancelOrder(order as OrderEntry));
         PrintTicketCommand = new RelayCommand(order => OpenTicketPreview(order as OrderEntry));
         CloseTicketPreviewCommand = new RelayCommand(_ => IsTicketPreviewOpen = false);
-        ExportTicketPdfCommand = new RelayCommand(_ => ExportTicketPdf());
-        ExportClientTicketPdfCommand = new RelayCommand(_ => ExportClientTicketPdf());
+        ExportTicketPdfCommand = new RelayCommand(_ => PrintPaymentReceipt());
+        ExportClientTicketPdfCommand = new RelayCommand(_ => PrintClientTicket());
         ViewOrderCommand = new RelayCommand(p =>
         {
             var id = p switch
@@ -656,55 +655,49 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
         };
     }
 
-    private void ExportTicketPdf()
+    private void PrintPaymentReceipt()
     {
         if (!TicketLines.Any())
             return;
 
-        var saveDialog = new SaveFileDialog
+        try
         {
-            Title = "Save Payment Receipt PDF",
-            Filter = "PDF files (*.pdf)|*.pdf",
-            DefaultExt = ".pdf",
-            AddExtension = true,
-            FileName = $"{AdminTicketPdfExportService.SanitizeFileName(TicketOrderId)}-payment.pdf"
-        };
-
-        if (saveDialog.ShowDialog() != true)
-            return;
-
-        AdminTicketPdfExportService.ExportPaymentReceiptPdf(saveDialog.FileName, BuildTicketReceiptPdfModel());
-
-        MessageBox.Show(
-            $"Ticket PDF saved:\n{saveDialog.FileName}",
-            "Payment Receipt Export",
-            MessageBoxButton.OK,
-            MessageBoxImage.Information);
+            var settings = SettingsManager.Load();
+            var printer = (settings.TicketReceipt?.ReceiptPrinterName ?? string.Empty).Trim();
+            var bytes = AdminTicketPdfExportService.GeneratePaymentReceiptPdfBytes(BuildTicketReceiptPdfModel());
+            var name = $"{AdminTicketPdfExportService.SanitizeFileName(TicketOrderId)}-payment";
+            ReceiptTicketPrintService.Print(bytes, printer, name);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                ex.GetBaseException().Message,
+                "Print payment receipt",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 
-    private void ExportClientTicketPdf()
+    private void PrintClientTicket()
     {
         if (!TicketLines.Any())
             return;
 
-        var saveDialog = new SaveFileDialog
+        try
         {
-            Title = "Save Client Ticket PDF",
-            Filter = "PDF files (*.pdf)|*.pdf",
-            DefaultExt = ".pdf",
-            AddExtension = true,
-            FileName = $"{AdminTicketPdfExportService.SanitizeFileName(TicketOrderId)}-client.pdf"
-        };
-
-        if (saveDialog.ShowDialog() != true)
-            return;
-
-        AdminTicketPdfExportService.ExportClientTicketPdf(saveDialog.FileName, BuildTicketReceiptPdfModel());
-
-        MessageBox.Show(
-            $"Client ticket saved:\n{saveDialog.FileName}",
-            "Client Ticket Export",
-            MessageBoxButton.OK,
-            MessageBoxImage.Information);
+            var settings = SettingsManager.Load();
+            var printer = (settings.TicketReceipt?.ReceiptPrinterName ?? string.Empty).Trim();
+            var bytes = AdminTicketPdfExportService.GenerateClientTicketPdfBytes(BuildTicketReceiptPdfModel());
+            var name = $"{AdminTicketPdfExportService.SanitizeFileName(TicketOrderId)}-client";
+            ReceiptTicketPrintService.Print(bytes, printer, name);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                ex.GetBaseException().Message,
+                "Print client ticket",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
     }
 }

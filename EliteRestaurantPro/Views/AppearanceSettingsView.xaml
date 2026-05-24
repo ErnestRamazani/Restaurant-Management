@@ -241,6 +241,25 @@
                                        TextWrapping="Wrap"
                                        Margin="0,4,0,12"/>
 
+                            <TextBlock Text="Receipt printer (Windows)" Style="{StaticResource HeadingSmall}"/>
+                            <TextBlock Text="Choose the POS printer queue (e.g. EliteRestaurant_Printer). A Windows default printer is not required."
+                                       Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ComboBox Grid.Column="0"
+                                          ItemsSource="{Binding InstalledPrinterNames}"
+                                          Text="{Binding ReceiptPrinterName, UpdateSourceTrigger=PropertyChanged}"
+                                          IsEditable="True"
+                                          IsTextSearchEnabled="True"
+                                          StaysOpenOnEdit="True"/>
+                                <Button Grid.Column="1" Margin="8,0,0,0" Content="Refresh"
+                                        Command="{Binding RefreshInstalledPrintersCommand}"
+                                        Style="{StaticResource GhostButton}"/>
+                            </Grid>
+
                             <TextBlock Text="Ticket header logo path (not the main restaurant logo)" Style="{StaticResource HeadingSmall}"/>
                             <TextBlock Text="Shown centered above the restaurant name on tickets only. Leave blank to skip."
                                        Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,0,0,6"/>

@@ -2216,7 +2216,9 @@
     </div>
   </div>
 
+  <script src="/js/elite-portal-session.js"></script>
   <script>
+    const PORTAL_ID = "Server";
     let token = "";
     let me = null;
     let tables = [];
@@ -4262,6 +4264,7 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       setLoginMessage("");
       token = res.body.accessToken;
       me = res.body;
+      if (window.ElitePortalSession) window.ElitePortalSession.save(PORTAL_ID, token, me);
       document.getElementById("sessionLabel").textContent = `${me.name} (${me.signInId || me.employeeUniqueId})`;
       document.getElementById("loginWrap").classList.add("hidden");
       document.getElementById("app").classList.remove("hidden");
@@ -4278,8 +4281,9 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       setOut("Server login success", { login: res, loaded: ok });
     };
 
-    document.getElementById("btnLogout").onclick = () => {
+    function clearServerSession() {
       stopOrderHubAndPolling();
+      if (window.ElitePortalSession) window.ElitePortalSession.clear(PORTAL_ID);
       token = ""; me = null; tables = []; products = []; readyOrders = []; ongoingOrders = []; drafts = []; incomingDrafts = []; tableCallsBoard = { tables: [], pendingCallCount: 0 }; cart.clear();
       closeOngoingOrderModal();
       document.getElementById("brandName").textContent = "ELITE SERVER PORTAL";
@@ -4290,7 +4294,35 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       document.getElementById("app").classList.add("hidden");
       document.getElementById("loginWrap").classList.remove("hidden");
       setOut("Logged out", { ok: true });
-    };
+    }
+
+    document.getElementById("btnLogout").onclick = () => clearServerSession();
+
+    async function tryRestoreServerSession() {
+      if (!window.ElitePortalSession) return;
+      const saved = window.ElitePortalSession.load(PORTAL_ID);
+      if (!saved.token) return;
+      token = saved.token;
+      me = saved.me;
+      document.getElementById("sessionLabel").textContent = me
+        ? `${me.name} (${me.signInId || me.employeeUniqueId})`
+        : "Server session";
+      document.getElementById("loginWrap").classList.add("hidden");
+      document.getElementById("app").classList.remove("hidden");
+      const ok = await loadPortalData();
+      if (!ok) {
+        clearServerSession();
+        return;
+      }
+      await loadDrafts();
+      await loadIncomingDrafts();
+      await loadTableCalls();
+      await loadOngoingOrders();
+      navigateToIncomingTab();
+      void startOrderHub();
+      startDraftListPolling();
+      startReadyOrdersPolling();
+    }
 
     document.getElementById("btnRefreshAll").onclick = async () => {
       const ok = await loadPortalData();
@@ -4429,6 +4461,10 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       clearCurrentOrder();
       await loadPortalData();
     };
+
+    if (window.location.protocol !== "file:") {
+      void tryRestoreServerSession();
+    }
   </script>
 </body>
 </html>
