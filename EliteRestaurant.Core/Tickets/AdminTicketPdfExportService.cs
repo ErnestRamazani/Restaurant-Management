@@ -240,21 +240,17 @@ public static class AdminTicketPdfExportService
             .Text(FormatReceiptUsd(m.TicketGrandTotal))
             .Style(ReceiptTextStyle(FontGrandAmount, bold: true));
 
-        column.Item().AlignRight().PaddingTop(2)
-            .Text($"Equivalent FC: {m.TicketEquivalentFcText}")
-            .Style(ReceiptTextStyle(FontBody));
-
         if (includePaymentSection)
         {
-            column.Item().PaddingTop(4).AlignRight()
-                .Text($"Collected: {m.TicketPaymentText}")
+            column.Item().AlignRight().PaddingTop(2)
+                .Text($"Equivalent FC: {m.TicketEquivalentFcText}")
                 .Style(ReceiptTextStyle(FontBody));
             column.Item().AlignRight()
                 .Text(m.TicketPaidBreakdownText)
-                .Style(ReceiptTextStyle(FontSmall));
+                .Style(ReceiptTextStyle(FontBody));
             column.Item().AlignRight()
                 .Text(m.TicketChangeBreakdownText)
-                .Style(ReceiptTextStyle(FontSmall));
+                .Style(ReceiptTextStyle(FontBody));
         }
 
         column.Item().PaddingTop(16);

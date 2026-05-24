@@ -436,9 +436,6 @@
                             <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,2">
                                 <Run Text="Equivalent FC: "/><Run Text="{Binding TicketEquivalentFcText}"/>
                             </TextBlock>
-                            <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,8">
-                                <Run Text="Collected: "/><Run Text="{Binding TicketPaymentText}"/>
-                            </TextBlock>
                             <TextBlock Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,2" FontSize="11"
                                        Text="{Binding TicketPaidBreakdownText}"/>
                             <TextBlock Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,8" FontSize="11"
@@ -510,9 +507,6 @@
                                 </TextBlock>
                                 <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0">
                                     <Run Text="Equivalent FC: "/><Run Text="{Binding TicketEquivalentFcText}"/>
-                                </TextBlock>
-                                <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource StatBlueBrush}" Margin="0,2,0,0">
-                                    <Run Text="Collected: "/><Run Text="{Binding TicketPaymentText}"/>
                                 </TextBlock>
                                 <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" FontSize="11"
                                            Text="{Binding TicketPaidBreakdownText}"/>

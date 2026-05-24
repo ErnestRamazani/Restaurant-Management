@@ -148,13 +148,12 @@ public static class OrderTicketHtmlBuilder
         sb.Append("</table>");
 
         sb.Append("<div class=\"grand\">GRAND TOTAL USD<br/>").Append(Money(m.TicketGrandTotal)).Append("</div>");
-        sb.Append("<div class=\"money\">Equivalent FC: ").Append(Enc(m.TicketEquivalentFcText)).Append("</div>");
 
         if (includePaymentSection)
         {
-            sb.Append("<div class=\"money\">Collected: ").Append(Enc(m.TicketPaymentText)).Append("</div>");
-            sb.Append("<div class=\"muted money\">").Append(Enc(m.TicketPaidBreakdownText)).Append("</div>");
-            sb.Append("<div class=\"muted money\">").Append(Enc(m.TicketChangeBreakdownText)).Append("</div>");
+            sb.Append("<div class=\"money\">Equivalent FC: ").Append(Enc(m.TicketEquivalentFcText)).Append("</div>");
+            sb.Append("<div class=\"money\">").Append(Enc(m.TicketPaidBreakdownText)).Append("</div>");
+            sb.Append("<div class=\"money\">").Append(Enc(m.TicketChangeBreakdownText)).Append("</div>");
         }
 
         var thankYou = string.IsNullOrWhiteSpace(m.FooterText) ? "MERCI / THANK YOU" : m.FooterText.Trim();
