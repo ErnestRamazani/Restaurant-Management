@@ -7,7 +7,7 @@
     "socialMedia": "",
     "logoPath": "",
     "homepageBackgroundImagePath": "",
-    "publicMenuBaseUrl": "https://etoilegourmandekin.com",
+    "publicMenuBaseUrl": "https://starfish-app-owtoz.ondigitalocean.app",
     "staffLoginPasscode": "",
     "adminWebSignInId": "",
     "adminWebPin": "",
@@ -18,7 +18,7 @@
     "socialMediaRows": []
   },
   "cloudApi": {
-    "baseUrl": "https://etoilegourmandekin.com",
+    "baseUrl": "https://starfish-app-owtoz.ondigitalocean.app",
     "accessToken": "",
     "tokenExpiresAtUtc": null
   },

@@ -83,10 +83,7 @@ public class MainViewModel : BaseViewModel
         CloudFirstSyncService.StatusChanged += OnSyncStatusChanged;
         _cloudStatusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
         _cloudStatusTimer.Tick += async (_, _) => await RefreshCloudStatusAsync();
-        if (SettingsManager.IsPortableInstall() && !SettingsManager.Load().FirstSiteSetupCompleted)
-            Navigate(new FirstSiteSetupViewModel(Navigate));
-        else
-            Navigate(new RoleSelectionViewModel(Navigate));
+        Navigate(new RoleSelectionViewModel(Navigate));
         _cloudStatusTimer.Start();
         _ = InitializeNavigationAsync();
         _ = RefreshCloudStatusAsync();
@@ -96,33 +93,41 @@ public class MainViewModel : BaseViewModel
     private async Task InitializeNavigationAsync()
     {
         var settings = SettingsManager.Load();
-        if (SettingsManager.IsPortableInstall() && !settings.FirstSiteSetupCompleted)
-            return;
+        var baseUrl = CloudEndpoints.NormalizeApiBaseUrl(settings.CloudApi.BaseUrl);
 
         try
         {
-            var baseUrl = CloudEndpoints.NormalizeApiBaseUrl(settings.CloudApi.BaseUrl);
             var status = await new SetupApiClient().GetStatusAsync(baseUrl);
-            if (status?.SetupRequired == true)
+            if (status is null)
             {
-                NavigateToFirstSiteSetup();
+                // Wrong URL or offline — stay on sign-in; do not show empty-site wizard.
+                if (CurrentViewModel is FirstSiteSetupViewModel)
+                    Navigate(new RoleSelectionViewModel(Navigate));
                 return;
             }
 
-            // Cloud already has a restaurant — do not force first-site wizard on upgrades/reinstalls.
-            if (!settings.FirstSiteSetupCompleted)
+            if (!status.SetupRequired)
             {
-                settings.FirstSiteSetupCompleted = true;
-                SettingsManager.Save(settings);
+                if (!settings.FirstSiteSetupCompleted)
+                {
+                    settings.FirstSiteSetupCompleted = true;
+                    SettingsManager.Save(settings);
+                }
+
+                if (CurrentViewModel is FirstSiteSetupViewModel)
+                    Navigate(new RoleSelectionViewModel(Navigate));
+                return;
             }
+
+            // Empty cloud database only — first restaurant not created yet.
+            if (!settings.FirstSiteSetupCompleted)
+                NavigateToFirstSiteSetup();
         }
         catch
         {
-            /* offline or older API — fall through to normal login */
+            if (CurrentViewModel is FirstSiteSetupViewModel)
+                Navigate(new RoleSelectionViewModel(Navigate));
         }
-
-        if (CurrentViewModel is FirstSiteSetupViewModel)
-            Navigate(new RoleSelectionViewModel(Navigate));
     }
 
     private void NavigateToFirstSiteSetup()

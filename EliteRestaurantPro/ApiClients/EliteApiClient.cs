@@ -249,17 +249,22 @@ public sealed class EliteApiClient
     /// </summary>
     public static string ResolveDesktopApiBaseUrl(AppSettings appSettings)
     {
+        // Login, sync, and admin calls must use CloudApi.BaseUrl — not the public menu / custom domain,
+        // which may be a different host or not expose /api/* until DNS is fully configured.
+        var cloudApi = CloudEndpoints.NormalizeApiBaseUrl(appSettings.CloudApi.BaseUrl);
+        if (!CloudEndpoints.IsLocalDevelopmentApiUrl(cloudApi))
+            return cloudApi;
+
         var publicMenuTarget = ResolvePublicMenuCloudBaseUrl(appSettings);
         if (!CloudEndpoints.IsLocalDevelopmentApiUrl(publicMenuTarget))
             return publicMenuTarget;
 
-        var configured = CloudEndpoints.NormalizeApiBaseUrl(appSettings.CloudApi.BaseUrl);
         var dbHost = (appSettings.Database?.PostgreSqlHost ?? string.Empty).Trim().ToLowerInvariant();
         var localDbHost = dbHost is "localhost" or "127.0.0.1" or "::1";
-        if (localDbHost && string.Equals(configured, CloudEndpoints.ProductionApiBaseUrl, StringComparison.OrdinalIgnoreCase))
+        if (localDbHost && string.Equals(cloudApi, CloudEndpoints.ProductionApiBaseUrl, StringComparison.OrdinalIgnoreCase))
             return CloudEndpoints.LocalApiBaseUrl;
 
-        return configured;
+        return cloudApi;
     }
 
     private static string Normalize(string path) => path.TrimStart('/');

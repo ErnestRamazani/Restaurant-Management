@@ -31,7 +31,7 @@ if (Test-Path $settingsPath) {
     Write-Host "Created fresh settings:"
     Write-Host "  $settingsPath"
 } else {
-    @'{"firstSiteSetupCompleted":false,"cloudApi":{"baseUrl":"https://etoilegourmandekin.com"}}'@ | Set-Content $settingsPath -Encoding UTF8
+    @'{"firstSiteSetupCompleted":false,"cloudApi":{"baseUrl":"https://starfish-app-owtoz.ondigitalocean.app"}}'@ | Set-Content $settingsPath -Encoding UTF8
     Write-Host "Created default settings:"
     Write-Host "  $settingsPath"
 }

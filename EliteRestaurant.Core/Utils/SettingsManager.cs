@@ -49,7 +49,9 @@ public static class SettingsManager
             loaded.Salary ??= new SalarySettings();
             loaded.TicketReceipt ??= new TicketReceiptSettings();
             loaded.MenuTaxonomy = MenuTaxonomyHelper.Resolve(loaded.MenuTaxonomy);
-            if (DatabaseSettingsMigration.TryMigrateInMemory(loaded.Database))
+            if (TryRepairCloudApiBaseUrl(loaded))
+                Save(loaded);
+            else if (DatabaseSettingsMigration.TryMigrateInMemory(loaded.Database))
                 Save(loaded);
             return loaded;
         }
@@ -113,6 +115,20 @@ public static class SettingsManager
         SalesBonusPercent = s.SalesBonusPercent,
         MaxSalaryAdvancePercentOfGross = s.MaxSalaryAdvancePercentOfGross
     };
+
+    /// <summary>
+    /// Older installs used the custom domain for API calls; sign-in requires the App Platform host until DNS routes /api.
+    /// </summary>
+    private static bool TryRepairCloudApiBaseUrl(AppSettings settings)
+    {
+        settings.CloudApi ??= new CloudApiSettings();
+        var api = (settings.CloudApi.BaseUrl ?? string.Empty).Trim();
+        if (!api.Contains("etoilegourmandekin.com", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        settings.CloudApi.BaseUrl = CloudEndpoints.ProductionApiBaseUrl;
+        return true;
+    }
 
     private static bool HasTicketReceiptContent(TicketReceiptSettings ticket) =>
         !string.IsNullOrWhiteSpace(ticket.HeaderLogoPath) ||

@@ -142,7 +142,8 @@ public sealed class FirstSiteSetupViewModel : BaseViewModel
         ErrorMessage = string.Empty;
         try
         {
-            var status = await _setupApi.GetStatusAsync(CloudApiUrl);
+            var normalizedUrl = CloudEndpoints.NormalizeApiBaseUrl(CloudApiUrl);
+            var status = await _setupApi.GetStatusAsync(normalizedUrl);
             if (status is null)
             {
                 HasError = true;
@@ -158,7 +159,16 @@ public sealed class FirstSiteSetupViewModel : BaseViewModel
 
             StatusMessage = status.SetupRequired
                 ? $"Cloud API is online. Ready to create the first site ({status.RestaurantCount} restaurants now)."
-                : $"Cloud API already has {status.RestaurantCount} restaurant(s) (e.g. Étoile). Enter the Setup Platform Secret from DigitalOcean to add another site, or skip to sign in to the existing one.";
+                : $"Your cloud site already exists ({status.RestaurantCount} restaurant). Use Sign in below with your existing admin ID and PIN — do not create a new site.";
+
+            if (!status.SetupRequired)
+            {
+                var settings = SettingsManager.Load();
+                settings.FirstSiteSetupCompleted = true;
+                settings.CloudApi.BaseUrl = normalizedUrl;
+                SettingsManager.Save(settings);
+                _navigate(new RoleSelectionViewModel(_navigate));
+            }
         }
         finally
         {

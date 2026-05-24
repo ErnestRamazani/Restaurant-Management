@@ -32,7 +32,8 @@ dotnet publish $proj `
 
 Get-ChildItem $staging -File | Where-Object { $_.Extension -ne ".exe" } | Remove-Item -Force
 
-Copy-Item $freshSettings (Join-Path $staging "app-settings.json") -Force
+# Do not ship app-settings.json next to the exe — that enables "portable" mode and a blank profile when
+# users run the exe from the ZIP instead of Update.bat + the desktop shortcut.
 Copy-Item $installScript (Join-Path $staging "Install-EliteRestaurantPro.ps1") -Force
 Copy-Item (Join-Path $PSScriptRoot "installer\Update-EliteRestaurantPro.bat") (Join-Path $staging "Update-EliteRestaurantPro.bat") -Force
 
