@@ -18,6 +18,48 @@ public static class MenuTaxonomyHelper
         return raw;
     }
 
+    /// <summary>Cloud JSON from <see cref="Models.PublicMenuSetting.MenuTaxonomyJson"/> wins over desktop app-settings.</summary>
+    public static MenuTaxonomySettings ResolveEffective(string? cloudMenuTaxonomyJson, MenuTaxonomySettings? appTaxonomy = null)
+    {
+        if (!string.IsNullOrWhiteSpace(cloudMenuTaxonomyJson)
+            && TryDeserialize(cloudMenuTaxonomyJson.Trim(), out var cloud))
+            return Resolve(cloud);
+        return Resolve(appTaxonomy);
+    }
+
+    /// <summary>
+    /// True when the product belongs to a drink menu type in taxonomy (e.g. Category Alcohol / Non-Alcohol),
+    /// or matches legacy drink category names.
+    /// </summary>
+    public static bool IsDrinkProduct(Product product, MenuTaxonomySettings? taxonomy = null)
+    {
+        var cat = (product.Category ?? string.Empty).Trim();
+        var sub = string.IsNullOrWhiteSpace(product.SubCategory) ? string.Empty : product.SubCategory.Trim();
+        foreach (var type in Resolve(taxonomy).Types)
+        {
+            if (!type.IsDrink)
+                continue;
+            foreach (var section in type.Sections)
+            {
+                if (SectionMatchesProduct(cat, sub, section, isDrinkType: true))
+                    return true;
+            }
+        }
+
+        return IsLegacyDrinkCategory(cat);
+    }
+
+    /// <summary>Legacy category-only check when taxonomy is unavailable (e.g. category string alone).</summary>
+    public static bool IsLegacyDrinkCategoryForCategoryString(string? category) =>
+        IsLegacyDrinkCategory((category ?? string.Empty).Trim());
+
+    private static bool IsLegacyDrinkCategory(string category) =>
+        category.Equals("Drink", StringComparison.OrdinalIgnoreCase)
+        || category.Equals("Drinks", StringComparison.OrdinalIgnoreCase)
+        || category.Equals("Beverage", StringComparison.OrdinalIgnoreCase)
+        || category.Equals("Beverages", StringComparison.OrdinalIgnoreCase)
+        || category.Equals("Bar", StringComparison.OrdinalIgnoreCase);
+
     public static string Serialize(MenuTaxonomySettings taxonomy) =>
         JsonSerializer.Serialize(Resolve(taxonomy), JsonOptions);
 

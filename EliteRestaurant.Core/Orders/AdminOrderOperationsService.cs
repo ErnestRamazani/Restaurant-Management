@@ -1,4 +1,5 @@
 using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Menu;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Reporting;
 using EliteRestaurant.Core.Utils;
@@ -574,7 +575,7 @@ public sealed class AdminOrderOperationsService(AppDbContext db)
         if (!productById.TryGetValue(productId, out var product))
             return (null, "Unknown", "Unassigned");
 
-        var isDrink = string.Equals(product.Category, "Drink", StringComparison.OrdinalIgnoreCase);
+        var isDrink = MenuTaxonomyHelper.IsDrinkProduct(product);
         if (isDrink)
         {
             var barman = activeStaff.FirstOrDefault(e =>

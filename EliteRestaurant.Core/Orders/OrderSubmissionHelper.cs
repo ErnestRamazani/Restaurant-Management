@@ -1,4 +1,5 @@
 using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Menu;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Utils;
 using Microsoft.EntityFrameworkCore;
@@ -16,7 +17,7 @@ public static class OrderSubmissionHelper
         if (!productById.TryGetValue(productId, out var product))
             return (null, "Unknown", "Unassigned");
 
-        if (string.Equals(product.Category, "Drink", StringComparison.OrdinalIgnoreCase))
+        if (MenuTaxonomyHelper.IsDrinkProduct(product))
         {
             var barman = activeStaff.FirstOrDefault(e =>
                 e.Role.Equals("Barman", StringComparison.OrdinalIgnoreCase) ||

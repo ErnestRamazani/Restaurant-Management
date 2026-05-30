@@ -2975,6 +2975,38 @@
       syncNewCheckKindVisibility();
       updateTicketModeHint();
     }
+    function eqTax(a, b) {
+      return String(a ?? "").trim().toLowerCase() === String(b ?? "").trim().toLowerCase();
+    }
+    function matchesTaxItemList(sub, items) {
+      if (!items || !items.length) return true;
+      const s = String(sub ?? "").trim();
+      if (!s) return items.some(i => !String(i ?? "").trim());
+      return items.some(i => eqTax(i, s));
+    }
+    function sectionMatchesProductTax(cat, sub, section, isDrinkType) {
+      const c = String(cat ?? "").trim();
+      const s = String(sub ?? "").trim();
+      const sec = String(section?.name ?? section?.Name ?? "").trim();
+      if (!sec) return false;
+      const items = Array.isArray(section.items) ? section.items : (Array.isArray(section.Items) ? section.Items : []);
+      if (!isDrinkType) {
+        if (!eqTax(c, sec)) return false;
+        return matchesTaxItemList(s, items);
+      }
+      if (eqTax(c, sec)) return matchesTaxItemList(s, items);
+      if (eqTax(c, "Drink") && !eqTax(sec, "Drink")) return items.length > 0 && matchesTaxItemList(s, items);
+      return false;
+    }
+    let menuTaxonomy = null;
+    function parseMenuTaxonomyFromConfig(cfg) {
+      const raw = cfg?.menuTaxonomyJson ?? cfg?.MenuTaxonomyJson;
+      if (!raw || typeof raw !== "string") return null;
+      try {
+        const o = JSON.parse(raw);
+        return o && Array.isArray(o.types) ? o : null;
+      } catch { return null; }
+    }
     function isDrinkCategory(cat) {
       const c = String(cat || "").toLowerCase();
       return c === "drink" || c === "drinks" || c === "beverage" || c === "beverages" || c === "bar";
@@ -2982,7 +3014,18 @@
     function productKind(productId) {
       const p = products.find(x => x.id === productId);
       if (!p) return "Food";
-      return isDrinkCategory(p.category) ? "Drink" : "Food";
+      if (menuTaxonomy?.types?.length) {
+        const cat = String(p.category ?? p.Category ?? "").trim();
+        const sub = String(p.subCategory ?? p.subcategory ?? p.SubCategory ?? "").trim();
+        for (const t of menuTaxonomy.types) {
+          const sections = Array.isArray(t.sections) ? t.sections : (Array.isArray(t.Sections) ? t.Sections : []);
+          for (const sec of sections) {
+            if (sectionMatchesProductTax(cat, sub, sec, !!t.isDrink || !!t.IsDrink))
+              return (t.isDrink || t.IsDrink) ? "Drink" : "Food";
+          }
+        }
+      }
+      return isDrinkCategory(p.category ?? p.Category) ? "Drink" : "Food";
     }
     function getNewCheckKind() {
       const d = document.getElementById("newCheckKindDrink");
@@ -3150,6 +3193,7 @@
         return false;
       }
       config = cfg.body;
+      menuTaxonomy = parseMenuTaxonomyFromConfig(config);
       const brandNameEl = document.getElementById("brandName");
       const brandLogoEl = document.getElementById("brandLogo");
       const staffPhotoEl = document.getElementById("staffPhoto");

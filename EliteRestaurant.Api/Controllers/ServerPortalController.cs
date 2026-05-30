@@ -11,6 +11,7 @@ using EliteRestaurant.Api.Dtos;
 using EliteRestaurant.Api.Security;
 using EliteRestaurant.Api.Services;
 using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Menu;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Tenancy;
 using EliteRestaurant.Core.Orders;
@@ -65,6 +66,10 @@ public sealed class     ServerPortalController(
             ? cloudSettings.UsdToFcRate
             : (settings.UsdToFcRate > 0m ? settings.UsdToFcRate : CurrencyHelper.DefaultFcPerUsd);
 
+        var menuTaxonomyJson = !string.IsNullOrWhiteSpace(cloudSettings?.MenuTaxonomyJson)
+            ? cloudSettings!.MenuTaxonomyJson!.Trim()
+            : MenuTaxonomyHelper.Serialize(MenuTaxonomyHelper.Resolve(allSettings.MenuTaxonomy));
+
         return Ok(new ServerPortalConfigDto(
             restaurantName,
             logoUrl,
@@ -72,7 +77,8 @@ public sealed class     ServerPortalController(
             displayMode,
             usdToFc,
             taxPercent,
-            servicePercent));
+            servicePercent,
+            menuTaxonomyJson));
     }
 
     [HttpGet("assets/restaurant-logo")]
@@ -220,7 +226,8 @@ public sealed class     ServerPortalController(
             .OrderByDescending(o => o.CreatedAt)
             .ToList();
 
-        var checks = orders.Select(MapOpenCheckDto).ToList();
+        var menuTaxonomy = LoadMenuTaxonomy();
+        var checks = orders.Select(o => MapOpenCheckDto(o, menuTaxonomy)).ToList();
         return Ok(new ServerOpenChecksResponse(tableId, checks));
     }
 
@@ -420,6 +427,8 @@ public sealed class     ServerPortalController(
             .Where(e => e.EmploymentStatus == "Active")
             .ToList();
 
+        var menuTaxonomy = LoadMenuTaxonomy();
+
         OrderRecord? openOrder = null;
         if (request.AppendToOpenCheck)
         {
@@ -450,14 +459,15 @@ public sealed class     ServerPortalController(
                 .Where(p => p is not null)
                 .Cast<Product>()
                 .ToList();
-            var checkKind = OpenCheckKindHelper.TryInferCheckKindFromProducts(existingProducts);
+            var checkKind = OpenCheckKindHelper.TryInferCheckKindFromProducts(existingProducts, menuTaxonomy);
             if (checkKind is null)
                 return BadRequest(new { message = "This open check mixes food and drinks. Start a new food or drink ticket instead." });
 
             var kindErr = OpenCheckKindHelper.TryValidateLinesForCheckKind(
                 checkKind,
                 products,
-                normalizedLines.Select(l => (l.ProductId, l.Quantity)));
+                normalizedLines.Select(l => (l.ProductId, l.Quantity)),
+                menuTaxonomy);
             if (kindErr is not null)
                 return BadRequest(new { message = kindErr });
         }
@@ -466,14 +476,16 @@ public sealed class     ServerPortalController(
             var newKind = OpenCheckKindHelper.NormalizeCheckKind(request.NewCheckKind)
                 ?? OpenCheckKindHelper.TryInferCheckKindFromLines(
                     products,
-                    normalizedLines.Select(l => (l.ProductId, l.Quantity)));
+                    normalizedLines.Select(l => (l.ProductId, l.Quantity)),
+                    menuTaxonomy);
             if (newKind is null)
                 return BadRequest(new { message = "Choose Food or Drink for a new ticket, or send only food or only drink items." });
 
             var newKindErr = OpenCheckKindHelper.TryValidateLinesForCheckKind(
                 newKind,
                 products,
-                normalizedLines.Select(l => (l.ProductId, l.Quantity)));
+                normalizedLines.Select(l => (l.ProductId, l.Quantity)),
+                menuTaxonomy);
             if (newKindErr is not null)
                 return BadRequest(new { message = newKindErr });
         }
@@ -658,7 +670,7 @@ public sealed class     ServerPortalController(
                 .ToDictionary(g => g.Key, g => g.ToList());
         }
 
-        var mappedByTable = MapTableCallOrdersByTable(ordersByTable);
+        var mappedByTable = MapTableCallOrdersByTable(ordersByTable, LoadMenuTaxonomy());
 
         var boardRows = new List<ServerTableBoardRowDto>();
         foreach (var table in assignedTables)
@@ -880,7 +892,7 @@ public sealed class     ServerPortalController(
         return null;
     }
 
-    private static ServerOpenCheckDto MapOpenCheckDto(OrderRecord order)
+    private static ServerOpenCheckDto MapOpenCheckDto(OrderRecord order, MenuTaxonomySettings menuTaxonomy)
     {
         var lines = order.Items
             .OrderBy(i => i.Product?.Name ?? string.Empty)
@@ -902,7 +914,7 @@ public sealed class     ServerPortalController(
             .Select(i => i.Product)
             .Where(p => p is not null)
             .Cast<Product>();
-        var checkKind = OpenCheckKindHelper.TryInferCheckKindFromProducts(productsOnOrder)
+        var checkKind = OpenCheckKindHelper.TryInferCheckKindFromProducts(productsOnOrder, menuTaxonomy)
             ?? OpenCheckKindHelper.Food;
         var orderLabel = string.IsNullOrWhiteSpace(order.UniqueId) ? $"#{order.Id:000}" : order.UniqueId;
 
@@ -1002,7 +1014,8 @@ public sealed class     ServerPortalController(
     }
 
     private Dictionary<int, List<ServerTableCallOrderDto>> MapTableCallOrdersByTable(
-        Dictionary<int, List<OrderRecord>> ordersByTable)
+        Dictionary<int, List<OrderRecord>> ordersByTable,
+        MenuTaxonomySettings menuTaxonomy)
     {
         if (ordersByTable.Count == 0)
             return [];
@@ -1024,7 +1037,8 @@ public sealed class     ServerPortalController(
             var checkKind = source is null
                 ? OpenCheckKindHelper.Food
                 : OpenCheckKindHelper.TryInferCheckKindFromProducts(
-                    source.Items.Select(i => i.Product).Where(p => p is not null).Cast<Product>())
+                    source.Items.Select(i => i.Product).Where(p => p is not null).Cast<Product>(),
+                    menuTaxonomy)
                   ?? OpenCheckKindHelper.Food;
 
             list.Add(new ServerTableCallOrderDto(
@@ -1083,6 +1097,12 @@ public sealed class     ServerPortalController(
         }
 
         return items;
+    }
+
+    private MenuTaxonomySettings LoadMenuTaxonomy()
+    {
+        var cloud = db.PublicMenuSettings.AsNoTracking().FirstOrDefault(s => s.Key == "default");
+        return MenuTaxonomyHelper.ResolveEffective(cloud?.MenuTaxonomyJson, SettingsManager.Load().MenuTaxonomy);
     }
 
 }

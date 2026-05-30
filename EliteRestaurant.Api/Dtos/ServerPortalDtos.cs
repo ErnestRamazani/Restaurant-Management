@@ -66,7 +66,8 @@ public sealed record ServerPortalConfigDto(
     string CurrencyDisplayMode,
     decimal UsdToFcRate,
     decimal TaxPercent,
-    decimal ServicePercent);
+    decimal ServicePercent,
+    string MenuTaxonomyJson);
 
 public sealed record ServerReadyOrderLineDto(
     int ProductId,

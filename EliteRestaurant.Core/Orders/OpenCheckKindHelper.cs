@@ -1,3 +1,4 @@
+using EliteRestaurant.Core.Menu;
 using EliteRestaurant.Core.Models;
 
 namespace EliteRestaurant.Core.Orders;
@@ -8,30 +9,25 @@ public static class OpenCheckKindHelper
     public const string Food = "Food";
     public const string Drink = "Drink";
 
-    public static bool IsDrinkCategory(string? category)
-    {
-        var c = (category ?? string.Empty).Trim();
-        return c.Equals("Drink", StringComparison.OrdinalIgnoreCase)
-               || c.Equals("Drinks", StringComparison.OrdinalIgnoreCase)
-               || c.Equals("Beverage", StringComparison.OrdinalIgnoreCase)
-               || c.Equals("Beverages", StringComparison.OrdinalIgnoreCase)
-               || c.Equals("Bar", StringComparison.OrdinalIgnoreCase);
-    }
+    public static bool IsDrinkCategory(string? category) =>
+        MenuTaxonomyHelper.IsLegacyDrinkCategoryForCategoryString(category);
 
-    public static string GetProductKind(Product product) =>
-        IsDrinkCategory(product.Category) ? Drink : Food;
+    public static string GetProductKind(Product product, MenuTaxonomySettings? taxonomy = null) =>
+        MenuTaxonomyHelper.IsDrinkProduct(product, taxonomy) ? Drink : Food;
 
     public static string GetProductKind(string? category) =>
         IsDrinkCategory(category) ? Drink : Food;
 
     /// <summary>Infer check kind from persisted lines. Returns null when empty or mixed food+drink.</summary>
-    public static string? TryInferCheckKindFromProducts(IEnumerable<Product> products)
+    public static string? TryInferCheckKindFromProducts(
+        IEnumerable<Product> products,
+        MenuTaxonomySettings? taxonomy = null)
     {
         var sawFood = false;
         var sawDrink = false;
         foreach (var p in products)
         {
-            if (IsDrinkCategory(p.Category))
+            if (MenuTaxonomyHelper.IsDrinkProduct(p, taxonomy))
                 sawDrink = true;
             else
                 sawFood = true;
@@ -48,7 +44,8 @@ public static class OpenCheckKindHelper
     public static string? TryValidateLinesForCheckKind(
         string checkKind,
         IReadOnlyDictionary<int, Product> productsById,
-        IEnumerable<(int ProductId, int Quantity)> lines)
+        IEnumerable<(int ProductId, int Quantity)> lines,
+        MenuTaxonomySettings? taxonomy = null)
     {
         var normalized = NormalizeCheckKind(checkKind);
         if (normalized is null)
@@ -59,7 +56,7 @@ public static class OpenCheckKindHelper
             if (quantity <= 0) continue;
             if (!productsById.TryGetValue(productId, out var product))
                 continue;
-            var lineKind = GetProductKind(product);
+            var lineKind = GetProductKind(product, taxonomy);
             if (!lineKind.Equals(normalized, StringComparison.OrdinalIgnoreCase))
             {
                 return normalized.Equals(Drink, StringComparison.OrdinalIgnoreCase)
@@ -73,7 +70,8 @@ public static class OpenCheckKindHelper
 
     public static string? TryInferCheckKindFromLines(
         IReadOnlyDictionary<int, Product> productsById,
-        IEnumerable<(int ProductId, int Quantity)> lines)
+        IEnumerable<(int ProductId, int Quantity)> lines,
+        MenuTaxonomySettings? taxonomy = null)
     {
         Product? first = null;
         var sawFood = false;
@@ -84,7 +82,7 @@ public static class OpenCheckKindHelper
             if (!productsById.TryGetValue(productId, out var product))
                 continue;
             first ??= product;
-            if (IsDrinkCategory(product.Category))
+            if (MenuTaxonomyHelper.IsDrinkProduct(product, taxonomy))
                 sawDrink = true;
             else
                 sawFood = true;
@@ -94,7 +92,7 @@ public static class OpenCheckKindHelper
             return null;
         if (sawDrink) return Drink;
         if (sawFood) return Food;
-        return first is null ? null : GetProductKind(first);
+        return first is null ? null : GetProductKind(first, taxonomy);
     }
 
     public static string? NormalizeCheckKind(string? raw)

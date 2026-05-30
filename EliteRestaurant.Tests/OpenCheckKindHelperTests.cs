@@ -1,3 +1,4 @@
+using EliteRestaurant.Core.Menu;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Orders;
 using Xunit;
@@ -13,6 +14,28 @@ public class OpenCheckKindHelperTests
     [InlineData("Main", false)]
     public void IsDrinkCategory_matches_expected(string category, bool isDrink) =>
         Assert.Equal(isDrink, OpenCheckKindHelper.IsDrinkCategory(category));
+
+    [Fact]
+    public void IsDrinkProduct_Alcohol_section_counts_as_drink_with_default_taxonomy()
+    {
+        var beer = new Product { Category = "Alcohol", SubCategory = "Beer", Name = "Primus" };
+        Assert.True(MenuTaxonomyHelper.IsDrinkProduct(beer));
+        Assert.Equal(OpenCheckKindHelper.Drink, OpenCheckKindHelper.GetProductKind(beer));
+    }
+
+    [Fact]
+    public void TryValidateLinesForCheckKind_allows_alcohol_on_drink_check()
+    {
+        var beer = new Product { Id = 1, Category = "Alcohol", SubCategory = "Beer", Name = "Primus", Price = 3m };
+        var map = new Dictionary<int, Product> { [1] = beer };
+
+        var err = OpenCheckKindHelper.TryValidateLinesForCheckKind(
+            OpenCheckKindHelper.Drink,
+            map,
+            [(1, 1)]);
+
+        Assert.Null(err);
+    }
 
     [Fact]
     public void TryValidateLinesForCheckKind_rejects_food_on_drink_check()
