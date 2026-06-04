@@ -126,11 +126,11 @@ public class OrderInventoryDeductionTests
     }
 
     [Fact]
-    public void TryApplyForAdditionalItems_DeductsOnlyNewLines_NotPriorLines()
+    public void TryApplyForPlacedOrderMemory_AfterMarkExisting_DeductsOnlyNewLineQty()
     {
-        using var db = BuildDb($"inv-addon-{Guid.NewGuid():N}");
         var inv = new InventoryItem
         {
+            Id = 1,
             UniqueId = "INV-FLOUR",
             Name = "Flour",
             Unit = "kg",
@@ -138,32 +138,33 @@ public class OrderInventoryDeductionTests
         };
         var product = new Product
         {
+            Id = 10,
             UniqueId = "P4",
             Name = "Bread",
             Category = "Food",
             SubCategory = "Bakery",
             Price = 5m
         };
-        db.InventoryItems.Add(inv);
-        db.Products.Add(product);
-        db.SaveChanges();
-        db.ProductIngredients.Add(new ProductIngredient
+        var ingredientRows = new List<ProductIngredient>
         {
-            ProductId = product.Id,
-            InventoryItemId = inv.Id,
-            Quantity = 2m
-        });
-        db.Employees.Add(new Employee
+            new() { ProductId = product.Id, InventoryItemId = inv.Id, Quantity = 2m }
+        };
+        var activeStaff = new List<Employee>
         {
-            UniqueId = "EMP-CHEF-1",
-            SignInId = "chef1",
-            Name = "Chef",
-            Role = "Chef",
-            PinCode = "x",
-            EmploymentStatus = "Active",
-            JoinDate = DateTime.Today
-        });
-        db.SaveChanges();
+            new()
+            {
+                Id = 1,
+                UniqueId = "EMP-CHEF-1",
+                SignInId = "chef1",
+                Name = "Chef",
+                Role = "Chef",
+                PinCode = "x",
+                EmploymentStatus = "Active",
+                JoinDate = DateTime.Today
+            }
+        };
+        var productById = new Dictionary<int, Product> { [product.Id] = product };
+        var inventoryById = new Dictionary<int, InventoryItem> { [inv.Id] = inv };
 
         var order = new OrderRecord
         {
@@ -180,17 +181,13 @@ public class OrderInventoryDeductionTests
         };
         var newLine = new OrderItem { ProductId = product.Id, Quantity = 3 };
         order.Items.Add(existingLine);
+        OrderInventoryDeduction.MarkExistingLinesAsDeducted(order, [newLine]);
         order.Items.Add(newLine);
-        db.Orders.Add(order);
-        db.SaveChanges();
 
-        var stockBefore = db.InventoryItems.AsNoTracking().Single(i => i.Id == inv.Id).StockQuantity;
-        var err = OrderInventoryDeduction.TryApplyForAdditionalItems(db, order, [newLine]);
+        var err = OrderInventoryDeduction.TryApplyForPlacedOrderMemory(
+            order, inventoryById, ingredientRows, activeStaff, productById);
         Assert.Null(err);
-        db.SaveChanges();
-
-        var stockAfter = db.InventoryItems.AsNoTracking().Single(i => i.Id == inv.Id).StockQuantity;
-        Assert.Equal(stockBefore - 6m, stockAfter);
+        Assert.Equal(94m, inv.StockQuantity);
         Assert.NotNull(newLine.InventoryDeductedAt);
     }
 }
