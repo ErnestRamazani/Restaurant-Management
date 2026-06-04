@@ -8,9 +8,18 @@ using System.Windows.Input;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Utils;
 using EliteRestaurantPro.ApiClients;
+using EliteRestaurantPro.Localization;
 using EliteRestaurantPro.Services;
 
 namespace EliteRestaurantPro.ViewModels;
+
+public sealed class InventoryAdjustmentOption
+{
+    public string Key { get; init; } = string.Empty;
+    public string Label { get; set; } = string.Empty;
+
+    public override string ToString() => Label;
+}
 
 public class InventoryViewModel : AdminBaseViewModel
 {
@@ -19,12 +28,13 @@ public class InventoryViewModel : AdminBaseViewModel
     private int? _editingItemId;
     private bool _isDialogOpen;
     private bool _isAdjustmentDialogOpen;
-    private string _dialogTitle = "Add Inventory Item";
+    private string _dialogTitle = string.Empty;
     private string _itemName = string.Empty;
     private string _unit = string.Empty;
     private string _stockText = string.Empty;
     private string _expirationDateText = string.Empty;
     private string _notes = string.Empty;
+    private string _rawNotes = string.Empty;
     private bool _isEditingExistingItem;
     private int? _adjustingItemId;
     private string _adjustmentItemName = string.Empty;
@@ -129,7 +139,7 @@ public class InventoryViewModel : AdminBaseViewModel
         set => SetField(ref _adjustmentItemName, value);
     }
 
-    public ObservableCollection<string> AdjustmentTypes { get; } = new(["Add", "Deduct"]);
+    public ObservableCollection<InventoryAdjustmentOption> AdjustmentTypeOptions { get; } = new();
 
     public string SelectedAdjustmentType
     {
@@ -160,6 +170,51 @@ public class InventoryViewModel : AdminBaseViewModel
     public ICommand SaveItemCommand { get; }
     public ICommand CancelDialogCommand { get; }
 
+    public string InvTitle => Loc.Admin("invTitle", "Inventory items");
+    public string InvSubtitle => Loc.Admin("invSubtitle", "Single food/ingredient records with unique IDs.");
+    public string InvSortExpLabel => ExpirationViewActive
+        ? Loc.Admin("invSortExpActive", "By expiration ✓")
+        : Loc.Admin("invSortExp", "By expiration");
+    public string InvSortQtyLabel => QuantityViewActive
+        ? Loc.Admin("invSortQtyActive", "By quantity ✓")
+        : Loc.Admin("invSortQty", "By quantity");
+    public string InvSortExpTooltip => Loc.Admin("invSortExpTooltip",
+        "Sort by expiry date (most urgent first) and show red / orange / blue on each card. Click again to return to alphabetical list.");
+    public string InvSortQtyTooltip => Loc.Admin("invSortQtyTooltip",
+        "Sort by stock quantity (lowest first) and show stock urgency colors. Click again to return to alphabetical list.");
+    public string InvAddItemLabel => Loc.Admin("invAddItem", "Add Inventory");
+    public string InvSearchTooltip => Loc.Admin("invSearchTooltip", "Search by name, ID, unit, stock, notes, or expiry");
+    public string InvColorKeyLabel => Loc.Admin("invColorKey", "Color key:");
+    public string InvColorRed => Loc.Admin("invColorRed", "Red");
+    public string InvColorOrange => Loc.Admin("invColorOrange", "Orange");
+    public string InvColorBlue => Loc.Admin("invColorBlue", "Blue");
+    public string InvColorNeutral => Loc.Admin("invColorNeutral", "Neutral");
+    public string InvExpColorRedDesc => Loc.Admin("invExpLegendRed", " — expired or ≤7 days  ·  ");
+    public string InvExpColorOrangeDesc => Loc.Admin("invExpLegendOrange", " — 8–14 days  ·  ");
+    public string InvExpColorBlueDesc => Loc.Admin("invExpLegendBlue", " — 15+ days  ·  ");
+    public string InvExpColorNeutralDesc => Loc.Admin("invExpLegendNeutral", " — no expiry date set");
+    public string InvQtyColorRedDesc => Loc.Admin("invQtyLegendRed", " — out / critical stock (≤3)  ·  ");
+    public string InvQtyColorOrangeDesc => Loc.Admin("invQtyLegendOrange", " — low stock (4–10)  ·  ");
+    public string InvQtyColorBlueDesc => Loc.Admin("invQtyLegendBlue", " — healthy stock (11+)");
+    public string InvStockPrefix => Loc.Admin("invStockColon", "Stock:");
+    public string InvStockStatusPrefix => Loc.Admin("invStockStatus", "Stock status:");
+    public string InvExpiresPrefix => Loc.Admin("invExpiresColon", "Expires:");
+    public string InvEditLabel => Loc.Common("edit", "Edit");
+    public string InvAddDeductLabel => Loc.Admin("invAddDeduct", "Add / deduct");
+    public string InvDeleteLabel => Loc.Common("delete", "Delete");
+    public string InvItemNameLabel => Loc.Admin("invFieldItemName", "ITEM NAME");
+    public string InvUnitLabel => Loc.Admin("invFieldUnit", "UNIT");
+    public string InvStockQtyLabel => Loc.Admin("invFieldStockQty", "STOCK QUANTITY");
+    public string InvExpirationDateLabel => Loc.Admin("invFieldExpiration", "EXPIRATION DATE (YYYY-MM-DD)");
+    public string InvNotesLabel => Loc.Admin("invFieldNotes", "NOTES");
+    public string InvCancelLabel => Loc.Common("cancel", "Cancel");
+    public string InvSaveItemLabel => Loc.Admin("invSaveItem", "Save Item");
+    public string InvAdjustmentTitle => Loc.Admin("invAdjustDialog", "Manual Inventory Adjustment");
+    public string InvAdjustmentTypeLabel => Loc.Admin("invAdjustType", "ADJUSTMENT TYPE");
+    public string InvQuantityLabel => Loc.Admin("invQuantity", "QUANTITY");
+    public string InvCommentRequiredLabel => Loc.Admin("invCommentRequired", "COMMENT (required)");
+    public string InvApplyAdjustmentLabel => Loc.Admin("invApplyDeduction", "Apply Adjustment");
+
     public InventoryViewModel(Action<BaseViewModel> navigate) : base(navigate)
     {
         OpenAddDialogCommand = new RelayCommand(_ => OpenAddDialog());
@@ -173,7 +228,85 @@ public class InventoryViewModel : AdminBaseViewModel
         SaveItemCommand = new RelayCommand(_ => SaveItem());
         CancelDialogCommand = new RelayCommand(_ => CloseDialog());
 
+        RefreshAdjustmentTypeOptions();
         _ = LoadItemsAsync();
+    }
+
+    protected override void RefreshLocalizedStrings()
+    {
+        base.RefreshLocalizedStrings();
+        RefreshAdjustmentTypeOptions();
+        InventoryUiLocalizer.ApplyAll(_allInventoryItems);
+        ApplyInventoryFilter();
+        if (IsDialogOpen)
+        {
+            DialogTitle = IsEditingExistingItem
+                ? Loc.Admin("invEditDialog", "Edit Inventory Item")
+                : Loc.Admin("invAddDialog", "Add Inventory Item");
+            if (IsEditingExistingItem)
+                Notes = InventoryUiLocalizer.TranslateNotesForDisplay(_rawNotes);
+        }
+
+        Notify(
+            nameof(InvTitle),
+            nameof(InvSubtitle),
+            nameof(InvSortExpLabel),
+            nameof(InvSortQtyLabel),
+            nameof(InvSortExpTooltip),
+            nameof(InvSortQtyTooltip),
+            nameof(InvAddItemLabel),
+            nameof(InvSearchTooltip),
+            nameof(InvColorKeyLabel),
+            nameof(InvColorRed),
+            nameof(InvColorOrange),
+            nameof(InvColorBlue),
+            nameof(InvColorNeutral),
+            nameof(InvExpColorRedDesc),
+            nameof(InvExpColorOrangeDesc),
+            nameof(InvExpColorBlueDesc),
+            nameof(InvExpColorNeutralDesc),
+            nameof(InvQtyColorRedDesc),
+            nameof(InvQtyColorOrangeDesc),
+            nameof(InvQtyColorBlueDesc),
+            nameof(InvStockPrefix),
+            nameof(InvStockStatusPrefix),
+            nameof(InvExpiresPrefix),
+            nameof(InvEditLabel),
+            nameof(InvAddDeductLabel),
+            nameof(InvDeleteLabel),
+            nameof(InvItemNameLabel),
+            nameof(InvUnitLabel),
+            nameof(InvStockQtyLabel),
+            nameof(InvExpirationDateLabel),
+            nameof(InvNotesLabel),
+            nameof(InvCancelLabel),
+            nameof(InvSaveItemLabel),
+            nameof(InvAdjustmentTitle),
+            nameof(InvAdjustmentTypeLabel),
+            nameof(InvQuantityLabel),
+            nameof(InvCommentRequiredLabel),
+            nameof(InvApplyAdjustmentLabel),
+            nameof(DialogTitle));
+    }
+
+    private void RefreshAdjustmentTypeOptions()
+    {
+        var selected = SelectedAdjustmentType;
+        AdjustmentTypeOptions.Clear();
+        AdjustmentTypeOptions.Add(new InventoryAdjustmentOption
+        {
+            Key = "Add",
+            Label = Loc.Admin("invAdjustAdd", "Add")
+        });
+        AdjustmentTypeOptions.Add(new InventoryAdjustmentOption
+        {
+            Key = "Deduct",
+            Label = Loc.Admin("invAdjustDeduct", "Deduct")
+        });
+        if (string.IsNullOrWhiteSpace(selected))
+            SelectedAdjustmentType = "Deduct";
+        else
+            SelectedAdjustmentType = selected;
     }
 
     private async Task LoadItemsAsync()
@@ -196,8 +329,9 @@ public class InventoryViewModel : AdminBaseViewModel
         catch (Exception ex)
         {
             MessageBox.Show(
-                $"Inventory could not be loaded safely.\n\n{ex.Message}",
-                "Inventory Load Error",
+                Loc.Admin("invLoadErrorBody", "Inventory could not be loaded safely.\n\n{{message}}",
+                    new Dictionary<string, string> { ["message"] = ex.Message }),
+                Loc.Admin("invLoadErrorTitle", "Inventory Load Error"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }
@@ -235,7 +369,10 @@ public class InventoryViewModel : AdminBaseViewModel
 
         InventoryItems.Clear();
         foreach (var item in seq)
+        {
+            InventoryUiLocalizer.Apply(item);
             InventoryItems.Add(item);
+        }
     }
 
     /// <summary>Lower sorts first (most urgent).</summary>
@@ -267,6 +404,7 @@ public class InventoryViewModel : AdminBaseViewModel
         _inventoryViewMode = normalized;
         OnPropertyChanged(nameof(ExpirationViewActive));
         OnPropertyChanged(nameof(QuantityViewActive));
+        Notify(nameof(InvSortExpLabel), nameof(InvSortQtyLabel));
         ApplyInventoryFilter();
     }
 
@@ -291,11 +429,12 @@ public class InventoryViewModel : AdminBaseViewModel
 
         _editingItemId = null;
         IsEditingExistingItem = false;
-        DialogTitle = "Add Inventory Item";
+        DialogTitle = Loc.Admin("invAddDialog", "Add Inventory Item");
         ItemName = string.Empty;
         Unit = string.Empty;
         StockText = string.Empty;
         ExpirationDateText = string.Empty;
+        _rawNotes = string.Empty;
         Notes = string.Empty;
         IsDialogOpen = true;
     }
@@ -305,12 +444,13 @@ public class InventoryViewModel : AdminBaseViewModel
         if (item is null || AppSession.IsStaffTablet) return;
         _editingItemId = item.Id;
         IsEditingExistingItem = true;
-        DialogTitle = "Edit Inventory Item";
+        DialogTitle = Loc.Admin("invEditDialog", "Edit Inventory Item");
         ItemName = item.Name;
         Unit = item.Unit;
         StockText = item.StockQuantity.ToString("0.##", CultureInfo.InvariantCulture);
         ExpirationDateText = item.ExpirationDate?.ToString("yyyy-MM-dd") ?? string.Empty;
-        Notes = item.Notes;
+        _rawNotes = item.Notes ?? string.Empty;
+        Notes = InventoryUiLocalizer.TranslateNotesForDisplay(_rawNotes);
         IsDialogOpen = true;
     }
 
@@ -331,8 +471,8 @@ public class InventoryViewModel : AdminBaseViewModel
             if (!DateTime.TryParse(ExpirationDateText, out var parsedExpiration))
             {
                 MessageBox.Show(
-                    "Expiration date format is invalid. Use YYYY-MM-DD.",
-                    "Validation",
+                    Loc.Admin("invInvalidExpirationDate", "Expiration date format is invalid. Use YYYY-MM-DD."),
+                    Loc.Admin("invValidationTitle", "Validation"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
                 return;
@@ -355,15 +495,15 @@ public class InventoryViewModel : AdminBaseViewModel
                     Unit = Unit.Trim(),
                     StockQuantity = shell.StockQuantity,
                     ExpirationDate = expirationDate,
-                    Notes = Notes.Trim()
+                    Notes = _rawNotes.Trim()
                 };
                 DesktopCloudPersistence.PushUpsertBlocking(toSave);
             }
             else
             {
                 var confirm = MessageBox.Show(
-                    "Add this inventory item?",
-                    "Confirm Add Inventory Item",
+                    Loc.Admin("invConfirmAddBody", "Add this inventory item?"),
+                    Loc.Admin("invConfirmAddTitle", "Confirm Add Inventory Item"),
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Question);
 
@@ -389,7 +529,7 @@ public class InventoryViewModel : AdminBaseViewModel
         {
             MessageBox.Show(
                 ex.GetBaseException().Message,
-                "Save inventory failed",
+                Loc.Admin("invSaveFailed", "Save inventory failed"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
@@ -400,8 +540,9 @@ public class InventoryViewModel : AdminBaseViewModel
         if (item is null || AppSession.IsStaffTablet) return;
 
         var confirm = MessageBox.Show(
-            $"Delete inventory item '{item.Name}'?",
-            "Confirm Delete Inventory Item",
+            Loc.Admin("invConfirmDeleteBody", "Delete inventory item '{{name}}'?",
+                new Dictionary<string, string> { ["name"] = item.Name }),
+            Loc.Admin("invConfirmDeleteTitle", "Confirm Delete Inventory Item"),
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
 
@@ -414,8 +555,8 @@ public class InventoryViewModel : AdminBaseViewModel
             if (links.Any(pi => pi.InventoryItemId == item.Id))
             {
                 MessageBox.Show(
-                    "This ingredient is used by menu items and cannot be deleted.",
-                    "Delete Blocked",
+                    Loc.Admin("invDeleteBlocked", "This ingredient is used by menu items and cannot be deleted."),
+                    Loc.Admin("invDeleteBlockedTitle", "Delete Blocked"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
                 return;
@@ -428,7 +569,7 @@ public class InventoryViewModel : AdminBaseViewModel
         {
             MessageBox.Show(
                 ex.GetBaseException().Message,
-                "Delete inventory failed",
+                Loc.Admin("invDeleteFailed", "Delete inventory failed"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
@@ -458,8 +599,8 @@ public class InventoryViewModel : AdminBaseViewModel
         if (string.IsNullOrWhiteSpace(AdjustmentComment))
         {
             MessageBox.Show(
-                "Add a comment for this manual deduction.",
-                "Validation",
+                Loc.Admin("invJustification", "Add a justification for this change."),
+                Loc.Admin("invValidationTitle", "Validation"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
             return;
@@ -475,8 +616,15 @@ public class InventoryViewModel : AdminBaseViewModel
             if (adjustmentType == "Deduct" && shell.StockQuantity < deductionQty)
             {
                 MessageBox.Show(
-                    $"Cannot deduct {deductionQty:0.##} {shell.Unit}. Current stock is {shell.StockQuantity:0.##} {shell.Unit}.",
-                    "Insufficient Stock",
+                    Loc.Admin("invCannotDeduct",
+                        "Cannot deduct {{qty}} {{unit}}. Current stock is {{stock}} {{unit}}.",
+                        new Dictionary<string, string>
+                        {
+                            ["qty"] = deductionQty.ToString("0.##", CultureInfo.InvariantCulture),
+                            ["unit"] = shell.Unit,
+                            ["stock"] = shell.StockQuantity.ToString("0.##", CultureInfo.InvariantCulture)
+                        }),
+                    Loc.Admin("invInsufficientStock", "Insufficient Stock"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
                 return;
@@ -486,8 +634,25 @@ public class InventoryViewModel : AdminBaseViewModel
                 ? shell.StockQuantity + deductionQty
                 : shell.StockQuantity - deductionQty;
 
-            var verb = adjustmentType == "Add" ? "Stock added" : "Manual deduction";
-            var logEntry = $"{DateTime.Now:yyyy-MM-dd HH:mm} - {verb} {deductionQty:0.##} {shell.Unit}: {AdjustmentComment.Trim()}";
+            var ts = DateTime.Now.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+            var qty = deductionQty.ToString("0.##", CultureInfo.InvariantCulture);
+            var logEntry = adjustmentType == "Add"
+                ? Loc.Admin("invNoteStockAdded", "{{ts}} - Stock added {{qty}} {{unit}}: {{comment}}",
+                    new Dictionary<string, string>
+                    {
+                        ["ts"] = ts,
+                        ["qty"] = qty,
+                        ["unit"] = shell.Unit,
+                        ["comment"] = AdjustmentComment.Trim()
+                    })
+                : Loc.Admin("invNoteManualDeduction", "{{ts}} - Manual deduction {{qty}} {{unit}}: {{comment}}",
+                    new Dictionary<string, string>
+                    {
+                        ["ts"] = ts,
+                        ["qty"] = qty,
+                        ["unit"] = shell.Unit,
+                        ["comment"] = AdjustmentComment.Trim()
+                    });
             var mergedNotes = string.IsNullOrWhiteSpace(shell.Notes) ? logEntry : $"{shell.Notes}\n{logEntry}";
 
             var toSave = new InventoryItem
@@ -509,7 +674,7 @@ public class InventoryViewModel : AdminBaseViewModel
         {
             MessageBox.Show(
                 ex.GetBaseException().Message,
-                "Adjustment failed",
+                Loc.Admin("invAdjustmentFailed", "Adjustment failed"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
@@ -520,6 +685,7 @@ public class InventoryViewModel : AdminBaseViewModel
         IsDialogOpen = false;
         _editingItemId = null;
         IsEditingExistingItem = false;
+        _rawNotes = string.Empty;
     }
 
     private void CloseAdjustmentDialog()

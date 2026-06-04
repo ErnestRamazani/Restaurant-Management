@@ -24,6 +24,7 @@ public sealed record AdminCreateOrderRequest(
     string AllergyNotes,
     /// <summary>Optional: <c>Immediate</c> (default) or <c>Deferred</c> (pay at restaurant / on delivery).</summary>
     string? PaymentTiming,
+    int? RestaurantClientId,
     IReadOnlyList<AdminOrderLineRequest> Lines);
 
 public sealed record AdminCreateOrderResponse(
@@ -35,6 +36,8 @@ public sealed record AdminCreateOrderResponse(
 public sealed record AdminOrderReleasePendingResponse(bool Ok, string? ErrorMessage, string? ReleasedOrderCode);
 
 public sealed record AdminOrderOpMessageResponse(bool Ok, string? Message);
+
+public sealed record OrderCancelRequest(string Passcode);
 
 public sealed record AdminWalkInOrderDeskRequest(int TableId, string SelectedOrderStatus, IReadOnlyList<AdminOrderLineRequest> Lines);
 

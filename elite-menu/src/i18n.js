@@ -1,20 +1,48 @@
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
-import en from './locales/en.json'
-import fr from './locales/fr.json'
+import baseEn from './locales/en.json'
+import baseFr from './locales/fr.json'
+import guestEn from './locales/guest-en.json'
+import guestFr from './locales/guest-fr.json'
 import { API_ORIGIN } from './utils/apiClient'
 
 export const LANGUAGE_STORAGE_KEY = 'elite_lang'
+
+/** Default UI language for the guest menu (English available via toggle). */
+export const DEFAULT_GUEST_LANGUAGE = 'fr'
 
 export function normalizeLanguage(code) {
   return String(code || '').toLowerCase().startsWith('fr') ? 'fr' : 'en'
 }
 
+function deepMerge(target, source) {
+  const out = { ...target }
+  for (const key of Object.keys(source)) {
+    const sv = source[key]
+    const tv = target[key]
+    if (
+      sv &&
+      typeof sv === 'object' &&
+      !Array.isArray(sv) &&
+      tv &&
+      typeof tv === 'object' &&
+      !Array.isArray(tv)
+    ) {
+      out[key] = deepMerge(tv, sv)
+    } else {
+      out[key] = sv
+    }
+  }
+  return out
+}
+
 export function getSavedLanguage() {
   try {
-    return normalizeLanguage(localStorage.getItem(LANGUAGE_STORAGE_KEY))
+    const raw = localStorage.getItem(LANGUAGE_STORAGE_KEY)
+    if (raw == null || raw === '') return DEFAULT_GUEST_LANGUAGE
+    return normalizeLanguage(raw)
   } catch {
-    return 'en'
+    return DEFAULT_GUEST_LANGUAGE
   }
 }
 
@@ -68,11 +96,13 @@ export async function setAppLanguage(lang) {
 }
 
 const saved = getSavedLanguage()
+const enResources = deepMerge(baseEn, guestEn)
+const frResources = deepMerge(baseFr, guestFr)
 
 i18n.use(initReactI18next).init({
   resources: {
-    en: { translation: en },
-    fr: { translation: fr },
+    en: { translation: enResources },
+    fr: { translation: frResources },
   },
   lng: saved,
   fallbackLng: 'en',

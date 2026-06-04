@@ -10,6 +10,7 @@ using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Sync;
 using EliteRestaurant.Core.Utils;
 using EliteRestaurantPro.ApiClients;
+using EliteRestaurantPro.Localization;
 using EliteRestaurantPro.Services;
 
 namespace EliteRestaurantPro.ViewModels;
@@ -17,6 +18,7 @@ namespace EliteRestaurantPro.ViewModels;
 public class TablesViewModel : AdminBaseViewModel
 {
     private static readonly JsonSerializerOptions SyncJson = new(JsonSerializerDefaults.Web);
+    private static readonly string[] StatusCanonical = ["Available", "Maintenance"];
     private readonly AdminDataApiClient _data = new();
 
     private int? _editingTableId;
@@ -26,12 +28,28 @@ public class TablesViewModel : AdminBaseViewModel
     private string _tableNameText = string.Empty;
     private string _capacityText = string.Empty;
     private string _selectedStatus = "Available";
+    private LocalizedSelectOption? _selectedStatusOption;
     private int? _selectedServerId;
     private bool _isTableNumberEditable;
     private readonly List<Table> _allTables = [];
     private string _searchText = string.Empty;
 
     public override string ActivePage => "Tables";
+
+    public string PageTitle => Loc.Admin("tblTitle", "Table Management");
+    public string PageSubtitle => Loc.Admin("tblSubtitle", "Manage dining capacity and live availability status.");
+    public string AddTableLabel => Loc.Admin("tblAddTable", "Add Table");
+    public string SearchTooltip => Loc.Admin("tblSearchTooltip", "Search by table number, name, ID, capacity, status, or server");
+    public string EditLabel => Loc.Admin("tblEdit", "Edit");
+    public string DeleteLabel => Loc.Admin("tblDelete", "Delete");
+    public string FieldTableNumberLabel => Loc.Admin("tblFieldTableNumber", "TABLE NUMBER");
+    public string FieldTableNameLabel => Loc.Admin("tblFieldTableName", "TABLE NAME");
+    public string FieldCapacityLabel => Loc.Admin("tblFieldCapacity", "CAPACITY");
+    public string FieldStatusLabel => Loc.Admin("tblFieldStatus", "STATUS");
+    public string FieldServerLabel => Loc.Admin("tblFieldServer", "ASSIGNED SERVER");
+    public string AutoIdHint => Loc.Admin("tblAutoIdHint", "For new tables, ID is assigned automatically.");
+    public string SaveTableLabel => Loc.Admin("tblSave", "Save Table");
+    public string CancelLabel => Loc.Admin("tblCancel", "Cancel");
 
     public bool ShowTableManagementChrome => !AppSession.IsStaffTablet;
 
@@ -48,8 +66,7 @@ public class TablesViewModel : AdminBaseViewModel
 
     public ObservableCollection<Table> Tables { get; } = new();
     public ObservableCollection<Employee> Servers { get; } = new();
-    public ObservableCollection<string> Statuses { get; } =
-        new(["Available", "Maintenance"]);
+    public ObservableCollection<LocalizedSelectOption> StatusOptions { get; } = new();
 
     public bool IsDialogOpen
     {
@@ -81,10 +98,27 @@ public class TablesViewModel : AdminBaseViewModel
         set => SetField(ref _tableNameText, value);
     }
 
+    public LocalizedSelectOption? SelectedStatusOption
+    {
+        get => _selectedStatusOption;
+        set
+        {
+            if (!SetField(ref _selectedStatusOption, value) || value is null)
+                return;
+            _selectedStatus = value.Value;
+            OnPropertyChanged(nameof(SelectedStatus));
+        }
+    }
+
     public string SelectedStatus
     {
         get => _selectedStatus;
-        set => SetField(ref _selectedStatus, value);
+        set
+        {
+            if (!SetField(ref _selectedStatus, value))
+                return;
+            SyncStatusOption(value);
+        }
     }
 
     public int? SelectedServerId
@@ -113,7 +147,34 @@ public class TablesViewModel : AdminBaseViewModel
         SaveTableCommand = new RelayCommand(_ => _ = SaveTableAsync());
         CancelDialogCommand = new RelayCommand(_ => CloseDialog());
 
+        RebuildStatusOptions();
         _ = LoadTablesAsync();
+    }
+
+    private void RebuildStatusOptions()
+    {
+        StatusOptions.Clear();
+        foreach (var value in StatusCanonical)
+        {
+            StatusOptions.Add(new LocalizedSelectOption
+            {
+                Value = value,
+                Label = AdminTextLocalizer.TranslateTableStatus(value)
+            });
+        }
+
+        SyncStatusOption(_selectedStatus);
+    }
+
+    private void SyncStatusOption(string canonical)
+    {
+        var match = StatusOptions.FirstOrDefault(o =>
+                        o.Value.Equals(canonical, StringComparison.OrdinalIgnoreCase))
+                    ?? StatusOptions.FirstOrDefault();
+        if (ReferenceEquals(_selectedStatusOption, match))
+            return;
+        _selectedStatusOption = match;
+        OnPropertyChanged(nameof(SelectedStatusOption));
     }
 
     private async Task LoadTablesAsync()
@@ -137,13 +198,14 @@ public class TablesViewModel : AdminBaseViewModel
                 _allTables.Add(t);
 
             ApplyTablesFilter();
+            TableUiLocalizer.ApplyAll(_allTables);
             RefreshReadyPickupBanner();
         }
         catch (Exception ex)
         {
             MessageBox.Show(
                 ex.GetBaseException().Message,
-                "Could not load tables",
+                Loc.Admin("tblLoadFailed", "Could not load tables"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
@@ -156,7 +218,10 @@ public class TablesViewModel : AdminBaseViewModel
         foreach (var table in _allTables)
         {
             if (q.Length == 0 || TableMatchesSearch(table, q))
+            {
+                TableUiLocalizer.Apply(table);
                 Tables.Add(table);
+            }
         }
     }
 
@@ -180,11 +245,11 @@ public class TablesViewModel : AdminBaseViewModel
         if (AppSession.IsStaffTablet) return;
 
         _editingTableId = null;
-        DialogTitle = "Add Table";
-        TableNumberText = "Auto-assigned";
+        DialogTitle = Loc.Admin("tblAddTable", "Add Table");
+        TableNumberText = Loc.Admin("tblAutoAssigned", "Auto-assigned");
         TableNameText = string.Empty;
         CapacityText = string.Empty;
-        SelectedStatus = Statuses.First();
+        SelectedStatus = StatusCanonical[0];
         SelectedServerId = Servers.FirstOrDefault()?.Id;
         IsTableNumberEditable = false;
         IsDialogOpen = true;
@@ -196,7 +261,7 @@ public class TablesViewModel : AdminBaseViewModel
         if (AppSession.IsStaffTablet) return;
 
         _editingTableId = table.Id;
-        DialogTitle = "Edit Table";
+        DialogTitle = Loc.Admin("tblEditTable", "Edit Table");
         TableNumberText = table.TableNumber.ToString(CultureInfo.InvariantCulture);
         TableNameText = table.Name;
         CapacityText = table.Capacity.ToString(CultureInfo.InvariantCulture);
@@ -230,8 +295,9 @@ public class TablesViewModel : AdminBaseViewModel
         if (normalizedStatus == "Occupied")
         {
             MessageBox.Show(
-                "You cannot manually set a table to Occupied. A table becomes Occupied only when it has an active order.",
-                "Validation",
+                Loc.Admin("tblMsgCannotSetOccupied",
+                    "You cannot manually set a table to Occupied. A table becomes Occupied only when it has an active order."),
+                Loc.Admin("tblValidationTitle", "Validation"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
             return;
@@ -246,8 +312,9 @@ public class TablesViewModel : AdminBaseViewModel
                 if (HasBlockingOrdersForTable(orders, maintenanceTableId))
                 {
                     MessageBox.Show(
-                        "You cannot switch this table to Maintenance while active orders exist.",
-                        "Validation",
+                        Loc.Admin("tblMsgMaintenanceBlocked",
+                            "You cannot switch this table to Maintenance while active orders exist."),
+                        Loc.Admin("tblValidationTitle", "Validation"),
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
                     return;
@@ -259,8 +326,9 @@ public class TablesViewModel : AdminBaseViewModel
                 if (HasBlockingOrdersForTable(orders, availableTableId))
                 {
                     MessageBox.Show(
-                        "This table has active orders and cannot be set to Available yet.",
-                        "Validation",
+                        Loc.Admin("tblMsgAvailableBlocked",
+                            "This table has active orders and cannot be set to Available yet."),
+                        Loc.Admin("tblValidationTitle", "Validation"),
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
                     return;
@@ -294,7 +362,7 @@ public class TablesViewModel : AdminBaseViewModel
                 {
                     MessageBox.Show(
                         ex.GetBaseException().Message,
-                        "Save table failed",
+                        Loc.Admin("tblSaveFailed", "Save table failed"),
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
                     return;
@@ -304,8 +372,12 @@ public class TablesViewModel : AdminBaseViewModel
             {
                 var nextTableNumber = GetNextTableNumberFromNumbers(_allTables.Select(t => t.TableNumber));
                 var confirmAdd = MessageBox.Show(
-                    $"Add this table as ID {nextTableNumber}?",
-                    "Confirm Add Table",
+                    Loc.Admin("tblConfirmAddBody", "Add this table as ID {{id}}?",
+                        new Dictionary<string, string>
+                        {
+                            ["id"] = nextTableNumber.ToString(CultureInfo.InvariantCulture)
+                        }),
+                    Loc.Admin("tblConfirmAddTitle", "Confirm Add Table"),
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Question);
 
@@ -330,7 +402,7 @@ public class TablesViewModel : AdminBaseViewModel
                 {
                     MessageBox.Show(
                         ex.GetBaseException().Message,
-                        "Add table failed",
+                        Loc.Admin("tblAddFailed", "Add table failed"),
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
                     return;
@@ -344,7 +416,7 @@ public class TablesViewModel : AdminBaseViewModel
         {
             MessageBox.Show(
                 ex.GetBaseException().Message,
-                "Save table failed",
+                Loc.Admin("tblSaveFailed", "Save table failed"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
@@ -356,8 +428,13 @@ public class TablesViewModel : AdminBaseViewModel
         if (AppSession.IsStaffTablet) return;
 
         var confirmDelete = MessageBox.Show(
-            $"Delete table '{table.TableNumber} · {table.Name}'?",
-            "Confirm Delete Table",
+            Loc.Admin("tblConfirmDeleteBody", "Delete table '{{number}} · {{name}}'?",
+                new Dictionary<string, string>
+                {
+                    ["number"] = table.TableNumber.ToString(CultureInfo.InvariantCulture),
+                    ["name"] = table.Name
+                }),
+            Loc.Admin("tblConfirmDeleteTitle", "Confirm Delete Table"),
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
 
@@ -371,8 +448,9 @@ public class TablesViewModel : AdminBaseViewModel
             if (HasBlockingOrdersForTable(orders, table.Id))
             {
                 MessageBox.Show(
-                    "This table has active orders and cannot be deleted.",
-                    "Delete Blocked",
+                    Loc.Admin("tblDeleteBlockedBody",
+                        "This table has active orders and cannot be deleted."),
+                    Loc.Admin("tblDeleteBlockedTitle", "Delete Blocked"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
                 return;
@@ -405,10 +483,10 @@ public class TablesViewModel : AdminBaseViewModel
             {
                 MessageBox.Show(
                     ex.GetBaseException().Message,
-                    "Delete table failed",
+                    Loc.Admin("tblDeleteFailed", "Delete table failed"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
-                return;
+                    return;
             }
 
             await LoadTablesAsync().ConfigureAwait(true);
@@ -417,7 +495,7 @@ public class TablesViewModel : AdminBaseViewModel
         {
             MessageBox.Show(
                 ex.GetBaseException().Message,
-                "Delete table failed",
+                Loc.Admin("tblDeleteFailed", "Delete table failed"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
@@ -483,5 +561,38 @@ public class TablesViewModel : AdminBaseViewModel
         while (used.Contains(next))
             next++;
         return next;
+    }
+
+    protected override void RefreshLocalizedStrings()
+    {
+        base.RefreshLocalizedStrings();
+        RebuildStatusOptions();
+        Notify(
+            nameof(PageTitle),
+            nameof(PageSubtitle),
+            nameof(AddTableLabel),
+            nameof(SearchTooltip),
+            nameof(EditLabel),
+            nameof(DeleteLabel),
+            nameof(FieldTableNumberLabel),
+            nameof(FieldTableNameLabel),
+            nameof(FieldCapacityLabel),
+            nameof(FieldStatusLabel),
+            nameof(FieldServerLabel),
+            nameof(AutoIdHint),
+            nameof(SaveTableLabel),
+            nameof(CancelLabel));
+
+        TableUiLocalizer.ApplyAll(_allTables);
+
+        if (IsDialogOpen)
+            DialogTitle = _editingTableId.HasValue
+                ? Loc.Admin("tblEditTable", "Edit Table")
+                : Loc.Admin("tblAddTable", "Add Table");
+
+        if (!IsDialogOpen && !_editingTableId.HasValue)
+            TableNumberText = Loc.Admin("tblAutoAssigned", "Auto-assigned");
+
+        ApplyTablesFilter();
     }
 }

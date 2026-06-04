@@ -8,6 +8,7 @@ using System.Windows.Input;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Utils;
 using EliteRestaurantPro.ApiClients;
+using EliteRestaurantPro.Localization;
 using EliteRestaurantPro.Services;
 using Microsoft.Win32;
 using ModelTable = EliteRestaurant.Core.Models.Table;
@@ -20,6 +21,7 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
     {
         public DateTime Day { get; set; }
         public string DayText { get; set; } = string.Empty;
+        public string OrdersCountText { get; set; } = string.Empty;
         public bool IsExpanded { get; set; }
         public ObservableCollection<OrderEntry> Orders { get; } = new();
         public int Count => Orders.Count;
@@ -31,6 +33,8 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
         public string Name { get; set; } = string.Empty;
         public decimal UnitPrice { get; set; }
         public decimal LineTotal { get; set; }
+        public string DisplayUnitPrice { get; set; } = string.Empty;
+        public string DisplayLineTotal { get; set; } = string.Empty;
     }
 
     private int _selectedTableId;
@@ -47,7 +51,7 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
     private string _ticketDeliveryInstructions = string.Empty;
     private bool _ticketShowServer = true;
     private string _ticketServer = string.Empty;
-    private DateTime _ticketDateTime = DateTime.Now;
+    private DateTime _ticketDateTime = DateTime.UtcNow;
     private decimal _ticketSubtotal;
     private decimal _ticketTaxAmount;
     private decimal _ticketServiceAmount;
@@ -95,7 +99,87 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
     }
 
     public string PendingCashierSectionTitle =>
-        $"Awaiting cashier validation ({PendingCashierOrders.Count})";
+        Loc.Admin("ordAwaitingCashier", "Awaiting cashier validation ({{count}})",
+            new Dictionary<string, string> { ["count"] = PendingCashierOrders.Count.ToString(CultureInfo.InvariantCulture) });
+
+    public string PageTitleOrder => Loc.Admin("ordMgmtTitleOrder", "Order");
+    public string PageTitleAccent => Loc.Admin("ordMgmtTitleMgmt", "Management");
+    public string PageSubtitle => Loc.Admin("ordMgmtSubtitle",
+        "Active list includes kitchen stages through Served. Cashier completes only after the server marks served (Pick up & serve). Use View order for full lines and notes.");
+    public string PendingCashierHint => Loc.Admin("ordPendingCashierHint",
+        "Server tablets send tickets here first. Release to deduct stock and send to the kitchen, or cancel.");
+    public string OrdViewOrderLabel => Loc.Admin("ordViewOrder", "View order");
+    public string OrdReleaseKitchenLabel => Loc.Admin("ordReleaseKitchen", "Release to kitchen");
+    public string OrdCancelTicketLabel => Loc.Admin("ordCancelTicket", "Cancel ticket");
+    public string OrdActiveOrdersLabel => Loc.Admin("ordActiveOrders", "Active Orders");
+    public string OrdPastOrdersLabel => Loc.Admin("ordPastOrders", "Past Orders");
+    public string OrdSearchActiveTooltip => Loc.Admin("ordSearchActiveTooltip", "Search by order #, table, server, items, or status");
+    public string OrdSearchPastTooltip => Loc.Admin("ordSearchPastTooltip", "Search by order #, table, server, items, or status");
+    public string OrdAdvanceLabel => Loc.Admin("ordAdvance", "Advance");
+    public string OrdCompleteLabel => Loc.Admin("ordComplete", "Complete");
+    public string OrdCancelLabel => Loc.Admin("ordCancel", "Cancel");
+    public string OrdViewTicketLabel => Loc.Admin("ordViewTicket", "View ticket");
+
+    public string OrdLoadingLabel => Loc.Admin("ordLoading", "Loading orders...");
+
+    public string TicketConfirmationCodeLabel => OrderTicketUiLocalizer.ConfirmationCodeLabel;
+    public string TicketDateLabel => OrderTicketUiLocalizer.DateLabel;
+    public string TicketTimeLabel => OrderTicketUiLocalizer.TimeLabel;
+    public string TicketOrderLabel => OrderTicketUiLocalizer.OrderLabel;
+    public string TicketStatusLabel => OrderTicketUiLocalizer.StatusLabel;
+    public string TicketCustomerLabel => OrderTicketUiLocalizer.CustomerLabel;
+    public string TicketPhoneLabel => OrderTicketUiLocalizer.PhoneLabel;
+    public string TicketAddressLabel => OrderTicketUiLocalizer.AddressLabel;
+    public string TicketNotesLabel => OrderTicketUiLocalizer.NotesLabel;
+    public string TicketServerLabel => OrderTicketUiLocalizer.ServerLabel;
+    public string TicketEquivalentFcLabel => OrderTicketUiLocalizer.EquivalentFcLabel;
+    public string TicketQtyHeader => OrderTicketUiLocalizer.QtyHeader;
+    public string TicketItemHeader => OrderTicketUiLocalizer.ItemHeader;
+    public string TicketUnitPriceHeader => OrderTicketUiLocalizer.UnitPriceHeader;
+    public string TicketTotalHeader => OrderTicketUiLocalizer.TotalHeader;
+    public string TicketSubtotalLabel => OrderTicketUiLocalizer.SubtotalLabel;
+    public string TicketDeliveryLabel => OrderTicketUiLocalizer.DeliveryLabel;
+    public string TicketGrandTotalUsdLabel => OrderTicketUiLocalizer.GrandTotalUsdLabel;
+    public string TicketCloseLabel => OrderTicketUiLocalizer.CloseLabel;
+    public string TicketPrintClientLabel => OrderTicketUiLocalizer.PrintClientTicketLabel;
+    public string TicketPrintPaymentLabel => OrderTicketUiLocalizer.PrintPaymentReceiptLabel;
+
+    public string OrdPayTitle => Loc.Admin("ordPayTitle", "Complete Order Payment");
+    public string OrdPayOrderLabel => Loc.Admin("ordPayOrder", "Order:");
+    public string OrdPayAmountDueLabel => Loc.Admin("ordPayAmountDue", "Amount due:");
+    public string OrdPayUsdFcLabel => Loc.Admin("ordPayUsdFc", "USD + FC");
+    public string OrdPayEditPaidUsdLabel => Loc.Admin("ordPayEditPaidUsd", "Edit Paid USD");
+    public string OrdPayEditPaidFcLabel => Loc.Admin("ordPayEditPaidFc", "Edit Paid FC");
+    public string OrdPayDueLabel => Loc.Admin("ordPayDue", "Due");
+    public string OrdPayRemainingLabel => Loc.Admin("ordPayRemaining", "Remaining");
+    public string OrdPayChangeLabel => Loc.Admin("ordPayChange", "Change");
+    public string OrdPayNumpadHint => Loc.Admin("ordPayNumpadHint",
+        "Use the numpad to enter Paid USD and Paid FC. If one currency is not used, leave it at 0.");
+    public string OrdPayCancelLabel => Loc.Common("cancel", "Cancel");
+    public string OrdPayGoToChangeLabel => Loc.Admin("ordPayGoToChange", "Go to change");
+
+    public string OrdChangeTitle => Loc.Admin("ordChangeTitle", "Change Allocation");
+    public string OrdChangeOrderLabel => Loc.Admin("ordPayOrder", "Order:");
+    public string OrdChangeRequiredLabel => Loc.Admin("ordChangeRequired", "Change required:");
+    public string OrdChangeAllocateLabel => Loc.Admin("ordChangeAllocate", "Allocate Change");
+    public string OrdChangeUsdLabel => Loc.Admin("ordChangeUsd", "USD change");
+    public string OrdChangeFcLabel => Loc.Admin("ordChangeFc", "FC change");
+    public string OrdChangeEditUsdLabel => Loc.Admin("ordChangeEditUsd", "Edit USD change");
+    public string OrdChangeEditFcLabel => Loc.Admin("ordChangeEditFc", "Edit FC change");
+    public string OrdChangeRemainingAllocateLabel => Loc.Admin("ordChangeRemainingAllocate", "Remaining to allocate:");
+    public string OrdChangeConfirmCompleteLabel => Loc.Admin("ordChangeConfirmComplete", "Confirm Complete");
+
+    private string _ticketDisplayStatus = string.Empty;
+    private string _ticketDateText = string.Empty;
+    private string _ticketTimeText = string.Empty;
+    private string _ticketDisplayLocationLine = string.Empty;
+    private string _ticketDisplaySubtotal = string.Empty;
+    private string _ticketDisplayGrandTotal = string.Empty;
+    private string _ticketDisplayVerification = string.Empty;
+    private decimal _ticketLastPaidUsd;
+    private decimal _ticketLastPaidFc;
+    private decimal _ticketLastChangeUsd;
+    private decimal _ticketLastChangeFc;
 
     public ObservableCollection<OrderEntry> ActiveOrders { get; } = new();
     public ObservableCollection<OrderEntry> PastOrders { get; } = new();
@@ -205,7 +289,52 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
         }
     }
 
-    public string TicketFulfillmentSectionTitle => TicketIsDeliveryFulfillment ? "DELIVERY" : "PICKUP";
+    public string TicketFulfillmentSectionTitle =>
+        TicketIsDeliveryFulfillment
+            ? OrderTicketUiLocalizer.DeliverySectionTitle
+            : OrderTicketUiLocalizer.PickupSectionTitle;
+
+    public string TicketDisplayStatus
+    {
+        get => _ticketDisplayStatus;
+        private set => SetField(ref _ticketDisplayStatus, value);
+    }
+
+    public string TicketDateText
+    {
+        get => _ticketDateText;
+        private set => SetField(ref _ticketDateText, value);
+    }
+
+    public string TicketTimeText
+    {
+        get => _ticketTimeText;
+        private set => SetField(ref _ticketTimeText, value);
+    }
+
+    public string TicketDisplayLocationLine
+    {
+        get => _ticketDisplayLocationLine;
+        private set => SetField(ref _ticketDisplayLocationLine, value);
+    }
+
+    public string TicketDisplaySubtotal
+    {
+        get => _ticketDisplaySubtotal;
+        private set => SetField(ref _ticketDisplaySubtotal, value);
+    }
+
+    public string TicketDisplayGrandTotal
+    {
+        get => _ticketDisplayGrandTotal;
+        private set => SetField(ref _ticketDisplayGrandTotal, value);
+    }
+
+    public string TicketDisplayVerification
+    {
+        get => _ticketDisplayVerification;
+        private set => SetField(ref _ticketDisplayVerification, value);
+    }
 
     public string TicketDeliveryCustomerName
     {

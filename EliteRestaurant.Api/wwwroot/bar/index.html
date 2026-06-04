@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="fr">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Elite Bar / Drink</title>
+  <title data-i18n="portals.bar.pageTitle" data-i18n-attr="textContent">Elite Bar / Drink</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -543,23 +543,26 @@
     }
     .line-badge--new { background: rgba(232, 168, 56, 0.25); color: #fde68a; }
     .line-badge--prepared { background: rgba(148, 163, 184, 0.2); color: #94a3b8; }
+    .kds-lang-wrap { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+    #kdsLangSidebar.kds-lang-wrap { margin-top: 4px; margin-bottom: 0; justify-content: flex-start; }
   </style>
 </head>
 <body>
   <div id="loginWrap" class="main-area">
     <div class="card">
-      <h1>Bar/Drink</h1>
+      <div id="kdsLangLogin" class="kds-lang-wrap"></div>
+      <h1 data-i18n="portals.bar.loginTitle">Bar / Drink</h1>
       <div id="loginErr" class="danger hidden"></div>
       <div class="login-stack">
         <div class="login-field">
-          <label class="lbl" for="staffId">Sign-in ID</label>
+          <label class="lbl" for="staffId" data-i18n="auth.signInId">Sign-in ID</label>
           <input class="inp" id="staffId" type="text" autocomplete="username">
         </div>
         <div class="login-field">
-          <label class="lbl" for="pin">PIN</label>
+          <label class="lbl" for="pin" data-i18n="auth.pin">PIN</label>
           <input class="inp" id="pin" type="password" autocomplete="current-password">
         </div>
-        <button type="button" class="btn btn-primary btn-block" id="btnLogin">Sign in</button>
+        <button type="button" class="btn btn-primary btn-block" id="btnLogin" data-i18n="common.signIn">Sign in</button>
       </div>
     </div>
   </div>
@@ -567,79 +570,81 @@
   <div id="app" class="layout hidden">
     <aside class="sidebar">
       <div class="brand-wrap">
-        <img id="brandLogo" class="brand-logo hidden" alt="Restaurant logo">
-        <div id="brandName" class="brand">Bar / Drink</div>
+        <img id="brandLogo" class="brand-logo hidden" alt="" alt="">
+        <div id="brandName" class="brand" data-i18n="portals.bar.brandDefault">Bar / Drink</div>
       </div>
+      <div id="kdsLangSidebar" class="kds-lang-wrap"></div>
       <div class="nav-stack">
-        <button type="button" class="nav-btn active" id="navQueue" data-view="queue">Queue</button>
-        <button type="button" class="nav-btn" id="navMenu" data-view="menu">Menu</button>
-        <button type="button" class="nav-btn" id="navInventory" data-view="inventory">Inventory</button>
+        <button type="button" class="nav-btn active" id="navQueue" data-view="queue" data-i18n="portals.bar.navQueue">Queue</button>
+        <button type="button" class="nav-btn" id="navMenu" data-view="menu" data-i18n="portals.bar.navMenu">Menu</button>
+        <button type="button" class="nav-btn" id="navInventory" data-view="inventory" data-i18n="portals.bar.navInventory">Inventory</button>
       </div>
       <div class="who">
         <div id="sessionLabel"></div>
         <span class="staff-role-chip" id="roleChip"></span>
-        <button type="button" class="btn btn-ghost btn-block" id="btnLogout" style="margin-top:12px;">Sign out</button>
+        <button type="button" class="btn btn-ghost btn-block" id="btnLogout" style="margin-top:12px;" data-i18n="common.signOut">Sign out</button>
       </div>
     </aside>
     <main class="main-area">
       <div id="viewQueue" class="view-panel">
         <div class="toolbar">
-          <h2>Ticket queue</h2>
+          <h2 data-i18n="portals.bar.queueHeading">Ticket queue</h2>
           <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-            <span id="hubStatus" class="hub-pill off">Live: …</span>
+            <span id="hubStatus" class="hub-pill off" data-i18n="portals.bar.hubPolling">Live: …</span>
+            <span id="orderStageFlash" class="muted" style="font-weight:600;color:#4ade80;flex:1;min-height:1.2em;"></span>
             <span id="lastUpdated" class="muted"></span>
-            <button type="button" class="btn btn-ghost" id="btnRefresh">Refresh</button>
+            <button type="button" class="btn btn-ghost" id="btnRefresh" data-i18n="common.refresh">Refresh</button>
           </div>
         </div>
         <div class="kanban">
           <div class="queue-col queue-col--waiting">
-            <h3><span style="display:flex;align-items:center;"><span class="dot"></span> Incoming</span><span id="countWaiting" class="muted">0</span></h3>
+            <h3><span style="display:flex;align-items:center;"><span class="dot"></span><span data-i18n="portals.bar.colIncoming">Incoming</span></span><span id="countWaiting" class="muted">0</span></h3>
             <div class="queue-body" id="listWaiting"></div>
           </div>
           <div class="queue-col queue-col--prep">
-            <h3><span style="display:flex;align-items:center;"><span class="dot"></span> In kitchen</span><span id="countPrep" class="muted">0</span></h3>
+            <h3><span style="display:flex;align-items:center;"><span class="dot"></span><span data-i18n="portals.bar.colInKitchen">In bar</span></span><span id="countPrep" class="muted">0</span></h3>
             <div class="queue-body" id="listPrep"></div>
           </div>
           <div class="queue-col queue-col--ready">
-            <h3><span style="display:flex;align-items:center;"><span class="dot"></span> Picked up</span><span id="countReady" class="muted">0</span></h3>
+            <h3><span style="display:flex;align-items:center;"><span class="dot"></span><span data-i18n="portals.bar.colPickedUp">Picked up</span></span><span id="countReady" class="muted">0</span></h3>
             <div class="queue-body" id="listReady"></div>
           </div>
         </div>
         <div class="detail-card" id="detailPane">
-          <h4>Ticket detail</h4>
-        <p id="detailEmpty" class="muted">Select a ticket from Incoming, In kitchen, or Picked up to view items and notes.</p>
+          <h4 data-i18n="portals.bar.ticketDetail">Ticket detail</h4>
+        <p id="detailEmpty" class="muted" data-i18n="portals.bar.detailEmpty">Select a ticket from Incoming, In kitchen, or Picked up to view items and notes.</p>
         <div id="detailContent" class="hidden detail-layout">
           <header class="detail-priority">
             <div class="actions-row" id="detailActions"></div>
-            <div class="detail-notes" aria-label="Customer and allergy notes">
+            <div class="detail-notes" data-i18n="portals.bar.notesAllergiesAria" data-i18n-attr="aria-label" aria-label="Customer and allergy notes">
               <div class="detail-notes__block">
-                <span class="detail-notes__label">Customer notes</span>
+                <span class="detail-notes__label" data-i18n="portals.bar.customerNotes">Customer notes</span>
                 <p id="dCust" class="detail-notes__text"></p>
               </div>
               <div class="detail-notes__block">
-                <span class="detail-notes__label">Allergy notes</span>
+                <span class="detail-notes__label" data-i18n="portals.bar.allergyNotes">Allergy notes</span>
                 <p id="dAllergy" class="detail-notes__text"></p>
               </div>
             </div>
-            <div class="detail-source" id="dSourceBlock" aria-label="Order source and fulfillment">
+            <div class="detail-source" id="dSourceBlock" data-i18n="portals.bar.orderSourceNotesAria" data-i18n-attr="aria-label" aria-label="Order source and fulfillment">
               <span id="dSourceBadge" class="kds-origin-badge kds-origin-badge--instore"></span>
               <p id="dSourceMeta" class="detail-source__meta"></p>
             </div>
             <p id="dKitchenWork" class="kitchen-work-summary hidden" role="status"></p>
           </header>
           <section class="detail-items-section detail-items-section--scroll" aria-labelledby="detailItemsHeading">
-            <h5 id="detailItemsHeading" class="detail-items-heading">Dishes on this ticket</h5>
+            <h5 id="detailItemsHeading" class="detail-items-heading" data-i18n="portals.bar.itemsHeading">Drinks on this ticket</h5>
             <div id="dLines" class="detail-line-list" role="list"></div>
           </section>
           <footer class="detail-meta-footer">
-            <div class="detail-grid detail-grid--compact" aria-label="Ticket metadata">
-            <div><span>Code</span><strong id="dCode"></strong></div>
-            <div><span>Table</span><span id="dTable"></span></div>
-            <div><span>Server</span><span id="dServer"></span></div>
-            <div><span>Status</span><span id="dStatus"></span></div>
-            <div><span>Created</span><span id="dTime"></span></div>
-            <div><span>Ticket total</span><strong id="dTotal"></strong></div>
-            <div><span>Fulfillment</span><strong id="dOrigin"></strong></div>
+            <div class="detail-grid detail-grid--compact" data-i18n="portals.bar.ticketMetaAria" data-i18n-attr="aria-label" aria-label="Ticket metadata">
+            <div><span data-i18n="portals.bar.metaCode">Code</span><strong id="dCode"></strong></div>
+            <div><span data-i18n="portals.bar.metaTable">Table</span><span id="dTable"></span></div>
+            <div><span data-i18n="portals.bar.metaServer">Server</span><span id="dServer"></span></div>
+            <div><span data-i18n="portals.bar.metaStatus">Status</span><span id="dStatus"></span></div>
+            <div><span data-i18n="portals.bar.metaCreated">Created</span><span id="dTime"></span></div>
+            <div><span data-i18n="portals.bar.metaTicketTotal">Ticket total</span><strong id="dTotal"></strong></div>
+            <div><span data-i18n="portals.bar.metaFulfillment">Fulfillment</span><strong id="dOrigin"></strong></div>
             </div>
           </footer>
         </div>
@@ -648,10 +653,10 @@
 
       <div id="viewMenu" class="view-panel hidden">
         <div class="toolbar">
-          <h2>Menu</h2>
+          <h2 data-i18n="portals.bar.navMenu">Menu</h2>
           <div class="toolbar-row">
-            <input type="search" id="menuSearch" class="search-field" placeholder="Search menu…" autocomplete="off">
-            <button type="button" class="btn btn-ghost" id="btnRefreshMenu">Refresh</button>
+            <input type="search" id="menuSearch" class="search-field" data-i18n="portals.bar.searchMenu" placeholder="Search menu…" autocomplete="off">
+            <button type="button" class="btn btn-ghost" id="btnRefreshMenu" data-i18n="common.refresh">Refresh</button>
           </div>
         </div>
         <div id="menuBody" class="menu-list"></div>
@@ -659,17 +664,17 @@
 
       <div id="viewInventory" class="view-panel hidden">
         <div class="toolbar">
-          <h2>Inventory</h2>
+          <h2 data-i18n="portals.bar.navInventory">Inventory</h2>
           <div class="toolbar-row">
-            <input type="search" id="invSearch" class="search-field" placeholder="Search inventory…" autocomplete="off">
-            <button type="button" class="btn btn-ghost" id="btnRefreshInventory">Refresh</button>
+            <input type="search" id="invSearch" class="search-field" data-i18n="portals.bar.searchInventory" placeholder="Search inventory…" autocomplete="off">
+            <button type="button" class="btn btn-ghost" id="btnRefreshInventory" data-i18n="common.refresh">Refresh</button>
           </div>
         </div>
         <div class="sort-bar">
-          <span class="label">Sort</span>
-          <button type="button" class="sort-btn active" data-sort="name" id="sortName">Name (A–Z)</button>
-          <button type="button" class="sort-btn" data-sort="expiration" id="sortExpiration">Expiration</button>
-          <button type="button" class="sort-btn" data-sort="quantity" id="sortQuantity">Quantity</button>
+          <span class="label" data-i18n="portals.bar.sortLabel">Sort</span>
+          <button type="button" class="sort-btn active" data-sort="name" id="sortName" data-i18n="portals.bar.sortName">Name (A–Z)</button>
+          <button type="button" class="sort-btn" data-sort="expiration" id="sortExpiration" data-i18n="portals.bar.sortExpiration">Expiration</button>
+          <button type="button" class="sort-btn" data-sort="quantity" id="sortQuantity" data-i18n="portals.bar.sortQuantity">Quantity</button>
         </div>
         <div id="invBody" class="inv-list"></div>
       </div>
@@ -678,42 +683,83 @@
 
   <div id="menuDetailModal" class="modal-backdrop hidden" aria-hidden="true">
     <div class="modal-card modal-card--menu" role="dialog" aria-modal="true" aria-labelledby="menuDetailTitle">
-      <button type="button" class="menu-detail-close" id="menuDetailClose" aria-label="Close">&times;</button>
+      <button type="button" class="menu-detail-close" id="menuDetailClose" data-i18n="portals.bar.menuCloseAria" data-i18n-attr="aria-label" aria-label="Close">&times;</button>
       <div id="menuDetailContent"></div>
     </div>
   </div>
 
   <div id="adjustModal" class="modal-backdrop hidden" aria-hidden="true">
     <div class="modal-card" role="dialog" aria-labelledby="adjTitle">
-      <h3 id="adjTitle">Adjust stock</h3>
+      <h3 id="adjTitle" data-i18n="portals.bar.adjustStock">Adjust stock</h3>
       <p id="adjItemLabel" class="muted" style="margin:0 0 12px;"></p>
       <div class="row">
-        <label for="adjType">Type</label>
+        <label for="adjType" data-i18n="portals.bar.adjType">Type</label>
         <select id="adjType" style="width:100%;min-height:44px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:0 10px;font-family:inherit;font-size:15px;background:var(--navy-elev);color:#e8eaef;">
-          <option value="Add">Add</option>
-          <option value="Deduct" selected>Deduct</option>
+          <option value="Add" data-i18n="portals.bar.adjAdd">Add</option>
+          <option value="Deduct" selected data-i18n="portals.bar.adjDeduct">Deduct</option>
         </select>
       </div>
       <div class="row">
-        <label for="adjQty">Quantity</label>
+        <label for="adjQty" data-i18n="portals.bar.adjQty">Quantity</label>
         <input id="adjQty" type="text" inputmode="decimal" autocomplete="off">
       </div>
       <div class="row">
-        <label for="adjComment">Justification (required)</label>
-        <input id="adjComment" type="text" autocomplete="off" placeholder="Why is stock changing?">
+        <label for="adjComment" data-i18n="portals.bar.adjJustification">Justification (required)</label>
+        <input id="adjComment" type="text" autocomplete="off" data-i18n="portals.bar.adjJustificationPlaceholder" placeholder="Why is stock changing?">
       </div>
       <div id="adjErr" class="danger hidden" style="margin:0;"></div>
       <div class="modal-actions">
-        <button type="button" class="btn btn-ghost" id="adjCancel">Cancel</button>
-        <button type="button" class="btn btn-primary" id="adjSubmit">Apply</button>
+        <button type="button" class="btn btn-ghost" id="adjCancel" data-i18n="common.cancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="adjSubmit" data-i18n="portals.bar.adjApply">Apply</button>
       </div>
     </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.7/dist/browser/signalr.min.js" crossorigin="anonymous"></script>
+  <script>window.EliteI18nDisableAutoInit = true;</script>
+  <script src="/js/elite-i18n.js?v=4"></script>
+  <script src="/shared/elite-kds-portal-i18n.js?v=4"></script>
   <script src="/js/elite-portal-session.js"></script>
+  <script src="/shared/api-error-banner.js"></script>
+  <script src="/shared/button-busy.js"></script>
+  <script src="/shared/signalr-connection-banner.js"></script>
+  <script src="/shared/order-stage-alert.js"></script>
+  <script src="/shared/restaurant-datetime.js"></script>
   <script>
 (function () {
+  const KDS_PORTAL = "bar";
+  const i18n = window.EliteKdsPortalI18n ? EliteKdsPortalI18n.create(KDS_PORTAL) : null;
+  function t(key, fallback, vars) {
+    return i18n ? i18n.t(key, fallback, vars) : (fallback != null ? String(fallback) : key);
+  }
+  function translateOrderStatus(status) {
+    return i18n ? i18n.translateOrderStatus(status) : status;
+  }
+  function translateOriginHeadline(h) {
+    return i18n ? i18n.translateOriginHeadline(h) : h;
+  }
+  function applyKdsStaticI18n(root) {
+    if (i18n) i18n.applyStatic(root);
+  }
+  function refreshKdsDynamicLabels() {
+    setHubPill(hubPillState);
+    if ($("lastUpdated") && lastUpdatedAt) {
+      $("lastUpdated").textContent = t("updatedPrefix", "Updated") + " " + lastUpdatedAt;
+    }
+    if (token) {
+      renderLists();
+      renderDetail();
+      if (currentView === "menu") renderMenuFromCatalog();
+      if (currentView === "inventory") renderInventory();
+      refreshMenuDetailModalIfOpen();
+    }
+  }
+  let hubPillState = "off";
+  let lastUpdatedAt = "";
+  document.addEventListener("elite-language-changed", function () {
+    applyKdsStaticI18n();
+    refreshKdsDynamicLabels();
+  });
   let token = "";
   let me = null;
   let products = {};
@@ -732,6 +778,7 @@
   let adjustingItemId = null;
   let menuCatalogRows = [];
   let menuDetailKeydownBound = false;
+  let menuDetailOpenState = null;
   let portalConfig = { restaurantName: "", restaurantLogoUrl: "" };
   const KITCHEN_TOKEN_KEY = "eliteBarWebJwt";
   const KITCHEN_ME_KEY = "eliteBarWebMe";
@@ -772,8 +819,12 @@
     const body = cfg.body || {};
     portalConfig = {
       restaurantName: body.restaurantName ?? body.RestaurantName ?? "",
-      restaurantLogoUrl: body.restaurantLogoUrl ?? body.RestaurantLogoUrl ?? ""
+      restaurantLogoUrl: body.restaurantLogoUrl ?? body.RestaurantLogoUrl ?? "",
+      restaurantTimeZoneId: body.restaurantTimeZoneId ?? body.RestaurantTimeZoneId ?? ""
     };
+    if (window.EliteRestaurantDateTime) {
+      EliteRestaurantDateTime.setRestaurantTimeZone(portalConfig.restaurantTimeZoneId);
+    }
     const brandNameEl = $("brandName");
     const brandLogoEl = $("brandLogo");
     brandNameEl.textContent = (portalConfig.restaurantName || "Elite Bar").toUpperCase();
@@ -961,7 +1012,7 @@
 
   function formatInvExpiration(item) {
     const exp = item.expirationDate;
-    if (exp == null || exp === "") return "No expiry";
+    if (exp == null || exp === "") return t("invNoExpiryDate", "No expiry");
     const d = new Date(exp);
     if (isNaN(d.getTime())) return "—";
     return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
@@ -1001,8 +1052,8 @@
     if (!rows.length) {
       root.innerHTML =
         q
-          ? '<div class="empty-col" style="padding:20px;">No rows match your search.</div>'
-          : '<div class="empty-col" style="padding:20px;">No inventory rows.</div>';
+          ? '<div class="empty-col" style="padding:20px;">' + escapeHtml(t("invNoSearch", "No rows match your search.")) + '</div>'
+          : '<div class="empty-col" style="padding:20px;">' + escapeHtml(t("invEmpty", "No inventory rows.")) + '</div>';
       return;
     }
     root.innerHTML = "";
@@ -1014,8 +1065,8 @@
       const left = document.createElement("div");
       left.innerHTML =
         '<div class="name">' + escapeHtml(it.name) + '</div>' +
-        '<div class="meta"><span class="badge ' + expBadgeClass(expSt) + '">' + escapeHtml(expSt) + '</span>' +
-        '<span class="badge ' + qtyBadgeClass(qtySt) + '">' + escapeHtml(qtySt) + '</span>' +
+        '<div class="meta"><span class="badge ' + expBadgeClass(expSt) + '">' + escapeHtml(i18n ? i18n.translateInvExpStatus(expSt) : expSt) + '</span>' +
+        '<span class="badge ' + qtyBadgeClass(qtySt) + '">' + escapeHtml(i18n ? i18n.translateInvQtyStatus(qtySt) : qtySt) + '</span>' +
         escapeHtml(String(it.stockQuantity)) + " " + escapeHtml(it.unit) + " · exp. " + escapeHtml(formatInvExpiration(it)) + "</div>";
       const right = document.createElement("div");
       right.style.display = "flex";
@@ -1025,7 +1076,7 @@
       adj.type = "button";
       adj.className = "btn btn-ghost";
       adj.style.whiteSpace = "nowrap";
-      adj.textContent = "Add / deduct";
+      adj.textContent = t("invAddDeduct", "Add / deduct");
       adj.onclick = () => openAdjustModal(it.id);
       right.appendChild(adj);
       card.appendChild(left);
@@ -1062,7 +1113,7 @@
     if (adjustingItemId == null) return;
     const shell = inventoryCache.find(x => Number(x.id) === Number(adjustingItemId));
     if (!shell) {
-      $("adjErr").textContent = "Item no longer loaded. Refresh inventory.";
+      $("adjErr").textContent = t("invItemGone", "Item no longer loaded. Refresh inventory.");
       $("adjErr").classList.remove("hidden");
       return;
     }
@@ -1071,18 +1122,18 @@
     const comment = ($("adjComment").value || "").trim();
     const qty = parseFloat(qtyText.replace(",", "."));
     if (!isFinite(qty) || qty <= 0) {
-      $("adjErr").textContent = "Enter a positive quantity.";
+      $("adjErr").textContent = t("invPositiveQty", "Enter a positive quantity.");
       $("adjErr").classList.remove("hidden");
       return;
     }
     if (!comment) {
-      $("adjErr").textContent = "Add a justification for this change.";
+      $("adjErr").textContent = t("invJustification", "Add a justification for this change.");
       $("adjErr").classList.remove("hidden");
       return;
     }
     const stock = Number(shell.stockQuantity) || 0;
     if (adjType === "Deduct" && stock < qty) {
-      $("adjErr").textContent = "Cannot deduct " + qty + " " + shell.unit + ". Current stock is " + stock + " " + shell.unit + ".";
+      $("adjErr").textContent = t("invCannotDeduct", "Cannot deduct {{qty}} {{unit}}. Current stock is {{stock}} {{unit}}.", { qty: qty, unit: shell.unit, stock: stock });
       $("adjErr").classList.remove("hidden");
       return;
     }
@@ -1121,14 +1172,14 @@
     };
     const res = await api("/api/admin/sync", "POST", { operations: [op] }, true);
     if (!res.ok) {
-      $("adjErr").textContent = res.body?.message || ("Sync failed (" + res.status + ")");
+      $("adjErr").textContent = res.body?.message || t("invSyncFailed", "Sync failed ({{status}})", { status: res.status });
       $("adjErr").classList.remove("hidden");
       return;
     }
     const results = res.body.results ?? res.body.Results;
     const first = Array.isArray(results) && results.length ? results[0] : null;
     if (first && (first.success === false || first.Success === false)) {
-      $("adjErr").textContent = first.message || first.Message || "Sync rejected.";
+      $("adjErr").textContent = first.message || first.Message || t("invSyncRejected", "Sync rejected.");
       $("adjErr").classList.remove("hidden");
       return;
     }
@@ -1159,7 +1210,7 @@
 
   function productCookTimeLabel(p) {
     const m = productPrepMinutes(p);
-    return m > 0 ? m + " min prep" : "Prep: category estimate";
+    return m > 0 ? t("menuPrepMin", "{{minutes}} min prep", { minutes: m }) : t("menuPrepEstimate", "Prep: category estimate");
   }
 
   function formatMenuQty(n) {
@@ -1249,10 +1300,10 @@
     if (!ings.length) {
       const compChips = renderMenuCompositionChipsHtml(p.composition, "menu-composition-chips--inline");
       if (compChips)
-        return '<div class="menu-card-comp" style="margin:0;">' + compChips + '<span class="menu-card-comp-note"> (display composition — no recipe linked)</span></div>';
-      return '<p class="muted" style="margin:0;font-size:11px;">No recipe ingredients linked.</p>';
+        return '<div class="menu-card-comp" style="margin:0;">' + compChips + '<span class="menu-card-comp-note"> ' + escapeHtml(t("menuCardDisplayCompositionNote", "(display composition — no recipe linked)")) + "</span></div>";
+      return '<p class="muted" style="margin:0;font-size:11px;">' + escapeHtml(t("menuDetailNoRecipeLinked", "No recipe ingredients linked.")) + "</p>";
     }
-    let html = '<p class="menu-card-ing-title">Recipe · on hand</p><ul class="menu-card-ing-list">';
+    let html = '<p class="menu-card-ing-title">' + escapeHtml(t("menuCardRecipeOnHand", "Recipe · on hand")) + '</p><ul class="menu-card-ing-list">';
     for (const ing of ings) {
       const unit = ing.unit ? " " + ing.unit : "";
       const recipe = formatMenuQty(ing.recipeQuantity) + unit;
@@ -1305,9 +1356,9 @@
   }
 
   function ingredientSufficientLabel(ing) {
-    if (ing.stockQuantity <= 0) return { text: "Out", cls: "menu-detail-suff--out" };
-    if (!ing.sufficient) return { text: "Insufficient", cls: "menu-detail-suff--no" };
-    return { text: "Sufficient", cls: "menu-detail-suff--ok" };
+    if (ing.stockQuantity <= 0) return { text: t("invQty.out", "Out"), cls: "menu-detail-suff--out" };
+    if (!ing.sufficient) return { text: t("menuDetailStockInsufficient", "Insufficient"), cls: "menu-detail-suff--no" };
+    return { text: t("menuDetailStockSufficient", "Sufficient"), cls: "menu-detail-suff--ok" };
   }
 
   function renderMenuDetailIngredientsTable(p) {
@@ -1315,12 +1366,15 @@
     if (!ings.length) {
       const compChips = renderMenuCompositionChipsHtml(p.composition, "menu-composition-chips--detail");
       if (compChips)
-        return '<div style="margin:0;font-size:14px;">' + compChips + '<p class="muted" style="margin:8px 0 0;font-size:13px;">Display composition — no recipe linked.</p></div>';
-      return '<p class="muted" style="margin:0;font-size:14px;">No recipe ingredients linked.</p>';
+        return '<div style="margin:0;font-size:14px;">' + compChips + '<p class="muted" style="margin:8px 0 0;font-size:13px;">' + escapeHtml(t("menuDetailDisplayCompositionNote", "Display composition — no recipe linked.")) + "</p></div>";
+      return '<p class="muted" style="margin:0;font-size:14px;">' + escapeHtml(t("menuDetailNoRecipeLinked", "No recipe ingredients linked.")) + "</p>";
     }
     let html =
       '<table class="menu-detail-ing-table"><thead><tr>' +
-      "<th>Ingredient</th><th>Recipe qty</th><th>On hand</th><th>Stock</th>" +
+      "<th>" + escapeHtml(t("menuDetailIngIngredient", "Ingredient")) + "</th>" +
+      "<th>" + escapeHtml(t("menuDetailIngRecipeQty", "Recipe qty")) + "</th>" +
+      "<th>" + escapeHtml(t("menuDetailIngOnHand", "On hand")) + "</th>" +
+      "<th>" + escapeHtml(t("menuDetailIngStock", "Stock")) + "</th>" +
       "</tr></thead><tbody>";
     for (const ing of ings) {
       const unit = ing.unit ? " " + ing.unit : "";
@@ -1359,26 +1413,26 @@
     html += '<div class="menu-detail-head">';
     html += '<h2 id="menuDetailTitle" class="menu-detail-title">' + escapeHtml(p.name) + "</h2>";
     html += '<p class="menu-detail-price">$ ' + p.price.toFixed(2) + "</p>";
-    html += '<span class="menu-detail-avail ' + availCls + '">' + (ok ? "Available" : "Unavailable") + "</span>";
+    html += '<span class="menu-detail-avail ' + availCls + '">' + (ok ? t("menuAvailable", "Available") : t("menuUnavailable", "Unavailable")) + "</span>";
     html += "</div>";
     html += '<div class="menu-detail-grid">';
-    html += "<div><span>Menu ID</span><strong class=\"mono\">" + escapeHtml(menuId) + "</strong></div>";
-    html += "<div><span>Internal ID</span><strong class=\"mono\">" + escapeHtml(String(p.id)) + "</strong></div>";
-    html += "<div><span>Type</span><strong>" + escapeHtml(p.category) + "</strong></div>";
-    html += "<div><span>Subtype</span><strong>" + escapeHtml(p.subCategory) + "</strong></div>";
-    html += "<div><span>Prep / cook</span><strong>" + escapeHtml(prepDetail) + "</strong></div>";
-    html += "<div><span>Availability</span><strong>" + (ok ? "In stock" : "Unavailable") + "</strong></div>";
+    html += "<div><span>" + escapeHtml(t("menuId", "Menu ID")) + "</span><strong class=\"mono\">" + escapeHtml(menuId) + "</strong></div>";
+    html += "<div><span>" + escapeHtml(t("menuDetailInternalId", "Internal ID")) + "</span><strong class=\"mono\">" + escapeHtml(String(p.id)) + "</strong></div>";
+    html += "<div><span>" + escapeHtml(t("menuType", "Type")) + "</span><strong>" + escapeHtml(p.category) + "</strong></div>";
+    html += "<div><span>" + escapeHtml(t("menuSubtype", "Subtype")) + "</span><strong>" + escapeHtml(p.subCategory) + "</strong></div>";
+    html += "<div><span>" + escapeHtml(t("menuDetailPrepCook", "Prep / cook")) + "</span><strong>" + escapeHtml(prepDetail) + "</strong></div>";
+    html += "<div><span>" + escapeHtml(t("menuDetailAvailability", "Availability")) + "</span><strong>" + (ok ? t("menuDetailInStock", "In stock") : t("menuDetailUnavailable", "Unavailable")) + "</strong></div>";
     html += "</div>";
     if (p.description) {
-      html += '<div class="menu-detail-block"><h4>Description</h4><p>' + escapeHtml(p.description) + "</p></div>";
+      html += '<div class="menu-detail-block"><h4>' + escapeHtml(t("menuDetailDescription", "Description")) + '</h4><p>' + escapeHtml(p.description) + "</p></div>";
     }
     const compParts = parseCompositionParts(p.composition);
     if (compParts.length) {
-      html += '<div class="menu-detail-block"><h4>Composition</h4>';
+      html += '<div class="menu-detail-block"><h4>' + escapeHtml(t("menuComposition", "Composition")) + '</h4>';
       html += renderMenuCompositionChipsHtml(compParts, "menu-composition-chips--detail");
       html += "</div>";
     }
-    html += '<div class="menu-detail-block"><h4>Ingredients</h4>' + renderMenuDetailIngredientsTable(p) + "</div>";
+    html += '<div class="menu-detail-block"><h4>' + escapeHtml(t("menuDetailIngredients", "Ingredients")) + '</h4>' + renderMenuDetailIngredientsTable(p) + "</div>";
     html += "</div></div>";
     return html;
   }
@@ -1390,6 +1444,15 @@
     closeMenuDetailModal();
   }
 
+  function refreshMenuDetailModalIfOpen() {
+    if (!menuDetailOpenState) return;
+    const modal = $("menuDetailModal");
+    if (!modal || modal.classList.contains("hidden")) return;
+    let row = resolveMenuDetailRow(menuDetailOpenState.productId);
+    if (!row) row = minimalMenuDetailRow(menuDetailOpenState.productId, menuDetailOpenState.displayName);
+    $("menuDetailContent").innerHTML = renderMenuDetailModalHtml(row);
+  }
+
   async function openMenuDetailModal(productId, displayName) {
     let row = resolveMenuDetailRow(productId);
     if (!row && !menuCatalogRows.length) {
@@ -1397,6 +1460,7 @@
       row = resolveMenuDetailRow(productId);
     }
     if (!row) row = minimalMenuDetailRow(productId, displayName);
+    menuDetailOpenState = { productId, displayName };
     $("menuDetailContent").innerHTML = renderMenuDetailModalHtml(row);
     const modal = $("menuDetailModal");
     modal.classList.remove("hidden");
@@ -1414,6 +1478,7 @@
     if (!modal) return;
     modal.classList.add("hidden");
     modal.setAttribute("aria-hidden", "true");
+    menuDetailOpenState = null;
     $("menuDetailContent").innerHTML = "";
   }
 
@@ -1423,7 +1488,7 @@
     if (q) rows = menuCatalogRows.filter(row => menuProductSearchHaystack(row).includes(q));
     if (!rows.length) {
       $("menuBody").innerHTML =
-        q ? '<p class="muted">No dishes match your search.</p>' : '<p class="muted">No products.</p>';
+        q ? '<p class="muted">' + escapeHtml(t("menuNoSearch", "No drinks match your search.")) + '</p>' : '<p class="muted">' + escapeHtml(t("menuEmpty", "No products.")) + '</p>';
       return;
     }
     const byCat = {};
@@ -1465,11 +1530,11 @@
           html += '<div class="menu-card-head"><div class="title">' + escapeHtml(p.name) + '</div>';
           html += '<div class="price">$ ' + p.price.toFixed(2) + '</div></div>';
           html += '<div class="menu-card-meta">';
-          html += '<span><strong>Type</strong> ' + escapeHtml(p.category) + '</span>';
-          html += '<span><strong>Subtype</strong> ' + escapeHtml(p.subCategory) + '</span>';
-          html += '<span class="menu-card-prep"><strong>Prep</strong> ' + escapeHtml(productCookTimeLabel(p)) + '</span>';
+          html += '<span><strong>' + escapeHtml(t('menuType', 'Type')) + '</strong> ' + escapeHtml(p.category) + '</span>';
+          html += '<span><strong>' + escapeHtml(t('menuSubtype', 'Subtype')) + '</strong> ' + escapeHtml(p.subCategory) + '</span>';
+          html += '<span class="menu-card-prep"><strong>' + escapeHtml(t('menuPrep', 'Prep')) + '</strong> ' + escapeHtml(productCookTimeLabel(p)) + '</span>';
           html += '<span class="' + availCls + '">' + (ok ? "Available" : "Unavailable") + '</span>';
-          html += '<span class="menu-card-id" style="grid-column:1/-1;"><strong>Menu ID</strong> ' + escapeHtml(menuId);
+          html += '<span class="menu-card-id" style="grid-column:1/-1;"><strong>' + escapeHtml(t('menuId', 'Menu ID')) + '</strong> ' + escapeHtml(menuId);
           html += ' · <strong>#</strong>' + escapeHtml(String(p.id)) + '</span>';
           html += '</div>';
           if (p.description)
@@ -1477,10 +1542,10 @@
           if (p.composition && (p.ingredients || []).length) {
             const cardComp = renderMenuCompositionChipsHtml(p.composition, "menu-composition-chips--inline");
             if (cardComp)
-              html += '<div class="menu-card-comp"><strong>Composition</strong> ' + cardComp + "</div>";
+              html += '<div class="menu-card-comp"><strong>' + escapeHtml(t('menuComposition', 'Composition')) + '</strong> ' + cardComp + "</div>";
           }
           html += renderMenuIngredientsHtml(p);
-          html += '<p class="menu-card-hint">Tap for full details · ';
+          html += '<p class="menu-card-hint">' + escapeHtml(t('menuTapHint', 'Tap for full details · '));
           html += '<span class="menu-card-filter-link" role="button" tabindex="0" data-menu-filter="' + escapeHtml(p.name) + '">Filter search</span></p>';
           html += '</div></button>';
         }
@@ -1522,7 +1587,7 @@
     renderMenuFromCatalog();
   }
 
-  async function api(path, method, body, auth) {
+  async function api(path, method, body, auth, wrapOptions) {
     const headers = {};
     if (body) headers["Content-Type"] = "application/json";
     if (auth !== false && token) headers["Authorization"] = "Bearer " + token;
@@ -1530,7 +1595,9 @@
     const txt = await res.text();
     let json;
     try { json = JSON.parse(txt); } catch { json = { raw: txt }; }
-    return { ok: res.ok, status: res.status, body: json };
+    var result = { ok: res.ok, status: res.status, body: json };
+    if (window.EliteApiError) window.EliteApiError.wrap(result, wrapOptions);
+    return result;
   }
 
   async function loadSettingsPricing() {
@@ -1621,13 +1688,13 @@
     const badge = $("dSourceBadge");
     if (badge) {
       badge.className = "kds-origin-badge " + origin.badgeMod;
-      badge.innerHTML = origin.iconSvg + "<span>" + escapeHtml(origin.headline) + "</span>";
+      badge.innerHTML = origin.iconSvg + "<span>" + escapeHtml(translateOriginHeadline(origin.headline)) + "</span>";
     }
     const os = String(o.orderSource ?? o.OrderSource ?? "").trim() || "—";
     const fulfill = customerFulfillmentDisplay(o);
     const parts = [];
-    if (os !== "—") parts.push("<strong>Order source:</strong> " + escapeHtml(os));
-    if (fulfill) parts.push("<strong>Customer fulfillment:</strong> " + escapeHtml(fulfill));
+    if (os !== "—") parts.push("<strong>" + escapeHtml(t("orderSourceLabel", "Order source:")) + "</strong> " + escapeHtml(os));
+    if (fulfill) parts.push("<strong>" + escapeHtml(t("customerFulfillmentLabel", "Customer fulfillment:")) + "</strong> " + escapeHtml(fulfill));
     const metaEl = $("dSourceMeta");
     if (metaEl) {
       metaEl.innerHTML = parts.length
@@ -1742,7 +1809,7 @@
     if (t) {
       const num = t.tableNumber ?? t.TableNumber ?? "?";
       const nm = t.name || t.Name || "";
-      return nm ? ("Table " + num + " · " + nm) : ("Table " + num);
+      return nm ? (t("tablePrefix", "Table ") + num + " · " + nm) : (t("tablePrefix", "Table ") + num);
     }
     return tc || "—";
   }
@@ -1757,6 +1824,11 @@
 
   function formatTime(iso) {
     if (!iso) return "—";
+    if (window.EliteRestaurantDateTime) {
+      return EliteRestaurantDateTime.formatRestaurantDateTime(iso, {
+        month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit"
+      }) || "—";
+    }
     const d = new Date(iso);
     if (isNaN(d.getTime())) return "—";
     return d.toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -1771,7 +1843,7 @@
       const q = it.quantity ?? it.Quantity ?? 0;
       const pr = it._product || products[pid];
       const name = pr ? (pr.name || pr.Name) : ("#" + pid);
-      const tag = lineIsNewForKitchen(it, items) ? " [NEW]" : "";
+      const tag = lineIsNewForKitchen(it, items) ? t("newTag", " [NEW]") : "";
       parts.push(name + " ×" + q + tag);
     }
     return parts.join(", ") || "—";
@@ -1812,7 +1884,8 @@
     }).filter(o => isKitchenKdsVisible(o.status || o.Status));
     renderLists();
     renderDetail();
-    $("lastUpdated").textContent = "Updated " + new Date().toLocaleTimeString();
+    lastUpdatedAt = new Date().toLocaleTimeString();
+    $("lastUpdated").textContent = t("updatedPrefix", "Updated") + " " + lastUpdatedAt;
   }
 
   function renderLists() {
@@ -1834,9 +1907,9 @@
     $("countWaiting").textContent = String(waiting.length);
     $("countPrep").textContent = String(prep.length);
     $("countReady").textContent = String(ready.length);
-    $("listWaiting").innerHTML = waiting.length ? "" : '<div class="empty-col">No tickets waiting.</div>';
-    $("listPrep").innerHTML = prep.length ? "" : '<div class="empty-col">Nothing in prep.</div>';
-    $("listReady").innerHTML = ready.length ? "" : '<div class="empty-col">Nothing ready for pickup.</div>';
+    $("listWaiting").innerHTML = waiting.length ? "" : '<div class="empty-col">' + escapeHtml(t("noWaitingTickets", "No tickets waiting.")) + '</div>';
+    $("listPrep").innerHTML = prep.length ? "" : '<div class="empty-col">' + escapeHtml(t("emptyPrep", "Nothing in prep.")) + '</div>';
+    $("listReady").innerHTML = ready.length ? "" : '<div class="empty-col">' + escapeHtml(t("emptyReady", "Nothing ready for pickup.")) + '</div>';
     if (waiting.length) {
       $("listWaiting").innerHTML = "";
       for (const o of waiting) $("listWaiting").appendChild(ticketEl(o, "waiting"));
@@ -1863,10 +1936,14 @@
       (sameOrderId(selectedOrderId, id) ? " selected" : "");
     el.dataset.orderId = String(id);
     const created = o.createdAt || o.CreatedAt;
-    const timeShort = created ? new Date(created).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+    const timeShort = created
+      ? (window.EliteRestaurantDateTime
+          ? EliteRestaurantDateTime.formatRestaurantDateTime(created, { hour: "2-digit", minute: "2-digit" })
+          : new Date(created).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }))
+      : "";
 
     el.innerHTML =
-      '<div class="kds-origin-corner" aria-label="Fulfillment">' +
+      '<div class="kds-origin-corner" aria-label="' + escapeHtml(t("fulfillmentAria", "Fulfillment")) + '">' +
       '<span class="kds-origin-badge ' + origin.badgeMod + '">' +
       origin.iconSvg +
       "<span>" + escapeHtml(origin.headline) + "</span>" +
@@ -1902,7 +1979,7 @@
     $("dCode").textContent = orderCode(o);
     $("dTable").textContent = tableLabel(o);
     $("dServer").textContent = serverName(o);
-    $("dStatus").textContent = st;
+    $("dStatus").textContent = translateOrderStatus(st) || st;
     $("dTime").textContent = formatTime(o.createdAt || o.CreatedAt);
     const totEl = $("dTotal");
     if (totEl) totEl.textContent = "$ " + computeGrandTotal(o).toFixed(2);
@@ -1939,8 +2016,8 @@
       empty.className = "detail-line-empty";
       empty.setAttribute("role", "listitem");
       empty.innerHTML = preview
-        ? "<strong>Items:</strong> " + escapeHtml(preview)
-        : "<strong>No item lines were sent for this ticket.</strong> Refresh the queue. If this stays empty, the order was saved without cookable line items.";
+        ? "<strong>" + escapeHtml(t("itemsPreview", "Items:")) + "</strong> " + escapeHtml(preview)
+        : "<strong>" + escapeHtml(t("noLineItems", "No item lines were sent for this ticket.")) + "</strong> " + escapeHtml(t("noLineItemsHint", "Refresh the queue. If this stays empty, the order was saved without drink line items."));
       listEl.appendChild(empty);
     }
     for (const it of sorted) {
@@ -1958,15 +2035,15 @@
       else if (isPrepared) btn.classList.add("detail-line-card--prepared");
       btn.setAttribute("role", "listitem");
       const badge = isNew
-        ? '<span class="line-badge line-badge--new">NEW</span>'
+        ? '<span class="line-badge line-badge--new">' + escapeHtml(t("lineNew", "NEW")) + '</span>'
         : isPrepared
-          ? '<span class="line-badge line-badge--prepared">Prepared</span>'
+          ? '<span class="line-badge line-badge--prepared">' + escapeHtml(t("linePrepared", "Prepared")) + '</span>'
           : "";
       const qtyLabel = qty === 1 ? "×1" : "×" + qty;
       btn.innerHTML =
         '<div class="detail-line-card__main"><span class="detail-line-card__name">' + escapeHtml(name) + "</span>" + badge + "</div>" +
         '<span class="detail-line-card__qty" aria-label="Quantity">' + escapeHtml(qtyLabel) + "</span>" +
-        '<span class="detail-line-card__station">Station · ' + escapeHtml(station) + "</span>";
+        '<span class="detail-line-card__station">' + escapeHtml(t("stationLabel", "Station")) + ' · ' + escapeHtml(station) + "</span>";
       if (pid) {
         btn.onclick = () => { void openMenuDetailModal(pid, name); };
       } else {
@@ -1983,72 +2060,94 @@
       const hint = document.createElement("p");
       hint.className = "muted";
       hint.style.margin = "0 0 10px";
-      hint.textContent = "Prepare NEW lines only — already-prepared items do not need re-cooking.";
+      hint.textContent = t("prepareNewHint", "Prepare NEW lines only — already-prepared items do not need re-pouring.");
       actions.appendChild(hint);
     }
     if (stKey === "waiting") {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "btn btn-waiting";
-      b.textContent = "Receive → In kitchen";
-      b.onclick = () => advanceOrder(id, "waiting");
+      b.textContent = t("receiveInKitchen", "Receive → In bar");
+      b.onclick = (ev) => advanceOrder(id, "waiting", ev.currentTarget);
       actions.appendChild(b);
     } else if (stKey === "inKitchen") {
       if (allPortalLinesPrepared(o)) {
         const p = document.createElement("p");
         p.className = "muted";
         p.style.margin = "0";
-        p.textContent = "Drinks complete — ticket stays here until kitchen finishes food, then moves to Ready.";
+        p.textContent = t("drinksPrepCompleteHint", "Drinks complete — ticket stays here until kitchen finishes food, then moves to Ready.");
         actions.appendChild(p);
       } else {
         const b = document.createElement("button");
         b.type = "button";
         b.className = "btn btn-ready";
-        b.textContent = "Mark drinks ready";
-        b.onclick = () => advanceOrder(id, "prep");
+        b.textContent = t("markDrinksReady", "Mark drinks ready");
+        b.onclick = (ev) => advanceOrder(id, "prep", ev.currentTarget);
         actions.appendChild(b);
       }
     } else if (stKey === "ready") {
       const p = document.createElement("p");
       p.className = "muted";
       p.style.margin = "0";
-      p.textContent = "This ticket is ready for server pickup. Advance it from a server tablet or the admin orders screen.";
+      p.textContent = t("readyPickupHint", "This ticket is ready for server pickup. Advance it from a server tablet or the admin orders screen.");
       actions.appendChild(p);
     } else {
       const p = document.createElement("p");
       p.className = "muted";
       p.style.margin = "0";
-      p.textContent = "No kitchen action is available for status: " + (st || "Unknown") + ". Refresh if the ticket changed.";
+      p.textContent = t("noActionForStatus", "No bar action is available for status: {{status}}. Refresh if the ticket changed.", { status: st || "Unknown" });
       actions.appendChild(p);
     }
   }
 
-  async function advanceOrder(orderId, from) {
+  async function advanceOrder(orderId, from, btn) {
     const o = ordersCache.find(x => sameOrderId(x.id ?? x.Id, orderId));
     const stKey = o ? kitchenStatusKey(o.status || o.Status) : "other";
     if (from === "waiting" && stKey !== "waiting") { await loadQueue(); return; }
     if (from === "prep" && stKey !== "inKitchen") { await loadQueue(); return; }
     const msg = from === "waiting"
-      ? "Start preparing this ticket? Status moves from Waiting to In kitchen."
-      : "Mark your drink lines prepared? The ticket stays In kitchen until kitchen finishes food.";
+      ? t("advanceWaitingConfirm", "Start preparing this ticket? Status moves from Waiting to In bar.")
+      : t("advancePrepConfirmBar", "Mark your drink lines prepared? The ticket stays In bar until kitchen finishes food.");
     if (!confirm(msg)) return;
-    const res = await api("/api/admin/orders/" + orderId + "/advance", "POST", { prepStationPortal: PREP_STATION_PORTAL }, true);
-    const r = res.body?.result ?? res.body?.Result;
-    if (!res.ok) {
-      alert(res.body?.message || "Request failed (" + res.status + ")");
-      return;
+    if (window.EliteButtonBusy) EliteButtonBusy.set(btn, true, "portals.common.saving", "Saving…");
+    try {
+      const res = await api("/api/admin/orders/" + orderId + "/advance", "POST", { prepStationPortal: PREP_STATION_PORTAL }, true);
+      const r = res.body?.result ?? res.body?.Result;
+      if (!res.ok) {
+        alert(res.body?.message || t("requestFailed", "Request failed ({{status}})", { status: res.status }));
+        return;
+      }
+      if (r === "missing") { alert(t("ticketGone", "This ticket changed or is gone. Refresh.")); await loadQueue(); return; }
+      if (r === "error") { alert(res.body?.errorMessage || res.body?.ErrorMessage || t("advanceFailed", "Advance failed.")); return; }
+      await loadQueue();
+    } finally {
+      if (window.EliteButtonBusy) EliteButtonBusy.set(btn, false);
     }
-    if (r === "missing") { alert("This ticket changed or is gone. Refresh."); await loadQueue(); return; }
-    if (r === "error") { alert(res.body?.errorMessage || res.body?.ErrorMessage || "Advance failed."); return; }
-    await loadQueue();
   }
 
   function setHubPill(state) {
-    const el = $("hubStatus");
-    el.classList.remove("ok", "warn", "off");
-    if (state === "live") { el.textContent = "Live: connected"; el.classList.add("ok"); }
-    else if (state === "degraded") { el.textContent = "Live: reconnecting"; el.classList.add("warn"); }
-    else { el.textContent = "Live: polling"; el.classList.add("off"); }
+    hubPillState = state;
+    if (i18n) i18n.setHubPill($("hubStatus"), state);
+    else {
+      const el = $("hubStatus");
+      el.classList.remove("ok", "warn", "off");
+      if (state === "live") { el.textContent = "Live: connected"; el.classList.add("ok"); }
+      else if (state === "degraded") { el.textContent = "Live: reconnecting"; el.classList.add("warn"); }
+      else { el.textContent = "Live: polling"; el.classList.add("off"); }
+    }
+  }
+
+  let orderStageFlashTimer = null;
+
+  function scheduleOrderStageFlash(msg) {
+    const el = $("orderStageFlash");
+    if (!el) return;
+    el.textContent = msg || "";
+    if (orderStageFlashTimer) clearTimeout(orderStageFlashTimer);
+    orderStageFlashTimer = setTimeout(() => {
+      el.textContent = "";
+      orderStageFlashTimer = null;
+    }, 12000);
   }
 
   function scheduleRefreshFromHub() {
@@ -2072,9 +2171,23 @@
       .withAutomaticReconnect()
       .build();
     conn.on("KitchenQueueChanged", () => scheduleRefreshFromHub());
+    if (window.EliteOrderStageAlert) {
+      EliteOrderStageAlert.wireHubConnection(conn, {
+        audience: "Kitchen",
+        onFlash: scheduleOrderStageFlash,
+        onNotify: () => scheduleRefreshFromHub()
+      });
+    }
     conn.onreconnecting(() => setHubPill("degraded"));
     conn.onreconnected(() => { setHubPill("live"); conn.invoke("JoinKitchen").catch(() => {}); });
     conn.onclose(() => setHubPill("off"));
+    if (window.EliteSignalRBanner) {
+      EliteSignalRBanner.wire(conn, function () {
+        setHubPill("live");
+        conn.invoke("JoinKitchen").catch(function () {});
+        loadQueue().catch(function () {});
+      });
+    }
     try {
       await conn.start();
       await conn.invoke("JoinKitchen");
@@ -2109,31 +2222,33 @@
     const staffId = ($("staffId").value || "").trim();
     const pin = $("pin").value || "";
     if (!staffId || !pin) {
-      $("loginErr").textContent = "Enter sign-in ID and PIN.";
+      $("loginErr").textContent = t("loginMissingCredentials", "Enter sign-in ID and PIN.");
       $("loginErr").classList.remove("hidden");
       return;
     }
-    const res = await api("/api/auth/login", "POST", { staffId, pin, portal: "Bar" }, false);
+    const res = await api("/api/auth/login", "POST", { staffId, pin, portal: "Bar" }, false, { silent: true });
     if (!res.ok || !res.body?.accessToken) {
-      const hint = res.body?.message || res.body?.title || "Check credentials and bar role (Barman, Bartender, etc.).";
-      $("loginErr").textContent = "Login failed (HTTP " + res.status + "). " + hint;
+      const hint = res.body?.message || res.body?.title || t("loginRoleHint", "Check credentials and bar role (Bartender, etc.).");
+      $("loginErr").textContent = t("loginFailed", "Login failed (HTTP {{status}}). {{hint}}", { status: res.status, hint: hint });
       $("loginErr").classList.remove("hidden");
       return;
     }
     token = res.body.accessToken;
     me = res.body;
+    if (window.EliteOrderStageAlert) window.EliteOrderStageAlert.unlockAudio();
     sessionStorage.setItem(KITCHEN_TOKEN_KEY, token);
     sessionStorage.setItem(KITCHEN_ME_KEY, JSON.stringify(me));
     $("sessionLabel").textContent = (me.name || "") + " (" + (me.signInId || me.employeeUniqueId || "") + ")";
-    $("roleChip").textContent = me.role || "Kitchen";
+    $("roleChip").textContent = me.role || t("roleChip", "Bar");
     $("loginWrap").classList.add("hidden");
     $("app").classList.remove("hidden");
+    applyKdsStaticI18n();
     setView("queue");
     await loadPortalBranding();
     try {
       await loadQueue();
     } catch (e) {
-      alert("Could not load queue: " + (e.message || e));
+      alert(t("loadQueueFailed", "Could not load queue: {{message}}", { message: e.message || e }));
     }
     void startOrderHub();
     startPollingFallback();
@@ -2234,10 +2349,17 @@
   }
 
   if (window.location.protocol === "file:") {
-    $("loginErr").textContent = "Open this page from the API site (e.g. http://localhost:8080/bar/) so /api and SignalR work.";
+    $("loginErr").textContent = t("fileProtocolHint", "Open this page from the API site (e.g. http://localhost:8080/bar/) so /api and SignalR work. For food, use /kitchen/.");
     $("loginErr").classList.remove("hidden");
   }
 
+  async function initKdsI18n() {
+    if (!window.EliteI18n || !i18n) return;
+    await i18n.init(["#kdsLangLogin", "#kdsLangSidebar"]);
+    applyKdsStaticI18n();
+    refreshKdsDynamicLabels();
+  }
+  void initKdsI18n();
   void tryRestoreBarSession();
 })();
   </script>

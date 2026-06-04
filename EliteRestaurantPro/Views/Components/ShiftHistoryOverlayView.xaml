@@ -73,7 +73,7 @@
                                    Margin="0,4,0,0"/>
                     </StackPanel>
                     <Button Grid.Column="1"
-                            Content="Close"
+                            Content="{Binding ShiftHistoryCloseLabel}"
                             Command="{Binding CloseShiftHistoryCommand}"
                             Style="{StaticResource GhostButton}"
                             MinWidth="88"
@@ -88,7 +88,8 @@
                            FontSize="13"
                            Visibility="{Binding ShiftHistoryBannerVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
-                <DataGrid Grid.Row="2"
+                <DataGrid x:Name="ShiftHistoryGrid"
+                          Grid.Row="2"
                           Margin="14,12,14,14"
                           ItemsSource="{Binding ShiftHistoryRows}"
                           AutoGenerateColumns="False"
@@ -136,7 +137,7 @@
                            Foreground="{StaticResource TextMutedBrush}"
                            FontSize="11"
                            TextWrapping="Wrap"
-                           Text="Tap the dimmed area or Close to dismiss. Rows are newest first."/>
+                           Text="{Binding ShiftHistoryDismissHint}"/>
             </Grid>
         </Border>
     </Grid>

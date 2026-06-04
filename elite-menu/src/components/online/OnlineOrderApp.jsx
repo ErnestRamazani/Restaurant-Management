@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowLeft, ShoppingBag } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { resolveApiAssetUrl } from '../../utils/apiClient'
 import { formatUsd } from '../../utils/format'
@@ -10,6 +11,7 @@ import { ProductCard } from '../ui/ProductCard'
 const spring = { type: 'spring', stiffness: 300, damping: 34 }
 
 export function OnlineOrderMenuScreen() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { cart, config, products: productsFromContext } = /** @type {import('./OnlineOrderLayout').OnlineOrderOutletContext} */ (
     useOutletContext()
@@ -38,11 +40,13 @@ export function OnlineOrderMenuScreen() {
   const promoCta =
     config?.onlinePromoCtaLabel != null && String(config.onlinePromoCtaLabel).trim()
       ? String(config.onlinePromoCtaLabel).trim()
-      : 'Shop the menu'
+      : t('guest.online.shopTheMenu')
   const promoImg =
     config?.onlinePromoImageUrl != null && String(config.onlinePromoImageUrl).trim()
       ? resolveApiAssetUrl(String(config.onlinePromoImageUrl).trim())
       : ''
+
+  const categoryLabel = (c) => (c === 'All' ? t('filters.all') : c)
 
   return (
     <div className="min-h-[100svh] bg-midnight text-champagne">
@@ -51,11 +55,11 @@ export function OnlineOrderMenuScreen() {
           type="button"
           onClick={() => navigate(-1)}
           className="flex h-11 min-w-[44px] items-center justify-center rounded-xl text-champagne"
-          aria-label="Back"
+          aria-label={t('guest.general.back')}
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
-        <h1 className="flex-1 text-center font-display text-lg font-semibold">Order online</h1>
+        <h1 className="flex-1 text-center font-display text-lg font-semibold">{t('guest.online.pageTitle')}</h1>
         <div className="w-11" aria-hidden />
       </header>
 
@@ -92,7 +96,7 @@ export function OnlineOrderMenuScreen() {
         ) : null}
 
         <p className="mb-2 font-body text-[0.72rem] font-bold uppercase tracking-[0.14em] text-gold/90">
-          Categories
+          {t('guest.online.categories')}
         </p>
         <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
           {categories.map((c) => (
@@ -104,7 +108,7 @@ export function OnlineOrderMenuScreen() {
                 cat === c ? 'border-gold/50 bg-gold/10 text-gold' : 'border-champagne/15 text-champagne/55'
               }`}
             >
-              {c}
+              {categoryLabel(c)}
             </button>
           ))}
         </div>
@@ -132,7 +136,7 @@ export function OnlineOrderMenuScreen() {
             <ShoppingBag className="h-5 w-5 shrink-0 text-gold" />
             <div className="min-w-0">
               <p className="truncate font-body text-xs font-semibold text-champagne">
-                {cart.totalItems} item{cart.totalItems === 1 ? '' : 's'}
+                {t('guest.cart.itemsInOrder', { count: cart.totalItems })}
               </p>
               <p className="truncate font-mono text-sm text-gold">{formatUsd(cart.grandTotal)}</p>
             </div>
@@ -143,7 +147,7 @@ export function OnlineOrderMenuScreen() {
               onClick={() => cart.clearCart()}
               className="shrink-0 rounded-lg px-2 py-1.5 font-body text-[0.62rem] font-bold uppercase tracking-[0.1em] text-champagne/50 underline decoration-champagne/25 underline-offset-2 hover:text-red-300 hover:decoration-red-400/50"
             >
-              Clear
+              {t('guest.online.clearBar')}
             </button>
           ) : null}
           <button
@@ -152,7 +156,7 @@ export function OnlineOrderMenuScreen() {
             onClick={() => navigate('/order-online/checkout')}
             className="h-12 shrink-0 rounded-2xl bg-gold px-4 font-body text-xs font-extrabold uppercase tracking-[0.12em] text-black disabled:opacity-40 sm:px-5"
           >
-            Checkout
+            {t('guest.online.checkoutBar')}
           </button>
         </div>
       </div>

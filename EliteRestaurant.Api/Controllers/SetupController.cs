@@ -5,6 +5,7 @@ using EliteRestaurant.Core.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace EliteRestaurant.Api.Controllers;
@@ -15,7 +16,8 @@ namespace EliteRestaurant.Api.Controllers;
 public sealed class SetupController(
     SiteSetupService setupService,
     JwtTokenService jwtTokenService,
-    IOptions<SetupOptions> setupOptions) : ControllerBase
+    IOptions<SetupOptions> setupOptions,
+    IHostEnvironment hostEnvironment) : ControllerBase
 {
     [HttpGet("status")]
     [EnableRateLimiting("Setup")]
@@ -70,6 +72,15 @@ public sealed class SetupController(
     [ProducesResponseType(401)]
     public async Task<ActionResult<SetupStatusDto>> PostWipeAllData(CancellationToken cancellationToken)
     {
+        if (hostEnvironment.IsProduction()
+            && !string.Equals(Environment.GetEnvironmentVariable("SETUP_ALLOW_WIPE"), "true", StringComparison.OrdinalIgnoreCase))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                message = "Tenant wipe is disabled in Production. Set SETUP_ALLOW_WIPE=true only for controlled maintenance."
+            });
+        }
+
         if (!IsAuthorizedForNewSite())
             return Unauthorized(new { message = "Missing or invalid X-Setup-Secret header." });
 

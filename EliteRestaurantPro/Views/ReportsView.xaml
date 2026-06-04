@@ -75,11 +75,9 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel>
-                    <TextBlock Style="{StaticResource HeadingLarge}" FontSize="26">
-                        <Run Text="General" Foreground="{StaticResource TextPrimaryBrush}"/>
-                        <Run Text=" Reports" Foreground="{StaticResource GoldAccentBrush}"/>
-                    </TextBlock>
-                    <TextBlock Text="Day-grouped reporting: Daily (with payroll &amp; salary), Orders, Employees, Tables, Inventory, and Menu."
+                    <TextBlock Text="{Binding PageTitle}"
+                               Style="{StaticResource HeadingLarge}" FontSize="26"/>
+                    <TextBlock Text="{Binding PageSubtitle}"
                                Style="{StaticResource BodyText}"
                                FontSize="13"
                                Margin="0,5,0,0"/>
@@ -92,17 +90,17 @@
                     <DatePicker SelectedDate="{Binding ReportEndDate}"
                                 Width="132"
                                 Margin="0,0,8,0"/>
-                    <ComboBox ItemsSource="{Binding ExportReportTypes}"
-                              SelectedItem="{Binding SelectedExportReportType}"
+                    <ComboBox ItemsSource="{Binding ExportReportTypeOptions}"
+                              SelectedItem="{Binding SelectedExportReportTypeOption}"
                               Width="140"
                               Style="{StaticResource EliteComboBox}"
                               Margin="0,0,8,0"/>
-                    <Button Content="Export Excel"
+                    <Button Content="{Binding ExportExcelLabel}"
                             Width="115"
                             Command="{Binding ExportExcelCommand}"
                             Style="{StaticResource GhostButton}"
                             Margin="0,0,8,0"/>
-                    <Button Content="Bulk Excel"
+                    <Button Content="{Binding BulkExcelLabel}"
                             Width="105"
                             Command="{Binding BulkExportExcelCommand}"
                             Style="{StaticResource GhostButton}"/>
@@ -110,7 +108,7 @@
 
                 <Button Grid.Column="3"
                         Width="110"
-                        Content="Refresh"
+                        Content="{Binding RefreshLabel}"
                         Command="{Binding RefreshCommand}"
                         Style="{StaticResource GoldPrimaryButton}"/>
             </Grid>
@@ -118,7 +116,7 @@
             <Border Grid.Row="1" Style="{StaticResource GlassCard}" Margin="24,0,24,24" Padding="18">
                 <TabControl Background="Transparent"
                             BorderThickness="0">
-                    <TabItem Header="Daily Report">
+                    <TabItem Header="{Binding TabDailyLabel}">
                         <Grid Margin="0,8,0,0">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
@@ -127,7 +125,7 @@
 
                             <Border Grid.Row="0" Background="#22000000" CornerRadius="12" Padding="12">
                                 <StackPanel>
-                                    <TextBlock Text="Chronological daily feed across all entities"
+                                    <TextBlock Text="{Binding DailyFeedTitle}"
                                                Foreground="{StaticResource GoldAccentBrush}"
                                                FontSize="17"
                                                FontWeight="SemiBold"/>
@@ -144,7 +142,7 @@
                         </Grid>
                     </TabItem>
 
-                    <TabItem Header="Orders">
+                    <TabItem Header="{Binding TabOrdersLabel}">
                         <Grid Margin="0,8,0,0">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
@@ -153,7 +151,7 @@
 
                             <Border Grid.Row="0" Background="#22000000" CornerRadius="12" Padding="12">
                                 <StackPanel>
-                                    <TextBlock Text="Orders by day (uses date range above)"
+                                    <TextBlock Text="{Binding OrdersByDayTitle}"
                                                Foreground="{StaticResource GoldAccentBrush}"
                                                FontSize="17"
                                                FontWeight="SemiBold"/>
@@ -170,7 +168,7 @@
                         </Grid>
                     </TabItem>
 
-                    <TabItem Header="Employees">
+                    <TabItem Header="{Binding TabEmployeesLabel}">
                         <Grid Margin="0,8,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="300"/>
@@ -184,7 +182,7 @@
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="*"/>
                                     </Grid.RowDefinitions>
-                                    <TextBlock Text="Employee Directory" Style="{StaticResource HeadingSmall}" Margin="6,4,6,8"/>
+                                    <TextBlock Text="{Binding EmployeeDirectoryTitle}" Style="{StaticResource HeadingSmall}" Margin="6,4,6,8"/>
                                     <ListBox Grid.Row="1"
                                              ItemsSource="{Binding Employees}"
                                              SelectedItem="{Binding SelectedEmployee}"
@@ -204,17 +202,17 @@
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="*"/>
                                     </Grid.RowDefinitions>
-                                    <TextBlock Text="Employee Details" Foreground="{StaticResource GoldAccentBrush}" FontSize="17" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding EmployeeDetailsTitle}" Foreground="{StaticResource GoldAccentBrush}" FontSize="17" FontWeight="SemiBold"/>
                                     <TextBlock Grid.Row="1" Text="{Binding EmployeeSummary}" Margin="0,8,0,0" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap"/>
                                     <Border Grid.Row="2" Background="#18000000" CornerRadius="10" Padding="10" Margin="0,12,0,0">
                                         <StackPanel>
-                                            <TextBlock Text="Notes" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                            <TextBlock Text="{Binding NotesSectionTitle}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold"/>
                                             <TextBlock Text="{Binding EmployeeNotes}" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                         </StackPanel>
                                     </Border>
                                     <Border Grid.Row="3" Background="#18000000" CornerRadius="10" Padding="10" Margin="0,12,0,0">
                                         <StackPanel>
-                                            <TextBlock Text="Payroll history (USD)" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                            <TextBlock Text="{Binding PayrollHistoryTitle}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold"/>
                                             <TextBlock Text="{Binding EmployeePayrollHistory}" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                         </StackPanel>
                                     </Border>
@@ -227,7 +225,7 @@
                         </Grid>
                     </TabItem>
 
-                    <TabItem Header="Tables">
+                    <TabItem Header="{Binding TabTablesLabel}">
                         <Grid Margin="0,8,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="300"/>
@@ -241,7 +239,7 @@
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="*"/>
                                     </Grid.RowDefinitions>
-                                    <TextBlock Text="Table Directory" Style="{StaticResource HeadingSmall}" Margin="6,4,6,8"/>
+                                    <TextBlock Text="{Binding TableDirectoryTitle}" Style="{StaticResource HeadingSmall}" Margin="6,4,6,8"/>
                                     <ListBox Grid.Row="1"
                                              ItemsSource="{Binding Tables}"
                                              SelectedItem="{Binding SelectedTable}"
@@ -260,11 +258,11 @@
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="*"/>
                                     </Grid.RowDefinitions>
-                                    <TextBlock Text="Table Details" Foreground="{StaticResource GoldAccentBrush}" FontSize="17" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding TableDetailsTitle}" Foreground="{StaticResource GoldAccentBrush}" FontSize="17" FontWeight="SemiBold"/>
                                     <TextBlock Grid.Row="1" Text="{Binding TableSummary}" Margin="0,8,0,0" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap"/>
                                     <Border Grid.Row="2" Background="#18000000" CornerRadius="10" Padding="10" Margin="0,12,0,0">
                                         <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="Assigned Server: " Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                            <TextBlock Text="{Binding AssignedServerLabel}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold"/>
                                             <TextBlock Text="{Binding TableCurrentServer}" Foreground="{StaticResource TextSecondaryBrush}"/>
                                         </StackPanel>
                                     </Border>
@@ -277,7 +275,7 @@
                         </Grid>
                     </TabItem>
 
-                    <TabItem Header="Inventory">
+                    <TabItem Header="{Binding TabInventoryLabel}">
                         <Grid Margin="0,8,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="300"/>
@@ -291,7 +289,7 @@
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="*"/>
                                     </Grid.RowDefinitions>
-                                    <TextBlock Text="Inventory Directory" Style="{StaticResource HeadingSmall}" Margin="6,4,6,8"/>
+                                    <TextBlock Text="{Binding InventoryDirectoryTitle}" Style="{StaticResource HeadingSmall}" Margin="6,4,6,8"/>
                                     <ListBox Grid.Row="1"
                                              ItemsSource="{Binding InventoryItems}"
                                              SelectedItem="{Binding SelectedInventoryItem}"
@@ -310,12 +308,19 @@
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="*"/>
                                     </Grid.RowDefinitions>
-                                    <TextBlock Text="Inventory Details" Foreground="{StaticResource GoldAccentBrush}" FontSize="17" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding InventoryDetailsTitle}" Foreground="{StaticResource GoldAccentBrush}" FontSize="17" FontWeight="SemiBold"/>
                                     <TextBlock Grid.Row="1" Text="{Binding InventorySummary}" Margin="0,8,0,0" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap"/>
                                     <Border Grid.Row="2" Background="#18000000" CornerRadius="10" Padding="10" Margin="0,12,0,0">
                                         <StackPanel>
-                                            <TextBlock Text="Inventory Notes" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold"/>
-                                            <TextBlock Text="{Binding InventoryNotes}" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                            <TextBlock Text="{Binding InventoryNotesTitle}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                            <ScrollViewer MaxHeight="160"
+                                                          Margin="0,4,0,0"
+                                                          VerticalScrollBarVisibility="Auto"
+                                                          Style="{StaticResource EliteScrollViewer}">
+                                                <TextBlock Text="{Binding InventoryNotes}"
+                                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                                           TextWrapping="Wrap"/>
+                                            </ScrollViewer>
                                         </StackPanel>
                                     </Border>
 
@@ -327,7 +332,7 @@
                         </Grid>
                     </TabItem>
 
-                    <TabItem Header="Menu">
+                    <TabItem Header="{Binding TabMenuLabel}">
                         <Grid Margin="0,8,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="300"/>
@@ -341,7 +346,7 @@
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="*"/>
                                     </Grid.RowDefinitions>
-                                    <TextBlock Text="Menu Directory" Style="{StaticResource HeadingSmall}" Margin="6,4,6,8"/>
+                                    <TextBlock Text="{Binding MenuDirectoryTitle}" Style="{StaticResource HeadingSmall}" Margin="6,4,6,8"/>
                                     <ListBox Grid.Row="1"
                                              ItemsSource="{Binding MenuItems}"
                                              SelectedItem="{Binding SelectedMenuItem}"
@@ -360,11 +365,11 @@
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="*"/>
                                     </Grid.RowDefinitions>
-                                    <TextBlock Text="Menu Item Details" Foreground="{StaticResource GoldAccentBrush}" FontSize="17" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding MenuItemDetailsTitle}" Foreground="{StaticResource GoldAccentBrush}" FontSize="17" FontWeight="SemiBold"/>
                                     <TextBlock Grid.Row="1" Text="{Binding MenuSummary}" Margin="0,8,0,0" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap"/>
                                     <Border Grid.Row="2" Background="#18000000" CornerRadius="10" Padding="10" Margin="0,12,0,0">
                                         <StackPanel>
-                                            <TextBlock Text="Ingredients" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold"/>
+                                            <TextBlock Text="{Binding IngredientsTitle}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold"/>
                                             <TextBlock Text="{Binding MenuIngredientsSummary}" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                         </StackPanel>
                                     </Border>

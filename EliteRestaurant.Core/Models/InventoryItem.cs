@@ -59,4 +59,16 @@ public class InventoryItem : IRestaurantScoped
             return "Healthy";
         }
     }
+
+    [NotMapped]
+    public string DisplayQuantityStatus { get; set; } = string.Empty;
+
+    [NotMapped]
+    public string DisplayShelfStatusLine { get; set; } = string.Empty;
+
+    [NotMapped]
+    public string DisplayExpirationDateText { get; set; } = string.Empty;
+
+    [NotMapped]
+    public string DisplayNotesForView { get; set; } = string.Empty;
 }

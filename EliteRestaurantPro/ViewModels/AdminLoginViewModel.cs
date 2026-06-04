@@ -2,11 +2,12 @@ using System.Windows.Input;
 using EliteRestaurant.Core.Staff;
 using EliteRestaurant.Core.Utils;
 using EliteRestaurantPro.ApiClients;
+using EliteRestaurantPro.Localization;
 using EliteRestaurantPro.Services;
 
 namespace EliteRestaurantPro.ViewModels;
 
-public class AdminLoginViewModel : BaseViewModel
+public class AdminLoginViewModel : LocalizableViewModel
 {
     private string _adminId = string.Empty;
     private string _password = string.Empty;
@@ -15,6 +16,14 @@ public class AdminLoginViewModel : BaseViewModel
 
     private readonly Action<BaseViewModel> _navigate;
     private readonly AuthApiClient _authApiClient = new();
+
+    public string PortalTitle => Loc.Admin("proAdminPortal", "Admin Portal");
+    public string SignInLead => Loc.Admin("proAdminSignInLead", "Sign in with your administrator credentials");
+    public string AdminIdLabel => Loc.Admin("proAdminIdLabel", "ADMIN ID");
+    public string AdminIdHint => Loc.Admin("proAdminIdHint", "Sign-in ID, employee code, or your name as shown in Employees.");
+    public string PasswordLabel => Loc.Admin("proPasswordLabel", "PASSWORD");
+    public string SignInButtonLabel => Loc.Common("signIn", "Sign In");
+    public string BackToRolesLabel => Loc.Admin("proBackToRoles", "← Back to Role Selection");
 
     public string AdminId
     {
@@ -50,12 +59,24 @@ public class AdminLoginViewModel : BaseViewModel
         BackCommand = new RelayCommand(_ => navigate(new RoleSelectionViewModel(navigate)));
     }
 
+    protected override void RefreshLocalizedStrings()
+    {
+        Notify(
+            nameof(PortalTitle),
+            nameof(SignInLead),
+            nameof(AdminIdLabel),
+            nameof(AdminIdHint),
+            nameof(PasswordLabel),
+            nameof(SignInButtonLabel),
+            nameof(BackToRolesLabel));
+    }
+
     private async Task ExecuteLoginAsync()
     {
         AppSession.Clear();
         if (string.IsNullOrWhiteSpace(AdminId) || string.IsNullOrWhiteSpace(Password))
         {
-            ErrorMessage = "Please enter your ID and password.";
+            ErrorMessage = Loc.Admin("proEnterIdPassword", "Please enter your ID and password.");
             HasError = true;
             return;
         }
@@ -65,7 +86,7 @@ public class AdminLoginViewModel : BaseViewModel
         {
             ErrorMessage = !string.IsNullOrWhiteSpace(auth.ErrorMessage)
                 ? auth.ErrorMessage
-                : "Sign-in failed. Check your ID and password.";
+                : Loc.Admin("proSignInFailed", "Sign-in failed. Check your ID and password.");
             HasError = true;
             return;
         }

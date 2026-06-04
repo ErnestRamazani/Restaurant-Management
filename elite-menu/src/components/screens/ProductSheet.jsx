@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { Check } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { isDrinkProduct } from '../../utils/menuKind'
 import { getCategoryColor } from '../../utils/placeholders'
 import { productIsAvailable } from '../../utils/availability'
@@ -10,6 +11,7 @@ import { GoldDivider } from '../ui/GoldDivider'
 import { QuantityControl } from '../ui/QuantityControl'
 
 export function ProductSheet({ product, open, onClose, cart }) {
+  const { t } = useTranslation()
   const [sheetQty, setSheetQty] = useState(1)
   const [flash, setFlash] = useState(false)
   const [imgErr, setImgErr] = useState(false)
@@ -29,7 +31,7 @@ export function ProductSheet({ product, open, onClose, cart }) {
   const inCart = cart.getItemQty(product.id) > 0
   const minStep = inCart ? 0 : 1
 
-  const sub = product.subcategory || 'General'
+  const sub = product.subcategory || t('guest.general.generalCategory')
   const ph = getCategoryColor(product.category)
   const initial = (product.name || '?').trim().charAt(0) || '?'
   const photoUrl = product.photoUrl ? String(product.photoUrl) : ''
@@ -40,10 +42,8 @@ export function ProductSheet({ product, open, onClose, cart }) {
   const isDrink = isDrinkProduct(product)
   const descText = product.description ? String(product.description).trim() : ''
   const compText = product.composition ? String(product.composition).trim() : ''
-  const descFallback = 'Ask your server for more detail.'
-  const compFallback = isDrink
-    ? 'Ask your server or the bar for ingredients and allergens.'
-    : 'Ask your server for ingredients and allergens.'
+  const descFallback = t('guest.product.descFallback')
+  const compFallback = isDrink ? t('guest.product.compFallbackDrink') : t('guest.product.compFallbackFood')
 
   const addLine = () => {
     if (!available) return
@@ -92,13 +92,13 @@ export function ProductSheet({ product, open, onClose, cart }) {
             <div className="flex items-center gap-2">
               <span className={`h-2 w-2 rounded-full ${available ? 'bg-emerald-500' : 'bg-red-600'}`} />
               {available ? (
-                <span className="font-body text-[0.78rem] font-medium text-champagne/80">Available</span>
+                <span className="font-body text-[0.78rem] font-medium text-champagne/80">{t('guest.product.available')}</span>
               ) : (
                 <span
                   className="font-body text-[0.8rem] font-bold uppercase tracking-[0.06em] text-red-600"
                   style={{ color: '#dc2626' }}
                 >
-                  Out of order
+                  {t('guest.product.outOfOrder')}
                 </span>
               )}
             </div>
@@ -107,7 +107,9 @@ export function ProductSheet({ product, open, onClose, cart }) {
           <GoldDivider className="my-4" />
 
           <section className="mb-4">
-            <h3 className="mb-2 font-body text-[0.7rem] font-bold uppercase tracking-[0.15em] text-gold">Description</h3>
+            <h3 className="mb-2 font-body text-[0.7rem] font-bold uppercase tracking-[0.15em] text-gold">
+              {t('guest.product.description')}
+            </h3>
             <p
               className={`font-body text-[0.9rem] font-light leading-relaxed ${descText ? 'text-champagne' : 'italic text-[var(--text-muted)]'}`}
             >
@@ -117,7 +119,7 @@ export function ProductSheet({ product, open, onClose, cart }) {
 
           <section className="mb-4">
             <h3 className="mb-2 font-body text-[0.7rem] font-bold uppercase tracking-[0.15em] text-gold">
-              {isDrink ? 'Composition' : 'Ingredients'}
+              {isDrink ? t('guest.product.composition') : t('guest.product.ingredients')}
             </h3>
             {compText ? (
               <div className="flex flex-wrap gap-2">
@@ -139,7 +141,7 @@ export function ProductSheet({ product, open, onClose, cart }) {
               <p className="font-body text-[0.9rem] font-light italic leading-relaxed text-[var(--text-muted)]">{compFallback}</p>
             )}
             <p className="mt-3 font-body text-[0.75rem] italic text-[var(--text-muted)]">
-              Please inform your server of any allergies before ordering.
+              {t('guest.product.allergyHint')}
             </p>
           </section>
 
@@ -166,9 +168,9 @@ export function ProductSheet({ product, open, onClose, cart }) {
               {flash ? (
                 <Check className="h-6 w-6" strokeWidth={3} />
               ) : sheetQty === 0 && inCart ? (
-                <>Remove from order</>
+                <>{t('guest.product.removeFromOrder')}</>
               ) : (
-                <>Add · {formatUsd(lineTotal)}</>
+                <>{t('guest.product.addWithPrice', { price: formatUsd(lineTotal) })}</>
               )}
             </motion.button>
           </div>

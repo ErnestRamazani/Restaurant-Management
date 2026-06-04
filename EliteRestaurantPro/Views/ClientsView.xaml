@@ -1,0 +1,389 @@
+<UserControl x:Class="EliteRestaurantPro.Views.ClientsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:components="clr-namespace:EliteRestaurantPro.Views.Components"
+             xmlns:converters="clr-namespace:EliteRestaurantPro.Converters">
+    <UserControl.Resources>
+        <converters:IntEqualsMultiConverter x:Key="IntEqualsConverter"/>
+        <Style x:Key="ClientSidebarCard" TargetType="Border">
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#22D4AF37"/>
+                </Trigger>
+                <DataTrigger Value="True">
+                    <DataTrigger.Binding>
+                        <MultiBinding Converter="{StaticResource IntEqualsConverter}">
+                            <Binding Path="Id"/>
+                            <Binding Path="DataContext.SelectedClientId" RelativeSource="{RelativeSource AncestorType=UserControl}"/>
+                        </MultiBinding>
+                    </DataTrigger.Binding>
+                    <Setter Property="Background" Value="#33D4AF37"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="230"/>
+            <ColumnDefinition Width="280"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <components:AdminSidebar Grid.Column="0"/>
+
+        <Grid Grid.Column="1" Background="{StaticResource BackgroundMediumBrush}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <StackPanel Margin="20,24,16,12">
+                <TextBlock Text="{Binding PageTitle, Mode=OneWay}" Style="{StaticResource HeadingLarge}" FontSize="22"
+                           Foreground="{StaticResource TextPrimaryBrush}"/>
+                <TextBox Margin="0,12,0,0"
+                         Style="{StaticResource EliteTextBox}"
+                         Height="40"
+                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="{Binding SearchTooltip, Mode=OneWay}"/>
+                <TextBlock Text="{Binding StatusMessage}" Style="{StaticResource BodyText}" Margin="0,8,0,0" FontSize="11"/>
+            </StackPanel>
+            <ScrollViewer Grid.Row="1"
+                          Margin="12,0,8,16"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          CanContentScroll="False"
+                          Style="{StaticResource EliteScrollViewerSidebar}">
+                <StackPanel>
+                    <TextBlock Text="{Binding RegularSectionLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="4,0,0,8"/>
+                    <ItemsControl ItemsSource="{Binding RegularClients}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource ClientSidebarCard}">
+                                    <Border.InputBindings>
+                                        <MouseBinding MouseAction="LeftClick"
+                                                      Command="{Binding DataContext.SelectClientCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                      CommandParameter="{Binding}"/>
+                                    </Border.InputBindings>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding FullName}"
+                                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                                   FontSize="14" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding PrimaryPhone}"
+                                                   Foreground="{StaticResource TextMutedBrush}"
+                                                   FontSize="11" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="{Binding StaffSectionLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="4,16,0,8"/>
+                    <TextBlock Text="{Binding StaffSectionHint}"
+                               Style="{StaticResource BodyText}"
+                               FontSize="11"
+                               Foreground="{StaticResource TextMutedBrush}"
+                               TextWrapping="Wrap"
+                               Margin="4,0,0,8"
+                               Visibility="{Binding ShowStaffSectionHint, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                    <ItemsControl ItemsSource="{Binding StaffClients}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource ClientSidebarCard}">
+                                    <Border.InputBindings>
+                                        <MouseBinding MouseAction="LeftClick"
+                                                      Command="{Binding DataContext.SelectClientCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                      CommandParameter="{Binding}"/>
+                                    </Border.InputBindings>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding FullName}"
+                                                   Foreground="{StaticResource GoldAccentBrush}"
+                                                   FontSize="14" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding DataContext.StaffListHint, Mode=OneWay, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                   Foreground="{StaticResource TextMutedBrush}"
+                                                   FontSize="10" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <Grid Grid.Column="2" Background="{StaticResource BackgroundDarkBrush}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <StackPanel Margin="28,24,28,12">
+                <TextBlock Text="{Binding ProfileTitle}" Style="{StaticResource HeadingLarge}" FontSize="24"/>
+                <TextBlock Text="{Binding ProfileSubtitle}" Style="{StaticResource BodyText}" Margin="0,4,0,16"/>
+                <WrapPanel Margin="0,0,0,12">
+                    <Border Style="{StaticResource GlassCard}" Padding="16,12" Margin="0,0,12,12" MinWidth="140">
+                        <StackPanel>
+                            <TextBlock Text="{Binding DebtBalanceLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" FontSize="10" Margin="0,0,0,4"/>
+                            <TextBlock Text="{Binding ProfileDebtText}" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource GoldAccentBrush}"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource GlassCard}" Padding="16,12" Margin="0,0,12,12" MinWidth="140">
+                        <StackPanel>
+                            <TextBlock Text="{Binding SettledRevenueLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" FontSize="10" Margin="0,0,0,4"/>
+                            <TextBlock Text="{Binding ProfileRevenueText}" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource GlassCard}" Padding="16,12" Margin="0,0,12,12" MinWidth="140">
+                        <StackPanel>
+                            <TextBlock Text="{Binding TotalGeneratedLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" FontSize="10" Margin="0,0,0,4"/>
+                            <TextBlock Text="{Binding ProfileTotalGeneratedText}" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource StatBlueBrush}"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource GlassCard}" Padding="16,12" Margin="0,0,12,12" MinWidth="120">
+                        <StackPanel>
+                            <TextBlock Text="{Binding OrdersLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" FontSize="10" Margin="0,0,0,4"/>
+                            <TextBlock Text="{Binding ProfileOrderCountText}" FontSize="22" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource GlassCard}" Padding="16,12" Margin="0,0,12,12" MinWidth="140">
+                        <StackPanel>
+                            <TextBlock Text="{Binding OpenOnAccountLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" FontSize="10" Margin="0,0,0,4"/>
+                            <TextBlock Text="{Binding ProfileOpenOnAccountText}" FontSize="22" FontWeight="SemiBold" Foreground="#FFF59E0B"/>
+                        </StackPanel>
+                    </Border>
+                </WrapPanel>
+                <StackPanel Orientation="Horizontal">
+                    <Button Content="{Binding SettleDebtLabel, Mode=OneWay}" Command="{Binding OpenSettleDialogCommand}" Style="{StaticResource GoldPrimaryButton}" Margin="0,0,8,0"/>
+                    <Button Content="{Binding EditClientLabel, Mode=OneWay}" Command="{Binding OpenEditDialogCommand}" Style="{StaticResource GhostButton}" Visibility="{Binding IsAdmin, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                    <Button Content="{Binding NewClientLabel, Mode=OneWay}" Command="{Binding OpenAddDialogCommand}" Style="{StaticResource GhostButton}" Margin="8,0,0,0" Visibility="{Binding IsAdmin, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                </StackPanel>
+            </StackPanel>
+            <Grid Grid.Row="1" Margin="24,0,24,24">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Style="{StaticResource GlassCard}" Padding="0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <Border Grid.Row="0" CornerRadius="15,15,0,0" Padding="16,12">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                    <GradientStop Color="#332196F3" Offset="0"/>
+                                    <GradientStop Color="#112196F3" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <StackPanel>
+                                <TextBlock Text="{Binding DebtLedgerTitle, Mode=OneWay}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="14" FontWeight="SemiBold"/>
+                                <TextBlock Text="{Binding DebtLedgerSubtitle, Mode=OneWay}" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <ScrollViewer Grid.Row="1"
+                                      Style="{StaticResource EliteScrollViewer}"
+                                      Padding="12,8,12,12"
+                                      VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      CanContentScroll="False">
+                            <ItemsControl ItemsSource="{Binding ProfileLedger}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Margin="0,0,0,8" CornerRadius="10" Padding="12,10" Background="{StaticResource CardBaseBrush}">
+                                            <Border.Style>
+                                                <Style TargetType="Border">
+                                                    <Setter Property="Cursor" Value="Arrow"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding HasOrder}" Value="True">
+                                                            <Setter Property="Cursor" Value="Hand"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Border.Style>
+                                            <Border.InputBindings>
+                                                <MouseBinding MouseAction="LeftClick"
+                                                              Command="{Binding DataContext.ViewOrderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                              CommandParameter="{Binding}"/>
+                                            </Border.InputBindings>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Border Background="#22D4AF37" CornerRadius="6" Padding="8,3" Margin="0,0,8,0">
+                                                            <TextBlock Text="{Binding DisplayTypeLabel}" Foreground="{StaticResource GoldAccentBrush}" FontSize="10" FontWeight="SemiBold"/>
+                                                        </Border>
+                                                        <TextBlock Text="{Binding DisplayCreatedText}" Foreground="{StaticResource TextMutedBrush}" FontSize="11" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding DisplayNoteText}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,6,0,0" TextWrapping="Wrap"/>
+                                                    <TextBlock Foreground="{StaticResource StatBlueBrush}" FontSize="10" Margin="0,4,0,0"
+                                                               Visibility="{Binding HasOrder, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                        <Run Text="{Binding DisplayOrderPrefix, Mode=OneWay}"/><Run Text="{Binding OrderCodeText, Mode=OneWay}"/>
+                                                    </TextBlock>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
+                                                    <TextBlock Text="{Binding AmountText}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Right"/>
+                                                    <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="10" HorizontalAlignment="Right" Margin="0,4,0,0">
+                                                        <Run Text="{Binding DisplayBalPrefix, Mode=OneWay}"/><Run Text="{Binding BalanceText, Mode=OneWay}"/>
+                                                    </TextBlock>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="2" Style="{StaticResource GlassCard}" Padding="0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <Border Grid.Row="0" CornerRadius="15,15,0,0" Padding="16,12">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                    <GradientStop Color="#33D4AF37" Offset="0"/>
+                                    <GradientStop Color="#11D4AF37" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <StackPanel>
+                                <TextBlock Text="{Binding OrderHistoryTitle, Mode=OneWay}" Foreground="{StaticResource GoldAccentBrush}" FontSize="14" FontWeight="SemiBold"/>
+                                <TextBlock Text="{Binding OrderHistorySubtitle, Mode=OneWay}" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <ScrollViewer Grid.Row="1"
+                                      Style="{StaticResource EliteScrollViewer}"
+                                      Padding="12,8,12,12"
+                                      VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      CanContentScroll="False">
+                            <ItemsControl ItemsSource="{Binding ProfileOrders}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Margin="0,0,0,8" CornerRadius="10" Padding="12,10" Background="{StaticResource CardBaseBrush}" Cursor="Hand">
+                                            <Border.InputBindings>
+                                                <MouseBinding MouseAction="LeftClick"
+                                                              Command="{Binding DataContext.ViewOrderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                              CommandParameter="{Binding}"/>
+                                            </Border.InputBindings>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding OrderCode}" Foreground="{StaticResource GoldAccentBrush}" FontWeight="SemiBold" FontSize="14"/>
+                                                    <TextBlock Text="{Binding DisplayCreatedText}" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,4,0,0"/>
+                                                    <TextBlock Text="{Binding DisplaySettlementText}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,4,0,0"/>
+                                                    <Border Background="#332196F3" CornerRadius="6" Padding="6,2" HorizontalAlignment="Left" Margin="0,6,0,0">
+                                                        <TextBlock Text="{Binding DisplayStatus}" Foreground="White" FontSize="10" FontWeight="SemiBold"/>
+                                                    </Border>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
+                                                    <TextBlock Text="{Binding TotalText}" Foreground="{StaticResource GoldAccentBrush}" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Right"/>
+                                                    <Button Content="{Binding DataContext.ViewOrderLabel, Mode=OneWay, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            Margin="0,8,0,0"
+                                                            Command="{Binding DataContext.ViewOrderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                            CommandParameter="{Binding}"
+                                                            Style="{StaticResource SapphireButton}"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+
+        <Border Grid.ColumnSpan="3"
+                Background="#CC000000"
+                Visibility="{Binding IsDialogOpen, Converter={StaticResource BoolToVisibilityConverter}}">
+            <Border Style="{StaticResource GlassCard}" Width="440" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="24">
+                <StackPanel>
+                    <TextBlock Text="{Binding DialogTitle}" Style="{StaticResource HeadingLarge}" Margin="0,0,0,8"/>
+                    <TextBlock Text="{Binding DialogIntro, Mode=OneWay}"
+                               Style="{StaticResource BodyText}" FontSize="12" Opacity="0.85"
+                               TextWrapping="Wrap" Margin="0,0,0,16"/>
+
+                    <TextBlock Text="{Binding FieldFullNameLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,0,0,6"/>
+                    <TextBox Text="{Binding DialogFullName, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource EliteTextBox}"
+                             ToolTip="{Binding FieldFullNameTooltip, Mode=OneWay}"/>
+
+                    <TextBlock Text="{Binding FieldPhoneLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,14,0,6"/>
+                    <TextBox Text="{Binding DialogPhone, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource EliteTextBox}"
+                             ToolTip="{Binding FieldPhoneTooltip, Mode=OneWay}"/>
+
+                    <TextBlock Text="{Binding FieldEmailLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,14,0,6"/>
+                    <TextBox Text="{Binding DialogEmail, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource EliteTextBox}"/>
+
+                    <TextBlock Text="{Binding FieldNotesLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,14,0,6"/>
+                    <TextBox Text="{Binding DialogNotes, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource EliteTextBox}"
+                             Height="72" TextWrapping="Wrap" AcceptsReturn="True"
+                             VerticalScrollBarVisibility="Auto" Margin="0,0,0,20"/>
+
+                    <Button Content="{Binding SaveClientLabel, Mode=OneWay}" Command="{Binding SaveClientCommand}" Style="{StaticResource GoldPrimaryButton}"/>
+                    <Button Content="{Binding CancelLabel, Mode=OneWay}" Command="{Binding CancelDialogCommand}" Style="{StaticResource GhostButton}" Margin="0,10,0,0"/>
+                </StackPanel>
+            </Border>
+        </Border>
+
+        <Border Grid.ColumnSpan="3"
+                Background="#CC000000"
+                Visibility="{Binding IsSettleDialogOpen, Converter={StaticResource BoolToVisibilityConverter}}">
+            <Border Style="{StaticResource GlassCard}" Width="400" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="24">
+                <StackPanel>
+                    <TextBlock Text="{Binding SettleDialogTitle, Mode=OneWay}" Style="{StaticResource HeadingLarge}" Margin="0,0,0,8"/>
+                    <TextBlock Text="{Binding SettleDialogIntro, Mode=OneWay}"
+                               Style="{StaticResource BodyText}" FontSize="12" Opacity="0.85"
+                               TextWrapping="Wrap" Margin="0,0,0,16"/>
+
+                    <TextBlock Text="{Binding SettleAmountLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,0,0,6"/>
+                    <TextBox Text="{Binding SettleAmountText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}" Margin="0,0,0,14"/>
+
+                    <TextBlock Text="{Binding SettleNoteLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,0,0,6"/>
+                    <TextBox Text="{Binding SettleNote, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"
+                             Height="56" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" Margin="0,0,0,14"/>
+
+                    <TextBlock Text="{Binding SettlePasscodeLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,0,0,6"/>
+                    <PasswordBox x:Name="SettlePasscodeBox" Style="{StaticResource ElitePasswordBox}"
+                                 PasswordChanged="SettlePasscodeBox_OnPasswordChanged" Margin="0,0,0,18"/>
+
+                    <Button Command="{Binding ConfirmSettleCommand}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource GoldPrimaryButton}">
+                                <Setter Property="Content" Value="{Binding ConfirmPaymentLabel, Mode=OneWay}"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsSettling}" Value="True">
+                                        <Setter Property="IsEnabled" Value="False"/>
+                                        <Setter Property="Content" Value="{Binding ProcessingLabel, Mode=OneWay}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <Button Content="{Binding CancelLabel, Mode=OneWay}" Command="{Binding CancelSettleDialogCommand}" Style="{StaticResource GhostButton}" Margin="0,10,0,0"/>
+                </StackPanel>
+            </Border>
+        </Border>
+
+        <components:OrderDetailPanelView Grid.ColumnSpan="3"
+                                         Panel.ZIndex="6"
+                                         DataContext="{Binding OrderDetail}"/>
+    </Grid>
+</UserControl>

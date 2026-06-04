@@ -48,4 +48,13 @@ public class PricingPrecedenceTests
         Assert.Equal(8m, PricingResolver.ResolveRestaurantTaxPercent(8m, 7m));
         Assert.Equal(7m, PricingResolver.ResolveRestaurantTaxPercent(null, 7m));
     }
+
+    [Fact]
+    public void ResolveEffectiveRestaurantPricing_MergesCloudServiceOverFile()
+    {
+        var cloud = new EliteRestaurant.Core.Models.PublicMenuSetting { ServicePercent = 12m, TaxPercent = 8m };
+        var effective = PricingResolver.ResolveEffectiveRestaurantPricing(cloud);
+        Assert.Equal(12m, effective.ServicePercent);
+        Assert.Equal(8m, effective.TaxPercent);
+    }
 }

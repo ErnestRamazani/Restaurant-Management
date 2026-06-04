@@ -1,11 +1,13 @@
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Hero “Reservation / Order” gateway — book a table vs order online (pickup/delivery).
  */
 export function ReservationOrderGatewayModal({ open, onClose, onBookTable, onOrderOnline }) {
+  const { t } = useTranslation()
   const panelRef = useRef(/** @type {HTMLDivElement | null} */ (null))
 
   useEffect(() => {
@@ -28,8 +30,8 @@ export function ReservationOrderGatewayModal({ open, onClose, onBookTable, onOrd
 
   useEffect(() => {
     if (!open) return
-    const t = window.setTimeout(() => panelRef.current?.querySelector('button')?.focus(), 50)
-    return () => window.clearTimeout(t)
+    const timer = window.setTimeout(() => panelRef.current?.querySelector('button')?.focus(), 50)
+    return () => window.clearTimeout(timer)
   }, [open])
 
   if (typeof document === 'undefined') return null
@@ -47,7 +49,7 @@ export function ReservationOrderGatewayModal({ open, onClose, onBookTable, onOrd
         >
           <motion.button
             type="button"
-            aria-label="Close"
+            aria-label={t('common.close')}
             className="absolute inset-0 bg-midnight/80 backdrop-blur-xl"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -70,7 +72,7 @@ export function ReservationOrderGatewayModal({ open, onClose, onBookTable, onOrd
               className="text-center font-display text-xl italic text-champagne"
               style={{ fontFamily: '"Playfair Display", serif' }}
             >
-              How can we serve you?
+              {t('guest.gateway.title')}
             </h2>
 
             <div className="mt-5 flex flex-col gap-3 sm:min-h-0">
@@ -83,7 +85,7 @@ export function ReservationOrderGatewayModal({ open, onClose, onBookTable, onOrd
                   onBookTable()
                 }}
               >
-                Book a table
+                {t('guest.gateway.bookTable')}
               </button>
               <button
                 type="button"
@@ -94,7 +96,7 @@ export function ReservationOrderGatewayModal({ open, onClose, onBookTable, onOrd
                   onOrderOnline()
                 }}
               >
-                Order online
+                {t('guest.gateway.orderOnline')}
               </button>
             </div>
 
@@ -103,7 +105,7 @@ export function ReservationOrderGatewayModal({ open, onClose, onBookTable, onOrd
               onClick={onClose}
               className="mt-5 w-full min-h-[44px] rounded-2xl border border-champagne/10 font-body text-xs font-semibold uppercase tracking-wider text-champagne/50 transition hover:text-champagne/75"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
           </motion.div>
         </motion.div>

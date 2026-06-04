@@ -68,14 +68,10 @@ public class KitchenQueueKindFilterTests
 
     [Fact]
 
-    public void TryInferOrderCheckKind_mixed_returns_null()
-
+    public void TryInferOrderCheckKind_mixed_returns_Mixed()
     {
-
         var kind = KitchenQueueKindFilter.TryInferOrderCheckKind(OrderWithCategories("Drink", "Main"));
-
-        Assert.Null(kind);
-
+        Assert.Equal(OpenCheckKindHelper.Mixed, kind);
     }
 
 
@@ -230,7 +226,7 @@ public class KitchenQueueKindFilterTests
 
         var mixed = OrderWithCategories("Drink", "Main");
 
-        Assert.Null(KitchenQueueKindFilter.TryInferOrderCheckKind(mixed));
+        Assert.Equal(OpenCheckKindHelper.Mixed, KitchenQueueKindFilter.TryInferOrderCheckKind(mixed));
 
         Assert.Contains(mixed, KitchenQueueKindFilter.FilterForPortal("Kitchen", [mixed]));
 
@@ -288,7 +284,7 @@ public class KitchenQueueKindFilterTests
 
         Assert.Single(row.Items);
 
-        Assert.Equal(OpenCheckKindHelper.Food, row.CheckKind);
+        Assert.Equal(OpenCheckKindHelper.Mixed, row.CheckKind);
 
     }
 

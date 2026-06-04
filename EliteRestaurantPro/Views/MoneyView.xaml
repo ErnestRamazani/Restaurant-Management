@@ -64,11 +64,10 @@
             </Grid.RowDefinitions>
 
             <StackPanel Grid.Row="0">
-                <TextBlock Style="{StaticResource HeadingLarge}" FontSize="26">
-                    <Run Text="Money"/>
-                    <Run Text=" Dashboard" Foreground="{StaticResource GoldAccentBrush}"/>
-                </TextBlock>
-                <TextBlock Text="Daily revenue and expenses in real-time."
+                <TextBlock Text="{Binding MoneyTitle, Mode=OneWay}"
+                           Style="{StaticResource HeadingLarge}"
+                           FontSize="26"/>
+                <TextBlock Text="{Binding MoneySubtitle, Mode=OneWay}"
                            Style="{StaticResource BodyText}"
                            Margin="0,6,0,14"/>
 
@@ -83,19 +82,19 @@
 
                     <Border Grid.Column="0" Style="{StaticResource MoneyGlassCard}">
                         <StackPanel>
-                            <TextBlock Text="Today Revenue" Style="{StaticResource HeadingSmall}"/>
-                            <TextBlock Text="{Binding TodayRevenueText}" Foreground="#2ECC71" FontSize="28" FontWeight="SemiBold" Margin="0,6,0,0"/>
+                            <TextBlock Text="{Binding TodayRevenueLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
+                            <TextBlock Text="{Binding TodayRevenueText, Mode=OneWay}" Foreground="#2ECC71" FontSize="28" FontWeight="SemiBold" Margin="0,6,0,0"/>
                         </StackPanel>
                     </Border>
                     <Border Grid.Column="2" Style="{StaticResource MoneyGlassCard}">
                         <StackPanel>
-                            <TextBlock Text="Today Expenses" Style="{StaticResource HeadingSmall}"/>
+                            <TextBlock Text="{Binding TodayExpensesLabel}" Style="{StaticResource HeadingSmall}"/>
                             <TextBlock Text="{Binding TodayExpensesText}" Foreground="#DC143C" FontSize="28" FontWeight="SemiBold" Margin="0,6,0,0"/>
                         </StackPanel>
                     </Border>
                     <Border Grid.Column="4" Style="{StaticResource MoneyGlassCard}">
                         <StackPanel>
-                            <TextBlock Text="Today Net" Style="{StaticResource HeadingSmall}"/>
+                            <TextBlock Text="{Binding TodayNetLabel}" Style="{StaticResource HeadingSmall}"/>
                             <TextBlock Text="{Binding TodayNetProfitText}" Foreground="{Binding TodayNetProfitColor}" FontSize="28" FontWeight="SemiBold" Margin="0,6,0,0"/>
                         </StackPanel>
                     </Border>
@@ -108,16 +107,16 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="{Binding SelectedPeriodLabel, StringFormat=Showing: {0}}"
+                    <TextBlock Text="{Binding ShowingPeriodText}"
                                Style="{StaticResource BodyText}"
                                VerticalAlignment="Center"/>
                     <StackPanel Grid.Column="1" Orientation="Horizontal">
-                        <Button Content="Today" Width="70" Margin="0,0,8,0" Command="{Binding SelectPeriodCommand}" CommandParameter="Today" Style="{StaticResource GhostButton}"/>
-                        <Button Content="Week" Width="70" Margin="0,0,8,0" Command="{Binding SelectPeriodCommand}" CommandParameter="Week" Style="{StaticResource GhostButton}"/>
-                        <Button Content="Month" Width="70" Margin="0,0,8,0" Command="{Binding SelectPeriodCommand}" CommandParameter="Month" Style="{StaticResource GhostButton}"/>
-                        <Button Content="Year" Width="70" Margin="0,0,8,0" Command="{Binding SelectPeriodCommand}" CommandParameter="Year" Style="{StaticResource GhostButton}"/>
-                        <Button Content="All" Width="70" Margin="0,0,8,0" Command="{Binding SelectPeriodCommand}" CommandParameter="All" Style="{StaticResource GhostButton}"/>
-                        <Button Content="Refresh" Width="80" Command="{Binding RefreshLedgerCommand}" Style="{StaticResource SapphireButton}"/>
+                        <Button Content="{Binding TodayLabel}" Width="70" Margin="0,0,8,0" Command="{Binding SelectPeriodCommand}" CommandParameter="Today" Style="{StaticResource GhostButton}"/>
+                        <Button Content="{Binding WeekLabel}" Width="70" Margin="0,0,8,0" Command="{Binding SelectPeriodCommand}" CommandParameter="Week" Style="{StaticResource GhostButton}"/>
+                        <Button Content="{Binding MonthLabel}" Width="70" Margin="0,0,8,0" Command="{Binding SelectPeriodCommand}" CommandParameter="Month" Style="{StaticResource GhostButton}"/>
+                        <Button Content="{Binding YearLabel}" Width="70" Margin="0,0,8,0" Command="{Binding SelectPeriodCommand}" CommandParameter="Year" Style="{StaticResource GhostButton}"/>
+                        <Button Content="{Binding AllLabel}" Width="70" Margin="0,0,8,0" Command="{Binding SelectPeriodCommand}" CommandParameter="All" Style="{StaticResource GhostButton}"/>
+                        <Button Content="{Binding RefreshLabel}" Width="80" Command="{Binding RefreshLedgerCommand}" Style="{StaticResource SapphireButton}"/>
                     </StackPanel>
                 </Grid>
             </Border>
@@ -134,27 +133,34 @@
                 <Border Grid.Column="0" Style="{StaticResource MoneyGlassCard}">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" Style="{StaticResource EliteScrollViewer}">
                         <StackPanel>
-                            <TextBlock Text="Quick Entry" Style="{StaticResource HeadingMedium}" FontSize="15"/>
-                            <TextBlock Text="Amount" Style="{StaticResource HeadingSmall}" Margin="0,10,0,4"/>
+                            <TextBlock Text="{Binding QuickEntryLabel}" Style="{StaticResource HeadingMedium}" FontSize="15"/>
+                            <TextBlock Text="{Binding AmountLabel}" Style="{StaticResource HeadingSmall}" Margin="0,10,0,4"/>
                             <TextBox Text="{Binding AmountInput, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource MoneyInputTextBox}"/>
-                            <TextBlock Text="Currency" Style="{StaticResource HeadingSmall}" Margin="0,10,0,4"/>
+                            <TextBlock Text="{Binding CurrencyLabel}" Style="{StaticResource HeadingSmall}" Margin="0,10,0,4"/>
                             <ComboBox ItemsSource="{Binding EntryCurrencies}"
-                                      SelectedItem="{Binding SelectedCurrency}"
-                                      Style="{StaticResource EliteComboBox}"/>
-                            <TextBlock Text="Type" Style="{StaticResource HeadingSmall}" Margin="0,10,0,4"/>
-                            <ComboBox ItemsSource="{Binding EntryTypes}" SelectedItem="{Binding SelectedType}" Style="{StaticResource EliteComboBox}"/>
-                            <TextBlock Text="Category" Style="{StaticResource HeadingSmall}" Margin="0,10,0,4"/>
-                            <ComboBox ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory}" Style="{StaticResource EliteComboBox}"/>
-                            <TextBlock Text="Date" Style="{StaticResource HeadingSmall}" Margin="0,10,0,4"/>
+                                      SelectedItem="{Binding SelectedCurrencyOption}"
+                                      Style="{StaticResource EliteComboBox}"
+                                      ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
+                            <TextBlock Text="{Binding TypeLabel}" Style="{StaticResource HeadingSmall}" Margin="0,10,0,4"/>
+                            <ComboBox ItemsSource="{Binding EntryTypes}"
+                                      SelectedItem="{Binding SelectedTypeOption}"
+                                      Style="{StaticResource EliteComboBox}"
+                                      ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
+                            <TextBlock Text="{Binding CategoryLabel}" Style="{StaticResource HeadingSmall}" Margin="0,10,0,4"/>
+                            <ComboBox ItemsSource="{Binding Categories}"
+                                      SelectedItem="{Binding SelectedCategoryOption}"
+                                      Style="{StaticResource EliteComboBox}"
+                                      ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
+                            <TextBlock Text="{Binding DateLabel}" Style="{StaticResource HeadingSmall}" Margin="0,10,0,4"/>
                             <DatePicker SelectedDate="{Binding EntryDate}"/>
-                            <TextBlock Text="Justification" Style="{StaticResource HeadingSmall}" Margin="0,10,0,4"/>
+                            <TextBlock Text="{Binding JustificationLabel}" Style="{StaticResource HeadingSmall}" Margin="0,10,0,4"/>
                             <TextBox Text="{Binding Justification, UpdateSourceTrigger=PropertyChanged}"
                                      MinHeight="70"
                                      AcceptsReturn="True"
                                      TextWrapping="Wrap"
                                      IsEnabled="{Binding IsJustificationEnabled}"
                                      Style="{StaticResource MoneyInputTextBox}"/>
-                            <Button Content="Add Entry" Margin="0,12,0,0" Height="36" Command="{Binding AddEntryCommand}" Style="{StaticResource SapphireButton}"/>
+                            <Button Content="{Binding AddEntryLabel}" Margin="0,12,0,0" Height="36" Command="{Binding AddEntryCommand}" Style="{StaticResource SapphireButton}"/>
                         </StackPanel>
                     </ScrollViewer>
                 </Border>
@@ -165,7 +171,7 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
-                        <TextBlock Text="Ledger (latest 200 entries)" Style="{StaticResource HeadingMedium}" FontSize="15"/>
+                        <TextBlock Text="{Binding LedgerTitle}" Style="{StaticResource HeadingMedium}" FontSize="15"/>
                         <DataGrid Grid.Row="1"
                                   Margin="0,10,0,0"
                                   AutoGenerateColumns="False"
@@ -184,11 +190,11 @@
                                   RowStyle="{StaticResource MoneyGridRowStyle}"
                                   CellStyle="{StaticResource MoneyGridCellStyle}">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="Date" Binding="{Binding Date, StringFormat={}{0:dd MMM HH:mm}}" Width="130"/>
-                                <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="100"/>
-                                <DataGridTextColumn Header="Category" Binding="{Binding Category}" Width="130"/>
-                                <DataGridTextColumn Header="Justification" Binding="{Binding Justification}" Width="*"/>
-                                <DataGridTextColumn Header="Amount" Binding="{Binding AmountText}" Width="120"/>
+                                <DataGridTextColumn Header="{Binding DataContext.ColDateLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Binding="{Binding DateText, Mode=OneWay}" Width="130"/>
+                                <DataGridTextColumn Header="{Binding DataContext.ColTypeLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Binding="{Binding Type}" Width="100"/>
+                                <DataGridTextColumn Header="{Binding DataContext.ColCategoryLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Binding="{Binding Category}" Width="130"/>
+                                <DataGridTextColumn Header="{Binding DataContext.ColJustificationLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Binding="{Binding Justification}" Width="*"/>
+                                <DataGridTextColumn Header="{Binding DataContext.ColAmountLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Binding="{Binding AmountText}" Width="120"/>
                             </DataGrid.Columns>
                         </DataGrid>
                     </Grid>
@@ -197,30 +203,30 @@
                 <StackPanel Grid.Column="4">
                     <Border Style="{StaticResource MoneyGlassCard}" Margin="0,0,0,10">
                         <StackPanel>
-                            <TextBlock Text="Period Revenue" Style="{StaticResource HeadingSmall}"/>
+                            <TextBlock Text="{Binding PeriodRevenueLabel}" Style="{StaticResource HeadingSmall}"/>
                             <TextBlock Text="{Binding TotalRevenueText}" Foreground="#2ECC71" FontSize="24" FontWeight="SemiBold" Margin="0,6,0,0"/>
                         </StackPanel>
                     </Border>
                     <Border Style="{StaticResource MoneyGlassCard}" Margin="0,0,0,10">
                         <StackPanel>
-                            <TextBlock Text="Period Expenses" Style="{StaticResource HeadingSmall}"/>
+                            <TextBlock Text="{Binding PeriodExpensesLabel}" Style="{StaticResource HeadingSmall}"/>
                             <TextBlock Text="{Binding TotalExpensesText}" Foreground="#DC143C" FontSize="24" FontWeight="SemiBold" Margin="0,6,0,0"/>
                         </StackPanel>
                     </Border>
                     <Border Style="{StaticResource MoneyGlassCard}" Margin="0,0,0,10">
                         <StackPanel>
-                            <TextBlock Text="Period Net" Style="{StaticResource HeadingSmall}"/>
+                            <TextBlock Text="{Binding PeriodNetLabel}" Style="{StaticResource HeadingSmall}"/>
                             <TextBlock Text="{Binding NetProfitText}" Foreground="{Binding NetProfitColor}" FontSize="26" FontWeight="SemiBold" Margin="0,6,0,0"/>
                         </StackPanel>
                     </Border>
                     <Border Style="{StaticResource MoneyGlassCard}">
                         <StackPanel>
-                            <TextBlock Text="Summary" Style="{StaticResource HeadingMedium}" FontSize="15"/>
-                            <TextBlock Text="{Binding SalesSummaryText, StringFormat=Sales: {0}}" Margin="0,8,0,0" Foreground="{StaticResource TextSecondaryBrush}"/>
-                            <TextBlock Text="{Binding TipsSummaryText, StringFormat=Tips: {0}}" Margin="0,4,0,0" Foreground="{StaticResource TextSecondaryBrush}"/>
-                            <TextBlock Text="{Binding DeliveryFeesSummaryText, StringFormat=Delivery fees: {0}}" Margin="0,4,0,0" Foreground="{StaticResource TextSecondaryBrush}"/>
-                            <TextBlock Text="{Binding PayrollSummaryText, StringFormat=Payroll: {0}}" Margin="0,4,0,0" Foreground="{StaticResource TextSecondaryBrush}"/>
-                            <Button Content="Generate Report (PDF)" Margin="0,12,0,0" Height="34" Command="{Binding GenerateReportCommand}" Style="{StaticResource GhostButton}"/>
+                            <TextBlock Text="{Binding SummaryLabel}" Style="{StaticResource HeadingMedium}" FontSize="15"/>
+                            <TextBlock Text="{Binding SalesSummaryLine}" Margin="0,8,0,0" Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <TextBlock Text="{Binding TipsSummaryLine}" Margin="0,4,0,0" Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <TextBlock Text="{Binding DeliveryFeesSummaryLine}" Margin="0,4,0,0" Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <TextBlock Text="{Binding PayrollSummaryLine}" Margin="0,4,0,0" Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <Button Content="{Binding GenerateReportLabel}" Margin="0,12,0,0" Height="34" Command="{Binding GenerateReportCommand}" Style="{StaticResource GhostButton}"/>
                         </StackPanel>
                     </Border>
                 </StackPanel>
@@ -232,7 +238,7 @@
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center"
                     Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}">
-                <TextBlock Text="Loading money dashboard..."
+                <TextBlock Text="{Binding LoadingText}"
                            Foreground="{StaticResource TextPrimaryBrush}"
                            FontSize="14"
                            FontWeight="SemiBold"/>

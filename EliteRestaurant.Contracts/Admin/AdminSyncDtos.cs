@@ -49,6 +49,7 @@ public sealed record AdminCloudSettingsRequest(
     string SocialMedia,
     string? CustomerMenuTagline,
     string StaffLoginPasscode,
+    string OrderCancelPasscode,
     string AdminWebSignInId,
     string AdminWebPin,
     string TicketFooterText,
@@ -82,6 +83,8 @@ public sealed record AdminCloudSettingsRequest(
     decimal PayrollMaxSalaryAdvancePercentOfGross = 30m,
     string? CustomerMenuAboutText = null,
     string? CustomerMenuContactIntro = null,
-    string? CustomerMenuNotesText = null);
+    string? CustomerMenuNotesText = null,
+    decimal ClientDebtCapUsd = 250m,
+    string? RestaurantTimeZoneId = null);
 
 public sealed record AdminCloudSettingsResponse(bool Success, string? LogoUrl, string Message);

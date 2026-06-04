@@ -2,7 +2,8 @@ namespace EliteRestaurant.Api.Dtos;
 
 public sealed record KitchenPortalConfigDto(
     string RestaurantName,
-    string RestaurantLogoUrl);
+    string RestaurantLogoUrl,
+    string RestaurantTimeZoneId);
 
 public sealed record KitchenMenuIngredientDto(
     int InventoryItemId,

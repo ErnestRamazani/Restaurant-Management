@@ -1,16 +1,22 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ChevronLeft } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { GoldDivider } from '../ui/GoldDivider'
 import { BottomSheet } from '../ui/BottomSheet'
 import { OnlineReservationConfirmScreen } from '../online/OnlineReservationConfirmScreen'
 import { publicAvailability, publicBookFloor, publicSuggestPlacements } from '../../utils/reservationApi'
+import {
+  formatRestaurantDateTime,
+  getRestaurantTimeZone,
+  restaurantDatetimeLocalAtStartOfDay,
+  restaurantDatetimeLocalMonthsAhead,
+  restaurantLocalInputToUtcIso,
+  utcIsoToRestaurantDatetimeLocal,
+} from '../../utils/restaurantDateTime'
 
-function toUtcIsoFromLocalInput(value) {
-  if (!value) return ''
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return ''
-  return d.toISOString()
+function toUtcIsoFromLocalInput(value, config) {
+  return restaurantLocalInputToUtcIso(value, getRestaurantTimeZone(config))
 }
 
 function addMinutesIso(iso, minutes) {
@@ -20,48 +26,27 @@ function addMinutesIso(iso, minutes) {
   return d.toISOString()
 }
 
-/** Start of local calendar day (today + dayOffset) as datetime-local string. */
-function localDateTimeAtStartOfDay(dayOffsetFromToday) {
-  const d = new Date()
-  d.setDate(d.getDate() + dayOffsetFromToday)
-  d.setHours(0, 0, 0, 0)
-  const pad = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
-function localDateTimeAtEndOfDayMonthsAhead(monthsAhead) {
-  const d = new Date()
-  d.setMonth(d.getMonth() + monthsAhead)
-  d.setHours(23, 59, 0, 0)
-  const pad = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
-/** @param {string} localValue datetime-local value */
-function validateReservationLeadTime(localValue, leadDays, maxMonthsAhead) {
-  if (!localValue) return 'Choose a date and time for your visit.'
-  const picked = new Date(localValue)
-  if (Number.isNaN(picked.getTime())) return 'Invalid date.'
-  const now = new Date()
-  if (picked.getTime() <= now.getTime()) return 'Reservation must be in the future — past dates are not allowed.'
-  const min = new Date()
-  min.setDate(min.getDate() + leadDays)
-  min.setHours(0, 0, 0, 0)
-  if (picked.getTime() < min.getTime()) {
-    return leadDays <= 0
-      ? ''
-      : `Online bookings need at least ${leadDays} full day(s)’ notice. For sooner dates, please call the restaurant.`
+/** @param {string} localValue datetime-local value (restaurant wall clock) */
+function validateReservationLeadTime(t, localValue, leadDays, maxMonthsAhead, config) {
+  if (!localValue) return t('guest.reservation.chooseDateTime')
+  const pickedIso = toUtcIsoFromLocalInput(localValue, config)
+  if (!pickedIso) return t('guest.reservation.invalidDate')
+  const pickedMs = new Date(pickedIso).getTime()
+  const nowMs = Date.now()
+  if (pickedMs <= nowMs) return t('guest.reservation.mustBeFuture')
+  const minIso = toUtcIsoFromLocalInput(restaurantDatetimeLocalAtStartOfDay(leadDays, config), config)
+  if (minIso && pickedMs < new Date(minIso).getTime()) {
+    return leadDays <= 0 ? '' : t('guest.reservation.leadDays', { days: leadDays })
   }
-  const max = new Date()
-  max.setMonth(max.getMonth() + maxMonthsAhead)
-  max.setHours(23, 59, 59, 999)
-  if (picked.getTime() > max.getTime()) {
-    return `Online bookings are available up to ${maxMonthsAhead} month(s) ahead.`
+  const maxIso = toUtcIsoFromLocalInput(restaurantDatetimeLocalMonthsAhead(maxMonthsAhead, config), config)
+  if (maxIso && pickedMs > new Date(maxIso).getTime()) {
+    return t('guest.reservation.maxMonths', { months: maxMonthsAhead })
   }
   return ''
 }
 
 export function ReservationScreen({ config }) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const name =
     config?.restaurantName && String(config.restaurantName).trim()
@@ -93,17 +78,20 @@ export function ReservationScreen({ config }) {
   )
   const [tablePickerOpen, setTablePickerOpen] = useState(false)
 
-  const minLocalDateTime = useMemo(() => localDateTimeAtStartOfDay(leadDays), [leadDays])
-  const maxLocalDateTime = useMemo(() => localDateTimeAtEndOfDayMonthsAhead(maxMonthsAhead), [maxMonthsAhead])
+  const tzLabel = getRestaurantTimeZone(config)
+  const minLocalDateTime = useMemo(
+    () => restaurantDatetimeLocalAtStartOfDay(leadDays, config),
+    [leadDays, config],
+  )
+  const maxLocalDateTime = useMemo(
+    () => restaurantDatetimeLocalMonthsAhead(maxMonthsAhead, config),
+    [maxMonthsAhead, config],
+  )
 
   const defaultLocalStart = useCallback(() => {
-    const d = new Date()
-    d.setDate(d.getDate() + leadDays)
-    d.setMinutes(0, 0, 0)
-    d.setHours(12, 0, 0, 0)
-    const pad = (n) => String(n).padStart(2, '0')
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-  }, [leadDays])
+    const base = restaurantDatetimeLocalAtStartOfDay(leadDays, config)
+    return base.replace(/T\d{2}:\d{2}$/, 'T12:00')
+  }, [leadDays, config])
 
   useEffect(() => {
     const def = defaultLocalStart()
@@ -122,7 +110,7 @@ export function ReservationScreen({ config }) {
   }, [suggestions, placementId])
 
   const refreshSuggestions = useCallback(async () => {
-    const startIso = toUtcIsoFromLocalInput(localStart)
+    const startIso = toUtcIsoFromLocalInput(localStart, config)
     if (!startIso) return
     const endIso = addMinutesIso(startIso, 105)
     setError('')
@@ -143,7 +131,7 @@ export function ReservationScreen({ config }) {
         setPlacementId(null)
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load table suggestions.')
+      setError(e instanceof Error ? e.message : t('guest.reservation.loadSuggestionsFailed'))
       setSuggestions([])
     } finally {
       setBusy(false)
@@ -152,15 +140,15 @@ export function ReservationScreen({ config }) {
 
   useEffect(() => {
     if (!localStart) return
-    const t = window.setTimeout(() => {
+    const timerId = window.setTimeout(() => {
       refreshSuggestions()
     }, 400)
-    return () => window.clearTimeout(t)
+    return () => window.clearTimeout(timerId)
   }, [localStart, partySize, refreshSuggestions])
 
   const loadSlots = async () => {
     if (placementId == null) return
-    const startIso = toUtcIsoFromLocalInput(localStart)
+    const startIso = toUtcIsoFromLocalInput(localStart, config)
     if (!startIso) return
     const rangeStart = new Date(startIso)
     const rangeEnd = new Date(rangeStart)
@@ -177,25 +165,25 @@ export function ReservationScreen({ config }) {
       })
       setSlots(Array.isArray(rows) ? rows : [])
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not load open times.')
+      setError(e instanceof Error ? e.message : t('guest.reservation.loadSlotsFailed'))
     } finally {
       setBusy(false)
     }
   }
 
   const submit = async () => {
-    const leadErr = validateReservationLeadTime(localStart, leadDays, maxMonthsAhead)
+    const leadErr = validateReservationLeadTime(t, localStart, leadDays, maxMonthsAhead, config)
     if (leadErr) {
       setError(leadErr)
       return
     }
-    const startIso = toUtcIsoFromLocalInput(localStart)
+    const startIso = toUtcIsoFromLocalInput(localStart, config)
     if (!startIso || !guestName.trim() || !guestPhone.trim()) {
-      setError('Name, phone, and arrival time are required.')
+      setError(t('guest.reservation.requiredFields'))
       return
     }
     if (placementId == null) {
-      setError('No table matched that party size and time. Try another time.')
+      setError(t('guest.reservation.noTableMatch'))
       return
     }
     setBusy(true)
@@ -215,7 +203,7 @@ export function ReservationScreen({ config }) {
       const confirmationCode = String(res?.confirmationCode ?? res?.ConfirmationCode ?? '').trim()
       if (!confirmationCode) {
         setError(
-          'Reservation was saved but no confirmation code was returned. Restart the API after migrations, then try again or call the restaurant.',
+          t('guest.reservation.noConfirmationCode'),
         )
         return
       }
@@ -226,16 +214,19 @@ export function ReservationScreen({ config }) {
       })
       const tableLabel =
         tableFromApi ||
-        String(sel?.tableDisplayName ?? sel?.TableDisplayName ?? 'Your table')
+        String(sel?.tableDisplayName ?? sel?.TableDisplayName ?? t('guest.reservation.yourTable'))
       const startUtc = res?.plannedStartUtc ?? res?.PlannedStartUtc ?? startIso
       const endUtc = res?.plannedEndUtc ?? res?.PlannedEndUtc ?? endIso
       const arrivalLabel = startUtc
-        ? new Date(startUtc).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+        ? formatRestaurantDateTime(startUtc, config, { dateStyle: 'medium', timeStyle: 'short' })
         : localStart
-          ? new Date(localStart).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+          ? formatRestaurantDateTime(toUtcIsoFromLocalInput(localStart, config), config, {
+              dateStyle: 'medium',
+              timeStyle: 'short',
+            })
           : ''
       const endLabel = endUtc
-        ? new Date(endUtc).toLocaleTimeString(undefined, { timeStyle: 'short' })
+        ? formatRestaurantDateTime(endUtc, config, { timeStyle: 'short' })
         : ''
       const guest = String(res?.guestName ?? res?.GuestName ?? guestName).trim()
       const phoneOnFile = String(res?.guestPhone ?? res?.GuestPhone ?? guestPhone).trim()
@@ -251,11 +242,14 @@ export function ReservationScreen({ config }) {
         arrivalLabel,
         endLabel,
         userNotes: userNotes || undefined,
-        bookedAtLabel: bookedAt.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }),
+        bookedAtLabel: formatRestaurantDateTime(bookedAt, config, {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        }),
       }
       setBookingDone({ confirmationCode, ticket })
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Booking failed.'
+      const msg = e instanceof Error ? e.message : t('guest.reservation.bookingFailed')
       setError(msg)
       if (msg.toLowerCase().includes('conflict')) await loadSlots()
     } finally {
@@ -268,7 +262,7 @@ export function ReservationScreen({ config }) {
       <OnlineReservationConfirmScreen
         confirmationCode={bookingDone.confirmationCode}
         ticket={bookingDone.ticket}
-        restaurantName={name || 'Restaurant'}
+        restaurantName={name || t('guest.general.restaurant')}
         onNewReservation={() => {
           setBookingDone(null)
           setError('')
@@ -289,56 +283,65 @@ export function ReservationScreen({ config }) {
           to="/"
           className="mb-8 inline-flex min-h-[44px] items-center self-start font-body text-xs font-bold uppercase tracking-[0.18em] text-gold/80 transition hover:text-gold"
         >
-          Back
+          {t('guest.general.back')}
         </Link>
 
-        <p className="font-body text-[0.68rem] font-bold uppercase tracking-[0.28em] text-gold/80">Reservations</p>
+        <p className="font-body text-[0.68rem] font-bold uppercase tracking-[0.28em] text-gold/80">
+          {t('guest.reservation.title')}
+        </p>
         <h1
           className="mt-3 font-display text-4xl italic leading-tight text-champagne"
           style={{ fontFamily: '"Playfair Display", serif' }}
         >
-          Reserve your table
+          {t('guest.reservation.headline')}
         </h1>
         <GoldDivider className="my-5" />
 
         <p className="font-body text-[0.95rem] leading-relaxed text-champagne/80">
-          Book online for {name}, or reach us by phone.
+          {t('guest.reservation.intro', { name: name || t('guest.general.restaurant') })}
         </p>
 
         <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/[0.07] p-4">
             <p className="font-body text-[0.65rem] font-bold uppercase tracking-[0.2em] text-amber-200/90">
-              Order food instead
+              {t('guest.reservation.orderFoodTitle')}
             </p>
             <p className="mt-2 font-body text-[0.82rem] leading-relaxed text-champagne/75">
-              Pickup or delivery — browse the menu and send an order without reserving a table.
+              {t('guest.reservation.orderFoodBody')}
             </p>
             <button
               type="button"
               onClick={() => navigate('/order-online')}
               className="mt-3 min-h-[48px] w-full rounded-xl border border-amber-400/50 bg-amber-500/15 font-display text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-amber-50 transition hover:border-amber-300 hover:bg-amber-500/25"
             >
-              Order online
+              {t('menu.orderOnline')}
             </button>
           </div>
 
           <div className="mt-6 space-y-4 rounded-2xl border border-champagne/10 bg-black/15 p-4">
-            <p className="font-body text-[0.65rem] font-bold uppercase tracking-[0.2em] text-gold/70">Online booking</p>
+            <p className="font-body text-[0.65rem] font-bold uppercase tracking-[0.2em] text-gold/70">
+              {t('guest.reservation.onlineBooking')}
+            </p>
             <div className="rounded-xl border border-gold/25 bg-gold/[0.06] p-3">
               <p className="font-body text-[0.72rem] leading-relaxed text-champagne/85">
-                We accept online reservations <strong className="text-gold">at least {leadDays} day(s) in advance</strong> and up to{' '}
-                <strong className="text-gold">{maxMonthsAhead} month(s)</strong> ahead. For
-                table requests sooner than that — or special occasions —{' '}
+                {t('guest.reservation.policyIntro', { days: leadDays, months: maxMonthsAhead })}{' '}
                 {phone ? (
                   <>
-                    please <a href={`tel:${phone.replace(/\s/g, '')}`} className="text-gold underline decoration-gold/40">call {phone}</a>.
+                    {t('guest.reservation.policyCallBefore')}{' '}
+                    <a
+                      href={`tel:${phone.replace(/\s/g, '')}`}
+                      className="font-semibold text-gold underline decoration-gold/40"
+                    >
+                      {phone}
+                    </a>
+                    .
                   </>
                 ) : (
-                  'please call the restaurant.'
+                  t('guest.reservation.policyCallRestaurant')
                 )}
               </p>
             </div>
             <label className="block font-body text-xs text-champagne/60" htmlFor="party">
-              Party size
+              {t('guest.reservation.partySize')}
             </label>
             <input
               id="party"
@@ -350,7 +353,7 @@ export function ReservationScreen({ config }) {
               className="h-11 w-full rounded-xl border border-gold/20 bg-black/25 px-3 font-body text-champagne outline-none focus:border-gold"
             />
             <label className="block font-body text-xs text-champagne/60" htmlFor="start">
-              Arrival (local time)
+              {t('guest.reservation.arrival')} ({tzLabel.replace(/_/g, ' ')})
             </label>
             <input
               id="start"
@@ -361,13 +364,13 @@ export function ReservationScreen({ config }) {
               onChange={(e) => {
                 const v = e.target.value
                 setLocalStart(v)
-                const err = validateReservationLeadTime(v, leadDays, maxMonthsAhead)
+                const err = validateReservationLeadTime(t, v, leadDays, maxMonthsAhead, config)
                 setError(err)
               }}
               className="h-11 w-full rounded-xl border border-gold/20 bg-black/25 px-3 font-body text-champagne outline-none focus:border-gold [color-scheme:dark]"
             />
             <label className="block font-body text-xs text-champagne/60" htmlFor="gname">
-              Guest name
+              {t('guest.reservation.guestName')}
             </label>
             <input
               id="gname"
@@ -376,7 +379,7 @@ export function ReservationScreen({ config }) {
               className="h-11 w-full rounded-xl border border-gold/20 bg-black/25 px-3 font-body text-champagne outline-none focus:border-gold"
             />
             <label className="block font-body text-xs text-champagne/60" htmlFor="gphone">
-              Phone
+              {t('guest.reservation.phone')}
             </label>
             <input
               id="gphone"
@@ -385,7 +388,7 @@ export function ReservationScreen({ config }) {
               className="h-11 w-full rounded-xl border border-gold/20 bg-black/25 px-3 font-body text-champagne outline-none focus:border-gold"
             />
             <label className="block font-body text-xs text-champagne/60" htmlFor="gemail">
-              Email (optional)
+              {t('guest.reservation.email')}
             </label>
             <input
               id="gemail"
@@ -394,7 +397,7 @@ export function ReservationScreen({ config }) {
               className="h-11 w-full rounded-xl border border-gold/20 bg-black/25 px-3 font-body text-champagne outline-none focus:border-gold"
             />
             <label className="block font-body text-xs text-champagne/60" htmlFor="notes">
-              Notes
+              {t('guest.reservation.notes')}
             </label>
             <textarea
               id="notes"
@@ -406,19 +409,22 @@ export function ReservationScreen({ config }) {
 
             {suggestions.length > 0 ? (
               <div>
-                <p className="font-body text-xs font-bold uppercase tracking-[0.12em] text-gold/75">Table</p>
+                <p className="font-body text-xs font-bold uppercase tracking-[0.12em] text-gold/75">
+                  {t('guest.reservation.tableSection')}
+                </p>
                 <p className="mt-1 font-body text-[0.7rem] leading-relaxed text-champagne/50">
-                  Choose a table that fits your party and arrival — we’ll hold it for your visit.
+                  {t('guest.reservation.tableSectionHint')}
                 </p>
                 <button
                   type="button"
                   onClick={() => setTablePickerOpen(true)}
-                  aria-label="Choose table"
+                  aria-label={t('guest.reservation.chooseTableAria')}
                   className="mt-3 flex min-h-[52px] w-full items-center justify-between gap-3 rounded-xl border border-champagne/15 bg-black/20 px-4 py-3 text-left transition hover:border-gold/35 hover:bg-black/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold/50"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-display text-sm font-semibold text-champagne">
-                      {selectedTableLabel || (placementId != null ? 'Table selected' : 'Choose a table')}
+                      {selectedTableLabel ||
+                        (placementId != null ? t('guest.reservation.tableSelected') : t('guest.reservation.chooseTable'))}
                     </p>
                   </div>
                   <ChevronLeft
@@ -429,14 +435,16 @@ export function ReservationScreen({ config }) {
                 </button>
               </div>
             ) : busy ? (
-              <p className="font-body text-xs text-champagne/45">Finding tables for this time…</p>
+              <p className="font-body text-xs text-champagne/45">{t('guest.reservation.findingTables')}</p>
             ) : (
-              <p className="font-body text-xs text-amber-200/90">No open tables for that time — adjust the time or party size.</p>
+              <p className="font-body text-xs text-amber-200/90">{t('guest.reservation.noTablesForTime')}</p>
             )}
 
             {slots.length > 0 ? (
               <div className="rounded-xl border border-gold/15 bg-gold/5 p-3">
-                <p className="font-body text-xs font-bold uppercase tracking-[0.14em] text-gold/90">Suggested slots</p>
+                <p className="font-body text-xs font-bold uppercase tracking-[0.14em] text-gold/90">
+                  {t('guest.reservation.suggestedSlots')}
+                </p>
                 <ul className="mt-2 max-h-32 space-y-1 overflow-auto font-body text-xs text-champagne/80">
                   {slots.map((s, i) => {
                     const st = s.startUtc ?? s.StartUtc
@@ -447,15 +455,14 @@ export function ReservationScreen({ config }) {
                           type="button"
                           onClick={() => {
                             if (!st) return
-                            const d = new Date(st)
-                            const pad = (n) => String(n).padStart(2, '0')
-                            setLocalStart(
-                              `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`,
-                            )
+                            setLocalStart(utcIsoToRestaurantDatetimeLocal(st, config))
                           }}
                           className="text-left text-gold/90 underline decoration-gold/30 hover:text-gold"
                         >
-                          {st ? new Date(st).toLocaleString() : ''} – {en ? new Date(en).toLocaleTimeString() : ''}
+                          {st ? formatRestaurantDateTime(st, config, { dateStyle: 'short', timeStyle: 'short' }) : ''}
+                          {' '}
+                          –{' '}
+                          {en ? formatRestaurantDateTime(en, config, { timeStyle: 'short' }) : ''}
                         </button>
                       </li>
                     )
@@ -474,7 +481,7 @@ export function ReservationScreen({ config }) {
               onClick={submit}
               className="flex min-h-[52px] w-full items-center justify-center rounded-xl bg-gold font-body text-sm font-extrabold uppercase tracking-[0.12em] text-black transition hover:brightness-105 disabled:opacity-50"
             >
-              {busy ? 'Please wait…' : 'Request reservation'}
+              {busy ? t('guest.reservation.pleaseWait') : t('guest.reservation.requestReservation')}
             </button>
           </div>
 
@@ -483,11 +490,11 @@ export function ReservationScreen({ config }) {
               href={`tel:${phone.replace(/\s/g, '')}`}
               className="mt-6 flex min-h-[52px] items-center justify-center rounded-sm border-2 border-gold/45 bg-gold/5 px-6 py-3 font-body text-sm font-bold uppercase tracking-[0.16em] text-gold transition hover:border-gold hover:bg-[var(--gold-dim)]"
             >
-              Call {phone}
+              {t('guest.reservation.callButton', { phone })}
             </a>
           ) : (
             <p className="mt-6 rounded-2xl border border-gold/15 bg-gold/5 px-4 py-3 font-body text-sm text-champagne/65">
-              Reservation contact is set in the restaurant back office.
+              {t('guest.reservation.noPhoneConfigured')}
             </p>
           )}
 
@@ -499,18 +506,22 @@ export function ReservationScreen({ config }) {
       <BottomSheet open={tablePickerOpen} onClose={() => setTablePickerOpen(false)}>
         <div className="px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-1">
           <p className="text-center font-body text-[0.66rem] font-bold uppercase tracking-[0.24em] text-gold/80">
-            Suggested tables
+            {t('guest.reservation.suggestedTables')}
           </p>
-          <h2 className="mt-2 text-center font-display text-xl italic text-champagne">Pick your table</h2>
+          <h2 className="mt-2 text-center font-display text-xl italic text-champagne">
+            {t('guest.reservation.pickYourTable')}
+          </h2>
           <p className="mx-auto mt-2 max-w-sm text-center font-body text-xs leading-relaxed text-champagne/55">
-            These placements match your party size and time. Tap one to select — you can change it anytime before
-            submitting.
+            {t('guest.reservation.pickerHint')}
           </p>
           <div className="mt-5 max-h-[min(52vh,420px)] space-y-2 overflow-y-auto overscroll-contain pr-1">
             {suggestions.map((s) => {
               const id = s.placementUnitId ?? s.PlacementUnitId
               const nid = id != null ? Number(id) : NaN
-              const label = s.tableDisplayName ?? s.TableDisplayName ?? `Placement ${id}`
+              const label =
+                s.tableDisplayName ??
+                s.TableDisplayName ??
+                t('guest.reservation.placementFallback', { id })
               const selected = placementId != null && nid === placementId
               return (
                 <button
@@ -529,7 +540,7 @@ export function ReservationScreen({ config }) {
                   <span className="font-display text-sm font-semibold text-champagne">{label}</span>
                   {selected ? (
                     <span className="mt-1 block font-body text-[0.65rem] uppercase tracking-[0.16em] text-gold">
-                      Selected
+                      {t('guest.reservation.selected')}
                     </span>
                   ) : null}
                 </button>
@@ -541,7 +552,7 @@ export function ReservationScreen({ config }) {
             onClick={() => setTablePickerOpen(false)}
             className="mt-4 min-h-[48px] w-full rounded-xl border border-champagne/25 bg-champagne/[0.06] font-body text-[0.72rem] font-bold uppercase tracking-[0.14em] text-champagne/85 transition hover:border-gold/40 hover:bg-gold/10"
           >
-            Close
+            {t('common.close')}
           </button>
         </div>
       </BottomSheet>

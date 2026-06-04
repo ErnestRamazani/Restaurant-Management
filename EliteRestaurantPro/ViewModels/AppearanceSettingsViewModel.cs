@@ -10,12 +10,19 @@ using System.Windows.Media.Imaging;
 using EliteRestaurant.Core.Menu;
 using EliteRestaurant.Core.Utils;
 using EliteRestaurantPro.ApiClients;
+using EliteRestaurantPro.Localization;
 using EliteRestaurantPro.Services;
 using EliteRestaurantPro.Utils;
 using Microsoft.Win32;
 using QRCoder;
 
 namespace EliteRestaurantPro.ViewModels;
+
+public sealed class UiLanguageOption
+{
+    public string Code { get; init; } = "fr";
+    public string DisplayName { get; init; } = string.Empty;
+}
 
 public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
 {
@@ -32,9 +39,12 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     private string _statBlueHex = string.Empty;
     private string _statGreenHex = string.Empty;
     private string _statRedHex = string.Empty;
-    private string _statusMessage = "Customize your theme colors. Use #RRGGBB or #AARRGGBB.";
-    private string _selectedSettingsSection = "All";
-    private string _selectedToken = "Gold Accent";
+    private string _statusMessage = SettingsUiLocalizer.StatusThemeCustomize();
+    private string _selectedSettingsSectionKey = SettingsUiLocalizer.SectionKeys.All;
+    private LocalizedSelectOption? _selectedSettingsSectionOption;
+    private string _selectedTokenKey = "GoldAccent";
+    private LocalizedSelectOption? _selectedTokenOption;
+    private LocalizedSelectOption? _selectedBackgroundPageOption;
     private double _pickerHue;
     private double _pickerSaturation = 50;
     private double _pickerLightness = 50;
@@ -72,6 +82,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     private string _customerMenuContactIntro = string.Empty;
     private string _customerMenuNotesText = string.Empty;
     private string _staffLoginPasscode = string.Empty;
+    private string _orderCancelPasscode = string.Empty;
     private string _adminWebSignInId = string.Empty;
     private string _adminWebPin = string.Empty;
     private string _onlinePromoTitle = string.Empty;
@@ -81,6 +92,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     private string _onlineOrdersTableId = string.Empty;
     private string _reservationLeadDays = "2";
     private string _reservationMaxMonthsAhead = "6";
+    private string _restaurantTimeZoneId = RestaurantTimeZone.DefaultId;
     private string _attendanceMorningStartText = "12:00";
     private string _attendanceMorningEndText = "18:00";
     private string _attendanceNightStartText = "18:00";
@@ -90,6 +102,173 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     private bool _salaryAbsenceCountsAsAttendanceUnit = true;
     private string _salarySalesBonusPercentText = "5";
     private string _salaryMaxAdvancePercentOfGrossText = "30";
+    private UiLanguageOption? _selectedUiLanguage;
+    private bool _isApplyingUiLanguage;
+
+    public string SettingsLanguageTitle => Loc.Admin("settingsLanguageTitle", "Language");
+    public string SettingsLanguageLead => Loc.Admin("settingsLanguageLead", "Choose the language for Elite Pro screens.");
+    public string SettingsLanguageLabel => Loc.Admin("settingsLanguageLabel", "Interface language");
+
+    public string SetPanelTitle => Loc.Admin("setPanelTitle", "Settings");
+    public string SetPanelTitleAccent => Loc.Admin("setPanelTitleAccent", " Panel");
+    public string SetPanelSubtitle => Loc.Admin("setPanelSubtitle", "Business profile, currency & pricing, and appearance controls.");
+    public string SetCloudWebsiteLabel => Loc.Admin("setCloudWebsiteLabel", "Cloud website:");
+    public string SetCloudWebsiteHint => Loc.Admin("setCloudWebsiteHint", " Pushing code to GitHub deploys the API and menu app only — not your restaurant data. Each Save here must push to the Public menu base URL below (hosted API). Sign in as Admin/Manager in Elite Pro first. Menu items and photos sync when you save them on the Menu tab.");
+    public string SetSectionFilterLabel => Loc.Admin("setSectionFilterLabel", "Section:");
+    public string SetBusinessProfileTitle => Loc.Admin("setBusinessProfileTitle", "Business Profile");
+    public string SetBusinessProfileLead => Loc.Admin("setBusinessProfileLead", "Restaurant identity, public menu URL, online promo, and staff access.");
+    public string SetRestaurantNameLabel => Loc.Admin("setRestaurantName", "Restaurant name");
+    public string SetPhoneLabel => Loc.Admin("setPhone", "Phone");
+    public string SetAddressLabel => Loc.Admin("setAddress", "Address");
+    public string SetWebsiteDomainLabel => Loc.Admin("setWebsiteDomain", "Website domain");
+    public string SetOtherSocialLabel => Loc.Admin("setOtherSocial", "Other social (optional)");
+    public string SetLogoPathLabel => Loc.Admin("setLogoPath", "Logo path");
+    public string SetHomepageBackgroundLabel => Loc.Admin("setHomepageBackground", "Homepage background image");
+    public string SetPublicMenuBaseUrlLabel => Loc.Admin("setPublicMenuBaseUrl", "Public menu base URL (QR codes for customers’ phones)");
+    public string SetPublicMenuBaseUrlHint => Loc.Admin("setPublicMenuBaseUrlHint", "Set this to your live API host (e.g. https://starfish-app-owtoz.ondigitalocean.app or https://etoilegourmandekin.com if that domain serves the API). Saves push settings to that server’s database. For Wi-Fi testing only, use this PC’s LAN IP — not localhost. No trailing slash.");
+    public string SetPublicMenuBaseUrlTooltip => Loc.Admin("setPublicMenuBaseUrlTooltip", "Example: https://starfish-app-owtoz.ondigitalocean.app — no trailing slash");
+    public string SetUsePhoneFriendlyUrlLabel => Loc.Admin("setUsePhoneFriendlyUrl", "Use phone-friendly URL");
+    public string SetCustomerMenuTaglineLabel => Loc.Admin("setCustomerMenuTagline", "Customer menu tagline (optional)");
+    public string SetCustomerMenuTaglineHint => Loc.Admin("setCustomerMenuTaglineHint", "Shown under the logo on the public homepage (e.g. Cuisine moderne · Kinshasa).");
+    public string SetPublicMenuAboutLabel => Loc.Admin("setPublicMenuAbout", "Public menu — About (footer sheet)");
+    public string SetPublicMenuAboutHint => Loc.Admin("setPublicMenuAboutHint", "Plain text for the About link on the customer menu homepage. Saved with Business Profile and pushed to the cloud.");
+    public string SetPublicMenuContactLabel => Loc.Admin("setPublicMenuContact", "Public menu — Contact intro (optional)");
+    public string SetPublicMenuContactHint => Loc.Admin("setPublicMenuContactHint", "Short line above address and phone on the Contact sheet. Address and phone still come from fields above.");
+    public string SetPublicMenuNotesLabel => Loc.Admin("setPublicMenuNotes", "Public menu — Notes (footer sheet)");
+    public string SetPublicMenuNotesHint => Loc.Admin("setPublicMenuNotesHint", "Allergies, ordering policy, and legal notes for the Notes link. Tax / legal line can still use Tax ID field in Tickets section.");
+    public string SetOnlinePromoTitle => Loc.Admin("setOnlinePromoTitle", "Online order — weekly promo (PWA)");
+    public string SetOnlinePromoLead => Loc.Admin("setOnlinePromoLead", "Hero card on the dedicated Order online flow. Saved with Business Profile and pushed to the cloud menu.");
+    public string SetPromoTitleLabel => Loc.Admin("setPromoTitle", "Promo title");
+    public string SetPromoSubtitleLabel => Loc.Admin("setPromoSubtitle", "Promo subtitle");
+    public string SetPromoCtaLabel => Loc.Admin("setPromoCta", "Button label (CTA)");
+    public string SetPromoHeroImageLabel => Loc.Admin("setPromoHeroImage", "Hero image (optional)");
+    public string SetOnlineOrdersTableIdLabel => Loc.Admin("setOnlineOrdersTableId", "Online orders table id (optional)");
+    public string SetOnlineOrdersTableIdHint => Loc.Admin("setOnlineOrdersTableIdHint", "POS table id to attach guest online orders (must have an assigned server). Leave blank to use the first available staffed table.");
+    public string SetStaffLoginPasscodeLabel => Loc.Admin("setStaffLoginPasscode", "Staff login passcode");
+    public string SetStaffLoginPasscodeHint => Loc.Admin("setStaffLoginPasscodeHint", "Customers see the menu first. Staff must enter this code before the workplace chooser opens.");
+    public string SetOrderCancelPasscodeLabel => Loc.Admin("setOrderCancelPasscode", "Order cancel passcode");
+    public string SetOrderCancelPasscodeHint => Loc.Admin("setOrderCancelPasscodeHint", "Required when any staff member cancels an order from cashier, kitchen, bar, server, or desktop admin.");
+    public string SetAdminWebPortalLabel => Loc.Admin("setAdminWebPortal", "Admin web portal");
+    public string SetAdminWebPortalHint => Loc.Admin("setAdminWebPortalHint", "Read-only owner dashboard at /admin/ on your API host. Sign-in ID and PIN are pushed to the cloud and synced to the AdminWeb employee.");
+    public string SetSignInIdLabel => Loc.Admin("setSignInId", "Sign-in ID");
+    public string SetPinLabel => Loc.Admin("setPin", "PIN");
+    public string SetSaveBusinessProfileLabel => Loc.Admin("setSaveBusinessProfile", "Save Business Profile");
+    public string SetBrowseLabel => Loc.Admin("menuBrowse", "Browse");
+    public string SetClearLabel => Loc.Admin("menuClear", "Clear");
+    public string SetRefreshLabel => Loc.Admin("refresh", "Refresh");
+    public string SetTicketsTitle => Loc.Admin("setTicketsTitle", "Tickets & receipts");
+    public string SetTicketsLead => Loc.Admin("setTicketsLead", "Printed and PDF tickets: optional header image above the restaurant name, footer and tax lines, and custom social rows (your label, text, and icon file per line). Phone is taken from Business Profile.");
+    public string SetReceiptPrinterLabel => Loc.Admin("setReceiptPrinter", "Receipt printer (Windows)");
+    public string SetReceiptPrinterHint => Loc.Admin("setReceiptPrinterHint", "Choose the POS printer queue (e.g. EliteRestaurant_Printer). A Windows default printer is not required.");
+    public string SetTicketHeaderLogoLabel => Loc.Admin("setTicketHeaderLogo", "Ticket header logo path (not the main restaurant logo)");
+    public string SetTicketHeaderLogoHint => Loc.Admin("setTicketHeaderLogoHint", "Shown centered above the restaurant name on tickets only. Leave blank to skip.");
+    public string SetTicketFooterLabel => Loc.Admin("setTicketFooter", "Footer text for tickets");
+    public string SetTaxIdLegalLabel => Loc.Admin("setTaxIdLegal", "Tax ID / legal info for receipts");
+    public string SetTicketSocialLinesLabel => Loc.Admin("setTicketSocialLines", "Social lines on tickets");
+    public string SetTicketSocialLinesHint => Loc.Admin("setTicketSocialLinesHint", "Add a row for each item: type the platform name, the username or URL to show, and pick a small icon image from disk.");
+    public string SetSocialNameExampleLabel => Loc.Admin("setSocialNameExample", "Name (e.g. Instagram)");
+    public string SetSocialUsernameUrlLabel => Loc.Admin("setSocialUsernameUrl", "Username / URL / text");
+    public string SetSocialIconPathLabel => Loc.Admin("setSocialIconPath", "Icon image path");
+    public string SetRemoveRowLabel => Loc.Admin("setRemoveRow", "Remove row");
+    public string SetAddSocialRowLabel => Loc.Admin("setAddSocialRow", "Add social row");
+    public string SetSaveTicketsLabel => Loc.Admin("setSaveTickets", "Save tickets & receipts");
+    public string SetTimezoneTitle => Loc.Admin("setTimezoneTitle", "Restaurant timezone");
+    public string SetTimezoneLead => Loc.Admin("setTimezoneLead", "All order times, reservations, guest menu confirmations, and staff web portals use this timezone — not each device's local clock. Use an IANA id (e.g. Africa/Kinshasa). Push to cloud after changing.");
+    public string SetIanaTimezoneLabel => Loc.Admin("setIanaTimezone", "IANA timezone");
+    public string SetReservationsTitle => Loc.Admin("setReservationsTitle", "Reservations (public menu)");
+    public string SetReservationsLead => Loc.Admin("setReservationsLead", "Controls how far ahead guests can book online and how much notice is required. Saved here and pushed to the cloud API so the reservation page and server rules stay in sync.");
+    public string SetReservationLeadDaysLabel => Loc.Admin("setReservationLeadDays", "Lead days (X days in advance)");
+    public string SetReservationLeadDaysHint => Loc.Admin("setReservationLeadDaysHint", "Guests may choose a date starting today + this many calendar days. Use 0 to allow any future day (still not in the past).");
+    public string SetReservationMaxMonthsLabel => Loc.Admin("setReservationMaxMonths", "Maximum months ahead");
+    public string SetReservationMaxMonthsHint => Loc.Admin("setReservationMaxMonthsHint", "Guests cannot book beyond this many months from today.");
+    public string SetSaveReservationSettingsLabel => Loc.Admin("setSaveReservationSettings", "Save reservation settings");
+    public string SetMenuCategoriesTitle => Loc.Admin("setMenuCategoriesTitle", "Menu categories");
+    public string SetMenuCategoriesLead => Loc.Admin("setMenuCategoriesLead", "Defines menu types (e.g. Food / Drink), product categories (saved on each item), and allowed subcategories. This drives the admin menu, customer PWA, and staff web menus after you save and push.");
+    public string SetMenuCategoriesDrinkHint => Loc.Admin("setMenuCategoriesDrinkHint", "Check “Drink type” for the bucket that holds beverages. Legacy rows with Category “Drink” still match drink sections by subcategory.");
+    public string SetAddMenuTypeLabel => Loc.Admin("setAddMenuType", "Add menu type");
+    public string SetRestoreEliteDefaultsLabel => Loc.Admin("setRestoreEliteDefaults", "Restore Elite defaults");
+    public string SetSaveMenuCategoriesLabel => Loc.Admin("setSaveMenuCategories", "Save menu categories");
+    public string SetMenuTypeNameLabel => Loc.Admin("setMenuTypeName", "Menu type name");
+    public string SetRemoveTypeLabel => Loc.Admin("setRemoveType", "Remove type");
+    public string SetDrinkTypeCheckboxLabel => Loc.Admin("setDrinkTypeCheckbox", "Drink type (beverages)");
+    public string SetSectionsHint => Loc.Admin("setSectionsHint", "Sections (product category = section name). Subcategories: comma-separated list.");
+    public string SetAddSectionLabel => Loc.Admin("setAddSection", "Add section");
+    public string SetCategorySectionNameLabel => Loc.Admin("setCategorySectionName", "Category (section name)");
+    public string SetRemoveLabel => Loc.Admin("setRemove", "Remove");
+    public string SetSubcategoriesCommaLabel => Loc.Admin("setSubcategoriesComma", "Subcategories (comma-separated)");
+    public string SetMenuQrTitle => Loc.Admin("setMenuQrTitle", "Menu QR codes");
+    public string SetMenuQrLead => Loc.Admin("setMenuQrLead", "Each code opens the customer menu with the table preset. URL: {base URL}/menu/?table={table id}. Save Business Profile if you change the base URL.");
+    public string SetPrintAllQrPdfLabel => Loc.Admin("setPrintAllQrPdf", "Print all QR codes (PDF)");
+    public string SetCurrencyTitle => Loc.Admin("setCurrencyTitle", "Currency & Pricing");
+    public string SetCurrencyLead => Loc.Admin("setCurrencyLead", "Default display, exchange rate, rounding, tax and service.");
+    public string SetDefaultCurrencyDisplayLabel => Loc.Admin("setDefaultCurrencyDisplay", "Default currency display mode");
+    public string SetExchangeRateLabel => Loc.Admin("setExchangeRate", "USD ↔ FC exchange rate");
+    public string SetExchangeRateUpdatedLabel => Loc.Admin("setExchangeRateUpdated", "Exchange rate last updated");
+    public string SetRoundingLineSubtotalLabel => Loc.Admin("setRoundingLineSubtotal", "Rounding: line / subtotal");
+    public string SetRoundingGrandTotalLabel => Loc.Admin("setRoundingGrandTotal", "Rounding: grand total");
+    public string SetTaxServicePercentLabel => Loc.Admin("setTaxServicePercent", "Tax % / Service % (admin only)");
+    public string SetSaveCurrencyPricingLabel => Loc.Admin("setSaveCurrencyPricing", "Save Currency & Pricing");
+    public string SetAttendanceTitle => Loc.Admin("setAttendanceTitle", "Attendance & shifts");
+    public string SetAttendanceLead => Loc.Admin("setAttendanceLead", "Define shift windows (local time). Morning and night set partial shifts; Full Day on an employee schedule uses morning start through night end. Used for attendance, late grace, payroll hours, and auto-absence on this PC.");
+    public string SetMorningStartLabel => Loc.Admin("setMorningStart", "Morning shift — start (HH:mm)");
+    public string SetMorningEndLabel => Loc.Admin("setMorningEnd", "Morning shift — end (HH:mm)");
+    public string SetNightStartLabel => Loc.Admin("setNightStart", "Night shift — start (HH:mm)");
+    public string SetNightEndLabel => Loc.Admin("setNightEnd", "Night shift — end (HH:mm)");
+    public string SetLateGraceLabel => Loc.Admin("setLateGrace", "Late clock-in grace (minutes after shift start)");
+    public string SetSaveAttendanceLabel => Loc.Admin("setSaveAttendance", "Save attendance shift settings");
+    public string SetSalaryTitle => Loc.Admin("setSalaryTitle", "Salary");
+    public string SetSalaryLead => Loc.Admin("setSalaryLead", "Payroll uses scheduled workdays, attendance absences/lates, merchandise sales bonus, and advance caps. These values sync to the cloud profile so API-side payroll matches this PC.");
+    public string SetLateDaysPerUnitLabel => Loc.Admin("setLateDaysPerUnit", "Late days per attendance deduction unit (e.g. 4 means four late days = one unit)");
+    public string SetAbsenceCountsAsUnitLabel => Loc.Admin("setAbsenceCountsAsUnit", "Each absence day counts as one deduction unit");
+    public string SetSalesBonusPercentLabel => Loc.Admin("setSalesBonusPercent", "Sales bonus (% of server merchandise for the month)");
+    public string SetMaxAdvancePercentLabel => Loc.Admin("setMaxAdvancePercent", "Max salary advance (% of scheduled gross for that payroll month)");
+    public string SetSaveSalaryLabel => Loc.Admin("setSaveSalary", "Save Salary settings");
+    public string SetMenuBackgroundsTitle => Loc.Admin("setMenuBackgroundsTitle", "Menu Backgrounds");
+    public string SetMenuBackgroundsLead => Loc.Admin("setMenuBackgroundsLead", "Set a custom image for each navigation page. Dim and contrast apply app-wide.");
+    public string SetPageLabel => Loc.Admin("setPage", "Page");
+    public string SetBackgroundImagePathLabel => Loc.Admin("setBackgroundImagePath", "Background image path");
+    public string SetDimLightLabel => Loc.Admin("setDimLight", "Dim light: ");
+    public string SetContrastLabel => Loc.Admin("setContrast", "Contrast: ");
+    public string SetSaveMenuBackgroundsLabel => Loc.Admin("setSaveMenuBackgrounds", "Save Menu Background Settings");
+    public string SetDatabaseTitle => Loc.Admin("setDatabaseTitle", "Database");
+    public string SetDatabaseLead => Loc.Admin("setDatabaseLead", "PostgreSQL-only runtime. Password is stored with Windows DPAPI (CurrentUser). Prefer ELITE_POSTGRES_CONNECTION for services or automation.");
+    public string SetProviderLabel => Loc.Admin("setProvider", "Provider");
+    public string SetHostLabel => Loc.Admin("setHost", "Host");
+    public string SetPortLabel => Loc.Admin("setPort", "Port");
+    public string SetDatabaseNameLabel => Loc.Admin("setDatabaseName", "Database name");
+    public string SetUsernameLabel => Loc.Admin("setUsername", "Username");
+    public string SetPasswordLabel => Loc.Admin("setPassword", "Password");
+    public string SetPasswordNotShownLabel => Loc.Admin("setPasswordNotShown", " (not shown after save)");
+    public string SetPasswordAlreadySavedLabel => Loc.Admin("setPasswordAlreadySaved", "A password is already saved on this PC. Enter a new password only to change it.");
+    public string SetTestConnectionLabel => Loc.Admin("setTestConnection", "Test Connection");
+    public string SetSaveDatabaseLabel => Loc.Admin("setSaveDatabase", "Save Database Settings");
+    public string SetAppearanceTitle => Loc.Admin("setAppearanceTitle", "Appearance");
+    public string SetAppearanceLead => Loc.Admin("setAppearanceLead", "Use HSL picker, then apply the token. No live preview panel.");
+    public string SetHueLabel => Loc.Admin("setHue", "Hue: ");
+    public string SetSaturationLabel => Loc.Admin("setSaturation", "Saturation: ");
+    public string SetLightnessLabel => Loc.Admin("setLightness", "Lightness: ");
+    public string SetApplyToTokenLabel => Loc.Admin("setApplyToToken", "Apply to selected token");
+    public string SetApplyThemeLabel => Loc.Admin("setApplyTheme", "Apply Theme");
+    public string SetSaveThemeLabel => Loc.Admin("setSaveTheme", "Save Theme");
+    public string SetResetDefaultThemeLabel => Loc.Admin("setResetDefaultTheme", "Reset Default Theme");
+
+    public ObservableCollection<UiLanguageOption> UiLanguageOptions { get; } =
+    [
+        new UiLanguageOption { Code = "fr", DisplayName = "Français" },
+        new UiLanguageOption { Code = "en", DisplayName = "English" }
+    ];
+
+    public UiLanguageOption? SelectedUiLanguage
+    {
+        get => _selectedUiLanguage;
+        set
+        {
+            if (value is null || !SetField(ref _selectedUiLanguage, value))
+                return;
+            if (!_isApplyingUiLanguage)
+                _ = ApplyUiLanguageAsync(value.Code);
+        }
+    }
 
     public override string ActivePage => "AppearanceSettings";
 
@@ -159,21 +338,37 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         set => SetField(ref _statusMessage, value);
     }
 
-    public ObservableCollection<string> SettingsSections { get; } = new(["All", "Business Profile", "Tickets & receipts", "Reservations", "Menu categories", "Currency & Pricing", "Attendance & shifts", "Salary", "Menu Backgrounds", "Menu QR Codes", "Database", "Appearance"]);
-    public ObservableCollection<string> BackgroundMenuKeys { get; } = new(["Dashboard", "Employees", "Menu", "Inventory", "Attendance", "Tables", "Reservations", "Orders", "CreateOrder", "Money", "Salary", "Reports", "KitchenQueue", "ServerPickup"]);
+    public ObservableCollection<LocalizedSelectOption> SettingsSectionOptions { get; } = new();
+    public ObservableCollection<LocalizedSelectOption> BackgroundPageOptions { get; } = new();
+    public ObservableCollection<LocalizedSelectOption> ThemeTokenOptions { get; } = new();
+    public ObservableCollection<LocalizedSelectOption> RoundingOptions { get; } = new();
+    public ObservableCollection<LocalizedSelectOption> CurrencyDisplayOptions { get; } = new();
     public ObservableCollection<string> DatabaseProviders { get; } = new(["PostgreSql"]);
 
     public ObservableCollection<TicketSocialMediaRowViewModel> TicketSocialMediaRows { get; } = new();
 
-    public string SelectedSettingsSection
+    public LocalizedSelectOption? SelectedSettingsSectionOption
     {
-        get => _selectedSettingsSection;
+        get => _selectedSettingsSectionOption;
         set
         {
-            var salaryWasVisible = _selectedSettingsSection == "All" || _selectedSettingsSection == "Salary";
-            if (!SetField(ref _selectedSettingsSection, value))
+            if (value is null || !SetField(ref _selectedSettingsSectionOption, value))
                 return;
-            var salaryNowVisible = _selectedSettingsSection == "All" || _selectedSettingsSection == "Salary";
+            SelectedSettingsSectionKey = value.Value;
+        }
+    }
+
+    public string SelectedSettingsSectionKey
+    {
+        get => _selectedSettingsSectionKey;
+        set
+        {
+            var salaryWasVisible = _selectedSettingsSectionKey == SettingsUiLocalizer.SectionKeys.All
+                || _selectedSettingsSectionKey == SettingsUiLocalizer.SectionKeys.Salary;
+            if (!SetField(ref _selectedSettingsSectionKey, value))
+                return;
+            var salaryNowVisible = _selectedSettingsSectionKey == SettingsUiLocalizer.SectionKeys.All
+                || _selectedSettingsSectionKey == SettingsUiLocalizer.SectionKeys.Salary;
             if (salaryNowVisible && !salaryWasVisible)
                 RefreshSalaryFromDiskIntoViewModel();
 
@@ -182,6 +377,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
             OnPropertyChanged(nameof(ShowMenuBackgroundSection));
             OnPropertyChanged(nameof(ShowDatabaseSection));
             OnPropertyChanged(nameof(ShowAppearanceSection));
+            OnPropertyChanged(nameof(ShowLanguageSection));
             OnPropertyChanged(nameof(ShowMenuQrSection));
             OnPropertyChanged(nameof(ShowAttendanceSection));
             OnPropertyChanged(nameof(ShowReservationsSection));
@@ -193,27 +389,57 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         }
     }
 
-    public bool ShowAttendanceSection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Attendance & shifts";
+    public bool ShowAttendanceSection => SelectedSettingsSectionKey == SettingsUiLocalizer.SectionKeys.All
+        || SelectedSettingsSectionKey == SettingsUiLocalizer.SectionKeys.AttendanceShifts;
 
-    public bool ShowSalarySection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Salary";
+    public bool ShowSalarySection => SelectedSettingsSectionKey == SettingsUiLocalizer.SectionKeys.All
+        || SelectedSettingsSectionKey == SettingsUiLocalizer.SectionKeys.Salary;
 
-    public bool ShowReservationsSection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Reservations";
+    public bool ShowReservationsSection => SelectedSettingsSectionKey == SettingsUiLocalizer.SectionKeys.All
+        || SelectedSettingsSectionKey == SettingsUiLocalizer.SectionKeys.Reservations;
 
-    public bool ShowMenuTaxonomySection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Menu categories";
+    public bool ShowMenuTaxonomySection => SelectedSettingsSectionKey == SettingsUiLocalizer.SectionKeys.All
+        || SelectedSettingsSectionKey == SettingsUiLocalizer.SectionKeys.MenuCategories;
 
-    public bool ShowBusinessSection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Business Profile";
-    public bool ShowCurrencySection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Currency & Pricing";
-    public bool ShowMenuBackgroundSection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Menu Backgrounds";
-    public bool ShowMenuQrSection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Menu QR Codes";
-    public bool ShowDatabaseSection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Database";
-    public bool ShowAppearanceSection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Appearance";
+    public bool ShowBusinessSection => SelectedSettingsSectionKey == SettingsUiLocalizer.SectionKeys.All
+        || SelectedSettingsSectionKey == SettingsUiLocalizer.SectionKeys.BusinessProfile;
 
-    public bool ShowTicketsReceiptSection => SelectedSettingsSection == "All" || SelectedSettingsSection == "Tickets & receipts";
+    public bool ShowCurrencySection => SelectedSettingsSectionKey == SettingsUiLocalizer.SectionKeys.All
+        || SelectedSettingsSectionKey == SettingsUiLocalizer.SectionKeys.CurrencyPricing;
+
+    public bool ShowMenuBackgroundSection => SelectedSettingsSectionKey == SettingsUiLocalizer.SectionKeys.All
+        || SelectedSettingsSectionKey == SettingsUiLocalizer.SectionKeys.MenuBackgrounds;
+
+    public bool ShowMenuQrSection => SelectedSettingsSectionKey == SettingsUiLocalizer.SectionKeys.All
+        || SelectedSettingsSectionKey == SettingsUiLocalizer.SectionKeys.MenuQrCodes;
+
+    public bool ShowDatabaseSection => SelectedSettingsSectionKey == SettingsUiLocalizer.SectionKeys.All
+        || SelectedSettingsSectionKey == SettingsUiLocalizer.SectionKeys.Database;
+
+    public bool ShowAppearanceSection => SelectedSettingsSectionKey == SettingsUiLocalizer.SectionKeys.All
+        || SelectedSettingsSectionKey == SettingsUiLocalizer.SectionKeys.Appearance;
+
+    public bool ShowLanguageSection => SelectedSettingsSectionKey == SettingsUiLocalizer.SectionKeys.All
+        || SelectedSettingsSectionKey == SettingsUiLocalizer.SectionKeys.Language;
+
+    public bool ShowTicketsReceiptSection => SelectedSettingsSectionKey == SettingsUiLocalizer.SectionKeys.All
+        || SelectedSettingsSectionKey == SettingsUiLocalizer.SectionKeys.TicketsReceipts;
 
     private string _selectedBackgroundMenu = "Dashboard";
     private string _selectedMenuBackgroundPath = string.Empty;
     private double _backgroundDimStrength = 0.45;
     private double _backgroundContrastIntensity = 0.55;
+
+    public LocalizedSelectOption? SelectedBackgroundPageOption
+    {
+        get => _selectedBackgroundPageOption;
+        set
+        {
+            if (value is null || !SetField(ref _selectedBackgroundPageOption, value))
+                return;
+            SelectedBackgroundMenu = value.Value;
+        }
+    }
 
     public string SelectedBackgroundMenu
     {
@@ -354,6 +580,12 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         set => SetField(ref _staffLoginPasscode, value);
     }
 
+    public string OrderCancelPasscode
+    {
+        get => _orderCancelPasscode;
+        set => SetField(ref _orderCancelPasscode, value);
+    }
+
     public string AdminWebSignInId
     {
         get => _adminWebSignInId;
@@ -407,6 +639,15 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     {
         get => _reservationMaxMonthsAhead;
         set => SetField(ref _reservationMaxMonthsAhead, value);
+    }
+
+    public ObservableCollection<string> RestaurantTimeZoneOptions { get; } =
+        new(RestaurantTimeZoneCatalog.CommonIds);
+
+    public string RestaurantTimeZoneId
+    {
+        get => _restaurantTimeZoneId;
+        set => SetField(ref _restaurantTimeZoneId, value);
     }
 
     public string AttendanceMorningStartText
@@ -556,12 +797,23 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
 
     public event Action? NotifyClearDatabasePassword;
 
-    public string SelectedToken
+    public LocalizedSelectOption? SelectedTokenOption
     {
-        get => _selectedToken;
+        get => _selectedTokenOption;
         set
         {
-            if (!SetField(ref _selectedToken, value))
+            if (value is null || !SetField(ref _selectedTokenOption, value))
+                return;
+            SelectedTokenKey = value.Value;
+        }
+    }
+
+    public string SelectedTokenKey
+    {
+        get => _selectedTokenKey;
+        set
+        {
+            if (!SetField(ref _selectedTokenKey, value))
                 return;
 
             LoadTokenIntoPicker();
@@ -689,8 +941,122 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         LoadBackgroundSettings();
         LoadDatabaseSettings();
         LoadFromCurrentTheme();
+        _isApplyingUiLanguage = true;
+        SelectedUiLanguage = UiLanguageOptions.FirstOrDefault(o =>
+            string.Equals(o.Code, Loc.NormalizeLanguage(_settings.UiLanguage), StringComparison.OrdinalIgnoreCase))
+            ?? UiLanguageOptions[0];
+        _isApplyingUiLanguage = false;
         if (ShowMenuQrSection)
             _ = RefreshMenuQrRowsAsync();
+        RebuildLocalizedSelectLists();
+    }
+
+    private void RebuildLocalizedSelectLists()
+    {
+        var sectionKey = SelectedSettingsSectionKey;
+        SettingsSectionOptions.Clear();
+        foreach (var key in SettingsUiLocalizer.SectionKeyOrder)
+            SettingsSectionOptions.Add(new LocalizedSelectOption { Value = key, Label = SettingsUiLocalizer.SectionLabel(key) });
+        SelectedSettingsSectionOption = SettingsSectionOptions.FirstOrDefault(o => o.Value == sectionKey)
+            ?? SettingsSectionOptions.FirstOrDefault();
+
+        var bgKey = SelectedBackgroundMenu;
+        BackgroundPageOptions.Clear();
+        foreach (var key in SettingsUiLocalizer.BackgroundPageKeys)
+            BackgroundPageOptions.Add(new LocalizedSelectOption { Value = key, Label = SettingsUiLocalizer.BackgroundPageLabel(key) });
+        SelectedBackgroundPageOption = BackgroundPageOptions.FirstOrDefault(o => o.Value == bgKey)
+            ?? BackgroundPageOptions.FirstOrDefault();
+
+        var tokenKey = SelectedTokenKey;
+        ThemeTokenOptions.Clear();
+        foreach (var key in SettingsUiLocalizer.ThemeTokenKeys)
+            ThemeTokenOptions.Add(new LocalizedSelectOption { Value = key, Label = SettingsUiLocalizer.ThemeTokenLabel(key) });
+        SelectedTokenOption = ThemeTokenOptions.FirstOrDefault(o => o.Value == tokenKey)
+            ?? ThemeTokenOptions.FirstOrDefault();
+
+        RoundingOptions.Clear();
+        foreach (var value in SettingsUiLocalizer.RoundingValues)
+            RoundingOptions.Add(new LocalizedSelectOption { Value = value, Label = SettingsUiLocalizer.RoundingLabel(value) });
+
+        CurrencyDisplayOptions.Clear();
+        foreach (var value in SettingsUiLocalizer.CurrencyDisplayValues)
+            CurrencyDisplayOptions.Add(new LocalizedSelectOption { Value = value, Label = SettingsUiLocalizer.CurrencyDisplayLabel(value) });
+    }
+
+    protected override void RefreshLocalizedStrings()
+    {
+        base.RefreshLocalizedStrings();
+        RebuildLocalizedSelectLists();
+        NotifyAllSetUiProperties();
+    }
+
+    private void NotifyAllSetUiProperties()
+    {
+        Notify(
+            nameof(SettingsLanguageTitle), nameof(SettingsLanguageLead), nameof(SettingsLanguageLabel),
+            nameof(SetPanelTitle), nameof(SetPanelTitleAccent), nameof(SetPanelSubtitle),
+            nameof(SetCloudWebsiteLabel), nameof(SetCloudWebsiteHint), nameof(SetSectionFilterLabel),
+            nameof(SetBusinessProfileTitle), nameof(SetBusinessProfileLead),
+            nameof(SetRestaurantNameLabel), nameof(SetPhoneLabel), nameof(SetAddressLabel),
+            nameof(SetWebsiteDomainLabel), nameof(SetOtherSocialLabel), nameof(SetLogoPathLabel),
+            nameof(SetHomepageBackgroundLabel), nameof(SetPublicMenuBaseUrlLabel), nameof(SetPublicMenuBaseUrlHint),
+            nameof(SetPublicMenuBaseUrlTooltip), nameof(SetUsePhoneFriendlyUrlLabel),
+            nameof(SetCustomerMenuTaglineLabel), nameof(SetCustomerMenuTaglineHint),
+            nameof(SetPublicMenuAboutLabel), nameof(SetPublicMenuAboutHint),
+            nameof(SetPublicMenuContactLabel), nameof(SetPublicMenuContactHint),
+            nameof(SetPublicMenuNotesLabel), nameof(SetPublicMenuNotesHint),
+            nameof(SetOnlinePromoTitle), nameof(SetOnlinePromoLead),
+            nameof(SetPromoTitleLabel), nameof(SetPromoSubtitleLabel), nameof(SetPromoCtaLabel),
+            nameof(SetPromoHeroImageLabel), nameof(SetOnlineOrdersTableIdLabel), nameof(SetOnlineOrdersTableIdHint),
+            nameof(SetStaffLoginPasscodeLabel), nameof(SetStaffLoginPasscodeHint),
+            nameof(SetOrderCancelPasscodeLabel), nameof(SetOrderCancelPasscodeHint),
+            nameof(SetAdminWebPortalLabel), nameof(SetAdminWebPortalHint),
+            nameof(SetSignInIdLabel), nameof(SetPinLabel), nameof(SetSaveBusinessProfileLabel),
+            nameof(SetBrowseLabel), nameof(SetClearLabel), nameof(SetRefreshLabel),
+            nameof(SetTicketsTitle), nameof(SetTicketsLead), nameof(SetReceiptPrinterLabel), nameof(SetReceiptPrinterHint),
+            nameof(SetTicketHeaderLogoLabel), nameof(SetTicketHeaderLogoHint),
+            nameof(SetTicketFooterLabel), nameof(SetTaxIdLegalLabel),
+            nameof(SetTicketSocialLinesLabel), nameof(SetTicketSocialLinesHint),
+            nameof(SetSocialNameExampleLabel), nameof(SetSocialUsernameUrlLabel), nameof(SetSocialIconPathLabel),
+            nameof(SetRemoveRowLabel), nameof(SetAddSocialRowLabel), nameof(SetSaveTicketsLabel),
+            nameof(SetTimezoneTitle), nameof(SetTimezoneLead), nameof(SetIanaTimezoneLabel),
+            nameof(SetReservationsTitle), nameof(SetReservationsLead),
+            nameof(SetReservationLeadDaysLabel), nameof(SetReservationLeadDaysHint),
+            nameof(SetReservationMaxMonthsLabel), nameof(SetReservationMaxMonthsHint),
+            nameof(SetSaveReservationSettingsLabel),
+            nameof(SetMenuCategoriesTitle), nameof(SetMenuCategoriesLead), nameof(SetMenuCategoriesDrinkHint),
+            nameof(SetAddMenuTypeLabel), nameof(SetRestoreEliteDefaultsLabel), nameof(SetSaveMenuCategoriesLabel),
+            nameof(SetMenuTypeNameLabel), nameof(SetRemoveTypeLabel), nameof(SetDrinkTypeCheckboxLabel),
+            nameof(SetSectionsHint), nameof(SetAddSectionLabel), nameof(SetCategorySectionNameLabel),
+            nameof(SetRemoveLabel), nameof(SetSubcategoriesCommaLabel),
+            nameof(SetMenuQrTitle), nameof(SetMenuQrLead), nameof(SetPrintAllQrPdfLabel),
+            nameof(SetCurrencyTitle), nameof(SetCurrencyLead), nameof(SetDefaultCurrencyDisplayLabel),
+            nameof(SetExchangeRateLabel), nameof(SetExchangeRateUpdatedLabel),
+            nameof(SetRoundingLineSubtotalLabel), nameof(SetRoundingGrandTotalLabel), nameof(SetTaxServicePercentLabel),
+            nameof(SetSaveCurrencyPricingLabel),
+            nameof(SetAttendanceTitle), nameof(SetAttendanceLead),
+            nameof(SetMorningStartLabel), nameof(SetMorningEndLabel), nameof(SetNightStartLabel), nameof(SetNightEndLabel),
+            nameof(SetLateGraceLabel), nameof(SetSaveAttendanceLabel),
+            nameof(SetSalaryTitle), nameof(SetSalaryLead), nameof(SetLateDaysPerUnitLabel),
+            nameof(SetAbsenceCountsAsUnitLabel), nameof(SetSalesBonusPercentLabel), nameof(SetMaxAdvancePercentLabel),
+            nameof(SetSaveSalaryLabel),
+            nameof(SetMenuBackgroundsTitle), nameof(SetMenuBackgroundsLead), nameof(SetPageLabel),
+            nameof(SetBackgroundImagePathLabel), nameof(SetDimLightLabel), nameof(SetContrastLabel),
+            nameof(SetSaveMenuBackgroundsLabel),
+            nameof(SetDatabaseTitle), nameof(SetDatabaseLead), nameof(SetProviderLabel),
+            nameof(SetHostLabel), nameof(SetPortLabel), nameof(SetDatabaseNameLabel),
+            nameof(SetUsernameLabel), nameof(SetPasswordLabel), nameof(SetPasswordNotShownLabel),
+            nameof(SetPasswordAlreadySavedLabel), nameof(SetTestConnectionLabel), nameof(SetSaveDatabaseLabel),
+            nameof(SetAppearanceTitle), nameof(SetAppearanceLead),
+            nameof(SetHueLabel), nameof(SetSaturationLabel), nameof(SetLightnessLabel),
+            nameof(SetApplyToTokenLabel), nameof(SetApplyThemeLabel), nameof(SetSaveThemeLabel), nameof(SetResetDefaultThemeLabel));
+    }
+
+    private async Task ApplyUiLanguageAsync(string code)
+    {
+        var settings = SettingsManager.Load();
+        await Loc.SetLanguageAsync(code, settings);
+        _settings.UiLanguage = Loc.NormalizeLanguage(code);
     }
 
     private void LoadFromCurrentTheme()
@@ -707,7 +1073,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         StatGreenHex = palette.StatGreen;
         StatRedHex = palette.StatRed;
         LoadTokenIntoPicker();
-        StatusMessage = "Theme values loaded.";
+        StatusMessage = SettingsUiLocalizer.StatusThemeLoaded();
     }
 
     private void ResetTheme()
@@ -727,7 +1093,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
 
         ThemeManager.ApplyPalette(defaults);
         ThemeManager.SavePalette(defaults);
-        StatusMessage = "Default palette restored and saved.";
+        StatusMessage = SettingsUiLocalizer.StatusDefaultPaletteRestored();
     }
 
     private void ApplyTheme()
@@ -739,7 +1105,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         }
 
         ThemeManager.ApplyPalette(palette);
-        StatusMessage = "Theme applied. Save to keep it after restart.";
+        StatusMessage = SettingsUiLocalizer.StatusThemeApplied();
     }
 
     private void SaveTheme()
@@ -752,7 +1118,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
 
         ThemeManager.ApplyPalette(palette);
         ThemeManager.SavePalette(palette);
-        StatusMessage = "Theme saved and applied.";
+        StatusMessage = SettingsUiLocalizer.StatusThemeSaved();
     }
 
     private bool TryBuildPalette(out ThemePalette palette, out string error)
@@ -771,7 +1137,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
             !TryNormalizeAndValidate(StatGreenHex, out var statGreen) ||
             !TryNormalizeAndValidate(StatRedHex, out var statRed))
         {
-            error = "One or more colors are invalid. Use #RRGGBB or #AARRGGBB.";
+            error = SettingsUiLocalizer.StatusInvalidColors();
             return false;
         }
 
@@ -793,18 +1159,18 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     {
         if (!TryNormalizeAndValidate(PickerHex, out var normalized))
         {
-            StatusMessage = "Picker color is invalid.";
+            StatusMessage = SettingsUiLocalizer.StatusPickerColorInvalid();
             return;
         }
 
-        SetHexForToken(SelectedToken, normalized);
+        SetHexForToken(SelectedTokenKey, normalized);
         ApplyTheme();
-        StatusMessage = $"{SelectedToken} updated from HSL picker. Save to keep after restart.";
+        StatusMessage = SettingsUiLocalizer.StatusTokenUpdated(SettingsUiLocalizer.ThemeTokenLabel(SelectedTokenKey));
     }
 
     private void LoadTokenIntoPicker()
     {
-        var tokenHex = GetHexForToken(SelectedToken);
+        var tokenHex = GetHexForToken(SelectedTokenKey);
         if (!TryNormalizeAndValidate(tokenHex, out var normalized))
             return;
 
@@ -835,6 +1201,15 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         OnPropertyChanged(nameof(PickerPreviewBrush));
     }
 
+    /// <summary>Normalize id, ensure it appears in the dropdown list, and bind <see cref="RestaurantTimeZoneId"/>.</summary>
+    private void ApplyRestaurantTimeZoneFromSettings(string? id)
+    {
+        var normalized = RestaurantTimeZone.NormalizeId(id);
+        if (!RestaurantTimeZoneOptions.Contains(normalized))
+            RestaurantTimeZoneOptions.Insert(0, normalized);
+        RestaurantTimeZoneId = normalized;
+    }
+
     private void LoadBusinessAndPricingSettings()
     {
         var business = _settings.BusinessProfile;
@@ -855,6 +1230,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         CustomerMenuContactIntro = business.CustomerMenuContactIntro ?? string.Empty;
         CustomerMenuNotesText = business.CustomerMenuNotesText ?? string.Empty;
         StaffLoginPasscode = business.StaffLoginPasscode?.Trim() ?? string.Empty;
+        OrderCancelPasscode = business.OrderCancelPasscode?.Trim() ?? string.Empty;
         AdminWebSignInId = business.AdminWebSignInId?.Trim() ?? string.Empty;
         AdminWebPin = business.AdminWebPin?.Trim() ?? string.Empty;
         OnlinePromoTitle = business.OnlinePromoTitle ?? string.Empty;
@@ -864,11 +1240,15 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         OnlineOrdersTableId = business.OnlineOrdersTableId?.ToString() ?? string.Empty;
         ReservationLeadDays = Math.Clamp(business.ReservationLeadDays, 0, 30).ToString(CultureInfo.InvariantCulture);
         ReservationMaxMonthsAhead = Math.Clamp(business.ReservationMaxMonthsAhead, 1, 24).ToString(CultureInfo.InvariantCulture);
+        ApplyRestaurantTimeZoneFromSettings(business.RestaurantTimeZoneId);
 
         var pricing = _settings.CurrencyPricing;
         DefaultCurrencyDisplayMode = pricing.DefaultCurrencyDisplayMode;
         ExchangeRateUsdToFc = pricing.UsdToFcRate.ToString("0.##");
-        ExchangeRateLastUpdated = pricing.ExchangeRateLastUpdatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+        ExchangeRateLastUpdated = RestaurantTimeZone.FormatUtc(
+            pricing.ExchangeRateLastUpdatedUtc,
+            RestaurantTimeZoneId,
+            "yyyy-MM-dd HH:mm");
         RoundingLine = pricing.RoundingLine;
         RoundingSubtotal = pricing.RoundingSubtotal;
         RoundingGrandTotal = pricing.RoundingGrandTotal;
@@ -960,20 +1340,20 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
             !TryParseWorkTime(AttendanceNightStartText, out var nStart) ||
             !TryParseWorkTime(AttendanceNightEndText, out var nEnd))
         {
-            StatusMessage = "Shift times must be valid (use HH:mm, e.g. 12:00 and 18:00).";
+            StatusMessage = SettingsUiLocalizer.StatusShiftTimesInvalid();
             return;
         }
 
         if (mEnd <= mStart || nEnd <= nStart)
         {
-            StatusMessage = "Each shift end must be after its start.";
+            StatusMessage = SettingsUiLocalizer.StatusShiftEndBeforeStart();
             return;
         }
 
         if (!int.TryParse((AttendanceLateGraceMinutesText ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var grace) ||
             grace < 0 || grace > 240)
         {
-            StatusMessage = "Late clock-in grace must be an integer from 0 to 240 (minutes).";
+            StatusMessage = SettingsUiLocalizer.StatusLateGraceInvalid();
             return;
         }
 
@@ -984,7 +1364,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         _settings.Attendance.NightShiftEnd = nEnd;
         _settings.Attendance.LateClockInGraceMinutes = grace;
         SettingsManager.Save(_settings);
-        StatusMessage = "Attendance shift settings saved.";
+        StatusMessage = SettingsUiLocalizer.StatusAttendanceSaved();
     }
 
     private void SaveSalarySettings()
@@ -992,19 +1372,19 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         if (!int.TryParse((SalaryLateDaysPerAttendanceUnitText ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var lateDays) ||
             lateDays < 1)
         {
-            StatusMessage = "Late days per attendance unit must be a whole number ≥ 1 (default 4).";
+            StatusMessage = SettingsUiLocalizer.StatusLateDaysInvalid();
             return;
         }
 
         if (!TryParseDecimalInput(SalarySalesBonusPercentText, out var bonusPct) || bonusPct < 0m || bonusPct > 100m)
         {
-            StatusMessage = "Sales bonus percent must be between 0 and 100.";
+            StatusMessage = SettingsUiLocalizer.StatusSalesBonusInvalid();
             return;
         }
 
         if (!TryParseDecimalInput(SalaryMaxAdvancePercentOfGrossText, out var advancePct) || advancePct < 0m || advancePct > 100m)
         {
-            StatusMessage = "Max advance percent of gross must be between 0 and 100.";
+            StatusMessage = SettingsUiLocalizer.StatusAdvancePercentInvalid();
             return;
         }
 
@@ -1018,7 +1398,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         _adminData.ReloadFromSettings();
         LoadSalarySettings();
         _ = PushSalarySettingsToCloudAndResyncFromDiskAsync();
-        StatusMessage = "Salary payroll settings saved. Syncing with API…";
+        StatusMessage = SettingsUiLocalizer.StatusSalarySavedSyncing();
     }
 
     private async Task PushSalarySettingsToCloudAndResyncFromDiskAsync()
@@ -1028,12 +1408,11 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
             await CloudSettingsPushService.PushAsync(_settings, applyLogoChanges: false, applyOnlinePromoImageChanges: false)
                 .ConfigureAwait(true);
             RefreshSalaryFromDiskIntoViewModel();
-            StatusMessage = $"Salary payroll settings saved and pushed to {CloudSettingsPushService.DescribePushTarget(_settings)}.";
+            StatusMessage = SettingsUiLocalizer.StatusSalarySavedAndPushed(CloudSettingsPushService.DescribePushTarget(_settings));
         }
         catch (Exception ex)
         {
-            StatusMessage =
-                $"Salary saved on this PC. Cloud push failed: {ex.GetBaseException().Message}. Sign in as Admin, check Public menu base URL, then Save again.";
+            StatusMessage = SettingsUiLocalizer.StatusCloudPushFailed(ex.GetBaseException().Message);
         }
     }
 
@@ -1041,23 +1420,25 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     {
         if (!int.TryParse((ReservationLeadDays ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var leadDays))
         {
-            StatusMessage = "Reservation lead days must be a whole number (0–30).";
+            StatusMessage = SettingsUiLocalizer.StatusReservationLeadDaysInvalid();
             return;
         }
 
         if (!int.TryParse((ReservationMaxMonthsAhead ?? string.Empty).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var maxMonths))
         {
-            StatusMessage = "Reservation horizon (months) must be a whole number (1–24).";
+            StatusMessage = SettingsUiLocalizer.StatusReservationMonthsInvalid();
             return;
         }
 
         _settings.BusinessProfile.ReservationLeadDays = Math.Clamp(leadDays, 0, 30);
         _settings.BusinessProfile.ReservationMaxMonthsAhead = Math.Clamp(maxMonths, 1, 24);
+        _settings.BusinessProfile.RestaurantTimeZoneId = RestaurantTimeZone.NormalizeId(RestaurantTimeZoneId);
         SettingsManager.Save(_settings);
         _adminData.ReloadFromSettings();
         ReservationLeadDays = _settings.BusinessProfile.ReservationLeadDays.ToString(CultureInfo.InvariantCulture);
         ReservationMaxMonthsAhead = _settings.BusinessProfile.ReservationMaxMonthsAhead.ToString(CultureInfo.InvariantCulture);
-        StatusMessage = "Reservation settings saved on this PC. Pushing to cloud…";
+        ApplyRestaurantTimeZoneFromSettings(_settings.BusinessProfile.RestaurantTimeZoneId);
+        StatusMessage = SettingsUiLocalizer.StatusReservationSavedSyncing();
         _ = PushReservationSettingsCloudAsync();
     }
 
@@ -1067,13 +1448,11 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         {
             await CloudSettingsPushService.PushAsync(_settings, applyLogoChanges: false, applyOnlinePromoImageChanges: false)
                 .ConfigureAwait(true);
-            StatusMessage =
-                $"Reservation settings saved and pushed to {CloudSettingsPushService.DescribePushTarget(_settings)}.";
+            StatusMessage = SettingsUiLocalizer.StatusReservationSavedAndPushed(CloudSettingsPushService.DescribePushTarget(_settings));
         }
         catch (Exception ex)
         {
-            StatusMessage =
-                $"Reservation saved on this PC. Cloud push failed: {ex.GetBaseException().Message}. Sign in as Admin, check Public menu base URL, then Save again.";
+            StatusMessage = SettingsUiLocalizer.StatusCloudPushFailed(ex.GetBaseException().Message);
         }
     }
 
@@ -1105,7 +1484,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     {
         _settings.MenuTaxonomy = MenuTaxonomyDefaults.CreateEliteDefault();
         LoadMenuTaxonomyUi();
-        StatusMessage = "Menu categories reset to Elite defaults in this screen. Click Save menu categories to persist and push.";
+        StatusMessage = SettingsUiLocalizer.StatusMenuTaxonomyReset();
     }
 
     private void AddMenuTaxonomyType()
@@ -1131,7 +1510,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
             var typeName = (t.Name ?? string.Empty).Trim();
             if (typeName.Length == 0)
             {
-                StatusMessage = "Each menu type needs a name.";
+                StatusMessage = SettingsUiLocalizer.StatusMenuTypeNeedsName();
                 return;
             }
 
@@ -1141,7 +1520,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
                 var secName = (s.Name ?? string.Empty).Trim();
                 if (secName.Length == 0)
                 {
-                    StatusMessage = "Each section needs a name (this is saved as the product category).";
+                    StatusMessage = SettingsUiLocalizer.StatusMenuSectionNeedsName();
                     return;
                 }
 
@@ -1154,7 +1533,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
 
             if (sections.Count == 0)
             {
-                StatusMessage = "Each menu type needs at least one section.";
+                StatusMessage = SettingsUiLocalizer.StatusMenuTypeNeedsSection();
                 return;
             }
 
@@ -1163,7 +1542,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
 
         if (types.Count == 0)
         {
-            StatusMessage = "Add at least one menu type (for example Food and Drink).";
+            StatusMessage = SettingsUiLocalizer.StatusMenuTypeRequired();
             return;
         }
 
@@ -1173,7 +1552,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         _settings.MenuTaxonomy = refreshed.MenuTaxonomy;
         _adminData.ReloadFromSettings();
         LoadMenuTaxonomyUi();
-        StatusMessage = "Menu categories saved on this PC. Pushing to cloud…";
+        StatusMessage = SettingsUiLocalizer.StatusMenuTaxonomySavedSyncing();
         _ = PushMenuTaxonomyCloudAsync();
     }
 
@@ -1183,12 +1562,11 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         {
             await CloudSettingsPushService.PushAsync(_settings, applyLogoChanges: false, applyOnlinePromoImageChanges: false)
                 .ConfigureAwait(true);
-            StatusMessage = $"Menu categories saved and pushed to {CloudSettingsPushService.DescribePushTarget(_settings)}.";
+            StatusMessage = SettingsUiLocalizer.StatusMenuTaxonomySavedAndPushed(CloudSettingsPushService.DescribePushTarget(_settings));
         }
         catch (Exception ex)
         {
-            StatusMessage =
-                $"Menu categories saved on this PC. Cloud push failed: {ex.GetBaseException().Message}. Fix API URL/token and use Save again to push.";
+            StatusMessage = SettingsUiLocalizer.StatusMenuTaxonomyPushFailed(ex.GetBaseException().Message);
         }
     }
 
@@ -1242,6 +1620,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
             ? null
             : CustomerMenuNotesText.Trim();
         _settings.BusinessProfile.StaffLoginPasscode = (StaffLoginPasscode ?? string.Empty).Trim();
+        _settings.BusinessProfile.OrderCancelPasscode = (OrderCancelPasscode ?? string.Empty).Trim();
         _settings.BusinessProfile.AdminWebSignInId = (AdminWebSignInId ?? string.Empty).Trim();
         _settings.BusinessProfile.AdminWebPin = (AdminWebPin ?? string.Empty).Trim();
         _settings.BusinessProfile.OnlinePromoTitle = string.IsNullOrWhiteSpace(OnlinePromoTitle)
@@ -1265,6 +1644,14 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
             maxMonthsBp = _settings.BusinessProfile.ReservationMaxMonthsAhead;
         _settings.BusinessProfile.ReservationLeadDays = Math.Clamp(leadDaysBp, 0, 30);
         _settings.BusinessProfile.ReservationMaxMonthsAhead = Math.Clamp(maxMonthsBp, 1, 24);
+        _settings.BusinessProfile.RestaurantTimeZoneId = RestaurantTimeZone.NormalizeId(RestaurantTimeZoneId);
+        ApplyRestaurantTimeZoneFromSettings(_settings.BusinessProfile.RestaurantTimeZoneId);
+
+        if (!TryApplyCurrencyPricingFromUi(out var currencyError))
+        {
+            StatusMessage = currencyError;
+            return;
+        }
 
         _settings.CloudApi.BaseUrl = EliteApiClient.ResolveDesktopApiBaseUrl(_settings);
 
@@ -1276,43 +1663,70 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         RefreshBusinessProfileBindings();
 
         var pushTarget = CloudSettingsPushService.DescribePushTarget(_settings);
-        StatusMessage = $"Business profile saved on this PC. Pushing to {pushTarget}…";
+        StatusMessage = SettingsUiLocalizer.StatusBusinessProfileSavedSyncing(pushTarget);
         try
         {
             await CloudSettingsPushService.PushAsync(_settings, applyLogoChanges: true, applyOnlinePromoImageChanges: true)
                 .ConfigureAwait(true);
-            var msg =
-                $"Business profile saved and pushed to {pushTarget}. Refresh your live menu site to see changes (git deploy alone does not copy settings).";
+            var msg = SettingsUiLocalizer.StatusBusinessProfileSavedAndPushed(pushTarget);
             if (PublicMenuUrlHelper.LooksLikeLocalHostOnly(_settings.BusinessProfile.PublicMenuBaseUrl))
-                msg += " QR: localhost will not work on customers’ phones — use the hosted cloud URL and re-print QRs.";
+                msg += SettingsUiLocalizer.StatusBusinessProfileQrLocalhostHint();
             StatusMessage = msg;
         }
         catch (Exception ex)
         {
-            StatusMessage =
-                $"Saved on this PC, but cloud push to {pushTarget} failed: {ex.GetBaseException().Message}. " +
-                "Sign in as admin on the web dashboard (or ensure Cloud API token in settings), then Save Business Profile again.";
+            StatusMessage = SettingsUiLocalizer.StatusBusinessProfilePushFailed(pushTarget, ex.GetBaseException().Message);
         }
     }
 
     private void SaveCurrencyPricing()
     {
+        if (!TryApplyCurrencyPricingFromUi(out var error))
+        {
+            StatusMessage = error;
+            return;
+        }
+
+        _settings.CloudApi.BaseUrl = EliteApiClient.ResolveDesktopApiBaseUrl(_settings);
+
+        SettingsManager.Save(_settings);
+        _adminData.ReloadFromSettings();
+        StatusMessage = SettingsUiLocalizer.StatusCurrencySavedSyncing();
+        _ = PushCurrencyPricingCloudAsync();
+    }
+
+    private async Task PushCurrencyPricingCloudAsync()
+    {
+        try
+        {
+            await CloudSettingsPushService.PushAsync(_settings, applyLogoChanges: false, applyOnlinePromoImageChanges: false)
+                .ConfigureAwait(true);
+            StatusMessage = SettingsUiLocalizer.StatusCurrencySavedAndPushed(CloudSettingsPushService.DescribePushTarget(_settings));
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = SettingsUiLocalizer.StatusCloudPushFailed(ex.GetBaseException().Message);
+        }
+    }
+
+    private bool TryApplyCurrencyPricingFromUi(out string errorMessage)
+    {
         if (!TryParseDecimalInput(ExchangeRateUsdToFc, out var rate) || rate <= 0)
         {
-            StatusMessage = "Exchange rate must be a positive number.";
-            return;
+            errorMessage = SettingsUiLocalizer.StatusExchangeRateInvalid();
+            return false;
         }
 
         if (!TryParseDecimalInput(TaxPercent, out var tax) || tax < 0)
         {
-            StatusMessage = "Tax percent must be zero or positive.";
-            return;
+            errorMessage = SettingsUiLocalizer.StatusTaxPercentInvalid();
+            return false;
         }
 
         if (!TryParseDecimalInput(ServicePercent, out var service) || service < 0)
         {
-            StatusMessage = "Service percent must be zero or positive.";
-            return;
+            errorMessage = SettingsUiLocalizer.StatusServicePercentInvalid();
+            return false;
         }
 
         _settings.CurrencyPricing.DefaultCurrencyDisplayMode = DefaultCurrencyDisplayMode;
@@ -1323,29 +1737,8 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         _settings.CurrencyPricing.RoundingGrandTotal = RoundingGrandTotal;
         _settings.CurrencyPricing.TaxPercent = tax;
         _settings.CurrencyPricing.ServicePercent = service;
-
-        _settings.CloudApi.BaseUrl = EliteApiClient.ResolveDesktopApiBaseUrl(_settings);
-
-        SettingsManager.Save(_settings);
-        _adminData.ReloadFromSettings();
-        StatusMessage = "Currency & pricing saved on this PC. Pushing to cloud…";
-        _ = PushCurrencyPricingCloudAsync();
-    }
-
-    private async Task PushCurrencyPricingCloudAsync()
-    {
-        try
-        {
-            await CloudSettingsPushService.PushAsync(_settings, applyLogoChanges: false, applyOnlinePromoImageChanges: false)
-                .ConfigureAwait(true);
-            StatusMessage =
-                $"Currency & pricing saved and pushed to {CloudSettingsPushService.DescribePushTarget(_settings)}.";
-        }
-        catch (Exception ex)
-        {
-            StatusMessage =
-                $"Currency saved on this PC. Cloud push failed: {ex.GetBaseException().Message}. Sign in as Admin, check Public menu base URL, then Save again.";
-        }
+        errorMessage = string.Empty;
+        return true;
     }
 
     private static bool TryParseDecimalInput(string input, out decimal value)
@@ -1362,8 +1755,8 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Title = "Select Restaurant Logo",
-            Filter = "Image files (*.png;*.jpg;*.jpeg;*.webp)|*.png;*.jpg;*.jpeg;*.webp|All files (*.*)|*.*"
+            Title = SettingsUiLocalizer.DialogSelectLogo(),
+            Filter = SettingsUiLocalizer.DialogImageFilter()
         };
 
         if (dialog.ShowDialog() == true)
@@ -1396,7 +1789,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         _adminData.ReloadFromSettings();
         _ = new AdminSettingsApiClient().PushSettingsAsync(_settings, applyLogoChanges: false, applyOnlinePromoImageChanges: false);
         RefreshBusinessProfileBindings();
-        StatusMessage = "Tickets & receipts settings saved.";
+        StatusMessage = SettingsUiLocalizer.StatusTicketsSaved();
     }
 
     private void ReloadTicketReceiptSettingsFromDisk()
@@ -1414,8 +1807,8 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Title = "Ticket header logo (above restaurant name on printed/PDF tickets)",
-            Filter = "Image files (*.png;*.jpg;*.jpeg;*.webp;*.bmp)|*.png;*.jpg;*.jpeg;*.webp;*.bmp|All files (*.*)|*.*"
+            Title = SettingsUiLocalizer.DialogTicketHeaderLogo(),
+            Filter = SettingsUiLocalizer.DialogImageFilterBmp()
         };
 
         if (dialog.ShowDialog() == true)
@@ -1428,8 +1821,8 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
             return;
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Title = "Icon image for this social line on tickets",
-            Filter = "Image files (*.png;*.jpg;*.jpeg;*.webp;*.bmp)|*.png;*.jpg;*.jpeg;*.webp;*.bmp|All files (*.*)|*.*"
+            Title = SettingsUiLocalizer.DialogTicketSocialIcon(),
+            Filter = SettingsUiLocalizer.DialogImageFilterBmp()
         };
         if (dialog.ShowDialog() == true)
             row.IconPath = dialog.FileName;
@@ -1445,8 +1838,8 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Title = "Online order hero image (public menu)",
-            Filter = "Image files (*.png;*.jpg;*.jpeg;*.webp)|*.png;*.jpg;*.jpeg;*.webp|All files (*.*)|*.*"
+            Title = SettingsUiLocalizer.DialogOnlinePromoImage(),
+            Filter = SettingsUiLocalizer.DialogImageFilter()
         };
 
         if (dialog.ShowDialog() == true)
@@ -1457,8 +1850,8 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Title = "Select Homepage Background Image",
-            Filter = "Image files (*.png;*.jpg;*.jpeg;*.webp)|*.png;*.jpg;*.jpeg;*.webp|All files (*.*)|*.*"
+            Title = SettingsUiLocalizer.DialogHomepageBackground(),
+            Filter = SettingsUiLocalizer.DialogImageFilter()
         };
 
         if (dialog.ShowDialog() == true)
@@ -1485,8 +1878,8 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Title = $"Select background for {SelectedBackgroundMenu}",
-            Filter = "Image files (*.png;*.jpg;*.jpeg;*.webp)|*.png;*.jpg;*.jpeg;*.webp|All files (*.*)|*.*"
+            Title = SettingsUiLocalizer.DialogMenuBackground(SettingsUiLocalizer.BackgroundPageLabel(SelectedBackgroundMenu)),
+            Filter = SettingsUiLocalizer.DialogImageFilter()
         };
         if (dialog.ShowDialog() == true)
             SelectedMenuBackgroundPath = dialog.FileName;
@@ -1497,7 +1890,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         var key = SelectedBackgroundMenu.Trim();
         if (string.IsNullOrWhiteSpace(key))
         {
-            StatusMessage = "Select a menu first.";
+            StatusMessage = SettingsUiLocalizer.StatusSelectMenuFirst();
             return;
         }
 
@@ -1509,7 +1902,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         _settings.NavigationBackgrounds.DimStrength = Math.Clamp(BackgroundDimStrength, 0, 0.5);
         _settings.NavigationBackgrounds.ContrastIntensity = Math.Clamp(BackgroundContrastIntensity, 0, 0.5);
         SettingsManager.Save(_settings);
-        StatusMessage = $"Background saved for {key}.";
+        StatusMessage = SettingsUiLocalizer.StatusBackgroundSaved(SettingsUiLocalizer.BackgroundPageLabel(key));
     }
 
     private void ClearMenuBackground()
@@ -1519,7 +1912,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
             _settings.NavigationBackgrounds.PageImagePaths.Remove(key);
         SelectedMenuBackgroundPath = string.Empty;
         SettingsManager.Save(_settings);
-        StatusMessage = $"Background cleared for {key}.";
+        StatusMessage = SettingsUiLocalizer.StatusBackgroundCleared(SettingsUiLocalizer.BackgroundPageLabel(key));
     }
 
     private void LoadDatabaseSettings()
@@ -1575,19 +1968,19 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         var username = (DatabaseUsername ?? string.Empty).Trim();
         if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(database) || string.IsNullOrWhiteSpace(username))
         {
-            StatusMessage = "Host, database name, and username are required.";
+            StatusMessage = SettingsUiLocalizer.StatusDatabaseFieldsRequired();
             return;
         }
 
         if (IsLocalDatabaseHost(host))
         {
-            StatusMessage = "Local PostgreSQL is disabled for live data. Enter the DigitalOcean PostgreSQL host.";
+            StatusMessage = SettingsUiLocalizer.StatusLocalPostgresDisabled();
             return;
         }
 
         if (!string.IsNullOrEmpty(_pendingDatabasePassword) && !DatabaseConnectionSecret.IsDpapiAvailable)
         {
-            StatusMessage = "Cannot store a password on this OS. Leave password blank for trust auth, or use ELITE_POSTGRES_CONNECTION.";
+            StatusMessage = SettingsUiLocalizer.StatusPasswordStorageUnavailable();
             return;
         }
 
@@ -1605,7 +1998,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         HasSavedDatabasePassword = !string.IsNullOrWhiteSpace(_settings.Database.PostgreSqlPasswordProtected);
         _pendingDatabasePassword = string.Empty;
         NotifyClearDatabasePassword?.Invoke();
-        StatusMessage = "Cloud database settings saved (PostgreSQL). Restart app to apply.";
+        StatusMessage = SettingsUiLocalizer.StatusDatabaseSaved();
     }
 
     private static bool IsLocalDatabaseHost(string host) =>
@@ -1618,11 +2011,11 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         try
         {
             _ = await _adminData.GetProductsAsync().ConfigureAwait(true);
-            StatusMessage = "API reachable (sample read succeeded). The desktop uses HTTP only; data lives on the API host.";
+            StatusMessage = SettingsUiLocalizer.StatusApiReachable();
         }
         catch (Exception ex)
         {
-            StatusMessage = $"API request failed: {ex.GetBaseException().Message}";
+            StatusMessage = SettingsUiLocalizer.StatusApiRequestFailed(ex.GetBaseException().Message);
         }
     }
 
@@ -1661,16 +2054,16 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     {
         return token switch
         {
-            "Background Dark" => BackgroundDarkHex,
-            "Background Medium" => BackgroundMediumHex,
+            "BackgroundDark" => BackgroundDarkHex,
+            "BackgroundMedium" => BackgroundMediumHex,
             "Sidebar" => SidebarHex,
-            "Card Base" => CardBaseHex,
-            "Gold Accent" => GoldAccentHex,
-            "Text Secondary" => TextSecondaryHex,
-            "Border Subtle" => BorderSubtleHex,
-            "Stat Blue" => StatBlueHex,
-            "Stat Green" => StatGreenHex,
-            "Stat Red" => StatRedHex,
+            "CardBase" => CardBaseHex,
+            "GoldAccent" => GoldAccentHex,
+            "TextSecondary" => TextSecondaryHex,
+            "BorderSubtle" => BorderSubtleHex,
+            "StatBlue" => StatBlueHex,
+            "StatGreen" => StatGreenHex,
+            "StatRed" => StatRedHex,
             _ => GoldAccentHex
         };
     }
@@ -1679,34 +2072,34 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     {
         switch (token)
         {
-            case "Background Dark":
+            case "BackgroundDark":
                 BackgroundDarkHex = hex;
                 break;
-            case "Background Medium":
+            case "BackgroundMedium":
                 BackgroundMediumHex = hex;
                 break;
             case "Sidebar":
                 SidebarHex = hex;
                 break;
-            case "Card Base":
+            case "CardBase":
                 CardBaseHex = hex;
                 break;
-            case "Gold Accent":
+            case "GoldAccent":
                 GoldAccentHex = hex;
                 break;
-            case "Text Secondary":
+            case "TextSecondary":
                 TextSecondaryHex = hex;
                 break;
-            case "Border Subtle":
+            case "BorderSubtle":
                 BorderSubtleHex = hex;
                 break;
-            case "Stat Blue":
+            case "StatBlue":
                 StatBlueHex = hex;
                 break;
-            case "Stat Green":
+            case "StatGreen":
                 StatGreenHex = hex;
                 break;
-            case "Stat Red":
+            case "StatRed":
                 StatRedHex = hex;
                 break;
         }
@@ -1789,15 +2182,13 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         if (string.IsNullOrEmpty(suggested))
         {
             var p = PublicMenuUrlHelper.QrBasePort;
-            StatusMessage =
-                $"Could not detect a LAN address. Enter your PC’s IP (e.g. http://192.168.1.50:{p}). " +
-                $"Allow inbound TCP {p} for Private networks in Windows Firewall if phones cannot connect.";
+            StatusMessage = SettingsUiLocalizer.StatusLanAddressNotDetected(p);
             return;
         }
 
         PublicMenuBaseUrl = suggested;
         _ = RefreshMenuQrRowsAsync();
-        StatusMessage = $"Public menu URL set to {suggested}. Save Business Profile to keep it, then re-print QR labels. Phone must use the same Wi-Fi as this PC (or a routed path to it).";
+        StatusMessage = SettingsUiLocalizer.StatusPublicMenuUrlSet(suggested);
     }
 
     private async Task RefreshMenuQrRowsAsync()
@@ -1816,7 +2207,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
                 var png = BuildQrPngBytes(url);
                 MenuQrRows.Add(new MenuQrTableRow
                 {
-                    TableLabel = $"Table {t.TableNumber} — {t.Name}",
+                    TableLabel = SettingsUiLocalizer.TableQrLabel(t.TableNumber, t.Name),
                     Url = url,
                     PngBytes = png,
                     QrImage = BitmapImageFromPng(png)
@@ -1828,16 +2219,15 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
             {
                 var dev =
                     PublicMenuUrlHelper.QrBasePort == PublicMenuUrlHelper.ViteDevMenuPort
-                        ? "In development, run the customer menu with npm run dev in elite-menu (Vite must use host: true) and allow that port in Windows Firewall on Private networks."
-                        : "Allow the API (static menu) port for Private networks in Windows Firewall if phones cannot connect.";
+                        ? SettingsUiLocalizer.StatusQrDevViteHint()
+                        : SettingsUiLocalizer.StatusQrFirewallHint();
 
-                StatusMessage =
-                    $"Settings still list localhost, but the QR links below use {baseUrl} so phones on Wi-Fi can open the menu. Save that as Public menu base URL to keep it, then re-print. {dev}";
+                StatusMessage = SettingsUiLocalizer.StatusQrLocalhostMismatch(baseUrl, dev);
             }
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Could not build QR list: {ex.Message}";
+            StatusMessage = SettingsUiLocalizer.StatusQrListFailed(ex.Message);
         }
     }
 
@@ -1847,13 +2237,13 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
             await RefreshMenuQrRowsAsync().ConfigureAwait(true);
         if (MenuQrRows.Count == 0)
         {
-            StatusMessage = "No tables in database to export.";
+            StatusMessage = SettingsUiLocalizer.StatusNoTablesForQr();
             return;
         }
 
         var dlg = new SaveFileDialog
         {
-            Filter = "PDF document|*.pdf",
+            Filter = SettingsUiLocalizer.DialogPdfFilter(),
             FileName = "Menu-QR-codes.pdf"
         };
         if (dlg.ShowDialog() != true)
@@ -1865,11 +2255,11 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         try
         {
             MenuQrPdfExportService.Save(dlg.FileName, pages);
-            StatusMessage = $"Saved QR PDF ({pages.Count} pages).";
+            StatusMessage = SettingsUiLocalizer.StatusQrPdfSaved(pages.Count);
         }
         catch (Exception ex)
         {
-            StatusMessage = $"Could not create PDF: {ex.Message}";
+            StatusMessage = SettingsUiLocalizer.StatusQrPdfFailed(ex.Message);
         }
     }
 

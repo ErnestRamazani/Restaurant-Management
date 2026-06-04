@@ -1,4 +1,5 @@
 using EliteRestaurant.Core.Tenancy;
+using EliteRestaurant.Core.Utils;
 
 namespace EliteRestaurant.Core.Models;
 
@@ -24,6 +25,12 @@ public sealed class PublicMenuSetting : IRestaurantScoped
     public string? CustomerMenuNotesText { get; set; }
     public string StaffLoginPasscode { get; set; } = string.Empty;
 
+    /// <summary>Maximum open client debt (USD) before new on-account charges are blocked.</summary>
+    public decimal ClientDebtCapUsd { get; set; } = 250m;
+
+    /// <summary>Admin passcode required to cancel orders from staff portals and desktop.</summary>
+    public string OrderCancelPasscode { get; set; } = string.Empty;
+
     /// <summary>Sign-in ID for the read-only admin web portal (<c>/admin/</c>).</summary>
     public string AdminWebSignInId { get; set; } = string.Empty;
 
@@ -46,6 +53,10 @@ public sealed class PublicMenuSetting : IRestaurantScoped
 
     /// <summary>How far ahead guests may book (months).</summary>
     public int ReservationMaxMonthsAhead { get; set; } = 6;
+
+    /// <summary>IANA timezone for all restaurant-facing dates (e.g. Africa/Kinshasa).</summary>
+    public string RestaurantTimeZoneId { get; set; } = RestaurantTimeZone.DefaultId;
+
     public string? OnlinePromoTitle { get; set; }
     public string? OnlinePromoSubtitle { get; set; }
     public string? OnlinePromoCtaLabel { get; set; }

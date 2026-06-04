@@ -1,8 +1,10 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { Bell, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { callServer } from '../../utils/api'
-import { CALL_SERVER_REASONS, CallServerReasonSheet } from './CallServerReasonSheet'
+import { callServerReasonLabel } from '../../utils/i18nLabels'
+import { CallServerReasonSheet } from './CallServerReasonSheet'
 
 const spring = { type: 'spring', stiffness: 420, damping: 28 }
 const COOLDOWN_MS = 60_000
@@ -41,16 +43,13 @@ function parseSuccess(res) {
   return { name: null, reasonLabel: null }
 }
 
-function reasonLabelForCode(code) {
-  return CALL_SERVER_REASONS.find((r) => r.code === code)?.label ?? null
-}
-
 /**
  * Fixed FAB for QR table guests — notifies assigned server via SignalR.
  * @param {number} tableId
  * @param {string} [className] extra positioning tweaks per screen
  */
 export function CallServerButton({ tableId, className = '' }) {
+  const { t } = useTranslation()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [successLine, setSuccessLine] = useState(/** @type {string | null} */ (null))
@@ -88,13 +87,13 @@ export function CallServerButton({ tableId, className = '' }) {
       setSheetOpen(false)
       setBusy(true)
       setError(null)
-      const pickedLabel = reasonLabelForCode(reasonCode)
+      const pickedLabel = callServerReasonLabel(t, reasonCode)
       try {
         const res = await callServer(tableId, reasonCode)
         const { name } = parseSuccess(res)
-        const who = name ?? 'your server'
+        const who = name ?? t('callServer.yourServer')
         const need = pickedLabel ? ` — ${pickedLabel}` : ''
-        setSuccessLine(`We notified ${who}${need}.`)
+        setSuccessLine(t('callServer.notified', { who, need }))
         writeCooldown(tableId)
         const until = Date.now() + COOLDOWN_MS
         setCooldownUntil(until)
@@ -113,12 +112,12 @@ export function CallServerButton({ tableId, className = '' }) {
             setNow(Date.now())
           }
         }
-        setError(raw && raw.length < 80 ? raw : 'Could not reach your server.')
+        setError(raw && raw.length < 80 ? raw : t('callServer.errorReach'))
       } finally {
         setBusy(false)
       }
     },
-    [tableId],
+    [tableId, t],
   )
 
   return (
@@ -131,10 +130,14 @@ export function CallServerButton({ tableId, className = '' }) {
           setSheetOpen(true)
         }}
         className={`fixed z-[45] flex min-h-[44px] items-center gap-2 rounded-full border border-gold/45 bg-midnight-2/95 px-4 py-2.5 font-body text-[0.72rem] font-bold uppercase tracking-[0.12em] text-gold shadow-[0_8px_28px_rgba(0,0,0,0.45)] backdrop-blur-sm transition hover:border-gold/70 hover:bg-midnight-3 disabled:cursor-not-allowed disabled:opacity-50 bottom-[max(5.5rem,env(safe-area-inset-bottom))] right-4 sm:bottom-6 sm:right-6 ${className}`}
-        aria-label={onCooldown ? `Call your server — available in ${cooldownSecLeft} seconds` : 'Call your server'}
+        aria-label={
+          onCooldown
+            ? t('callServer.fabAriaCooldown', { seconds: cooldownSecLeft })
+            : t('callServer.fabAria')
+        }
       >
         <Bell className="h-4 w-4 shrink-0" aria-hidden />
-        <span>{onCooldown ? `Wait ${cooldownSecLeft}s` : 'Call your Server'}</span>
+        <span>{onCooldown ? t('callServer.fabCooldown', { seconds: cooldownSecLeft }) : t('callServer.fab')}</span>
       </button>
 
       <CallServerReasonSheet

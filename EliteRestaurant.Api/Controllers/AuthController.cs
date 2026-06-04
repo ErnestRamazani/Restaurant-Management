@@ -4,6 +4,8 @@ using EliteRestaurant.Contracts.Auth;
 using EliteRestaurant.Core.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Serilog;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -37,6 +39,7 @@ public sealed class AuthController(
     }
 
     [HttpPost("login")]
+    [EnableRateLimiting("AuthLogin")]
     public ActionResult<CloudLoginResponse> Login([FromBody] CloudLoginRequest request)
     {
         if (AdminDevLoginBypass.TryCreateSession(request, db, authDevOptions) is { } devSession)
@@ -55,7 +58,11 @@ public sealed class AuthController(
 
         var outcome = authService.Login(request.StaffId, request.Pin, request.Portal);
         if (outcome.Session is null)
+        {
+            Log.Information("Staff login failed for portal {Portal} signInId {SignInId}",
+                request.Portal, request.StaffId?.Trim() ?? "");
             return Unauthorized(new { message = outcome.ErrorMessage ?? "Sign-in failed." });
+        }
 
         var employeeLang = db.Employees.AsNoTracking()
             .Where(e => e.Id == outcome.Session.EmployeeId)

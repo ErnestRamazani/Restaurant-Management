@@ -1,3 +1,6 @@
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
+
 namespace EliteRestaurant.Core.Models;
 
 public class OrderEntry
@@ -51,4 +54,24 @@ public class OrderEntry
     public string KitchenWorkSummary { get; set; } = string.Empty;
 
     public bool ShowKitchenWorkSummary => !string.IsNullOrWhiteSpace(KitchenWorkSummary);
+
+    [NotMapped]
+    [JsonIgnore]
+    public string DisplayStatus { get; set; } = string.Empty;
+
+    [NotMapped]
+    [JsonIgnore]
+    public string DisplayServerLine { get; set; } = string.Empty;
+
+    [NotMapped]
+    [JsonIgnore]
+    public string DisplayConfirmationLine { get; set; } = string.Empty;
+
+    [NotMapped]
+    [JsonIgnore]
+    public string DisplayTableLabel { get; set; } = string.Empty;
+
+    [NotMapped]
+    [JsonIgnore]
+    public string DisplayTime { get; set; } = string.Empty;
 }

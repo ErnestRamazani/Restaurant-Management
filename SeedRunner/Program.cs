@@ -1,4 +1,5 @@
 // Destructively truncates and reseeds the database. Interactive confirmation is required unless you pass --force (for automation only).
+using EliteRestaurant.Core.Clients;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Utils;
@@ -6,6 +7,27 @@ using Microsoft.EntityFrameworkCore;
 
 DatabaseInitializer.Initialize();
 using var db = new AppDbContext();
+
+if (args.Any(a => string.Equals(a, "--seed-demo-clients", StringComparison.OrdinalIgnoreCase)))
+{
+    Console.WriteLine($"Target database: {AppDbContext.GetDatabaseTargetDescription()}");
+    Console.WriteLine("(Elite Pro reads clients from the API database — if the app uses a cloud URL, seed that server or call POST /api/dev/seed-demo-clients on it in Development.)");
+    Console.WriteLine();
+
+    var result = DemoClientHistorySeed.Ensure(db);
+    var message = result switch
+    {
+        DemoClientHistorySeed.EnsureResult.Seeded =>
+            "Seeded 15 demo clients with order history, debt, and revenue.",
+        DemoClientHistorySeed.EnsureResult.RepairedTenantScope =>
+            "Repaired demo clients (assigned restaurant tenant). Refresh the Clients tab.",
+        DemoClientHistorySeed.EnsureResult.AlreadyPresent =>
+            "Demo clients already present (CLT-DEMO-*).",
+        _ => "Could not seed demo clients — need products, tables, servers, and a restaurant row."
+    };
+    Console.WriteLine(message);
+    return;
+}
 
 if (args.Any(a => string.Equals(a, "--cancel-all-open-orders", StringComparison.OrdinalIgnoreCase)))
 {

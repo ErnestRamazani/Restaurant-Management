@@ -149,13 +149,22 @@ public sealed class CashierReservationsController(
         if (RequireCashierOrAdminSession() is null)
             return Unauthorized(new { message = "Missing/invalid token or non-cashier role." });
 
+        var tz = ResolveRestaurantTimeZoneId();
+        var localToday = RestaurantTimeZone.UtcToRestaurant(DateTime.UtcNow, tz).Date;
+        var closedSinceUtc = RestaurantTimeZone.RestaurantToUtc(localToday.AddDays(-7), tz);
+
         var rows = await db.ReservationEngagements
             .AsNoTracking()
             .Include(e => e.Table)
-            .Where(e => e.Status == ReservationEngagementStatuses.Scheduled
-                        || e.Status == ReservationEngagementStatuses.CheckedIn)
+            .Where(e =>
+                e.Status == ReservationEngagementStatuses.Scheduled
+                || e.Status == ReservationEngagementStatuses.CheckedIn
+                || ((e.Status == ReservationEngagementStatuses.Cancelled
+                     || e.Status == ReservationEngagementStatuses.NoShow
+                     || e.Status == ReservationEngagementStatuses.Completed)
+                    && e.UpdatedAtUtc >= closedSinceUtc))
             .OrderBy(e => e.PlannedStartUtc)
-            .Take(200)
+            .Take(500)
             .Select(e => new CashierEngagementListRow(
                 e.Id,
                 e.ConfirmationCode,
@@ -380,6 +389,13 @@ public sealed class CashierReservationsController(
         }
 
         return false;
+    }
+
+    private string ResolveRestaurantTimeZoneId()
+    {
+        var business = SettingsManager.Load().BusinessProfile;
+        var cloud = db.PublicMenuSettings.AsNoTracking().FirstOrDefault(s => s.Key == "default");
+        return RestaurantTimeZone.ResolveId(cloud, business);
     }
 
     private AuthenticatedStaffSession? RequireCashierOrAdminSession()

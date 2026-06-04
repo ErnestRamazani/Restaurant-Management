@@ -4,10 +4,11 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using EliteRestaurant.Core.Utils;
+using EliteRestaurantPro.Localization;
 
 namespace EliteRestaurantPro.ViewModels;
 
-public abstract class AdminBaseViewModel : BaseViewModel
+public abstract class AdminBaseViewModel : LocalizableViewModel
 {
     private string _readyPickupBannerText = string.Empty;
     private readonly ImageSource? _sidebarAvatarImage;
@@ -38,6 +39,10 @@ public abstract class AdminBaseViewModel : BaseViewModel
     public bool ShowReservationsNav =>
         ShowFullAdminNav || AppSession.IsCashierTablet;
 
+    /// <summary>Client accounts: admin, server, and cashier.</summary>
+    public bool ShowClientsNav =>
+        ShowFullAdminNav || AppSession.IsServerTablet || AppSession.IsCashierTablet;
+
     /// <summary>Inventory in sidebar: admin + kitchen/bar tablet.</summary>
     public bool ShowInventorySidebarNav =>
         ShowFullAdminNav || AppSession.IsKitchenBarTablet;
@@ -53,16 +58,46 @@ public abstract class AdminBaseViewModel : BaseViewModel
             ? AppSession.StaffEmployeeName
             : !string.IsNullOrWhiteSpace(AppSession.AdminLoginDisplayName)
                 ? AppSession.AdminLoginDisplayName
-                : "Admin";
+                : Loc.Admin("role.admin", "Admin");
 
     public string SidebarRoleDisplay =>
-        AppSession.IsServerTablet ? "Server"
-        : AppSession.IsCashierTablet ? "Cashier"
-        : AppSession.IsKitchenBarTablet ? "Kitchen / Bar"
-        : "Administrator";
+        AppSession.IsServerTablet ? Loc.Admin("role.server", "Server")
+        : AppSession.IsCashierTablet ? Loc.Admin("role.cashier", "Cashier")
+        : AppSession.IsKitchenBarTablet ? Loc.Admin("roleKitchenBar", "Kitchen / Bar")
+        : Loc.Admin("roleAdministrator", "Administrator");
 
     public string SidebarCreateOrderLabel =>
-        AppSession.IsServerTablet || AppSession.IsCashierTablet ? "Take Order" : "Create Order";
+        AppSession.IsServerTablet || AppSession.IsCashierTablet
+            ? Loc.Admin("navTakeOrder", "Take Order")
+            : Loc.Admin("navCreateOrder", "Create Order");
+
+    public string NavSectionLabel => Loc.Admin("navNavigation", "NAVIGATION");
+    public string NavDashboardLabel => Loc.Admin("navDashboard", "Dashboard");
+    public string NavEmployeesLabel => Loc.Admin("navEmployees", "Employees");
+    public string NavMenuLabel => Loc.Admin("navMenu", "Menu");
+    public string NavInventoryLabel => Loc.Admin("navInventory", "Inventory");
+    public string NavAttendanceLabel => Loc.Admin("navAttendance", "Attendance");
+    public string NavKitchenQueueLabel => Loc.Admin("navKitchenQueue", "Kitchen queue");
+    public string NavTablesLabel => Loc.Admin("navTables", "Tables");
+    public string NavClientsLabel => Loc.Admin("navClients", "Clients");
+    public string NavReservationFloorLabel => Loc.Admin("navReservationFloor", "Reservations");
+    public string NavPickupServeLabel => Loc.Admin("navPickupServe", "Pick up & serve");
+    public string NavOrdersLabel => Loc.Admin("navOrders", "Orders");
+    public string NavMoneyLabel => Loc.Admin("navMoney", "Money");
+    public string NavSalaryLabel => Loc.Admin("navSalary", "Salary");
+    public string NavReportsLabel => Loc.Admin("navReports", "Reports");
+    public string NavSettingsLabel => Loc.Admin("settings", "Settings");
+    public string NavLogoutLabel => Loc.Admin("signOut", "Logout");
+
+    public string ShiftHistoryCloseLabel => Loc.Common("close", "Close");
+    public string ShiftHistoryColDate => Loc.Admin("empShiftHistoryColDate", "Date");
+    public string ShiftHistoryColShift => Loc.Admin("empShiftHistoryColShift", "Shift");
+    public string ShiftHistoryColIn => Loc.Admin("empShiftHistoryColIn", "In");
+    public string ShiftHistoryColOut => Loc.Admin("empShiftHistoryColOut", "Out");
+    public string ShiftHistoryColStatus => Loc.Admin("empShiftHistoryColStatus", "Status");
+    public string ShiftHistoryColJustification => Loc.Admin("empShiftHistoryColJustification", "Justification");
+    public string ShiftHistoryColNotes => Loc.Admin("empShiftHistoryColNotes", "Notes");
+    public string ShiftHistoryDismissHint => Loc.Admin("empShiftHistoryDismissHint", "Tap the dimmed area or Close to dismiss. Rows are newest first.");
 
     public string SidebarBusinessName => _businessName;
     public string SidebarBusinessTagline => _businessTagline;
@@ -76,7 +111,7 @@ public abstract class AdminBaseViewModel : BaseViewModel
 
     public void RefreshReadyPickupBanner()
     {
-        _readyPickupBannerText = StaffOrderAlerts.GetBannerText();
+        _readyPickupBannerText = StaffOrderAlertsUiLocalizer.GetBannerText();
         OnPropertyChanged(nameof(ReadyPickupBannerText));
         OnPropertyChanged(nameof(ReadyPickupBannerVisible));
     }
@@ -129,6 +164,7 @@ public abstract class AdminBaseViewModel : BaseViewModel
     public ICommand NavigateToTablesCommand { get; }
     public ICommand NavigateToReservationsCommand { get; }
     public ICommand NavigateToOrdersCommand { get; }
+    public ICommand NavigateToClientsCommand { get; }
     public ICommand NavigateToKitchenQueueCommand { get; }
     public ICommand NavigateToServerPickupCommand { get; }
     public ICommand NavigateToCreateOrderCommand { get; }
@@ -157,6 +193,9 @@ public abstract class AdminBaseViewModel : BaseViewModel
             _ => navigate(new ReservationFloorWebViewModel(navigate)),
             _ => ShowReservationsNav);
         NavigateToOrdersCommand = new RelayCommand(_ => navigate(new AdminOrdersViewModel(navigate)));
+        NavigateToClientsCommand = new RelayCommand(
+            _ => navigate(new ClientsViewModel(navigate)),
+            _ => ShowClientsNav);
         NavigateToKitchenQueueCommand = new RelayCommand(_ => navigate(new KitchenOrdersViewModel(navigate)));
         NavigateToServerPickupCommand = new RelayCommand(_ => navigate(new ServerPickupViewModel(navigate)));
         NavigateToCreateOrderCommand = new RelayCommand(_ => navigate(new CreateOrderViewModel(navigate)));
@@ -173,6 +212,39 @@ public abstract class AdminBaseViewModel : BaseViewModel
         });
         PlaceholderCommand = new RelayCommand(_ => { });
         RefreshReadyPickupBanner();
+    }
+
+    protected override void RefreshLocalizedStrings()
+    {
+        Notify(
+            nameof(SidebarRoleDisplay),
+            nameof(SidebarCreateOrderLabel),
+            nameof(NavSectionLabel),
+            nameof(NavDashboardLabel),
+            nameof(NavEmployeesLabel),
+            nameof(NavMenuLabel),
+            nameof(NavInventoryLabel),
+            nameof(NavAttendanceLabel),
+            nameof(NavKitchenQueueLabel),
+            nameof(NavTablesLabel),
+            nameof(NavClientsLabel),
+            nameof(NavReservationFloorLabel),
+            nameof(NavPickupServeLabel),
+            nameof(NavOrdersLabel),
+            nameof(NavMoneyLabel),
+            nameof(NavSalaryLabel),
+            nameof(NavReportsLabel),
+            nameof(NavSettingsLabel),
+            nameof(NavLogoutLabel),
+            nameof(ShiftHistoryCloseLabel),
+            nameof(ShiftHistoryColDate),
+            nameof(ShiftHistoryColShift),
+            nameof(ShiftHistoryColIn),
+            nameof(ShiftHistoryColOut),
+            nameof(ShiftHistoryColStatus),
+            nameof(ShiftHistoryColJustification),
+            nameof(ShiftHistoryColNotes),
+            nameof(ShiftHistoryDismissHint));
     }
 
     protected void RefreshBusinessProfileBindings()

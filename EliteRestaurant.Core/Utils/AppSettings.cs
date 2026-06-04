@@ -56,6 +56,9 @@ public sealed class AppSettings
     /// <summary>Set true after <c>POST /api/setup/first-site</c> (or portable wizard) so the desktop app does not reopen setup.</summary>
     public bool FirstSiteSetupCompleted { get; set; }
 
+    /// <summary>Desktop UI language (<c>en</c> or <c>fr</c>). Defaults to French when unset.</summary>
+    public string UiLanguage { get; set; } = "fr";
+
     /// <summary>Matches API <c>Setup__PlatformSecret</c> — required for <c>POST /api/setup/new-site</c> when a tenant already exists.</summary>
     public string SetupPlatformSecret { get; set; } = string.Empty;
 }
@@ -143,6 +146,12 @@ public sealed class BusinessProfileSettings
     /// <summary>Simple gate before exposing staff/admin workspace links from the public menu.</summary>
     public string StaffLoginPasscode { get; set; } = string.Empty;
 
+    /// <summary>Admin passcode required to cancel orders from staff portals and desktop.</summary>
+    public string OrderCancelPasscode { get; set; } = string.Empty;
+
+    /// <summary>Maximum open client debt (USD) before new on-account charges are blocked.</summary>
+    public decimal ClientDebtCapUsd { get; set; } = 250m;
+
     /// <summary>Sign-in ID for the read-only admin web portal (<c>/admin/</c>).</summary>
     public string AdminWebSignInId { get; set; } = string.Empty;
 
@@ -165,6 +174,9 @@ public sealed class BusinessProfileSettings
     public int ReservationLeadDays { get; set; } = 2;
     /// <summary>Maximum months ahead allowed for public booking.</summary>
     public int ReservationMaxMonthsAhead { get; set; } = 6;
+
+    /// <summary>IANA timezone for display and calendar boundaries (synced to cloud).</summary>
+    public string RestaurantTimeZoneId { get; set; } = RestaurantTimeZone.DefaultId;
 }
 
 /// <summary>Local ticket/PDF receipt branding (paths on this machine).</summary>

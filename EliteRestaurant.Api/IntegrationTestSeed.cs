@@ -148,6 +148,7 @@ public static class IntegrationTestSeed
                 WebsiteDomain = "",
                 SocialMedia = "",
                 StaffLoginPasscode = "staffgate",
+                OrderCancelPasscode = "cancelgate",
                 AdminWebSignInId = AdminWebTestSignInId,
                 AdminWebPin = AdminWebTestPin,
                 TicketFooterText = "Thanks",

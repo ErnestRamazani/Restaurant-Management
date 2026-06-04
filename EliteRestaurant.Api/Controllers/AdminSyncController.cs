@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.Json;
 using EliteRestaurant.Contracts.Admin;
+using EliteRestaurant.Core.Clients;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Reservations;
@@ -13,7 +14,7 @@ namespace EliteRestaurant.Api.Controllers;
 [ApiController]
 [Route("api/admin/sync")]
 [Authorize(Policy = "OperationalWrite")]
-public sealed class AdminSyncController(AppDbContext db) : ControllerBase
+public sealed class AdminSyncController(AppDbContext db, ClientAccountService clientAccounts) : ControllerBase
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly Dictionary<string, Type> EntityTypes = new(StringComparer.OrdinalIgnoreCase)
@@ -35,7 +36,8 @@ public sealed class AdminSyncController(AppDbContext db) : ControllerBase
         [nameof(SharedOrderDraft)] = typeof(SharedOrderDraft),
         [nameof(TabletSession)] = typeof(TabletSession),
         [nameof(AttendanceDayValidation)] = typeof(AttendanceDayValidation),
-        [nameof(PublicMenuAsset)] = typeof(PublicMenuAsset)
+        [nameof(PublicMenuAsset)] = typeof(PublicMenuAsset),
+        [nameof(RestaurantClient)] = typeof(RestaurantClient)
     };
 
     [HttpPost]
@@ -94,6 +96,18 @@ public sealed class AdminSyncController(AppDbContext db) : ControllerBase
                 });
 
                 await db.SaveChangesAsync(cancellationToken);
+
+                if (string.Equals(operation.EntityName, nameof(Employee), StringComparison.OrdinalIgnoreCase)
+                    && !operation.Operation.Equals("Delete", StringComparison.OrdinalIgnoreCase))
+                {
+                    var incomingEmp = operation.Payload.Deserialize(typeof(Employee), JsonOptions) as Employee;
+                    if (incomingEmp is not null)
+                    {
+                        var syncedEmp = await FindExistingAsync(typeof(Employee), incomingEmp, cancellationToken) as Employee;
+                        if (syncedEmp is not null)
+                            clientAccounts.SyncStaffClientFromEmployee(syncedEmp);
+                    }
+                }
 
                 if (isTable && !operation.Operation.Equals("Delete", StringComparison.OrdinalIgnoreCase))
                 {

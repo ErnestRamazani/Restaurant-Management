@@ -1,3 +1,6 @@
+using EliteRestaurant.Core.Utils;
+using EliteRestaurantPro.Localization;
+
 namespace EliteRestaurantPro.ViewModels;
 
 public class ProductSelectionItemViewModel : BaseViewModel
@@ -34,7 +37,21 @@ public class ProductSelectionItemViewModel : BaseViewModel
     public bool CanToggleProductRow => IsAvailable || IsSelected;
 
     public string AvailabilityHint =>
-        IsAvailable ? string.Empty : "Out of stock (ingredients)";
+        IsAvailable ? string.Empty : Loc.Admin("createOrderOutOfStockHint", "Out of stock (ingredients)");
+
+    public string FormattedPrice =>
+        CurrencyHelper.FormatAmount(Price, CurrencyHelper.Usd, CreateOrderUiLocalizer.MoneyCulture);
+
+    public string FormattedLineTotal =>
+        CurrencyHelper.FormatAmount(LineTotal, CurrencyHelper.Usd, CreateOrderUiLocalizer.MoneyCulture);
+
+    public void NotifyMoneyDisplay()
+    {
+        OnPropertyChanged(nameof(FormattedPrice));
+        OnPropertyChanged(nameof(FormattedLineTotal));
+    }
+
+    public void NotifyAvailabilityHint() => OnPropertyChanged(nameof(AvailabilityHint));
 
     public bool IsSelected
     {

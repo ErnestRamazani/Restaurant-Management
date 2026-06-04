@@ -385,4 +385,61 @@ public class AdminOrderOperationsTests
         Assert.Equal("Completed", completed.Status);
         Assert.Equal(changeUsd, completed.ChangeGivenUsd);
     }
+
+    private static void SeedCancelPasscode(AppDbContext db, string passcode)
+    {
+        db.PublicMenuSettings.Add(new PublicMenuSetting
+        {
+            Key = "default",
+            OrderCancelPasscode = passcode
+        });
+        db.SaveChanges();
+    }
+
+    [Fact]
+    public void TryCancelOrder_CancelsPendingApproval_WithValidPasscode()
+    {
+        using var db = SeedPendingOnlineOrder($"can-pend-{Guid.NewGuid():N}").db;
+        SeedCancelPasscode(db, "cancel123");
+        var orderId = db.Orders.Single().Id;
+        var ops = new AdminOrderOperationsService(db);
+
+        Assert.Null(ops.TryCancelOrder(orderId, "cancel123"));
+
+        db.ChangeTracker.Clear();
+        Assert.Equal("Cancelled", db.Orders.AsNoTracking().Single(o => o.Id == orderId).Status);
+    }
+
+    [Fact]
+    public void TryCancelOrder_CancelsReady_WithValidPasscode()
+    {
+        using var db = SeedPendingOnlineOrder($"can-rdy-{Guid.NewGuid():N}").db;
+        SeedCancelPasscode(db, "cancel123");
+        var order = db.Orders.Single();
+        order.Status = "Ready";
+        db.SaveChanges();
+
+        var ops = new AdminOrderOperationsService(db);
+        Assert.Null(ops.TryCancelOrder(order.Id, "cancel123"));
+
+        db.ChangeTracker.Clear();
+        Assert.Equal("Cancelled", db.Orders.AsNoTracking().Single(o => o.Id == order.Id).Status);
+    }
+
+    [Fact]
+    public void TryCancelOrder_Rejects_CompletedAndWrongPasscode()
+    {
+        using var db = SeedPendingOnlineOrder($"can-no-{Guid.NewGuid():N}").db;
+        SeedCancelPasscode(db, "cancel123");
+        var order = db.Orders.Single();
+        order.Status = "Completed";
+        db.SaveChanges();
+        var ops = new AdminOrderOperationsService(db);
+
+        Assert.Contains("completed", ops.TryCancelOrder(order.Id, "cancel123") ?? "", StringComparison.OrdinalIgnoreCase);
+
+        order.Status = "Waiting";
+        db.SaveChanges();
+        Assert.Contains("Incorrect", ops.TryCancelOrder(order.Id, "bad") ?? "", StringComparison.OrdinalIgnoreCase);
+    }
 }

@@ -1,4 +1,5 @@
 using EliteRestaurant.Contracts.Admin;
+using EliteRestaurantPro.Localization;
 using EliteRestaurantPro.Services;
 
 namespace EliteRestaurantPro.ApiClients;
@@ -34,6 +35,7 @@ public sealed class AdminOrdersApiClient(EliteApiClient? apiClient = null)
             snapshot.CustomerNotes,
             snapshot.AllergyNotes,
             snapshot.PaymentTiming,
+            snapshot.RestaurantClientId,
             snapshot.SelectedLines
                 .Select(line => new AdminOrderLineRequest(line.ProductId, line.Quantity))
                 .ToList());
@@ -42,7 +44,8 @@ public sealed class AdminOrdersApiClient(EliteApiClient? apiClient = null)
                    "api/admin/orders/create",
                    request,
                    cancellationToken)
-               ?? new AdminCreateOrderResponse(false, "Create Order", "Cloud API returned an empty response.", null);
+               ?? new AdminCreateOrderResponse(false, CreateOrderUiLocalizer.DialogTitle,
+                   Loc.Admin("createOrderCloudEmptyResponse", "Cloud API returned an empty response."), null);
     }
 
     public Task<AdminOrderReleasePendingResponse?> ReleasePendingToKitchenAsync(int orderId, CancellationToken cancellationToken = default) =>
@@ -51,10 +54,22 @@ public sealed class AdminOrdersApiClient(EliteApiClient? apiClient = null)
             new { },
             cancellationToken);
 
-    public Task<AdminOrderOpMessageResponse?> CancelPendingAsync(int orderId, CancellationToken cancellationToken = default) =>
-        _apiClient.PostAsync<object, AdminOrderOpMessageResponse>(
+    public Task<AdminOrderOpMessageResponse?> CancelPendingAsync(
+        int orderId,
+        string passcode,
+        CancellationToken cancellationToken = default) =>
+        _apiClient.PostAsync<OrderCancelRequest, AdminOrderOpMessageResponse>(
             $"api/admin/orders/pending/{orderId}/cancel",
-            new { },
+            new OrderCancelRequest(passcode),
+            cancellationToken);
+
+    public Task<AdminOrderOpMessageResponse?> CancelOrderAsync(
+        int orderId,
+        string passcode,
+        CancellationToken cancellationToken = default) =>
+        _apiClient.PostAsync<OrderCancelRequest, AdminOrderOpMessageResponse>(
+            $"api/admin/orders/{orderId}/cancel",
+            new OrderCancelRequest(passcode),
             cancellationToken);
 
     public Task<AdminOrderOpMessageResponse?> CreateWalkInFromDeskAsync(

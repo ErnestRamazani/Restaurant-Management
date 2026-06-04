@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
@@ -31,7 +32,8 @@ public static class MoneyDashboardSnapshotBuilder
         IReadOnlyList<MoneyTransaction> transactions,
         string selectedPeriod,
         int maxLedgerRows = 200,
-        string? originFilter = null)
+        string? originFilter = null,
+        CultureInfo? formatCulture = null)
     {
         LogMoneyDebug($"Build snapshot (in-memory) start | period={selectedPeriod}");
         var startedAt = DateTime.UtcNow;
@@ -98,7 +100,8 @@ public static class MoneyDashboardSnapshotBuilder
                     row.AmountUsd,
                     row.AmountFc,
                     row.CurrencyCode,
-                    isRevenue),
+                    isRevenue,
+                    formatCulture),
                 AmountColor = isRevenue ? "#2ECC71" : "#DC143C"
             };
         }).ToList();
@@ -142,11 +145,12 @@ public static class MoneyDashboardSnapshotBuilder
 
         var snapshot = new MoneyDashboardSnapshotData
         {
-            TodayRevenueText = CurrencyHelper.FormatDualCurrency(todayRevenueUsd, todayRevenueFc),
-            TodayExpensesText = CurrencyHelper.FormatDualCurrency(todayExpensesUsd, todayExpensesFc),
+            TodayRevenueText = CurrencyHelper.FormatDualCurrency(todayRevenueUsd, todayRevenueFc, formatCulture),
+            TodayExpensesText = CurrencyHelper.FormatDualCurrency(todayExpensesUsd, todayExpensesFc, formatCulture),
             TodayNetProfitText = CurrencyHelper.FormatDualCurrency(
                 todayRevenueUsd - todayExpensesUsd,
-                todayRevenueFc - todayExpensesFc),
+                todayRevenueFc - todayExpensesFc,
+                formatCulture),
             TodayNetProfitColor = todayRevenueUsd - todayExpensesUsd >= 0m
                 ? "#2ECC71"
                 : "#DC143C",
@@ -154,14 +158,14 @@ public static class MoneyDashboardSnapshotBuilder
             ReportStartDate = period.FromDate,
             ReportEndDate = period.ToDate,
             LedgerItems = ledger,
-            TotalRevenueText = CurrencyHelper.FormatDualCurrency(totalRevenueUsd, totalRevenueFc),
-            TotalExpensesText = CurrencyHelper.FormatDualCurrency(totalExpensesUsd, totalExpensesFc),
-            NetProfitText = CurrencyHelper.FormatDualCurrency(netUsd, netFc),
+            TotalRevenueText = CurrencyHelper.FormatDualCurrency(totalRevenueUsd, totalRevenueFc, formatCulture),
+            TotalExpensesText = CurrencyHelper.FormatDualCurrency(totalExpensesUsd, totalExpensesFc, formatCulture),
+            NetProfitText = CurrencyHelper.FormatDualCurrency(netUsd, netFc, formatCulture),
             NetProfitColor = netUsd >= 0m ? "#2ECC71" : "#DC143C",
-            SalesSummaryText = CurrencyHelper.FormatDualCurrency(salesUsd, salesFc),
-            TipsSummaryText = CurrencyHelper.FormatDualCurrency(tipsUsd, tipsFc),
-            PayrollSummaryText = CurrencyHelper.FormatDualCurrency(payrollUsd, payrollFc),
-            DeliveryFeesSummaryText = CurrencyHelper.FormatDualCurrency(deliveryFeesUsd, deliveryFeesFc),
+            SalesSummaryText = CurrencyHelper.FormatDualCurrency(salesUsd, salesFc, formatCulture),
+            TipsSummaryText = CurrencyHelper.FormatDualCurrency(tipsUsd, tipsFc, formatCulture),
+            PayrollSummaryText = CurrencyHelper.FormatDualCurrency(payrollUsd, payrollFc, formatCulture),
+            DeliveryFeesSummaryText = CurrencyHelper.FormatDualCurrency(deliveryFeesUsd, deliveryFeesFc, formatCulture),
             OriginFilterLabel = originLabel
         };
         LogMoneyDebug($"Build snapshot (in-memory) done in {(DateTime.UtcNow - startedAt).TotalMilliseconds:N0} ms");

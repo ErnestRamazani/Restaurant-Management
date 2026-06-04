@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/merge-guest-locales.mjs && vite build",
+    "sync-locales": "node scripts/merge-guest-locales.mjs",
     "lint": "eslint .",
     "preview": "vite preview"
   },

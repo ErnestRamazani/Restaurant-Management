@@ -39,8 +39,8 @@ jobs:
       - name: Generate coverage summary
         run: reportgenerator "-reports:./coverage/**/coverage.cobertura.xml" "-targetdir:./coverage/report" "-reporttypes:TextSummary"
 
-      # Rubric target: 40% line coverage as tests grow. Migrations are excluded via CodeCoverage.runsettings
-      # (~20% combined Core+Api today). Raise $min toward 40 when the suite catches up.
+      # Rubric target: 40% line coverage as tests grow. Migrations are excluded via CodeCoverage.runsettings.
+      # Gate at 35% (remediation tests); target 40% per upgrade rubric.
       - name: Check coverage threshold (line minimum)
         shell: pwsh
         run: |
@@ -111,10 +111,10 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
       - name: Wait for deploy
-        run: sleep 30
+        run: sleep 90
 
       - name: Production health smoke test
         run: |
-          curl -fsS --retry 5 --retry-delay 10 --retry-all-errors \
+          curl -fsS --retry 5 --retry-delay 15 --retry-all-errors \
             "https://starfish-app-owtoz.ondigitalocean.app/api/health"
           echo "Production /api/health OK"

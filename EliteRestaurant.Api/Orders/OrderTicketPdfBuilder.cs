@@ -77,7 +77,9 @@ public static class OrderTicketPdfBuilder
             TicketIsDeliveryFulfillment = OrderRecordUiLabels.IsDeliveryOrder(order),
             ShowServerOnTicket = OrderRecordUiLabels.ShowServerOnTicket(order),
             TicketServer = OrderRecordUiLabels.ServerCaption(order),
-            TicketDateTime = order.CreatedAt,
+            TicketDateTime = RestaurantTimeZone.OrderCreatedAtForDisplay(
+                order.CreatedAt,
+                business.RestaurantTimeZoneId),
             TicketSubtotal = lineSum,
             TicketDiscountAmount = totals.DiscountApplied,
             TicketDiscountLineText = totals.DiscountApplied > 0m

@@ -8,6 +8,7 @@ public static class OpenCheckKindHelper
 {
     public const string Food = "Food";
     public const string Drink = "Drink";
+    public const string Mixed = "Mixed";
 
     public static bool IsDrinkCategory(string? category) =>
         MenuTaxonomyHelper.IsLegacyDrinkCategoryForCategoryString(category);
@@ -18,7 +19,7 @@ public static class OpenCheckKindHelper
     public static string GetProductKind(string? category) =>
         IsDrinkCategory(category) ? Drink : Food;
 
-    /// <summary>Infer check kind from persisted lines. Returns null when empty or mixed food+drink.</summary>
+    /// <summary>Infer check kind from persisted lines. Returns null when empty.</summary>
     public static string? TryInferCheckKindFromProducts(
         IEnumerable<Product> products,
         MenuTaxonomySettings? taxonomy = null)
@@ -32,7 +33,7 @@ public static class OpenCheckKindHelper
             else
                 sawFood = true;
             if (sawFood && sawDrink)
-                return null;
+                return Mixed;
         }
 
         if (sawDrink) return Drink;
@@ -49,7 +50,10 @@ public static class OpenCheckKindHelper
     {
         var normalized = NormalizeCheckKind(checkKind);
         if (normalized is null)
-            return "Check type must be Food or Drink.";
+            return "Check type must be Food, Drink, or Mixed.";
+
+        if (normalized.Equals(Mixed, StringComparison.OrdinalIgnoreCase))
+            return null;
 
         foreach (var (productId, quantity) in lines)
         {
@@ -89,7 +93,7 @@ public static class OpenCheckKindHelper
         }
 
         if (sawFood && sawDrink)
-            return null;
+            return Mixed;
         if (sawDrink) return Drink;
         if (sawFood) return Food;
         return first is null ? null : GetProductKind(first, taxonomy);
@@ -100,6 +104,7 @@ public static class OpenCheckKindHelper
         var k = (raw ?? string.Empty).Trim();
         if (k.Equals(Drink, StringComparison.OrdinalIgnoreCase)) return Drink;
         if (k.Equals(Food, StringComparison.OrdinalIgnoreCase)) return Food;
+        if (k.Equals(Mixed, StringComparison.OrdinalIgnoreCase)) return Mixed;
         return null;
     }
 }
