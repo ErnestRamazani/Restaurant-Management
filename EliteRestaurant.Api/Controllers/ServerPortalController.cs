@@ -40,7 +40,8 @@ public sealed class ServerPortalController(
     IOptions<CurrencyPricingOptions> currencyPricingOptions,
     AppDbContext db,
     SharedOrderDraftService draftStore,
-    IHubContext<OrderHub> orderHub) : ControllerBase
+    IHubContext<OrderHub> orderHub,
+    PublicMenuSettingsCache menuSettings) : ControllerBase
 {
     [HttpGet("config")]
     public ActionResult<ServerPortalConfigDto> GetConfig()
@@ -52,7 +53,7 @@ public sealed class ServerPortalController(
         var allSettings = SettingsManager.Load();
         var settings = allSettings.CurrencyPricing;
         var business = allSettings.BusinessProfile;
-        var cloudSettings = db.PublicMenuSettings.AsNoTracking().FirstOrDefault(s => s.Key == "default");
+        var cloudSettings = menuSettings.GetDefault();
         var restaurantName = PublicMenuBrandingMerge.RestaurantDisplayName(cloudSettings, business);
         var logoUrl = "/api/server/assets/restaurant-logo";
         var employeePhotoUrl = "/api/server/assets/me-photo";
@@ -1302,7 +1303,7 @@ public sealed class ServerPortalController(
 
     private MenuTaxonomySettings LoadMenuTaxonomy()
     {
-        var cloud = db.PublicMenuSettings.AsNoTracking().FirstOrDefault(s => s.Key == "default");
+        var cloud = menuSettings.GetDefault();
         return MenuTaxonomyHelper.ResolveEffective(cloud?.MenuTaxonomyJson, SettingsManager.Load().MenuTaxonomy);
     }
 

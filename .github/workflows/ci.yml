@@ -52,8 +52,8 @@ jobs:
             throw "Could not parse Line coverage from Summary.txt"
           }
           $cov = [decimal]$Matches[1]
-          $min = [decimal]20
-          Write-Host "Line coverage: $cov% (minimum $min%; milestone 40% — see workflow comment)"
+          $min = [decimal]35
+          Write-Host "Line coverage: $cov% (minimum $min%)"
           if ($cov -lt $min) { throw "Line coverage $cov% is below the $min% minimum (regression gate)" }
 
       - name: Upload coverage report
@@ -81,3 +81,40 @@ jobs:
 
       - name: Run tests
         run: dotnet test EliteRestaurant.Tests/EliteRestaurant.Tests.csproj --no-build --configuration Release --verbosity normal
+
+  migrate-check:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Apply EF migrations (when PROD_DB_CONNECTION secret is set)
+        env:
+          ConnectionStrings__DefaultConnection: ${{ secrets.PROD_DB_CONNECTION }}
+        run: |
+          if [ -z "$ConnectionStrings__DefaultConnection" ]; then
+            echo "PROD_DB_CONNECTION not configured — skipping migrate-check (apply migrations manually; see docs/DEPLOY-CHECKLIST.md)"
+            exit 0
+          fi
+          dotnet tool install --global dotnet-ef
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          dotnet ef database update --project EliteRestaurant.Core --startup-project EliteRestaurant.Api
+
+  smoke-production:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Wait for deploy
+        run: sleep 30
+
+      - name: Production health smoke test
+        run: |
+          curl -fsS --retry 5 --retry-delay 10 --retry-all-errors \
+            "https://starfish-app-owtoz.ondigitalocean.app/api/health"
+          echo "Production /api/health OK"

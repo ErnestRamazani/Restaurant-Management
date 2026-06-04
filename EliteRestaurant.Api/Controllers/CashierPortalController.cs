@@ -1,8 +1,11 @@
 using EliteRestaurant.Api.Branding;
 using EliteRestaurant.Api.Dtos;
 using EliteRestaurant.Api.Hubs;
+using EliteRestaurant.Api.Services;
 using EliteRestaurant.Api.Orders;
 using EliteRestaurant.Api.Security;
+using EliteRestaurant.Contracts.Admin;
+using EliteRestaurant.Core.Clients;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Orders;
@@ -11,6 +14,7 @@ using EliteRestaurant.Core.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using Serilog;
 using Microsoft.EntityFrameworkCore;
 
 namespace EliteRestaurant.Api.Controllers;
@@ -22,7 +26,8 @@ public sealed class CashierPortalController(
     TabletAuthService authService,
     AppDbContext db,
     IHubContext<OrderHub> orderHub,
-    IWebHostEnvironment env) : ControllerBase
+    IWebHostEnvironment env,
+    PublicMenuSettingsCache menuSettings) : ControllerBase
 {
     private readonly AdminOrderOperationsService _ops = new(db);
 
@@ -91,7 +96,10 @@ public sealed class CashierPortalController(
         if (!result.Ok)
             return BadRequest(new { message = result.ErrorMessage ?? "Release failed." });
 
-        await orderHub.Clients.Group("Kitchen").SendAsync("KitchenQueueChanged", new { reason = "cashier-release", orderId });
+        Log.Information("Order {OrderId} released to kitchen by cashier {EmployeeId} ({OrderCode})",
+            orderId, session.EmployeeId, result.ReleasedOrderCode ?? "");
+
+        await OrderHubBroadcasts.NotifyKitchenQueueChangedAsync(orderHub, db, orderId, "cashier-release");
         await OrderHubBroadcasts.NotifyCashierOrderBoardChangedAsync(orderHub, db, orderId, "released-to-kitchen");
         await OrderHubBroadcasts.NotifyReceptionDeliveryPickupChangedAsync(orderHub, db, orderId, "released-to-kitchen");
 
@@ -99,13 +107,13 @@ public sealed class CashierPortalController(
     }
 
     [HttpPost("orders/pending/{orderId:int}/cancel")]
-    public async Task<ActionResult> CancelPending(int orderId)
+    public async Task<ActionResult> CancelPending(int orderId, [FromBody] OrderCancelRequest request)
     {
         var session = RequireCashierSession();
         if (session is null)
             return Unauthorized(new { message = "Missing/invalid token or non-cashier role." });
 
-        var err = _ops.TryCancelPendingCashier(orderId);
+        var err = _ops.TryCancelOrder(orderId, request.Passcode);
         if (err is not null)
             return BadRequest(new { message = err });
 
@@ -124,6 +132,7 @@ public sealed class CashierPortalController(
         const bool showAdminAdvance = false;
         const bool canViewTicket = true;
 
+        var tz = ResolveRestaurantTimeZoneId();
         var orders = db.Orders
             .AsNoTracking()
             .Include(o => o.Table)
@@ -134,7 +143,7 @@ public sealed class CashierPortalController(
                         o.Status == OrderWorkflow.Served)
             .OrderByDescending(o => o.CreatedAt)
             .ToList()
-            .Select(o => AdminOrdersViewMapper.MapOrder(o, false, showAdminAdvance, canViewTicket))
+            .Select(o => AdminOrdersViewMapper.MapOrder(o, false, showAdminAdvance, canViewTicket, tz))
             .ToList();
 
         return Ok(orders);
@@ -150,6 +159,7 @@ public sealed class CashierPortalController(
         const bool showAdminAdvance = false;
         const bool canViewTicket = true;
 
+        var tz = ResolveRestaurantTimeZoneId();
         var orders = db.Orders
             .AsNoTracking()
             .Include(o => o.Table)
@@ -160,7 +170,7 @@ public sealed class CashierPortalController(
             .OrderByDescending(o => o.CreatedAt)
             .Take(250)
             .ToList()
-            .Select(o => AdminOrdersViewMapper.MapOrder(o, true, showAdminAdvance, canViewTicket))
+            .Select(o => AdminOrdersViewMapper.MapOrder(o, true, showAdminAdvance, canViewTicket, tz))
             .ToList();
 
         return Ok(orders);
@@ -183,7 +193,12 @@ public sealed class CashierPortalController(
         if (order is null)
             return NotFound(new { message = "Order not found." });
 
-        return Ok(CashierOrderDetailBuilder.Build(order));
+        RestaurantClient? client = null;
+        if (order.RestaurantClientId is int cid)
+            client = db.RestaurantClients.AsNoTracking().FirstOrDefault(c => c.Id == cid);
+
+        var cap = new ClientAccountService(db).GetDebtCapUsd();
+        return Ok(CashierOrderDetailBuilder.Build(order, client, cap));
     }
 
     /// <summary>Alias for the full invoice breakdown (same payload as <see cref="GetOrderDetail"/>).</summary>
@@ -287,42 +302,55 @@ public sealed class CashierPortalController(
                         : "Complete is only available when the order is Served. Flow: kitchen marks Ready → server marks Served → cashier completes payment."
             });
 
-        try
+        var clients = new ClientAccountService(db);
+        var settlement = (request.Settlement ?? "PayNow").Trim();
+        if (string.Equals(settlement, "OnAccount", StringComparison.OrdinalIgnoreCase))
         {
-            _ops.UpdateOrderStatus(
+            var err = clients.TryCompleteOrderOnAccount(orderId, null);
+            if (err is not null)
+                return BadRequest(new { message = err });
+        }
+        else
+        {
+            var err = clients.TryCompleteOrderPaid(
                 orderId,
-                "Completed",
                 request.PaymentCurrencyCode,
                 request.PaidUsd,
                 request.PaidFc,
                 request.ChangeUsd,
-                request.ChangeFc);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
+                request.ChangeFc,
+                _ops);
+            if (err is not null)
+                return BadRequest(new { message = err });
         }
 
         await OrderHubBroadcasts.NotifyReceptionDeliveryPickupChangedAsync(orderHub, db, orderId, "order-completed");
+        await OrderHubBroadcasts.NotifyCashierOrderBoardChangedAsync(orderHub, db, orderId, "order-completed");
 
         return Ok(new { ok = true });
     }
 
     [HttpPost("orders/{orderId:int}/cancel")]
-    public ActionResult CancelActiveOrder(int orderId)
+    public async Task<ActionResult> CancelActiveOrder(int orderId, [FromBody] OrderCancelRequest request)
     {
         var session = RequireCashierSession();
         if (session is null)
             return Unauthorized(new { message = "Missing/invalid token or non-cashier role." });
 
-        var order = db.Orders.SingleOrDefault(o => o.Id == orderId);
-        if (order is null)
-            return NotFound(new { message = "Order not found." });
-        if (string.Equals(order.Status, "Completed", StringComparison.OrdinalIgnoreCase))
-            return BadRequest(new { message = "Cannot cancel a completed order." });
+        var err = _ops.TryCancelOrder(orderId, request.Passcode);
+        if (err is not null)
+            return BadRequest(new { message = err });
 
-        _ops.UpdateOrderStatus(orderId, "Cancelled");
+        await OrderHubBroadcasts.NotifyCashierOrderBoardChangedAsync(orderHub, db, orderId, "order-cancelled");
+
         return Ok(new { ok = true });
+    }
+
+    private string ResolveRestaurantTimeZoneId()
+    {
+        var business = SettingsManager.Load().BusinessProfile;
+        var cloud = menuSettings.GetDefault();
+        return RestaurantTimeZone.ResolveId(cloud, business);
     }
 
     private AuthenticatedStaffSession? RequireCashierSession()
