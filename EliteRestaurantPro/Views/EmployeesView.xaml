@@ -28,11 +28,9 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Row="0" Grid.Column="0">
-                    <TextBlock Style="{StaticResource HeadingLarge}" FontSize="26">
-                        <Run Text="Employee" Foreground="{StaticResource TextPrimaryBrush}"/>
-                        <Run Text=" Management" Foreground="{StaticResource GoldAccentBrush}"/>
-                    </TextBlock>
-                    <TextBlock Text="Manage staff access, roles, and tablet PINs (stored hashed; never shown here)."
+                    <TextBlock Text="{Binding PageTitle}"
+                               Style="{StaticResource HeadingLarge}" FontSize="26"/>
+                    <TextBlock Text="{Binding PageSubtitle}"
                                Style="{StaticResource BodyText}"
                                FontSize="13"
                                Margin="0,5,0,0"/>
@@ -40,7 +38,7 @@
 
                 <Button Grid.Row="0" Grid.Column="1"
                         Width="170"
-                        Content="Add New Employee"
+                        Content="{Binding AddNewEmployeeLabel}"
                         Command="{Binding OpenAddDialogCommand}"
                         Style="{StaticResource GoldPrimaryButton}"/>
 
@@ -51,7 +49,7 @@
                          MinHeight="42"
                          FontSize="13"
                          Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                         ToolTip="Search by name, role, sign-in ID, system ID, phone, or status"/>
+                         ToolTip="{Binding SearchTooltip}"/>
             </Grid>
 
             <ScrollViewer Grid.Row="1"
@@ -77,10 +75,10 @@
                                                            FontWeight="SemiBold"/>
                                                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                                     <Border Background="#22D4AF37" CornerRadius="8" Padding="10,4" Margin="0,0,8,0">
-                                                        <TextBlock Text="{Binding Role}" Foreground="{StaticResource GoldAccentBrush}" FontSize="11"/>
+                                                        <TextBlock Text="{Binding DisplayRole}" Foreground="{StaticResource GoldAccentBrush}" FontSize="11"/>
                                                     </Border>
                                                     <Border Background="#152196F3" CornerRadius="8" Padding="10,4" Margin="0,0,8,0">
-                                                        <TextBlock Text="PIN ●●●●" Foreground="{StaticResource StatBlueBrush}" FontSize="11"/>
+                                                        <TextBlock Text="{Binding DataContext.PinMaskedLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Foreground="{StaticResource StatBlueBrush}" FontSize="11"/>
                                                     </Border>
                                                     <Border Background="#331E88E5" CornerRadius="8" Padding="10,4" Margin="0,0,8,0">
                                                         <Border.Style>
@@ -93,10 +91,10 @@
                                                                 </Style.Triggers>
                                                             </Style>
                                                         </Border.Style>
-                                                        <TextBlock Text="{Binding SignInId, StringFormat=Sign-in {0}}" Foreground="#FF64B5F6" FontSize="11"/>
+                                                        <TextBlock Text="{Binding DisplaySignInBadge}" Foreground="#FF64B5F6" FontSize="11"/>
                                                     </Border>
                                                     <Border Background="#22FFFFFF" CornerRadius="8" Padding="10,4">
-                                                        <TextBlock Text="{Binding EmploymentStatus}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="11"/>
+                                                        <TextBlock Text="{Binding DisplayEmploymentStatus}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="11"/>
                                                     </Border>
                                                 </StackPanel>
                                             </StackPanel>
@@ -153,10 +151,10 @@
                                                 </Grid>
                                             </Border>
 
-                                            <TextBlock Text="Notes" Style="{StaticResource HeadingSmall}" Margin="0,14,0,6"/>
+                                            <TextBlock Text="{Binding DataContext.NotesLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Style="{StaticResource HeadingSmall}" Margin="0,14,0,6"/>
                                             <Border Background="#22000000" CornerRadius="10" Padding="10" BorderBrush="#33FFFFFF" BorderThickness="1">
                                                 <ScrollViewer Height="120" VerticalScrollBarVisibility="Auto" Style="{StaticResource EliteScrollViewer}">
-                                                    <TextBlock Text="{Binding Notes, TargetNullValue=No notes yet.}"
+                                                    <TextBlock Text="{Binding DisplayNotesForView}"
                                                                Foreground="{StaticResource TextSecondaryBrush}"
                                                                FontSize="12"
                                                                TextWrapping="Wrap"/>
@@ -165,69 +163,58 @@
                                         </StackPanel>
 
                                         <StackPanel Grid.Column="2">
-                                            <TextBlock Text="Employee Profile" Foreground="{StaticResource GoldAccentBrush}" FontSize="18" FontWeight="SemiBold"/>
+                                            <TextBlock Text="{Binding DataContext.ProfileTitle, RelativeSource={RelativeSource AncestorType=UserControl}}" Foreground="{StaticResource GoldAccentBrush}" FontSize="18" FontWeight="SemiBold"/>
                                             <WrapPanel Margin="0,10,0,0">
                                                 <Border Background="#22FFFFFF" CornerRadius="10" Padding="12,8" Margin="0,0,8,8">
-                                                    <TextBlock Text="{Binding PhoneNumber, StringFormat=Phone {0}, TargetNullValue=Phone N/A}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
+                                                    <TextBlock Text="{Binding DisplayPhoneText}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
+                                                </Border>
+                                                <Border Background="#22FFFFFF" CornerRadius="10" Padding="12,8" Margin="0,0,8,8">
+                                                    <TextBlock Text="{Binding DisplayMonthlySalaryText}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
                                                 </Border>
                                                 <Border Background="#22FFFFFF" CornerRadius="10" Padding="12,8" Margin="0,0,8,8">
                                                     <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="12">
-                                                        <TextBlock.Style>
-                                                            <Style TargetType="TextBlock">
-                                                                <Setter Property="Text" Value="{Binding MonthlySalaryUSD, StringFormat=Monthly $ {0:N2}}"/>
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding MonthlySalaryUSD}" Value="0">
-                                                                        <Setter Property="Text" Value="Monthly — set salary in Edit"/>
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </TextBlock.Style>
-                                                    </TextBlock>
-                                                </Border>
-                                                <Border Background="#22FFFFFF" CornerRadius="10" Padding="12,8" Margin="0,0,8,8">
-                                                    <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="12">
-                                                        <Run Text="System ID "/>
+                                                        <Run Text="{Binding DataContext.SystemIdLabel, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}"/>
                                                         <Run Text="{Binding UniqueId, Mode=OneWay}" Foreground="{StaticResource TextMutedBrush}"/>
                                                     </TextBlock>
                                                 </Border>
                                                 <Border Background="#22FFFFFF" CornerRadius="10" Padding="12,8" Margin="0,0,8,8">
                                                     <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="12">
-                                                        <Run Text="Sign-in ID "/>
+                                                        <Run Text="{Binding DataContext.EmpSignInIdLabel, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}"/>
                                                         <Run Text="{Binding SignInId, Mode=OneWay, TargetNullValue=—}" Foreground="{StaticResource GoldAccentBrush}"/>
                                                     </TextBlock>
                                                 </Border>
                                                 <Border Background="#22FFFFFF" CornerRadius="10" Padding="12,8" Margin="0,0,8,8">
-                                                    <TextBlock Text="{Binding JoinDate, StringFormat=Joined {0:yyyy-MM-dd}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
+                                                    <TextBlock Text="{Binding DisplayJoinedText}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
                                                 </Border>
                                                 <Border Background="#22FFFFFF" CornerRadius="10" Padding="12,8" Margin="0,0,8,8">
-                                                    <TextBlock Text="{Binding DaysSinceJoined, StringFormat=Tenure {0} day(s)}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
+                                                    <TextBlock Text="{Binding DisplayTenureText}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
                                                 </Border>
                                             </WrapPanel>
 
-                                            <TextBlock Text="Performance" Foreground="{StaticResource GoldAccentBrush}" FontSize="18" FontWeight="SemiBold" Margin="0,10,0,8"/>
+                                            <TextBlock Text="{Binding DataContext.PerformanceTitle, RelativeSource={RelativeSource AncestorType=UserControl}}" Foreground="{StaticResource GoldAccentBrush}" FontSize="18" FontWeight="SemiBold" Margin="0,10,0,8"/>
                                             <WrapPanel>
                                                 <Border Background="#152196F3" CornerRadius="10" Padding="14,8" Margin="0,0,8,8">
-                                                    <TextBlock Text="{Binding TotalOrdersServed, StringFormat=Total Orders Served: {0}}" Foreground="{StaticResource StatBlueBrush}" FontSize="13"/>
+                                                    <TextBlock Text="{Binding DisplayOrdersServedText}" Foreground="{StaticResource StatBlueBrush}" FontSize="13"/>
                                                 </Border>
                                                 <Border Background="#224CAF50" CornerRadius="10" Padding="14,8" Margin="0,0,8,8">
-                                                    <TextBlock Text="{Binding TotalSalesGenerated, StringFormat=Total Sales Generated: $ {0:N2}}" Foreground="{StaticResource StatGreenBrush}" FontSize="13"/>
+                                                    <TextBlock Text="{Binding DisplaySalesGeneratedText}" Foreground="{StaticResource StatGreenBrush}" FontSize="13"/>
                                                 </Border>
                                             </WrapPanel>
 
-                                            <TextBlock Text="Attendance (Today)" Foreground="{StaticResource GoldAccentBrush}" FontSize="18" FontWeight="SemiBold" Margin="0,10,0,8"/>
+                                            <TextBlock Text="{Binding DataContext.AttendanceTodayTitle, RelativeSource={RelativeSource AncestorType=UserControl}}" Foreground="{StaticResource GoldAccentBrush}" FontSize="18" FontWeight="SemiBold" Margin="0,10,0,8"/>
                                             <WrapPanel>
                                                 <Border Background="#22FFFFFF" CornerRadius="10" Padding="12,8" Margin="0,0,8,8">
-                                                    <TextBlock Text="{Binding TodayClockInText, StringFormat=Clock In: {0}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
+                                                    <TextBlock Text="{Binding DisplayClockInLine}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
                                                 </Border>
                                                 <Border Background="#22FFFFFF" CornerRadius="10" Padding="12,8" Margin="0,0,8,8">
-                                                    <TextBlock Text="{Binding TodayClockOutText, StringFormat=Clock Out: {0}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
+                                                    <TextBlock Text="{Binding DisplayClockOutLine}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
                                                 </Border>
                                                 <Border Background="#22D4AF37" CornerRadius="10" Padding="12,8" Margin="0,0,8,8">
-                                                    <TextBlock Text="{Binding PendingSalaryToday, StringFormat=Pending Salary Today: $ {0:N2}}" Foreground="{StaticResource GoldAccentBrush}" FontSize="12"/>
+                                                    <TextBlock Text="{Binding DisplayPendingSalaryText}" Foreground="{StaticResource GoldAccentBrush}" FontSize="12"/>
                                                 </Border>
                                             </WrapPanel>
 
-                                            <TextBlock Text="Work Schedule" Foreground="{StaticResource GoldAccentBrush}" FontSize="18" FontWeight="SemiBold" Margin="0,10,0,8"/>
+                                            <TextBlock Text="{Binding DataContext.WorkScheduleTitle, RelativeSource={RelativeSource AncestorType=UserControl}}" Foreground="{StaticResource GoldAccentBrush}" FontSize="18" FontWeight="SemiBold" Margin="0,10,0,8"/>
                                             <Border Style="{StaticResource GlassCard}"
                                                     Padding="10,10"
                                                     Margin="0,0,0,8"
@@ -301,7 +288,7 @@
                                             </Border>
 
                                             <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                                <TextBlock Text="Attendance Status:"
+                                                    <TextBlock Text="{Binding DataContext.AttendanceStatusLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                            Foreground="{StaticResource TextSecondaryBrush}"
                                                            FontSize="12"
                                                            VerticalAlignment="Center"
@@ -317,20 +304,8 @@
                                                             </Style.Triggers>
                                                         </Style>
                                                     </Border.Style>
-                                                    <TextBlock FontSize="12" FontWeight="SemiBold">
-                                                        <TextBlock.Style>
-                                                            <Style TargetType="TextBlock">
-                                                                <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
-                                                                <Setter Property="Text" Value="Not Active"/>
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding CanClockOut}" Value="True">
-                                                                        <Setter Property="Foreground" Value="{StaticResource StatGreenBrush}"/>
-                                                                        <Setter Property="Text" Value="Active"/>
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </TextBlock.Style>
-                                                    </TextBlock>
+                                                    <TextBlock FontSize="12" FontWeight="SemiBold"
+                                                               Text="{Binding DisplayAttendanceStatus}"/>
                                                 </Border>
                                             </StackPanel>
 
@@ -343,20 +318,20 @@
                                                 <Button Grid.Column="0"
                                                         Width="120"
                                                         Margin="0,0,10,0"
-                                                        Content="Edit Profile"
+                                                        Content="{Binding DataContext.EditProfileLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         Command="{Binding DataContext.EditEmployeeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         CommandParameter="{Binding}"
                                                         Style="{StaticResource SapphireButton}"/>
                                                 <Button Grid.Column="1"
                                                         Width="120"
                                                         Margin="0,0,10,0"
-                                                        Content="Shift History"
+                                                        Content="{Binding DataContext.ShiftHistoryLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         Command="{Binding DataContext.ShowShiftHistoryCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         CommandParameter="{Binding}"
                                                         Style="{StaticResource GhostButton}"/>
                                                 <Button Grid.Column="2"
                                                         Width="120"
-                                                        Content="Delete"
+                                                        Content="{Binding DataContext.DeleteLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         Command="{Binding DataContext.DeleteEmployeeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         CommandParameter="{Binding}"
                                                         Style="{StaticResource DangerButton}"/>
@@ -394,25 +369,26 @@
                                       VerticalScrollBarVisibility="Auto"
                                       Style="{StaticResource EliteScrollViewer}">
                             <StackPanel>
-                                <TextBlock Text="EMPLOYEE NAME" Style="{StaticResource HeadingSmall}" Margin="0,4,0,8"/>
+                                <TextBlock Text="{Binding EmpEmployeeNameLabel}" Style="{StaticResource HeadingSmall}" Margin="0,4,0,8"/>
                                 <TextBox Text="{Binding EmployeeName, UpdateSourceTrigger=PropertyChanged}"
                                          Style="{StaticResource EliteTextBox}"/>
 
-                                <TextBlock Text="ROLE" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
-                                <ComboBox ItemsSource="{Binding Roles}"
-                                          SelectedItem="{Binding SelectedRole}"
+                                <TextBlock Text="{Binding EmpRoleLabel}" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                                <ComboBox ItemsSource="{Binding RoleOptions}"
+                                          SelectedItem="{Binding SelectedRoleOption}"
+                                          DisplayMemberPath="Label"
                                           Style="{StaticResource EliteComboBox}"
                                           ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
 
                                 <TextBlock Style="{StaticResource HeadingSmall}" Margin="0,18,0,8">
-                                    <Run Text="SIGN-IN ID"/>
-                                    <Run Text=" (required for floor + kitchen tablets)" Foreground="{StaticResource TextMutedBrush}" FontSize="10"/>
+                                    <Run Text="{Binding EmpSignInIdLabel, Mode=OneWay}"/>
+                                    <Run Text="{Binding EmpSignInIdHint, Mode=OneWay}" Foreground="{StaticResource TextMutedBrush}" FontSize="10"/>
                                 </TextBlock>
                                 <TextBox Text="{Binding SignInId, UpdateSourceTrigger=PropertyChanged}"
                                          Style="{StaticResource EliteTextBox}"
-                                         ToolTip="Short ID for tablet login with PIN (letters, numbers, - or _). Not the long system Unique ID."/>
+                                         ToolTip="{Binding EmpSignInIdTooltip}"/>
 
-                                <TextBlock Text="PIN CODE" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                                <TextBlock Text="{Binding EmpPinCodeLabel}" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
                                 <TextBlock Text="{Binding PinFieldHelpText}"
                                            Foreground="{StaticResource TextMutedBrush}"
                                            FontSize="11"
@@ -428,26 +404,32 @@
                                              Foreground="{StaticResource TextPrimaryBrush}"
                                              CaretBrush="{StaticResource GoldAccentBrush}"/>
 
-                                <TextBlock Text="PHONE NUMBER" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                                <TextBlock Text="{Binding EmpPhoneNumberLabel}" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
                                 <TextBox Text="{Binding PhoneNumber, UpdateSourceTrigger=PropertyChanged}"
                                          Style="{StaticResource EliteTextBox}"/>
 
-                                <TextBlock Text="MONTHLY SALARY (USD) — PAYROLL" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                                <TextBlock Text="{Binding EmpMonthlySalaryLabel}" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
                                 <TextBox Text="{Binding MonthlySalaryUsdText, UpdateSourceTrigger=PropertyChanged}"
                                          Style="{StaticResource EliteTextBox}"
-                                         ToolTip="Required for payroll. Gross monthly amount in USD (calendar-prorated after join date)."/>
+                                         ToolTip="{Binding EmpMonthlySalaryTooltip}"/>
 
-                                <TextBlock Text="JOIN DATE (YYYY-MM-DD)" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                                <TextBlock Text="{Binding EmpStaffMealDiscountLabel}" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                                <TextBox Text="{Binding StaffMealDiscountPercentText, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource EliteTextBox}"
+                                         ToolTip="{Binding EmpStaffMealDiscountTooltip}"/>
+
+                                <TextBlock Text="{Binding EmpJoinDateLabel}" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
                                 <TextBox Text="{Binding JoinDateText, UpdateSourceTrigger=PropertyChanged}"
                                          Style="{StaticResource EliteTextBox}"/>
 
-                                <TextBlock Text="EMPLOYMENT STATUS" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
-                                <ComboBox ItemsSource="{Binding EmploymentStatuses}"
-                                          SelectedItem="{Binding SelectedEmploymentStatus}"
+                                <TextBlock Text="{Binding EmpEmploymentStatusLabel}" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                                <ComboBox ItemsSource="{Binding EmploymentStatusOptions}"
+                                          SelectedItem="{Binding SelectedEmploymentStatusOption}"
+                                          DisplayMemberPath="Label"
                                           Style="{StaticResource EliteComboBox}"
                                           ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
 
-                                <TextBlock Text="PROFILE IMAGE (OPTIONAL)" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                                <TextBlock Text="{Binding EmpProfileImageLabel}" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
@@ -460,12 +442,12 @@
                                     <Button Grid.Column="1"
                                             Width="96"
                                             Margin="10,0,0,0"
-                                            Content="Browse"
+                                            Content="{Binding BrowseLabel}"
                                             Command="{Binding BrowseProfileImageCommand}"
                                             Style="{StaticResource SapphireButton}"/>
                                 </Grid>
 
-                                <TextBlock Text="NOTES" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                                <TextBlock Text="{Binding EmpDialogNotesLabel}" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
                                 <TextBox Text="{Binding EmployeeNotes, UpdateSourceTrigger=PropertyChanged}"
                                          Height="110"
                                          TextWrapping="Wrap"
@@ -477,7 +459,7 @@
                                          BorderThickness="1"
                                          Padding="10"/>
 
-                                <TextBlock Text="WEEKLY WORK SCHEDULE" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                                <TextBlock Text="{Binding EmpWeeklyScheduleLabel}" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
@@ -491,35 +473,35 @@
                                     </Grid.RowDefinitions>
 
                                     <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,8,10">
-                                        <TextBlock Text="MONDAY" Style="{StaticResource HeadingSmall}" Margin="0,0,0,6"/>
-                                        <ComboBox ItemsSource="{Binding ShiftOptions}" SelectedItem="{Binding MondayShift}" Style="{StaticResource EliteComboBox}" ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
+                                        <TextBlock Text="{Binding EmpMondayLabel}" Style="{StaticResource HeadingSmall}" Margin="0,0,0,6"/>
+                                        <ComboBox ItemsSource="{Binding ShiftOptions}" SelectedItem="{Binding SelectedMondayShiftOption}" DisplayMemberPath="Label" Style="{StaticResource EliteComboBox}" ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="0" Grid.Column="1" Margin="8,0,0,10">
-                                        <TextBlock Text="TUESDAY" Style="{StaticResource HeadingSmall}" Margin="0,0,0,6"/>
-                                        <ComboBox ItemsSource="{Binding ShiftOptions}" SelectedItem="{Binding TuesdayShift}" Style="{StaticResource EliteComboBox}" ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
+                                        <TextBlock Text="{Binding EmpTuesdayLabel}" Style="{StaticResource HeadingSmall}" Margin="0,0,0,6"/>
+                                        <ComboBox ItemsSource="{Binding ShiftOptions}" SelectedItem="{Binding SelectedTuesdayShiftOption}" DisplayMemberPath="Label" Style="{StaticResource EliteComboBox}" ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
                                     </StackPanel>
 
                                     <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,8,10">
-                                        <TextBlock Text="WEDNESDAY" Style="{StaticResource HeadingSmall}" Margin="0,0,0,6"/>
-                                        <ComboBox ItemsSource="{Binding ShiftOptions}" SelectedItem="{Binding WednesdayShift}" Style="{StaticResource EliteComboBox}" ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
+                                        <TextBlock Text="{Binding EmpWednesdayLabel}" Style="{StaticResource HeadingSmall}" Margin="0,0,0,6"/>
+                                        <ComboBox ItemsSource="{Binding ShiftOptions}" SelectedItem="{Binding SelectedWednesdayShiftOption}" DisplayMemberPath="Label" Style="{StaticResource EliteComboBox}" ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="1" Grid.Column="1" Margin="8,0,0,10">
-                                        <TextBlock Text="THURSDAY" Style="{StaticResource HeadingSmall}" Margin="0,0,0,6"/>
-                                        <ComboBox ItemsSource="{Binding ShiftOptions}" SelectedItem="{Binding ThursdayShift}" Style="{StaticResource EliteComboBox}" ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
+                                        <TextBlock Text="{Binding EmpThursdayLabel}" Style="{StaticResource HeadingSmall}" Margin="0,0,0,6"/>
+                                        <ComboBox ItemsSource="{Binding ShiftOptions}" SelectedItem="{Binding SelectedThursdayShiftOption}" DisplayMemberPath="Label" Style="{StaticResource EliteComboBox}" ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
                                     </StackPanel>
 
                                     <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,0,8,10">
-                                        <TextBlock Text="FRIDAY" Style="{StaticResource HeadingSmall}" Margin="0,0,0,6"/>
-                                        <ComboBox ItemsSource="{Binding ShiftOptions}" SelectedItem="{Binding FridayShift}" Style="{StaticResource EliteComboBox}" ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
+                                        <TextBlock Text="{Binding EmpFridayLabel}" Style="{StaticResource HeadingSmall}" Margin="0,0,0,6"/>
+                                        <ComboBox ItemsSource="{Binding ShiftOptions}" SelectedItem="{Binding SelectedFridayShiftOption}" DisplayMemberPath="Label" Style="{StaticResource EliteComboBox}" ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
                                     </StackPanel>
                                     <StackPanel Grid.Row="2" Grid.Column="1" Margin="8,0,0,10">
-                                        <TextBlock Text="SATURDAY" Style="{StaticResource HeadingSmall}" Margin="0,0,0,6"/>
-                                        <ComboBox ItemsSource="{Binding ShiftOptions}" SelectedItem="{Binding SaturdayShift}" Style="{StaticResource EliteComboBox}" ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
+                                        <TextBlock Text="{Binding EmpSaturdayLabel}" Style="{StaticResource HeadingSmall}" Margin="0,0,0,6"/>
+                                        <ComboBox ItemsSource="{Binding ShiftOptions}" SelectedItem="{Binding SelectedSaturdayShiftOption}" DisplayMemberPath="Label" Style="{StaticResource EliteComboBox}" ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
                                     </StackPanel>
 
                                     <StackPanel Grid.Row="3" Grid.Column="0" Margin="0,0,8,0">
-                                        <TextBlock Text="SUNDAY" Style="{StaticResource HeadingSmall}" Margin="0,0,0,6"/>
-                                        <ComboBox ItemsSource="{Binding ShiftOptions}" SelectedItem="{Binding SundayShift}" Style="{StaticResource EliteComboBox}" ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
+                                        <TextBlock Text="{Binding EmpSundayLabel}" Style="{StaticResource HeadingSmall}" Margin="0,0,0,6"/>
+                                        <ComboBox ItemsSource="{Binding ShiftOptions}" SelectedItem="{Binding SelectedSundayShiftOption}" DisplayMemberPath="Label" Style="{StaticResource EliteComboBox}" ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
                                     </StackPanel>
                                 </Grid>
                             </StackPanel>
@@ -531,12 +513,12 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <Button Grid.Column="0"
-                                    Content="Cancel"
+                                    Content="{Binding CancelLabel}"
                                     Margin="0,0,8,0"
                                     Command="{Binding CancelDialogCommand}"
                                     Style="{StaticResource GhostButton}"/>
                             <Button Grid.Column="1"
-                                    Content="Save Employee"
+                                    Content="{Binding EmpSaveEmployeeLabel}"
                                     Margin="8,0,0,0"
                                     Command="{Binding SaveEmployeeCommand}"
                                     Style="{StaticResource GoldPrimaryButton}"/>

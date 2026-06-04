@@ -1,4 +1,5 @@
 using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Utils;
 using System.Linq.Expressions;
 
 namespace EliteRestaurant.Core.Reporting;
@@ -22,21 +23,28 @@ public static class OrderReportAnchor
     public static IOrderedQueryable<OrderRecord> OrderByAnchorDescending(IQueryable<OrderRecord> source) =>
         source.OrderByDescending(AnchorExpression);
 
-    public static DateTime LocalCalendarDay(DateTime t) =>
+  public static DateTime LocalCalendarDay(DateTime t, string? restaurantTimeZoneId = null) =>
         t.Kind switch
         {
-            DateTimeKind.Utc => t.ToLocalTime().Date,
-            DateTimeKind.Local => t.Date,
-            _ => t.Date,
+            DateTimeKind.Utc => RestaurantTimeZone.UtcToRestaurant(t, restaurantTimeZoneId).Date,
+            DateTimeKind.Local when string.IsNullOrWhiteSpace(restaurantTimeZoneId) => t.Date,
+            DateTimeKind.Local => RestaurantTimeZone.UtcToRestaurant(t.ToUniversalTime(), restaurantTimeZoneId).Date,
+            _ => RestaurantTimeZone.UtcToRestaurant(DateTime.SpecifyKind(t, DateTimeKind.Utc), restaurantTimeZoneId).Date,
         };
 
-    /// <param name="startDay">Local midnight start (inclusive).</param>
-    /// <param name="endExclusive">Local midnight after last inclusive day.</param>
-    public static bool IsAnchorInHalfOpenLocalRange(OrderRecord o, DateTime startDay, DateTime endExclusive)
+    /// <param name="startDay">Restaurant-calendar midnight start (inclusive).</param>
+    /// <param name="endExclusive">Restaurant-calendar midnight after last inclusive day.</param>
+    public static bool IsAnchorInHalfOpenLocalRange(
+        OrderRecord o,
+        DateTime startDay,
+        DateTime endExclusive,
+        string? restaurantTimeZoneId = null)
     {
         var local = Anchor(o);
         if (local.Kind == DateTimeKind.Utc)
-            local = local.ToLocalTime();
+            local = RestaurantTimeZone.UtcToRestaurant(local, restaurantTimeZoneId);
+        else if (!string.IsNullOrWhiteSpace(restaurantTimeZoneId))
+            local = RestaurantTimeZone.UtcToRestaurant(local.ToUniversalTime(), restaurantTimeZoneId);
         return local >= startDay && local < endExclusive;
     }
 }

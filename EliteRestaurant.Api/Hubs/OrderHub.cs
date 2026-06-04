@@ -70,7 +70,7 @@ public sealed class OrderHub(IServiceScopeFactory scopeFactory) : Hub
         if (!r.Ok)
             throw new HubException(r.ErrorMessage ?? "Release failed.");
 
-        await hub.Clients.Group("Kitchen").SendAsync("KitchenQueueChanged", new { reason = "hub-start-preparation", orderId });
+        await OrderHubBroadcasts.NotifyKitchenQueueChangedAsync(hub, db, orderId, "hub-start-preparation");
     }
 
     /// <summary>Kitchen marks an order ready; notifies cashier dashboard listeners.</summary>
@@ -92,6 +92,8 @@ public sealed class OrderHub(IServiceScopeFactory scopeFactory) : Hub
         var result = ops.TryMarkKitchenReadyForCashier(orderId, prepStation);
         if (!result.Ok)
             throw new HubException(result.ErrorMessage ?? "Cannot mark ready.");
+
+        await OrderHubBroadcasts.NotifyServerStationPrepReadyAsync(hub, db, orderId, prepStation);
 
         if (result.SuppressBroadcast || result.Notification is null)
             return;

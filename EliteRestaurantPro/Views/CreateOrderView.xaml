@@ -46,11 +46,11 @@
             </Grid.RowDefinitions>
 
             <StackPanel Grid.Row="0" Margin="32,24,32,20">
-                <TextBlock Text="{Binding PageTitle}"
+                <TextBlock Text="{Binding PageTitle, Mode=OneWay}"
                            Style="{StaticResource HeadingLarge}"
                            FontSize="26"
                            Foreground="{StaticResource TextPrimaryBrush}"/>
-                <TextBlock Text="{Binding PageSubtitle}"
+                <TextBlock Text="{Binding PageSubtitle, Mode=OneWay}"
                            Style="{StaticResource BodyText}"
                            FontSize="13"
                            Margin="0,5,0,0"
@@ -58,13 +58,13 @@
 
                 <Border Margin="0,12,0,0" Padding="12,8" CornerRadius="8" Background="#3327AE60"
                         Visibility="{Binding ReadyPickupBannerVisible, Converter={StaticResource BoolToVisibilityConverter}}">
-                    <TextBlock Text="{Binding ReadyPickupBannerText}"
+                    <TextBlock Text="{Binding ReadyPickupBannerText, Mode=OneWay}"
                                Foreground="#FFB2DFDB" FontSize="13" TextWrapping="Wrap"/>
                 </Border>
 
                 <Border Margin="0,8,0,0" Padding="12,8" CornerRadius="8" Background="#334682B4"
                         Visibility="{Binding HasOpenCheckForTable, Converter={StaticResource BoolToVisibilityConverter}}">
-                    <TextBlock Text="{Binding OpenCheckBannerText}"
+                    <TextBlock Text="{Binding OpenCheckBannerText, Mode=OneWay}"
                                Foreground="#FFBBDEFB" FontSize="13" TextWrapping="Wrap"/>
                 </Border>
 
@@ -78,27 +78,27 @@
                               ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
                     <Button Width="100"
                             Margin="0,0,8,8"
-                            Content="Load Draft"
+                            Content="{Binding LoadDraftLabel, Mode=OneWay}"
                             Command="{Binding LoadDraftCommand}"
                             Style="{StaticResource GoldPrimaryButton}"/>
                     <Button Width="100"
                             Margin="0,0,8,8"
-                            Content="Save Draft"
+                            Content="{Binding SaveDraftLabel, Mode=OneWay}"
                             Command="{Binding SaveDraftCommand}"
                             Style="{StaticResource SapphireButton}"/>
                     <Button Width="84"
                             Margin="0,0,8,8"
-                            Content="Remove"
+                            Content="{Binding RemoveDraftLabel, Mode=OneWay}"
                             Command="{Binding DeleteDraftCommand}"
                             Style="{StaticResource GhostButton}"/>
                     <Button Width="100"
                             Margin="0,0,8,8"
-                            Content="Remove All"
+                            Content="{Binding RemoveAllDraftsLabel, Mode=OneWay}"
                             Command="{Binding DeleteAllDraftsCommand}"
                             Style="{StaticResource DangerButton}"/>
                     <Button Width="78"
                             Margin="0,0,0,8"
-                            Content="Clear"
+                            Content="{Binding ClearSelectionLabel, Mode=OneWay}"
                             Command="{Binding ClearSelectionCommand}"
                             Style="{StaticResource GhostButton}"/>
                 </WrapPanel>
@@ -127,7 +127,7 @@
                                 </Grid.ColumnDefinitions>
 
                                 <StackPanel Grid.Column="0">
-                                    <TextBlock Text="TABLE" Style="{StaticResource HeadingSmall}" Margin="0,0,0,8"/>
+                                    <TextBlock Text="{Binding TableLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,0,0,8"/>
                                     <ComboBox ItemsSource="{Binding AvailableTables}"
                                               SelectedValue="{Binding SelectedTableId}"
                                               SelectedValuePath="Id"
@@ -137,12 +137,12 @@
                                         <ComboBox.ItemTemplate>
                                             <DataTemplate>
                                                 <TextBlock Foreground="{StaticResource TextPrimaryBrush}" TextWrapping="Wrap">
-                                                    <Run Text="Table "/>
-                                                    <Run Text="{Binding TableNumber}"/>
+                                                    <Run Text="{Binding DataContext.TableComboPrefix, Mode=OneWay, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                                                    <Run Text="{Binding TableNumber, Mode=OneWay}"/>
                                                     <Run Text=" - "/>
-                                                    <Run Text="{Binding Name}"/>
+                                                    <Run Text="{Binding Name, Mode=OneWay}"/>
                                                     <Run Text=" · " Foreground="{StaticResource TextMutedBrush}"/>
-                                                    <Run Text="{Binding Status}" Foreground="{StaticResource GoldAccentBrush}"/>
+                                                    <Run Text="{Binding DisplayStatus, Mode=OneWay}" Foreground="{StaticResource GoldAccentBrush}"/>
                                                 </TextBlock>
                                             </DataTemplate>
                                         </ComboBox.ItemTemplate>
@@ -150,9 +150,9 @@
                                 </StackPanel>
 
                                 <StackPanel Grid.Column="2">
-                                    <TextBlock Text="MENU TYPE" Style="{StaticResource HeadingSmall}" Margin="0,0,0,8"/>
-                                    <ComboBox ItemsSource="{Binding OrderCategories}"
-                                              SelectedItem="{Binding SelectedOrderCategory}"
+                                    <TextBlock Text="{Binding MenuTypeLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,0,0,8"/>
+                                    <ComboBox ItemsSource="{Binding OrderCategoryOptions}"
+                                              SelectedItem="{Binding SelectedOrderCategoryOption}"
                                               Style="{StaticResource EliteComboBox}"
                                               ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
                                 </StackPanel>
@@ -164,12 +164,12 @@
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0"
-                                           Text="SUBMENU TYPE"
+                                           Text="{Binding SubmenuTypeLabel, Mode=OneWay}"
                                            Style="{StaticResource HeadingSmall}"
                                            VerticalAlignment="Center"/>
                                 <ComboBox Grid.Column="1"
-                                          ItemsSource="{Binding OrderSubCategories}"
-                                          SelectedItem="{Binding SelectedOrderSubCategory}"
+                                          ItemsSource="{Binding OrderSubCategoryOptions}"
+                                          SelectedItem="{Binding SelectedOrderSubCategoryOption}"
                                           Style="{StaticResource EliteComboBox}"
                                           ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
                             </Grid>
@@ -180,7 +180,7 @@
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0"
-                                           Text="SEARCH PRODUCT (NAME / ID)"
+                                           Text="{Binding SearchProductLabel, Mode=OneWay}"
                                            Style="{StaticResource HeadingSmall}"
                                            VerticalAlignment="Center"/>
                                 <TextBox Grid.Column="1"
@@ -233,7 +233,7 @@
                                                         <TextBlock Foreground="{StaticResource TextPrimaryBrush}" FontSize="13" FontWeight="SemiBold">
                                                             <Run Text="{Binding Name, Mode=OneWay}"/>
                                                             <Run Text=" "/>
-                                                            <Run Text="{Binding Price, Mode=OneWay, StringFormat=($ {0:N2})}" Foreground="{StaticResource GoldAccentBrush}"/>
+                                                            <Run Text="{Binding FormattedPrice, Mode=OneWay}" Foreground="{StaticResource GoldAccentBrush}"/>
                                                         </TextBlock>
                                                         <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="11">
                                                             <Run Text="{Binding Category, Mode=OneWay}"/>
@@ -288,16 +288,16 @@
                         </Grid.RowDefinitions>
 
                         <StackPanel>
-                            <TextBlock Text="Live Totals" Foreground="{StaticResource GoldAccentBrush}" FontSize="18" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding LiveTotalsLabel, Mode=OneWay}" Foreground="{StaticResource GoldAccentBrush}" FontSize="18" FontWeight="SemiBold"/>
                             <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="12" Margin="0,4,0,0">
-                                <Run Text="Items selected: "/>
+                                <Run Text="{Binding ItemsSelectedLabel, Mode=OneWay}"/>
                                 <Run Text="{Binding LiveItemCount, Mode=OneWay}"/>
                             </TextBlock>
                             <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="12" Margin="0,2,0,0">
-                                <Run Text="Estimated prep: "/>
+                                <Run Text="{Binding EstimatedPrepLabel, Mode=OneWay}"/>
                                 <Run Text="{Binding EstimatedPrepText, Mode=OneWay}"/>
                             </TextBlock>
-                            <TextBlock Text="CUSTOMER NOTES" Style="{StaticResource HeadingSmall}" Margin="0,10,0,6"/>
+                            <TextBlock Text="{Binding CustomerNotesLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,10,0,6"/>
                             <TextBox Text="{Binding CustomerNotes, UpdateSourceTrigger=PropertyChanged}"
                                      Height="62"
                                      TextWrapping="Wrap"
@@ -308,7 +308,7 @@
                                      BorderBrush="{StaticResource BorderSubtleBrush}"
                                      BorderThickness="1"
                                      Padding="8"/>
-                            <TextBlock Text="ALLERGY NOTES" Style="{StaticResource HeadingSmall}" Margin="0,8,0,6"/>
+                            <TextBlock Text="{Binding AllergyNotesLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,8,0,6"/>
                             <TextBox Text="{Binding AllergyNotes, UpdateSourceTrigger=PropertyChanged}"
                                      Height="62"
                                      TextWrapping="Wrap"
@@ -320,8 +320,24 @@
                                      BorderThickness="1"
                                      Padding="8"/>
 
-                            <TextBlock Text="DISCOUNT" Style="{StaticResource HeadingSmall}" Margin="0,12,0,6"/>
-                            <TextBlock Text="Applies to merchandise subtotal before tax &amp; service. FC payment still uses discounted grand total."
+                            <TextBlock Text="{Binding LinkClientLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,12,0,6"/>
+                            <Grid Margin="0,0,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox Grid.Column="0"
+                                         Text="{Binding ClientSearchText, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource EliteTextBox}"
+                                         ToolTip="{Binding ClientSearchTooltip, Mode=OneWay}"/>
+                                <Button Grid.Column="1" Margin="8,0,0,0" Content="{Binding LinkClientButtonLabel, Mode=OneWay}" Command="{Binding LinkClientCommand}" Style="{StaticResource GhostButton}"/>
+                                <Button Grid.Column="2" Margin="8,0,0,0" Content="{Binding ClearClientButtonLabel, Mode=OneWay}" Command="{Binding ClearLinkedClientCommand}" Style="{StaticResource GhostButton}"/>
+                            </Grid>
+                            <TextBlock Text="{Binding LinkedClientLabel, Mode=OneWay}" Foreground="{StaticResource GoldAccentBrush}" FontSize="12" Margin="0,0,0,4"/>
+
+                            <TextBlock Text="{Binding DiscountLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,12,0,6"/>
+                            <TextBlock Text="{Binding DiscountHint, Mode=OneWay}"
                                        Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,0,0,8" TextWrapping="Wrap"/>
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -330,13 +346,13 @@
                                     <ColumnDefinition Width="120"/>
                                 </Grid.ColumnDefinitions>
                                 <ComboBox Grid.Column="0"
-                                          ItemsSource="{Binding DiscountModes}"
-                                          SelectedItem="{Binding SelectedDiscountMode}"
+                                          ItemsSource="{Binding DiscountModeOptions}"
+                                          SelectedItem="{Binding SelectedDiscountModeOption}"
                                           Style="{StaticResource EliteComboBox}"
                                           ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
                                 <TextBox Grid.Column="2"
                                          Text="{Binding DiscountInput, UpdateSourceTrigger=PropertyChanged}"
-                                         ToolTip="Percent (e.g. 10) or USD amount (e.g. 5.50)"
+                                         ToolTip="{Binding DiscountInputTooltip, Mode=OneWay}"
                                          Foreground="{StaticResource TextPrimaryBrush}"
                                          Background="{StaticResource CardBaseBrush}"
                                          BorderBrush="{StaticResource BorderSubtleBrush}"
@@ -371,7 +387,13 @@
                                                 <StackPanel Grid.Column="0">
                                                     <TextBlock Text="{Binding Name, Mode=OneWay}" Foreground="{StaticResource TextPrimaryBrush}" FontWeight="SemiBold"/>
                                                     <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="11">
-                                                        <Run Text="{Binding UniqueId, Mode=OneWay}"/><Run Text=" | Qty "/><Run Text="{Binding Quantity, Mode=OneWay}"/><Run Text=" x $ "/><Run Text="{Binding Price, Mode=OneWay, StringFormat={}{0:N2}}"/>
+                                                        <Run Text="{Binding UniqueId, Mode=OneWay}"/>
+                                                        <Run Text=" | "/>
+                                                        <Run Text="{Binding DataContext.QtyPrefix, Mode=OneWay, RelativeSource={RelativeSource AncestorType=UserControl}}"/>
+                                                        <Run Text=" "/>
+                                                        <Run Text="{Binding Quantity, Mode=OneWay}"/>
+                                                        <Run Text=" x "/>
+                                                        <Run Text="{Binding FormattedPrice, Mode=OneWay}"/>
                                                     </TextBlock>
                                                 </StackPanel>
                                                 <Grid Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center">
@@ -399,13 +421,11 @@
                                                     <Button Content="X"
                                                             Width="36"
                                                             Margin="0,0,8,0"
-                                                            ToolTip="Remove from ticket"
+                                                            ToolTip="{Binding DataContext.RemoveLineTooltip, Mode=OneWay, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                             Command="{Binding DataContext.RemoveSelectedLineCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                             CommandParameter="{Binding}"
                                                             Style="{StaticResource DangerButton}"/>
-                                                    <TextBlock VerticalAlignment="Center" Foreground="{StaticResource GoldAccentBrush}" FontWeight="SemiBold">
-                                                        <Run Text="$ "/><Run Text="{Binding LineTotal, Mode=OneWay, StringFormat={}{0:N2}}"/>
-                                                    </TextBlock>
+                                                    <TextBlock Text="{Binding FormattedLineTotal, Mode=OneWay}" VerticalAlignment="Center" Foreground="{StaticResource GoldAccentBrush}" FontWeight="SemiBold"/>
                                                 </StackPanel>
                                             </Grid>
                                         </Border>
@@ -415,29 +435,17 @@
                         </ScrollViewer>
 
                         <StackPanel Grid.Row="2">
-                            <TextBlock Foreground="{StaticResource TextSecondaryBrush}">
-                                <Run Text="{Binding SubtotalCaption, Mode=OneWay}"/><Run Text="{Binding LiveSubtotal, Mode=OneWay, StringFormat={}{0:N2}}"/>
-                            </TextBlock>
-                            <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0">
-                                <Run Text="{Binding LiveTaxRateLabel, Mode=OneWay}"/><Run Text=": $ "/><Run Text="{Binding LiveTaxAmount, Mode=OneWay, StringFormat={}{0:N2}}"/>
-                            </TextBlock>
-                            <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0">
-                                <Run Text="{Binding LiveServiceRateLabel, Mode=OneWay}"/><Run Text=": $ "/><Run Text="{Binding LiveServiceAmount, Mode=OneWay, StringFormat={}{0:N2}}"/>
-                            </TextBlock>
-                            <TextBlock Foreground="{StaticResource GoldAccentBrush}" FontSize="20" FontWeight="SemiBold" Margin="0,6,0,0">
-                                <Run Text="Grand Total: "/><Run Text="{Binding LiveGrandTotalUsdText, Mode=OneWay}"/>
-                            </TextBlock>
-                            <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0">
-                                <Run Text="Equivalent FC: "/><Run Text="{Binding LiveGrandTotalFcText, Mode=OneWay}"/>
-                            </TextBlock>
-                            <TextBlock Foreground="{StaticResource StatBlueBrush}" FontWeight="SemiBold" Margin="0,2,0,0">
-                                <Run Text="Amount To Collect: "/><Run Text="{Binding ChosenPaymentAmountText, Mode=OneWay}"/>
-                            </TextBlock>
+                            <TextBlock Text="{Binding SubtotalLineText, Mode=OneWay}" Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <TextBlock Text="{Binding TaxLineText, Mode=OneWay}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+                            <TextBlock Text="{Binding ServiceLineText, Mode=OneWay}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+                            <TextBlock Text="{Binding GrandTotalLineText, Mode=OneWay}" Foreground="{StaticResource GoldAccentBrush}" FontSize="20" FontWeight="SemiBold" Margin="0,6,0,0"/>
+                            <TextBlock Text="{Binding EquivalentFcLineText, Mode=OneWay}" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+                            <TextBlock Text="{Binding AmountToCollectLineText, Mode=OneWay}" Foreground="{StaticResource StatBlueBrush}" FontWeight="SemiBold" Margin="0,2,0,0"/>
 
                             <!-- Focusable=false: after a modal dialog closes, Enter can otherwise re-fire this Command from focus snap-back. -->
                             <Button Margin="0,14,0,0"
                                     Focusable="False"
-                                    Content="{Binding PrimaryActionLabel}"
+                                    Content="{Binding PrimaryActionLabel, Mode=OneWay}"
                                     Command="{Binding CreateOrderCommand}"
                                     Style="{StaticResource GoldPrimaryButton}"/>
                         </StackPanel>
@@ -451,7 +459,7 @@
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center"
                     Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}">
-                <TextBlock Text="Loading create order..."
+                <TextBlock Text="{Binding LoadingOverlayText, Mode=OneWay}"
                            Foreground="{StaticResource TextPrimaryBrush}"
                            FontSize="14"
                            FontWeight="SemiBold"/>

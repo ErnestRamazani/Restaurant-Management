@@ -101,6 +101,19 @@ public static class OrderTotalsHelper
         return (core.DiscountApplied, core.TaxableSubtotal, core.Tax, core.Service, core.GrandTotal + fee);
     }
 
+    /// <summary>Delivery fee variant using resolved public-menu pricing (cloud profile + file fallback).</summary>
+    public static (decimal DiscountApplied, decimal TaxableSubtotal, decimal Tax, decimal Service, decimal GrandTotal) ComputeTotalsWithDeliveryFee(
+        decimal lineItemsSubtotal,
+        string? discountMode,
+        decimal discountValue,
+        decimal deliveryFeeUsd,
+        PublicMenuSetting pricing)
+    {
+        var core = ComputeTotals(lineItemsSubtotal, discountMode, discountValue, pricing);
+        var fee = Math.Round(Math.Max(0m, deliveryFeeUsd), 2);
+        return (core.DiscountApplied, core.TaxableSubtotal, core.Tax, core.Service, core.GrandTotal + fee);
+    }
+
     public static string FormatDiscountLabel(string? discountMode, decimal discountValue, decimal discountApplied)
     {
         if (discountApplied <= 0m)

@@ -6,6 +6,7 @@
     <UserControl.Resources>
         <converters:ProductToMenuCardPhotoConverter x:Key="ProductToMenuCardPhotoConverter"/>
         <converters:ProductMenuMonogramConverter x:Key="ProductMenuMonogramConverter"/>
+        <converters:MenuIngredientCountConverter x:Key="MenuIngredientCountConverter"/>
     </UserControl.Resources>
     <Grid>
         <Grid.ColumnDefinitions>
@@ -29,10 +30,9 @@
 
                 <StackPanel>
                     <TextBlock Style="{StaticResource HeadingLarge}" FontSize="26">
-                        <Run Text="Menu" Foreground="{StaticResource TextPrimaryBrush}"/>
-                        <Run Text=" Products" Foreground="{StaticResource GoldAccentBrush}"/>
+                        <Run Text="{Binding PageTitle, Mode=OneWay}" Foreground="{StaticResource TextPrimaryBrush}"/>
                     </TextBlock>
-                    <TextBlock Text="Curate the premium product catalog for service and POS."
+                    <TextBlock Text="{Binding PageSubtitle, Mode=OneWay}"
                                Style="{StaticResource BodyText}"
                                FontSize="13"
                                Margin="0,5,0,0"/>
@@ -40,7 +40,7 @@
 
                 <Button Grid.Column="1"
                         Width="140"
-                        Content="Add Product"
+                        Content="{Binding AddProductLabel, Mode=OneWay}"
                         Command="{Binding OpenAddDialogCommand}"
                         Style="{StaticResource GoldPrimaryButton}"
                         Visibility="{Binding ShowFullAdminNav, Converter={StaticResource BoolToVisibilityConverter}}"/>
@@ -66,16 +66,18 @@
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Grid.Column="0">
-                                    <TextBlock Text="MENU TYPE" Style="{StaticResource HeadingSmall}" Margin="0,0,0,8"/>
-                                    <ComboBox ItemsSource="{Binding ViewCategories}"
-                                              SelectedItem="{Binding SelectedViewCategory}"
+                                    <TextBlock Text="{Binding MenuTypeLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,0,0,8"/>
+                                    <ComboBox ItemsSource="{Binding ViewCategoryOptions}"
+                                              SelectedItem="{Binding SelectedViewCategoryOption}"
+                                              DisplayMemberPath="Label"
                                               Style="{StaticResource EliteComboBox}"
                                               ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
-                                    <TextBlock Text="SUBMENU TYPE" Style="{StaticResource HeadingSmall}" Margin="0,0,0,8"/>
-                                    <ComboBox ItemsSource="{Binding ViewSubCategories}"
-                                              SelectedItem="{Binding SelectedViewSubCategory}"
+                                    <TextBlock Text="{Binding SubmenuTypeLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,0,0,8"/>
+                                    <ComboBox ItemsSource="{Binding ViewSubCategoryOptions}"
+                                              SelectedItem="{Binding SelectedViewSubCategoryOption}"
+                                              DisplayMemberPath="Label"
                                               Style="{StaticResource EliteComboBox}"
                                               ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
                                 </StackPanel>
@@ -87,7 +89,7 @@
                                      MinHeight="42"
                                      FontSize="13"
                                      Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                                     ToolTip="Search menu items by name, category, ID, or price"/>
+                                     ToolTip="{Binding SearchTooltip, Mode=OneWay}"/>
                         </Grid>
                     </Border>
 
@@ -176,7 +178,7 @@
                                                                                                            FontFamily="Segoe UI Variable Text, Segoe UI"
                                                                                                            FontSize="12"
                                                                                                            FontWeight="SemiBold"
-                                                                                                           Text="{Binding Path=Ingredients.Count, StringFormat=Ingredients ({0})}"/>
+                                                                                                           Text="{Binding Path=Ingredients.Count, Converter={StaticResource MenuIngredientCountConverter}}"/>
                                                                                             </Expander.Header>
                                                                                             <ScrollViewer MaxHeight="200"
                                                                                                           VerticalScrollBarVisibility="Auto"
@@ -208,19 +210,19 @@
                                                                                                 <ColumnDefinition Width="*"/>
                                                                                             </Grid.ColumnDefinitions>
                                                                                             <Button Grid.Column="0"
-                                                                                                    Content="Details"
+                                                                                                    Content="{Binding DataContext.DetailsLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                                                     Margin="0,0,6,0"
                                                                                                     Command="{Binding DataContext.ShowProductDetailsCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                                                     CommandParameter="{Binding .}"
                                                                                                     Style="{StaticResource GhostButton}"/>
                                                                                             <Button Grid.Column="1"
-                                                                                                    Content="Edit"
+                                                                                                    Content="{Binding DataContext.EditLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                                                     Margin="6,0,6,0"
                                                                                                     Command="{Binding DataContext.EditProductCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                                                     CommandParameter="{Binding .}"
                                                                                                     Style="{StaticResource SapphireButton}"/>
                                                                                             <Button Grid.Column="2"
-                                                                                                    Content="Delete"
+                                                                                                    Content="{Binding DataContext.DeleteLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                                                     Margin="6,0,0,0"
                                                                                                     Command="{Binding DataContext.DeleteProductCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                                                     CommandParameter="{Binding .}"
@@ -256,38 +258,38 @@
                         MaxHeight="640">
                     <ScrollViewer MaxHeight="560" VerticalScrollBarVisibility="Auto" PanningMode="VerticalOnly">
                     <StackPanel>
-                        <TextBlock Text="{Binding DialogTitle}"
+                        <TextBlock Text="{Binding DialogTitle, Mode=OneWay}"
                                    Style="{StaticResource HeadingMedium}"
                                    FontSize="22"/>
 
                         <StackPanel Visibility="{Binding IsEditorDialogMode, Converter={StaticResource BoolToVisibilityConverter}}">
-                            <TextBlock Text="PRODUCT NAME" Style="{StaticResource HeadingSmall}" Margin="0,22,0,8"/>
+                            <TextBlock Text="{Binding MenuFieldProductNameLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,22,0,8"/>
                             <TextBox Text="{Binding ProductName, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource EliteTextBox}"/>
 
-                            <TextBlock Text="SECTION" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                            <TextBlock Text="{Binding MenuFieldSectionLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
                             <ComboBox ItemsSource="{Binding Categories}"
                                       SelectedItem="{Binding SelectedCategory}"
                                       Style="{StaticResource EliteComboBox}"
                                       ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
 
-                            <TextBlock Text="TYPE" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                            <TextBlock Text="{Binding MenuFieldTypeLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
                             <ComboBox ItemsSource="{Binding SubCategories}"
                                       SelectedItem="{Binding SelectedSubCategory}"
                                       Style="{StaticResource EliteComboBox}"
                                       ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
 
-                            <TextBlock Text="PRICE" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                            <TextBlock Text="{Binding MenuFieldPriceLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
                             <TextBox Text="{Binding PriceText, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource EliteTextBox}"/>
 
-                            <TextBlock Text="COOKING TIME (MINUTES)" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
-                            <TextBlock Text="Used for kitchen estimates on guest menu, POS, and server tablets. Required for each menu item."
+                            <TextBlock Text="{Binding MenuFieldCookingTimeLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                            <TextBlock Text="{Binding MenuFieldCookingTimeHelp, Mode=OneWay}"
                                        Style="{StaticResource BodyText}" FontSize="11" Opacity="0.75" TextWrapping="Wrap" Margin="0,0,0,6"/>
                             <TextBox Text="{Binding PrepMinutesText, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource EliteTextBox}"/>
 
-                            <TextBlock Text="DESCRIPTION (CUSTOMER MENU)" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                            <TextBlock Text="{Binding MenuFieldDescriptionLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
                             <TextBox Text="{Binding ProductDescription, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource EliteTextBox}"
                                      TextWrapping="Wrap"
@@ -296,9 +298,9 @@
                                      MaxLength="350"
                                      VerticalScrollBarVisibility="Auto"/>
                             <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,4,0,0"
-                                       Text="{Binding DescriptionCharCountRemaining, StringFormat=Characters remaining: {0}}"/>
+                                       Text="{Binding DescriptionCharCountRemainingText, Mode=OneWay}"/>
 
-                            <TextBlock Text="COMPOSITION (CUSTOMER, COMMA-SEPARATED)" Style="{StaticResource HeadingSmall}" Margin="0,12,0,8"/>
+                            <TextBlock Text="{Binding MenuFieldCompositionLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,12,0,8"/>
                             <TextBox Text="{Binding ProductComposition, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource EliteTextBox}"
                                      TextWrapping="Wrap"
@@ -306,7 +308,7 @@
                                      MinHeight="56"
                                      VerticalScrollBarVisibility="Auto"/>
 
-                            <TextBlock Text="PRODUCT IMAGE" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                            <TextBlock Text="{Binding MenuFieldProductImageLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -317,12 +319,12 @@
                                          Text="{Binding ProductImagePath, UpdateSourceTrigger=PropertyChanged}"
                                          Style="{StaticResource EliteTextBox}"/>
                                 <Button Grid.Column="1"
-                                        Content="Browse"
+                                        Content="{Binding BrowseLabel, Mode=OneWay}"
                                         Margin="8,0,0,0"
                                         Command="{Binding BrowseProductImageCommand}"
                                         Style="{StaticResource SapphireButton}"/>
                                 <Button Grid.Column="2"
-                                        Content="Clear"
+                                        Content="{Binding ClearLabel, Mode=OneWay}"
                                         Margin="8,0,0,0"
                                         Command="{Binding ClearProductImageCommand}"
                                         Style="{StaticResource GhostButton}"/>
@@ -332,7 +334,7 @@
                                     <Image Source="{Binding EditorImagePreview}"
                                            Stretch="UniformToFill"
                                            Visibility="{Binding HasEditorImagePreview, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                                    <TextBlock Text="No image selected"
+                                    <TextBlock Text="{Binding MenuNoImageSelectedLabel, Mode=OneWay}"
                                                Foreground="{StaticResource TextMutedBrush}"
                                                FontSize="12"
                                                HorizontalAlignment="Center"
@@ -345,7 +347,7 @@
                                       IsExpanded="False"
                                       Foreground="{StaticResource TextPrimaryBrush}">
                                 <Expander.Header>
-                                    <TextBlock Text="Ingredients from inventory"
+                                    <TextBlock Text="{Binding MenuInventoryIngredientsLabel, Mode=OneWay}"
                                                Foreground="{StaticResource TextMutedBrush}"
                                                FontFamily="Segoe UI Variable Text, Segoe UI"
                                                FontSize="12"
@@ -372,7 +374,8 @@
                                                                 <Run Text=")"/>
                                                             </TextBlock>
                                                             <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="10">
-                                                                <Run Text="Stock: "/>
+                                                                <Run Text="{Binding DataContext.MenuStockPrefix, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}"/>
+                                                                <Run Text=" "/>
                                                                 <Run Text="{Binding StockQuantity, StringFormat={}{0:0.##}}"/>
                                                                 <Run Text=" "/>
                                                                 <Run Text="{Binding Unit}"/>
@@ -406,7 +409,7 @@
                                     <Image Source="{Binding DetailsImagePreview}"
                                            Stretch="UniformToFill"
                                            Visibility="{Binding HasDetailsImagePreview, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                                    <TextBlock Text="No image available"
+                                    <TextBlock Text="{Binding MenuNoImageAvailableLabel, Mode=OneWay}"
                                                Foreground="{StaticResource TextMutedBrush}"
                                                FontSize="12"
                                                HorizontalAlignment="Center"
@@ -417,45 +420,45 @@
 
                             <UniformGrid Columns="2" Margin="0,14,0,0">
                                 <StackPanel Margin="0,0,8,8">
-                                    <TextBlock Text="PRODUCT ID" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBlock Text="{Binding MenuFieldProductIdLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                                     <TextBlock Text="{Binding DetailsUniqueId}" Style="{StaticResource BodyText}" Margin="0,4,0,0"/>
                                 </StackPanel>
                                 <StackPanel Margin="8,0,0,8">
-                                    <TextBlock Text="PRICE" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBlock Text="{Binding MenuFieldPriceLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                                     <TextBlock Style="{StaticResource BodyText}" Margin="0,4,0,0">
                                         <Run Text="$ "/>
-                                        <Run Text="{Binding DetailsPrice}"/>
+                                        <Run Text="{Binding DetailsPrice, Mode=OneWay}"/>
                                     </TextBlock>
                                 </StackPanel>
                                 <StackPanel Margin="0,0,8,8">
-                                    <TextBlock Text="SECTION" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBlock Text="{Binding MenuFieldSectionLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                                     <TextBlock Text="{Binding DetailsCategory}" Style="{StaticResource BodyText}" Margin="0,4,0,0"/>
                                 </StackPanel>
                                 <StackPanel Margin="8,0,0,8">
-                                    <TextBlock Text="TYPE" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBlock Text="{Binding MenuFieldTypeLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                                     <TextBlock Text="{Binding DetailsSubCategory}" Style="{StaticResource BodyText}" Margin="0,4,0,0"/>
                                 </StackPanel>
                                 <StackPanel Margin="0,0,8,8">
-                                    <TextBlock Text="COOKING TIME" Style="{StaticResource HeadingSmall}"/>
-                                    <TextBlock Text="{Binding DetailsPrepMinutes}" Style="{StaticResource BodyText}" Margin="0,4,0,0"/>
+                                    <TextBlock Text="{Binding MenuFieldCookingTimeShortLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBlock Text="{Binding DetailsPrepMinutes, Mode=OneWay}" Style="{StaticResource BodyText}" Margin="0,4,0,0"/>
                                 </StackPanel>
                             </UniformGrid>
 
-                            <TextBlock Text="DESCRIPTION" Style="{StaticResource HeadingSmall}" Margin="0,8,0,8"/>
+                            <TextBlock Text="{Binding MenuDetailsDescriptionLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,8,0,8"/>
                             <Border Style="{StaticResource GlassCard}" Padding="10">
-                                <TextBlock Text="{Binding DetailsDescription}" TextWrapping="Wrap" Style="{StaticResource BodyText}"/>
+                                <TextBlock Text="{Binding DetailsDescription, Mode=OneWay}" TextWrapping="Wrap" Style="{StaticResource BodyText}"/>
                             </Border>
 
-                            <TextBlock Text="COMPOSITION" Style="{StaticResource HeadingSmall}" Margin="0,12,0,8"/>
+                            <TextBlock Text="{Binding MenuDetailsCompositionLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,12,0,8"/>
                             <Border Style="{StaticResource GlassCard}" Padding="10">
-                                <TextBlock Text="{Binding DetailsComposition}" TextWrapping="Wrap" Style="{StaticResource BodyText}"/>
+                                <TextBlock Text="{Binding DetailsComposition, Mode=OneWay}" TextWrapping="Wrap" Style="{StaticResource BodyText}"/>
                             </Border>
 
                             <Expander Margin="0,12,0,0"
                                       IsExpanded="False"
                                       Foreground="{StaticResource TextPrimaryBrush}">
                                 <Expander.Header>
-                                    <TextBlock Text="Ingredients"
+                                    <TextBlock Text="{Binding MenuIngredientsLabel, Mode=OneWay}"
                                                Foreground="{StaticResource TextMutedBrush}"
                                                FontFamily="Segoe UI Variable Text, Segoe UI"
                                                FontSize="12"
@@ -484,18 +487,18 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <Button Grid.Column="0"
-                                    Content="Cancel"
+                                    Content="{Binding CancelLabel, Mode=OneWay}"
                                     Margin="0,0,8,0"
                                     Command="{Binding CancelDialogCommand}"
                                     Style="{StaticResource GhostButton}"/>
                             <Button Grid.Column="1"
-                                    Content="Save Product"
+                                    Content="{Binding MenuSaveProductLabel, Mode=OneWay}"
                                     Margin="8,0,0,0"
                                     Command="{Binding SaveProductCommand}"
                                     Style="{StaticResource GoldPrimaryButton}"/>
                         </Grid>
 
-                        <Button Content="Close"
+                        <Button Content="{Binding CloseLabel, Mode=OneWay}"
                                 Margin="0,24,0,0"
                                 Command="{Binding CancelDialogCommand}"
                                 Style="{StaticResource GhostButton}"

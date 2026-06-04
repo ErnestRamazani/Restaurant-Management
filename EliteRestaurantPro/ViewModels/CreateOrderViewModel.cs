@@ -6,6 +6,8 @@ using System.Windows.Input;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Utils;
 using EliteRestaurantPro.ApiClients;
+using EliteRestaurant.Contracts.Clients;
+using EliteRestaurantPro.Localization;
 using EliteRestaurantPro.Services;
 using EliteRestaurantPro.Views;
 using ModelTable = EliteRestaurant.Core.Models.Table;
@@ -28,12 +30,15 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         public override string ToString() => DisplayName;
     }
 
-    private static DraftEntry EmptyDraftOption => new() { FilePath = string.Empty, DisplayName = "None (empty slot)" };
+    private DraftEntry EmptyDraftOption => new() { FilePath = string.Empty, DisplayName = CreateOrderUiLocalizer.EmptyDraftLabel };
 
     private int _selectedTableId;
     private string _selectedOrderStatus = "Waiting";
     private string _selectedOrderCategory = "All";
     private string _selectedOrderSubCategory = "All";
+    private LocalizedSelectOption? _selectedOrderCategoryOption;
+    private LocalizedSelectOption? _selectedOrderSubCategoryOption;
+    private LocalizedSelectOption? _selectedDiscountModeOption;
     private string _productSearchText = string.Empty;
     private DraftEntry? _selectedDraft;
     private string _customerNotes = string.Empty;
@@ -53,6 +58,9 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
     private readonly int? _serverEmployeeId;
     private readonly string _serverEmployeeName = string.Empty;
     private int? _openCheckOrderId;
+    private int? _selectedRestaurantClientId;
+    private string _clientSearchText = string.Empty;
+    private string _linkedClientLabel = string.Empty;
     private string _openCheckCode = string.Empty;
     private string _openCheckStatus = string.Empty;
     private bool _suppressOpenCheckRefresh;
@@ -65,28 +73,74 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
     private decimal _persistedOpenOrderLineSubtotal;
 
     public override string ActivePage => "CreateOrder";
-    public string PageTitle => "Create Order";
-    public string PageSubtitle =>
-        IsTabletStaffOrderFlow
-            ? "Shared order pad for admin/server/cashier. If table already has an open check, you can append lines to the same ticket."
-            : "Create and manage table tickets with live totals, discounts, and open-check append support.";
+    public string PageTitle => CreateOrderUiLocalizer.PageTitle;
+    public string PageSubtitle => CreateOrderUiLocalizer.PageSubtitle;
+    public string LoadDraftLabel => Loc.Admin("createOrderLoadDraft", "Load Draft");
+    public string SaveDraftLabel => Loc.Admin("createOrderSaveDraft", "Save Draft");
+    public string RemoveDraftLabel => Loc.Admin("createOrderRemoveDraft", "Remove");
+    public string RemoveAllDraftsLabel => Loc.Admin("createOrderRemoveAllDrafts", "Remove All");
+    public string ClearSelectionLabel => Loc.Admin("createOrderClearSelection", "Clear");
+    public string TableLabel => Loc.Admin("createOrderTableLabel", "TABLE");
+    public string MenuTypeLabel => Loc.Admin("createOrderMenuTypeLabel", "MENU TYPE");
+    public string SubmenuTypeLabel => Loc.Admin("createOrderSubmenuTypeLabel", "SUBMENU TYPE");
+    public string SearchProductLabel => Loc.Admin("createOrderSearchProductLabel", "SEARCH PRODUCT (NAME / ID)");
+    public string LiveTotalsLabel => Loc.Admin("createOrderLiveTotals", "Live Totals");
+    public string ItemsSelectedLabel => Loc.Admin("createOrderItemsSelected", "Items selected:");
+    public string EstimatedPrepLabel => Loc.Admin("createOrderEstimatedPrep", "Estimated prep:");
+    public string CustomerNotesLabel => Loc.Admin("createOrderCustomerNotes", "CUSTOMER NOTES");
+    public string AllergyNotesLabel => Loc.Admin("createOrderAllergyNotes", "ALLERGY NOTES");
+    public string LinkClientLabel => Loc.Admin("createOrderLinkClient", "LINK CLIENT (OPTIONAL)");
+    public string LinkClientButtonLabel => Loc.Admin("createOrderLink", "Link");
+    public string ClearClientButtonLabel => Loc.Admin("createOrderClear", "Clear");
+    public string ClientSearchTooltip => Loc.Admin("createOrderClientSearchTooltip", "Search by name or phone");
+    public string DiscountLabel => Loc.Admin("createOrderDiscount", "DISCOUNT");
+    public string DiscountHint => Loc.Admin("createOrderDiscountHint", "Applies to merchandise subtotal before tax & service. FC payment still uses discounted grand total.");
+    public string DiscountInputTooltip => Loc.Admin("createOrderDiscountInputTooltip", "Percent (e.g. 10) or USD amount (e.g. 5.50)");
+    public string LoadingOverlayText => Loc.Admin("createOrderLoading", "Loading create order...");
+    public string TableComboPrefix => CreateOrderUiLocalizer.TableComboPrefix;
+    public string RemoveLineTooltip => Loc.Admin("createOrderRemoveLineTooltip", "Remove from ticket");
+    public string QtyPrefix => Loc.Admin("createOrderQtyPrefix", "Qty");
+    public string GrandTotalLabel => Loc.Admin("createOrderGrandTotal", "Grand Total:");
+    public string EquivalentFcLabel => Loc.Admin("createOrderEquivalentFc", "Equivalent FC:");
+    public string AmountToCollectLabel => Loc.Admin("createOrderAmountToCollect", "Amount To Collect:");
 
     public bool IsTabletStaffOrderFlow => AppSession.IsServerTablet || AppSession.IsCashierTablet;
     public bool CanEditTablePicker => !AppSession.IsServerTablet || AvailableTables.Count > 1;
     public bool CanEditTableForCurrentSource => CanEditTablePicker;
     public bool CanEditOrderStatusPicker => !AppSession.IsStaffTablet;
     public bool HasOpenCheckForTable => _openCheckOrderId.HasValue;
+
+    public int? SelectedRestaurantClientId
+    {
+        get => _selectedRestaurantClientId;
+        set => SetField(ref _selectedRestaurantClientId, value);
+    }
+
+    public string ClientSearchText
+    {
+        get => _clientSearchText;
+        set => SetField(ref _clientSearchText, value);
+    }
+
+    public string LinkedClientLabel
+    {
+        get => _linkedClientLabel;
+        set => SetField(ref _linkedClientLabel, value);
+    }
+
+    public ICommand LinkClientCommand { get; }
+    public ICommand ClearLinkedClientCommand { get; }
     public string OpenCheckBannerText =>
         HasOpenCheckForTable
-            ? $"Open check {_openCheckCode} ({_openCheckStatus}) exists for this table. Submit will ask to append or create a separate ticket."
+            ? CreateOrderUiLocalizer.OpenCheckBanner(_openCheckCode, _openCheckStatus)
             : string.Empty;
-    public string PrimaryActionLabel => IsTabletStaffOrderFlow ? "Send to cashier" : "Create Order";
+    public string PrimaryActionLabel => CreateOrderUiLocalizer.PrimaryActionLabel;
 
     public ObservableCollection<ModelTable> AvailableTables { get; } = new();
     public ObservableCollection<string> OrderStatuses { get; } = new(["Waiting", "In Kitchen", "Ready"]);
-    public ObservableCollection<string> OrderCategories { get; } = new();
-    public ObservableCollection<string> OrderSubCategories { get; } = new();
-    public ObservableCollection<string> DiscountModes { get; } = new(["None", "Percent", "Usd"]);
+    public ObservableCollection<LocalizedSelectOption> OrderCategoryOptions { get; } = new();
+    public ObservableCollection<LocalizedSelectOption> OrderSubCategoryOptions { get; } = new();
+    public ObservableCollection<LocalizedSelectOption> DiscountModeOptions { get; } = new();
     public ObservableCollection<ProductSelectionItemViewModel> ProductSelections { get; } = new();
     public ObservableCollection<ProductSelectionItemViewModel> FilteredProductSelections { get; } = new();
     public ObservableCollection<ProductSelectionItemViewModel> SelectedProductSelections { get; } = new();
@@ -116,23 +170,47 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
     public string SelectedOrderCategory
     {
         get => _selectedOrderCategory;
-        set
+        private set
         {
             if (!SetField(ref _selectedOrderCategory, value))
                 return;
+            SyncOrderCategoryOption();
             RebuildSubCategoryFilter();
             ApplyProductFilters();
+        }
+    }
+
+    public LocalizedSelectOption? SelectedOrderCategoryOption
+    {
+        get => _selectedOrderCategoryOption;
+        set
+        {
+            if (!SetField(ref _selectedOrderCategoryOption, value))
+                return;
+            SelectedOrderCategory = value?.Value ?? "All";
         }
     }
 
     public string SelectedOrderSubCategory
     {
         get => _selectedOrderSubCategory;
-        set
+        private set
         {
             if (!SetField(ref _selectedOrderSubCategory, value))
                 return;
+            SyncOrderSubCategoryOption();
             ApplyProductFilters();
+        }
+    }
+
+    public LocalizedSelectOption? SelectedOrderSubCategoryOption
+    {
+        get => _selectedOrderSubCategoryOption;
+        set
+        {
+            if (!SetField(ref _selectedOrderSubCategoryOption, value))
+                return;
+            SelectedOrderSubCategory = value?.Value ?? "All";
         }
     }
 
@@ -203,25 +281,31 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
     }
 
     public decimal LiveGrandTotalFc => CurrencyHelper.ConvertUsdToFc(LiveGrandTotal);
-    public string LiveGrandTotalUsdText => CurrencyHelper.FormatAmount(LiveGrandTotal, CurrencyHelper.Usd);
-    public string LiveGrandTotalFcText => CurrencyHelper.FormatAmount(LiveGrandTotalFc, CurrencyHelper.CongoleseFranc);
-    public string LiveTaxRateLabel
-    {
-        get
-        {
-            var pct = SettingsManager.Load().CurrencyPricing.TaxPercent;
-            return $"TVA ({pct:0.##}%)";
-        }
-    }
+    public string LiveGrandTotalUsdText => CurrencyHelper.FormatAmount(LiveGrandTotal, CurrencyHelper.Usd, CreateOrderUiLocalizer.MoneyCulture);
+    public string LiveGrandTotalFcText => CurrencyHelper.FormatAmount(LiveGrandTotalFc, CurrencyHelper.CongoleseFranc, CreateOrderUiLocalizer.MoneyCulture);
+    public string LiveTaxRateLabel =>
+        CreateOrderUiLocalizer.TaxRateLabel(SettingsManager.Load().CurrencyPricing.TaxPercent);
 
-    public string LiveServiceRateLabel
-    {
-        get
-        {
-            var pct = SettingsManager.Load().CurrencyPricing.ServicePercent;
-            return $"Service ({pct:0.##}%)";
-        }
-    }
+    public string LiveServiceRateLabel =>
+        CreateOrderUiLocalizer.ServiceRateLabel(SettingsManager.Load().CurrencyPricing.ServicePercent);
+
+    public string SubtotalLineText =>
+        $"{SubtotalCaption} {CurrencyHelper.FormatAmount(LiveSubtotal, CurrencyHelper.Usd, CreateOrderUiLocalizer.MoneyCulture)}";
+
+    public string TaxLineText =>
+        $"{LiveTaxRateLabel}: {CurrencyHelper.FormatAmount(LiveTaxAmount, CurrencyHelper.Usd, CreateOrderUiLocalizer.MoneyCulture)}";
+
+    public string ServiceLineText =>
+        $"{LiveServiceRateLabel}: {CurrencyHelper.FormatAmount(LiveServiceAmount, CurrencyHelper.Usd, CreateOrderUiLocalizer.MoneyCulture)}";
+
+    public string GrandTotalLineText =>
+        $"{GrandTotalLabel} {LiveGrandTotalUsdText}";
+
+    public string EquivalentFcLineText =>
+        $"{EquivalentFcLabel} {LiveGrandTotalFcText}";
+
+    public string AmountToCollectLineText =>
+        $"{AmountToCollectLabel} {ChosenPaymentAmountText}";
 
     public decimal LiveDiscountAmount
     {
@@ -232,11 +316,23 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
     public string SelectedDiscountMode
     {
         get => _selectedDiscountMode;
-        set
+        private set
         {
             if (!SetField(ref _selectedDiscountMode, value))
                 return;
+            SyncDiscountModeOption();
             RecalculateTotals();
+        }
+    }
+
+    public LocalizedSelectOption? SelectedDiscountModeOption
+    {
+        get => _selectedDiscountModeOption;
+        set
+        {
+            if (!SetField(ref _selectedDiscountModeOption, value))
+                return;
+            SelectedDiscountMode = value?.Value ?? "None";
         }
     }
 
@@ -259,21 +355,14 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
 
     public string LiveDiscountSummary =>
         LiveDiscountAmount <= 0m
-            ? "No discount applied."
-            : $"{LiveDiscountLabel}: -{CurrencyHelper.FormatAmount(LiveDiscountAmount, CurrencyHelper.Usd)}";
+            ? CreateOrderUiLocalizer.NoDiscountSummary
+            : CreateOrderUiLocalizer.LiveDiscountSummary(LiveDiscountLabel, LiveDiscountAmount);
 
     /// <summary>Label for the subtotal line — reflects whether totals include the existing open check.</summary>
-    public string SubtotalCaption
-    {
-        get
-        {
-            if (!ProductSelections.Any(p => p.IsSelected))
-                return "Subtotal (items): $ ";
-            if (!_skipPersistedSubtotalInTotals && HasOpenCheckForTable)
-                return "Ticket subtotal (existing check + new lines): $ ";
-            return "Subtotal (items): $ ";
-        }
-    }
+    public string SubtotalCaption =>
+        CreateOrderUiLocalizer.SubtotalCaption(
+            ProductSelections.Any(p => p.IsSelected),
+            !_skipPersistedSubtotalInTotals && HasOpenCheckForTable);
 
     public int LiveItemCount
     {
@@ -287,10 +376,10 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         private set => SetField(ref _estimatedPrepMinutes, value);
     }
 
-    public string EstimatedPrepText => EstimatedPrepMinutes <= 0 ? "-" : $"{EstimatedPrepMinutes} min";
+    public string EstimatedPrepText => CreateOrderUiLocalizer.EstimatedPrepText(EstimatedPrepMinutes);
 
     public string ChosenPaymentAmountText =>
-        CurrencyHelper.FormatAmount(LiveGrandTotal, CurrencyHelper.Usd);
+        CurrencyHelper.FormatAmount(LiveGrandTotal, CurrencyHelper.Usd, CreateOrderUiLocalizer.MoneyCulture);
 
     public ICommand CreateOrderCommand { get; }
     public ICommand ClearSelectionCommand { get; }
@@ -322,8 +411,137 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         LoadDraftCommand = new RelayCommand(_ => LoadSelectedDraft());
         DeleteDraftCommand = new RelayCommand(_ => DeleteSelectedDraft());
         DeleteAllDraftsCommand = new RelayCommand(_ => DeleteAllDrafts());
+        LinkClientCommand = new RelayCommand(_ => _ = LinkClientAsync());
+        ClearLinkedClientCommand = new RelayCommand(_ => ClearLinkedClient());
+        _linkedClientLabel = CreateOrderUiLocalizer.NoClientLinked;
+        CreateOrderUiLocalizer.RebuildDiscountModeOptions(DiscountModeOptions);
+        SyncDiscountModeOption();
 
         _ = LoadDataAsync();
+    }
+
+    protected override void RefreshLocalizedStrings()
+    {
+        base.RefreshLocalizedStrings();
+        CreateOrderUiLocalizer.RebuildDiscountModeOptions(DiscountModeOptions);
+        SyncDiscountModeOption();
+        RebuildCategoryFilter();
+        RebuildSubCategoryFilter();
+        if (SelectedRestaurantClientId is null)
+            LinkedClientLabel = CreateOrderUiLocalizer.NoClientLinked;
+        foreach (var table in AvailableTables)
+            TableUiLocalizer.Apply(table);
+        RefreshProductMoneyDisplay();
+        OnPropertyChanged(nameof(OpenCheckBannerText));
+        RecalculateTotals();
+        Notify(
+            nameof(PageTitle),
+            nameof(PageSubtitle),
+            nameof(LoadDraftLabel),
+            nameof(SaveDraftLabel),
+            nameof(RemoveDraftLabel),
+            nameof(RemoveAllDraftsLabel),
+            nameof(ClearSelectionLabel),
+            nameof(TableLabel),
+            nameof(MenuTypeLabel),
+            nameof(SubmenuTypeLabel),
+            nameof(SearchProductLabel),
+            nameof(LiveTotalsLabel),
+            nameof(ItemsSelectedLabel),
+            nameof(EstimatedPrepLabel),
+            nameof(CustomerNotesLabel),
+            nameof(AllergyNotesLabel),
+            nameof(LinkClientLabel),
+            nameof(LinkClientButtonLabel),
+            nameof(ClearClientButtonLabel),
+            nameof(ClientSearchTooltip),
+            nameof(DiscountLabel),
+            nameof(DiscountHint),
+            nameof(DiscountInputTooltip),
+            nameof(LoadingOverlayText),
+            nameof(TableComboPrefix),
+            nameof(RemoveLineTooltip),
+            nameof(QtyPrefix),
+            nameof(GrandTotalLabel),
+            nameof(EquivalentFcLabel),
+            nameof(AmountToCollectLabel),
+            nameof(PrimaryActionLabel),
+            nameof(OpenCheckBannerText),
+            nameof(LiveTaxRateLabel),
+            nameof(LiveServiceRateLabel),
+            nameof(SubtotalCaption),
+            nameof(SubtotalLineText),
+            nameof(TaxLineText),
+            nameof(ServiceLineText),
+            nameof(GrandTotalLineText),
+            nameof(EquivalentFcLineText),
+            nameof(AmountToCollectLineText),
+            nameof(LiveDiscountSummary),
+            nameof(EstimatedPrepText),
+            nameof(LiveGrandTotalUsdText),
+            nameof(LiveGrandTotalFcText),
+            nameof(ChosenPaymentAmountText));
+        RefreshSavedDrafts();
+    }
+
+    private void RefreshProductMoneyDisplay()
+    {
+        foreach (var item in ProductSelections)
+        {
+            item.NotifyMoneyDisplay();
+            item.NotifyAvailabilityHint();
+        }
+    }
+
+    private void SyncOrderCategoryOption()
+    {
+        var match = OrderCategoryOptions.FirstOrDefault(o =>
+                        o.Value.Equals(_selectedOrderCategory, StringComparison.OrdinalIgnoreCase))
+                    ?? OrderCategoryOptions.FirstOrDefault();
+        if (ReferenceEquals(_selectedOrderCategoryOption, match))
+            return;
+        _selectedOrderCategoryOption = match;
+        OnPropertyChanged(nameof(SelectedOrderCategoryOption));
+    }
+
+    private void SyncOrderSubCategoryOption()
+    {
+        var match = OrderSubCategoryOptions.FirstOrDefault(o =>
+                        o.Value.Equals(_selectedOrderSubCategory, StringComparison.OrdinalIgnoreCase))
+                    ?? OrderSubCategoryOptions.FirstOrDefault();
+        if (ReferenceEquals(_selectedOrderSubCategoryOption, match))
+            return;
+        _selectedOrderSubCategoryOption = match;
+        OnPropertyChanged(nameof(SelectedOrderSubCategoryOption));
+    }
+
+    private void SyncDiscountModeOption()
+    {
+        var match = DiscountModeOptions.FirstOrDefault(o =>
+                        o.Value.Equals(_selectedDiscountMode, StringComparison.OrdinalIgnoreCase))
+                    ?? DiscountModeOptions.FirstOrDefault();
+        if (ReferenceEquals(_selectedDiscountModeOption, match))
+            return;
+        _selectedDiscountModeOption = match;
+        OnPropertyChanged(nameof(SelectedDiscountModeOption));
+    }
+
+    private Task LinkClientAsync()
+    {
+        var dlg = new ClientPickerDialog(ClientSearchText.Trim()) { Owner = DialogOwner() };
+        if (dlg.ShowDialog() == true && dlg.SelectedClient is { } pick)
+        {
+            SelectedRestaurantClientId = pick.Id;
+            LinkedClientLabel = $"{pick.FullName} ({pick.UniqueId})";
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void ClearLinkedClient()
+    {
+        SelectedRestaurantClientId = null;
+        LinkedClientLabel = CreateOrderUiLocalizer.NoClientLinked;
     }
 
     private void OnAppSettingsChanged()
@@ -333,6 +551,13 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
             RecalculateTotals();
             OnPropertyChanged(nameof(LiveTaxRateLabel));
             OnPropertyChanged(nameof(LiveServiceRateLabel));
+            OnPropertyChanged(nameof(SubtotalLineText));
+            OnPropertyChanged(nameof(TaxLineText));
+            OnPropertyChanged(nameof(ServiceLineText));
+            OnPropertyChanged(nameof(GrandTotalLineText));
+            OnPropertyChanged(nameof(EquivalentFcLineText));
+            OnPropertyChanged(nameof(AmountToCollectLineText));
+            RefreshProductMoneyDisplay();
         }));
     }
 
@@ -417,7 +642,7 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
                 AvailableTables.Clear();
                 foreach (var t in catalog.Tables)
                 {
-                    AvailableTables.Add(new ModelTable
+                    var table = new ModelTable
                     {
                         Id = t.Id,
                         UniqueId = t.UniqueId,
@@ -426,7 +651,9 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
                         Capacity = t.Capacity,
                         Status = t.Status,
                         AssignedServerId = t.AssignedServerId
-                    });
+                    };
+                    TableUiLocalizer.Apply(table);
+                    AvailableTables.Add(table);
                 }
 
                 ProductSelections.Clear();
@@ -484,7 +711,12 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         catch (Exception ex)
         {
             await Application.Current.Dispatcher.InvokeAsync(() =>
-                ShowDialog($"Create Order failed to load:\n\n{ex.Message}", "Create Order", MessageBoxButton.OK, MessageBoxImage.Error));
+                ShowDialog(
+                    Loc.Admin("createOrderLoadFailed", "Create Order failed to load:\n\n{{message}}",
+                        new Dictionary<string, string> { ["message"] = ex.Message }),
+                    CreateOrderUiLocalizer.DialogTitle,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error));
         }
         finally
         {
@@ -612,6 +844,7 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         _discountInput = input;
         OnPropertyChanged(nameof(SelectedDiscountMode));
         OnPropertyChanged(nameof(DiscountInput));
+        SyncDiscountModeOption();
     }
 
     private decimal GetPersistedOpenOrderLineSubtotal()
@@ -623,19 +856,28 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
 
     private void RebuildCategoryFilter()
     {
-        OrderCategories.Clear();
-        OrderCategories.Add("All");
+        var current = _selectedOrderCategory;
+        OrderCategoryOptions.Clear();
+        OrderCategoryOptions.Add(new LocalizedSelectOption
+        {
+            Value = "All",
+            Label = Loc.Admin("menuAllTypes", "All types")
+        });
         foreach (var c in ProductSelections
                      .Select(p => p.Category)
                      .Where(c => !string.IsNullOrWhiteSpace(c))
                      .Distinct(StringComparer.OrdinalIgnoreCase)
                      .OrderBy(c => c))
         {
-            OrderCategories.Add(c);
+            OrderCategoryOptions.Add(new LocalizedSelectOption { Value = c, Label = c });
         }
 
-        if (!OrderCategories.Contains(SelectedOrderCategory))
-            SelectedOrderCategory = "All";
+        if (!OrderCategoryOptions.Any(o => o.Value.Equals(current, StringComparison.OrdinalIgnoreCase)))
+            current = "All";
+
+        _selectedOrderCategory = current;
+        OnPropertyChanged(nameof(SelectedOrderCategory));
+        SyncOrderCategoryOption();
     }
 
     private void RebuildSubCategoryFilter()
@@ -648,13 +890,22 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
             .OrderBy(s => s)
             .ToList();
 
-        OrderSubCategories.Clear();
-        OrderSubCategories.Add("All");
+        var current = _selectedOrderSubCategory;
+        OrderSubCategoryOptions.Clear();
+        OrderSubCategoryOptions.Add(new LocalizedSelectOption
+        {
+            Value = "All",
+            Label = Loc.Admin("menuAllSubtypes", "All subtypes")
+        });
         foreach (var s in sub)
-            OrderSubCategories.Add(s);
+            OrderSubCategoryOptions.Add(new LocalizedSelectOption { Value = s, Label = s });
 
-        if (!OrderSubCategories.Contains(SelectedOrderSubCategory))
-            SelectedOrderSubCategory = "All";
+        if (!OrderSubCategoryOptions.Any(o => o.Value.Equals(current, StringComparison.OrdinalIgnoreCase)))
+            current = "All";
+
+        _selectedOrderSubCategory = current;
+        OnPropertyChanged(nameof(SelectedOrderSubCategory));
+        SyncOrderSubCategoryOption();
     }
 
     private void ApplyProductFilters()
@@ -707,7 +958,8 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
             prepLines);
         LiveItemCount = ticket.LiveItemCount;
         LiveDiscountAmount = ticket.DiscountApplied;
-        LiveDiscountLabel = ticket.DiscountLabel;
+        LiveDiscountLabel = CreateOrderUiLocalizer.FormatDiscountLabel(
+            SelectedDiscountMode, OrderDiscountParser.Parse(DiscountInput), ticket.DiscountApplied);
         LiveTaxAmount = ticket.TaxAmount;
         LiveServiceAmount = ticket.ServiceAmount;
         LiveGrandTotal = ticket.GrandTotal;
@@ -718,6 +970,12 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
             SelectedProductSelections.Add(row);
 
         OnPropertyChanged(nameof(SubtotalCaption));
+        OnPropertyChanged(nameof(SubtotalLineText));
+        OnPropertyChanged(nameof(TaxLineText));
+        OnPropertyChanged(nameof(ServiceLineText));
+        OnPropertyChanged(nameof(GrandTotalLineText));
+        OnPropertyChanged(nameof(EquivalentFcLineText));
+        OnPropertyChanged(nameof(AmountToCollectLineText));
         OnPropertyChanged(nameof(LiveDiscountSummary));
         OnPropertyChanged(nameof(EstimatedPrepText));
         OnPropertyChanged(nameof(LiveGrandTotalFc));
@@ -726,6 +984,7 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         OnPropertyChanged(nameof(LiveTaxRateLabel));
         OnPropertyChanged(nameof(LiveServiceRateLabel));
         OnPropertyChanged(nameof(ChosenPaymentAmountText));
+        RefreshProductMoneyDisplay();
     }
 
     private void IncreaseQuantity(ProductSelectionItemViewModel? item)
@@ -785,7 +1044,8 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
             _serverEmployeeName,
             string.Empty,
             string.Empty,
-            null);
+            null,
+            SelectedRestaurantClientId);
 
     private void CreateOrder()
     {
@@ -800,12 +1060,20 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         var selected = ProductSelections.Where(p => p.IsSelected).ToList();
         if (selected.Count == 0)
         {
-            ShowDialog("Select at least one menu item.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
+            ShowDialog(
+                Loc.Admin("createOrderSelectItem", "Select at least one menu item."),
+                CreateOrderUiLocalizer.DialogTitle,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
         if (SelectedTableId == 0)
         {
-            ShowDialog("Select a table for this order.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
+            ShowDialog(
+                Loc.Admin("createOrderSelectTable", "Select a table for this order."),
+                CreateOrderUiLocalizer.DialogTitle,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 
@@ -842,7 +1110,7 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
                     var append = await _orderSubmission.AppendToExistingAsync(snap, openOrderId).ConfigureAwait(true);
                     if (!append.Ok)
                     {
-                        var appendImage = string.Equals(append.Caption, "Cloud API", StringComparison.OrdinalIgnoreCase)
+                        var appendImage = string.Equals(append.Caption, CreateOrderUiLocalizer.CloudApiCaption, StringComparison.OrdinalIgnoreCase)
                             ? MessageBoxImage.Error
                             : MessageBoxImage.Warning;
                         ShowDialog(append.Message, append.Caption, MessageBoxButton.OK, appendImage);
@@ -867,32 +1135,39 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
             if (string.Equals(snap.DiscountMode, "Percent", StringComparison.OrdinalIgnoreCase) &&
                 (discountRaw <= 0m || discountRaw > 100m))
             {
-                ShowDialog("Enter a discount percent between 0 and 100.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ShowDialog(
+                    Loc.Admin("createOrderDiscountPctRange", "Enter a discount percent between 0 and 100."),
+                    CreateOrderUiLocalizer.DialogTitle,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
                 return;
             }
 
             if (string.Equals(snap.DiscountMode, "Usd", StringComparison.OrdinalIgnoreCase) && discountRaw <= 0m)
             {
-                ShowDialog("Enter a discount amount greater than zero (USD).", "Create Order", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ShowDialog(
+                    Loc.Admin("createOrderDiscountUsdPositive", "Enter a discount amount greater than zero (USD)."),
+                    CreateOrderUiLocalizer.DialogTitle,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
                 return;
             }
 
             var discountLine = snap.LiveDiscountAmount > 0m
-                ? $"\n{snap.LiveDiscountLabel}: -{CurrencyHelper.FormatAmount(snap.LiveDiscountAmount, CurrencyHelper.Usd)}"
+                ? $"\n{snap.LiveDiscountLabel}: -{CurrencyHelper.FormatAmount(snap.LiveDiscountAmount, CurrencyHelper.Usd, CreateOrderUiLocalizer.MoneyCulture)}"
                 : string.Empty;
 
-            var sourceLine = $"Create walk-in order for Table {phase.TableNumber} ({phase.TableName})";
-
-            var detailsBlock =
-                $"Subtotal: {CurrencyHelper.FormatAmount(snap.LiveSubtotal, CurrencyHelper.Usd)}{discountLine}\n" +
-                $"Grand Total: {snap.LiveGrandTotalUsdText}\n" +
-                $"Equivalent FC: {snap.LiveGrandTotalFcText}\n" +
-                $"Amount To Collect: {snap.ChosenPaymentAmountText}\n" +
-                $"Estimated Prep: {snap.EstimatedPrepText}";
+            var detailsBlock = CreateOrderUiLocalizer.ConfirmDetailsBlock(
+                snap.LiveSubtotal,
+                discountLine,
+                snap.LiveGrandTotalUsdText,
+                snap.LiveGrandTotalFcText,
+                snap.ChosenPaymentAmountText,
+                snap.EstimatedPrepText);
 
             var confirmDlg = new ConfirmCreateOrderDialog(
                     snap.IsTabletStaffOrderFlow,
-                    $"{sourceLine} with {snap.SelectedLines.Count} selected item(s)?",
+                    CreateOrderUiLocalizer.ConfirmWalkInQuestion(phase.TableNumber, phase.TableName, snap.SelectedLines.Count),
                     detailsBlock)
                 { Owner = DialogOwner() };
 
@@ -902,7 +1177,7 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
             var save = await _orderSubmission.SaveNewAsync(snap).ConfigureAwait(true);
             if (!save.Ok)
             {
-                var saveImage = string.Equals(save.Caption, "Cloud API", StringComparison.OrdinalIgnoreCase)
+                var saveImage = string.Equals(save.Caption, CreateOrderUiLocalizer.CloudApiCaption, StringComparison.OrdinalIgnoreCase)
                     ? MessageBoxImage.Error
                     : MessageBoxImage.Warning;
                 ShowDialog(save.Message, save.Caption, MessageBoxButton.OK, saveImage);
@@ -916,7 +1191,12 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         }
         catch (Exception ex)
         {
-            ShowDialog($"Create order could not be completed.\n\n{ex.Message}", "Create Order", MessageBoxButton.OK, MessageBoxImage.Error);
+            ShowDialog(
+                Loc.Admin("createOrderSubmitFailed", "Create order could not be completed.\n\n{{message}}",
+                    new Dictionary<string, string> { ["message"] = ex.Message }),
+                CreateOrderUiLocalizer.DialogTitle,
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
         }
         finally
         {
@@ -959,7 +1239,11 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         var ownerId = ResolveDraftOwnerEmployeeId();
         if (!ownerId.HasValue)
         {
-            ShowDialog("Drafts are available for signed-in server sessions only.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
+            ShowDialog(
+                Loc.Admin("createOrderDraftsServerOnly", "Drafts are available for signed-in server sessions only."),
+                CreateOrderUiLocalizer.DialogTitle,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 
@@ -991,7 +1275,11 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         var saved = _draftPersistence.Save(ownerId.Value, ResolveDraftOwnerName(), draft);
         RefreshSavedDrafts();
         SelectedDraft = SavedDrafts.FirstOrDefault(d => d.FilePath == saved.Id) ?? EmptyDraftOption;
-        ShowDialog("Draft saved.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
+        ShowDialog(
+            Loc.Admin("createOrderDraftSaved", "Draft saved."),
+            CreateOrderUiLocalizer.DialogTitle,
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
     }
 
     private void LoadSelectedDraft()
@@ -1070,7 +1358,13 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         }
 
         if (showMessage)
-            ShowDialog(autoDeleteAfterLoad ? "Draft loaded and removed." : "Draft loaded.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
+            ShowDialog(
+                autoDeleteAfterLoad
+                    ? Loc.Admin("createOrderDraftLoadedRemoved", "Draft loaded and removed.")
+                    : Loc.Admin("createOrderDraftLoaded", "Draft loaded."),
+                CreateOrderUiLocalizer.DialogTitle,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
 
         return true;
     }
@@ -1097,11 +1391,20 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
     {
         if (SelectedDraft is null || string.IsNullOrWhiteSpace(SelectedDraft.FilePath))
         {
-            ShowDialog("Select a draft to delete.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
+            ShowDialog(
+                Loc.Admin("createOrderSelectDraftDelete", "Select a draft to delete."),
+                CreateOrderUiLocalizer.DialogTitle,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 
-        var confirm = ShowDialog($"Delete draft \"{SelectedDraft.DisplayName}\"?", "Delete Draft", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        var confirm = ShowDialog(
+            Loc.Admin("createOrderConfirmDeleteDraft", "Delete draft \"{{name}}\"?",
+                new Dictionary<string, string> { ["name"] = SelectedDraft.DisplayName }),
+            Loc.Admin("createOrderDeleteDraftTitle", "Delete Draft"),
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
         if (confirm != MessageBoxResult.Yes)
             return;
 
@@ -1118,7 +1421,11 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         var ownerId = ResolveDraftOwnerEmployeeId();
         if (!ownerId.HasValue)
         {
-            ShowDialog("No drafts to delete.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
+            ShowDialog(
+                Loc.Admin("createOrderNoDrafts", "No drafts to delete."),
+                CreateOrderUiLocalizer.DialogTitle,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 
@@ -1127,11 +1434,19 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
         var hasDrafts = drafts.Count > 0;
         if (!hasDrafts)
         {
-            ShowDialog("No drafts to delete.", "Create Order", MessageBoxButton.OK, MessageBoxImage.Information);
+            ShowDialog(
+                Loc.Admin("createOrderNoDrafts", "No drafts to delete."),
+                CreateOrderUiLocalizer.DialogTitle,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 
-        var confirm = ShowDialog("Delete ALL saved drafts?", "Delete All Drafts", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        var confirm = ShowDialog(
+            Loc.Admin("createOrderConfirmDeleteAllDrafts", "Delete ALL saved drafts?"),
+            Loc.Admin("createOrderDeleteAllDraftsTitle", "Delete All Drafts"),
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
         if (confirm != MessageBoxResult.Yes)
             return;
 

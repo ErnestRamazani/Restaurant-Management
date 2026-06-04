@@ -141,6 +141,7 @@ public sealed class ServerPickupViewModel : AdminBaseViewModel
         var items = string.Join(", ",
             order.Items.Select(i => $"{i.Product?.Name ?? "Unknown"} x{i.Quantity}"));
 
+        var tz = SettingsManager.Load().BusinessProfile.RestaurantTimeZoneId;
         return new OrderEntry
         {
             Id = order.Id,
@@ -156,7 +157,7 @@ public sealed class ServerPickupViewModel : AdminBaseViewModel
             AllergyNotes = order.AllergyNotes ?? string.Empty,
             Status = order.Status,
             CreatedAt = order.CreatedAt,
-            Time = order.CreatedAt.ToString("HH:mm"),
+            Time = RestaurantTimeZone.FormatUtc(order.CreatedAt, tz, "HH:mm"),
             Total = totals.GrandTotal,
             StatusColor = "#4CAF50"
         };

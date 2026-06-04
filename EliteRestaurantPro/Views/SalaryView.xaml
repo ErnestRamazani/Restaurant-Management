@@ -87,18 +87,18 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBlock Style="{StaticResource HeadingLarge}" FontSize="28">
-                    <Run Text="Salary" Foreground="{StaticResource TextPrimaryBrush}"/>
-                    <Run Text=" &amp; Payroll" Foreground="{StaticResource GoldAccentBrush}"/>
+                    <Run Text="{Binding PageTitlePrimary, Mode=OneWay}" Foreground="{StaticResource TextPrimaryBrush}"/>
+                    <Run Text="{Binding PageTitleAccent, Mode=OneWay}" Foreground="{StaticResource GoldAccentBrush}"/>
                 </TextBlock>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                     <Border Background="#22000000" CornerRadius="10" Padding="12,8" Margin="0,0,14,0" BorderBrush="#33FFFFFF" BorderThickness="1">
-                        <CheckBox Content="Simple table layout"
+                        <CheckBox Content="{Binding SimpleTableLayoutLabel, Mode=OneWay}"
                                   IsChecked="{Binding UseTableView, Mode=TwoWay}"
                                   Foreground="{StaticResource TextSecondaryBrush}"
                                   FontSize="14"
                                   VerticalAlignment="Center"/>
                     </Border>
-                    <Button Content="Refresh"
+                    <Button Content="{Binding RefreshLabel, Mode=OneWay}"
                             Command="{Binding RefreshPayrollCommand}"
                             Style="{StaticResource GhostButton}"
                             Padding="14,10"
@@ -115,7 +115,7 @@
                     BorderThickness="1"
                     Visibility="{Binding ShowPayrollOverdueWarning, Converter={StaticResource BoolToVisibilityConverter}}">
                 <StackPanel>
-                    <TextBlock Text="Payroll overdue"
+                    <TextBlock Text="{Binding OverdueTitle, Mode=OneWay}"
                                Foreground="#FFEF9A9A"
                                FontWeight="SemiBold"
                                FontSize="15"/>
@@ -125,7 +125,7 @@
                                Margin="0,6,0,0"
                                TextWrapping="Wrap"/>
                     <TextBlock Margin="0,4,0,0" FontSize="13" Foreground="#FFB0B0B0">
-                        <Run Text="Days past month end: "/>
+                        <Run Text="{Binding DaysPastMonthEndLabel, Mode=OneWay}"/>
                         <Run Text="{Binding DaysPastPayDay, Mode=OneWay}" FontWeight="SemiBold"/>
                     </TextBlock>
                 </StackPanel>
@@ -133,9 +133,9 @@
 
             <Border Grid.Row="2" Style="{StaticResource GlassCard}" Margin="24,0,24,12" Padding="18,18">
                 <StackPanel>
-                    <TextBlock Text="Salary advance" Foreground="{StaticResource GoldAccentBrush}" FontSize="19" FontWeight="SemiBold"/>
+                    <TextBlock Text="{Binding AdvanceSectionTitle, Mode=OneWay}" Foreground="{StaticResource GoldAccentBrush}" FontSize="19" FontWeight="SemiBold"/>
                     <WrapPanel Margin="0,14,0,0">
-                        <TextBlock Text="Employee" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" FontSize="14" Margin="0,0,10,10"/>
+                        <TextBlock Text="{Binding EmployeeLabel, Mode=OneWay}" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" FontSize="14" Margin="0,0,10,10"/>
                         <ComboBox Width="260"
                                   Margin="0,0,20,10"
                                   ItemsSource="{Binding AdvanceEmployees}"
@@ -148,14 +148,14 @@
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
                         </ComboBox>
-                        <TextBlock Text="Amount (USD)" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" FontSize="14" Margin="0,0,10,10"/>
+                        <TextBlock Text="{Binding AmountUsdLabel, Mode=OneWay}" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" FontSize="14" Margin="0,0,10,10"/>
                         <TextBox Width="110"
                                  Margin="0,0,20,10"
                                  VerticalAlignment="Center"
                                  FontSize="14"
                                  Text="{Binding AdvanceAmountText, UpdateSourceTrigger=PropertyChanged}"
                                  Style="{StaticResource EliteTextBox}"/>
-                        <TextBlock Text="Note" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" FontSize="14" Margin="0,0,10,10"/>
+                        <TextBlock Text="{Binding NoteLabel, Mode=OneWay}" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" FontSize="14" Margin="0,0,10,10"/>
                         <TextBox MinWidth="200"
                                  Width="280"
                                  Margin="0,0,16,10"
@@ -163,7 +163,7 @@
                                  FontSize="14"
                                  Text="{Binding AdvanceNoteText, UpdateSourceTrigger=PropertyChanged}"
                                  Style="{StaticResource EliteTextBox}"/>
-                        <Button Content="Record advance"
+                        <Button Content="{Binding RecordAdvanceLabel, Mode=OneWay}"
                                 Command="{Binding RecordSalaryAdvanceCommand}"
                                 Style="{StaticResource GoldPrimaryButton}"
                                 Margin="0,0,0,10"
@@ -171,7 +171,7 @@
                                 FontSize="14"
                                 VerticalAlignment="Center"/>
                     </WrapPanel>
-                    <Button Content="Pay all remaining balances"
+                    <Button Content="{Binding PayAllRemainingLabel, Mode=OneWay}"
                             Command="{Binding ConfirmAllPayrollCommand}"
                             Style="{StaticResource GoldPrimaryButton}"
                             HorizontalAlignment="Left"
@@ -184,14 +184,14 @@
             <Border Grid.Row="3" Style="{StaticResource GlassCard}" Margin="24,0,24,12" Padding="16,14">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Pay period" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" FontSize="14" Margin="0,0,14,0"/>
-                        <TextBlock Text="Year" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14" Margin="0,0,8,0"/>
+                        <TextBlock Text="{Binding PayPeriodLabel, Mode=OneWay}" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" FontSize="14" Margin="0,0,14,0"/>
+                        <TextBlock Text="{Binding YearLabel, Mode=OneWay}" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14" Margin="0,0,8,0"/>
                         <ComboBox Width="110"
                                   ItemsSource="{Binding YearChoices}"
                                   SelectedItem="{Binding SelectedPayrollYear}"
                                   Style="{StaticResource EliteComboBox}"
                                   ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
-                        <TextBlock Text="Month" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14" Margin="16,0,8,0"/>
+                        <TextBlock Text="{Binding MonthLabel, Mode=OneWay}" VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14" Margin="16,0,8,0"/>
                         <ComboBox Width="100"
                                   ItemsSource="{Binding MonthChoices}"
                                   SelectedItem="{Binding SelectedPayrollMonth}"
@@ -205,23 +205,23 @@
                                    Margin="20,0,0,0"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
-                        <TextBlock Text="Show" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" FontSize="14" Margin="0,0,12,0"/>
+                        <TextBlock Text="{Binding ShowLabel, Mode=OneWay}" VerticalAlignment="Center" Foreground="{StaticResource TextMutedBrush}" FontSize="14" Margin="0,0,12,0"/>
                         <RadioButton GroupName="SalaryEmployeeFilter"
-                                     Content="All employees"
+                                     Content="{Binding FilterAllEmployeesLabel, Mode=OneWay}"
                                      IsChecked="{Binding FilterShowAllEmployees, Mode=TwoWay}"
                                      Margin="0,0,18,0"
                                      VerticalAlignment="Center"
                                      Foreground="{StaticResource TextSecondaryBrush}"
                                      FontSize="14"/>
                         <RadioButton GroupName="SalaryEmployeeFilter"
-                                     Content="Paid only"
+                                     Content="{Binding FilterPaidOnlyLabel, Mode=OneWay}"
                                      IsChecked="{Binding FilterShowPaidOnly, Mode=TwoWay}"
                                      Margin="0,0,18,0"
                                      VerticalAlignment="Center"
                                      Foreground="{StaticResource TextSecondaryBrush}"
                                      FontSize="14"/>
                         <RadioButton GroupName="SalaryEmployeeFilter"
-                                     Content="Not paid yet"
+                                     Content="{Binding FilterUnpaidOnlyLabel, Mode=OneWay}"
                                      IsChecked="{Binding FilterShowUnpaidOnly, Mode=TwoWay}"
                                      VerticalAlignment="Center"
                                      Foreground="{StaticResource TextSecondaryBrush}"
@@ -318,15 +318,13 @@
                                                                     </Style.Triggers>
                                                                 </Style>
                                                             </Border.Style>
-                                                            <TextBlock FontSize="13">
+                                                            <TextBlock Text="{Binding PayStatusBadgeText, Mode=OneWay}" FontSize="13">
                                                                 <TextBlock.Style>
                                                                     <Style TargetType="TextBlock">
                                                                         <Setter Property="Foreground" Value="{StaticResource GoldAccentBrush}"/>
-                                                                        <Setter Property="Text" Value="Pending pay"/>
                                                                         <Style.Triggers>
                                                                             <DataTrigger Binding="{Binding AlreadyPaid}" Value="True">
                                                                                 <Setter Property="Foreground" Value="{StaticResource StatGreenBrush}"/>
-                                                                                <Setter Property="Text" Value="Paid in full"/>
                                                                             </DataTrigger>
                                                                             <MultiDataTrigger>
                                                                                 <MultiDataTrigger.Conditions>
@@ -334,7 +332,6 @@
                                                                                     <Condition Binding="{Binding IsPartiallyPaid}" Value="True"/>
                                                                                 </MultiDataTrigger.Conditions>
                                                                                 <Setter Property="Foreground" Value="#FFFFCC80"/>
-                                                                                <Setter Property="Text" Value="Partially paid"/>
                                                                             </MultiDataTrigger>
                                                                         </Style.Triggers>
                                                                     </Style>
@@ -358,7 +355,7 @@
                                         </Expander.Header>
 
                                         <StackPanel Margin="18,0,18,22">
-                                            <TextBlock Text="Schedule &amp; payroll base" Foreground="{StaticResource GoldAccentBrush}" FontSize="19" FontWeight="SemiBold" Margin="0,0,0,12"/>
+                                            <TextBlock Text="{Binding DataContext.ScheduleBaseSectionTitle, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}" Foreground="{StaticResource GoldAccentBrush}" FontSize="19" FontWeight="SemiBold" Margin="0,0,0,12"/>
                                             <WrapPanel>
                                                 <Border Style="{StaticResource SalaryPayrollChip}">
                                                     <TextBlock Text="{Binding PayrollPrimaryRateChipText}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
@@ -374,40 +371,40 @@
                                                             </Style.Triggers>
                                                         </Style>
                                                     </Border.Style>
-                                                    <TextBlock Text="{Binding ScheduledHoursMonth, StringFormat=Scheduled hours {0:0.#}}"
+                                                    <TextBlock Text="{Binding ScheduledHoursChipText, Mode=OneWay}"
                                                                Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
                                                 </Border>
                                                 <Border Style="{StaticResource SalaryPayrollChip}">
-                                                    <TextBlock Text="{Binding ScheduledWorkdays, StringFormat=Workdays {0}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
+                                                    <TextBlock Text="{Binding ScheduledWorkdaysChipText, Mode=OneWay}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
                                                 </Border>
                                                 <Border Background="#22D4AF37" CornerRadius="10" Padding="14,10" Margin="0,0,10,10">
-                                                    <TextBlock Text="{Binding BaseGrossUsd, StringFormat=Base gross $ {0:N2}}" Foreground="{StaticResource GoldAccentBrush}" FontSize="14"/>
+                                                    <TextBlock Text="{Binding BaseGrossChipText, Mode=OneWay}" Foreground="{StaticResource GoldAccentBrush}" FontSize="14"/>
                                                 </Border>
                                             </WrapPanel>
 
                                             <StackPanel Margin="0,16,0,12">
-                                                <TextBlock Text="Attendance"
+                                                <TextBlock Text="{Binding DataContext.AttendanceSectionTitle, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}"
                                                            Foreground="{StaticResource GoldAccentBrush}"
                                                            FontSize="19"
                                                            FontWeight="SemiBold"/>
                                                 <WrapPanel Margin="0,12,0,0">
                                                     <Border Style="{StaticResource SalaryPayrollChip}">
-                                                        <TextBlock Text="{Binding AbsenceDays, StringFormat=Absences {0}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
+                                                        <TextBlock Text="{Binding AbsencesChipText, Mode=OneWay}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
                                                     </Border>
                                                     <Border Style="{StaticResource SalaryPayrollChip}">
-                                                        <TextBlock Text="{Binding LateDays, StringFormat=Lates {0}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
+                                                        <TextBlock Text="{Binding LatesChipText, Mode=OneWay}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
                                                     </Border>
                                                     <Border Style="{StaticResource SalaryPayrollChip}">
-                                                        <TextBlock Text="{Binding LatePenaltyAbsences, StringFormat=Late → units {0}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
+                                                        <TextBlock Text="{Binding LateUnitsChipText, Mode=OneWay}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
                                                     </Border>
                                                     <Border Style="{StaticResource SalaryPayrollChip}">
-                                                        <TextBlock Text="{Binding TotalDeductionUnits, StringFormat=Total units {0}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
+                                                        <TextBlock Text="{Binding TotalUnitsChipText, Mode=OneWay}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
                                                     </Border>
                                                     <Border Background="#152196F3" CornerRadius="10" Padding="14,10" Margin="0,0,10,10">
-                                                        <TextBlock Text="{Binding BaseAfterAttendanceUsd, StringFormat=After attendance $ {0:N2}}" Foreground="{StaticResource StatBlueBrush}" FontSize="14"/>
+                                                        <TextBlock Text="{Binding AfterAttendanceChipText, Mode=OneWay}" Foreground="{StaticResource StatBlueBrush}" FontSize="14"/>
                                                     </Border>
                                                 </WrapPanel>
-                                                <Button Content="Shift history"
+                                                <Button Content="{Binding DataContext.ShiftHistoryLabel, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}"
                                                         HorizontalAlignment="Left"
                                                         Margin="0,10,0,0"
                                                         Padding="14,8"
@@ -417,17 +414,17 @@
                                                         Style="{StaticResource GhostButton}"/>
                                             </StackPanel>
 
-                                            <TextBlock Text="Sales &amp; bonus" Foreground="{StaticResource GoldAccentBrush}" FontSize="19" FontWeight="SemiBold" Margin="0,16,0,12"/>
+                                            <TextBlock Text="{Binding DataContext.SalesBonusSectionTitle, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}" Foreground="{StaticResource GoldAccentBrush}" FontSize="19" FontWeight="SemiBold" Margin="0,16,0,12"/>
                                             <WrapPanel>
                                                 <Border Style="{StaticResource SalaryPayrollChip}">
-                                                    <TextBlock Text="{Binding MoneyGeneratedUsd, StringFormat=Sales served $ {0:N2}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
+                                                    <TextBlock Text="{Binding SalesServedChipText, Mode=OneWay}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
                                                 </Border>
                                                 <Border Style="{StaticResource SalaryPayrollChip}">
-                                                    <TextBlock Text="{Binding BonusFivePercentUsd, StringFormat=Sales bonus $ {0:N2}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
+                                                    <TextBlock Text="{Binding SalesBonusChipText, Mode=OneWay}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"/>
                                                 </Border>
                                             </WrapPanel>
 
-                                            <TextBlock Text="Advance and Net Salary" Foreground="{StaticResource GoldAccentBrush}" FontSize="19" FontWeight="SemiBold" Margin="0,18,0,12"/>
+                                            <TextBlock Text="{Binding DataContext.AdvanceNetSectionTitle, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}" Foreground="{StaticResource GoldAccentBrush}" FontSize="19" FontWeight="SemiBold" Margin="0,18,0,12"/>
                                             <Border Background="#1A0D0D12" CornerRadius="14" Padding="20,18" BorderBrush="#44FF6B6B" BorderThickness="1" Margin="0,0,0,14">
                                                 <Grid>
                                                     <Grid.ColumnDefinitions>
@@ -436,15 +433,15 @@
                                                         <ColumnDefinition Width="*"/>
                                                     </Grid.ColumnDefinitions>
                                                     <StackPanel Grid.Column="0">
-                                                        <TextBlock Text="Advances (deducted)" Foreground="{StaticResource TextMutedBrush}" FontSize="14" Margin="0,0,0,6"/>
-                                                        <TextBlock Text="{Binding AdvancesDeductUsd, StringFormat=$ {0:N2}}"
+                                                        <TextBlock Text="{Binding DataContext.AdvancesDeductedLabel, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}" Foreground="{StaticResource TextMutedBrush}" FontSize="14" Margin="0,0,0,6"/>
+                                                        <TextBlock Text="{Binding AdvancesDisplayText, Mode=OneWay}"
                                                                    Foreground="#FFFF6B6B"
                                                                    FontSize="34"
                                                                    FontWeight="Bold"/>
                                                     </StackPanel>
                                                     <StackPanel Grid.Column="2">
                                                         <TextBlock Text="{Binding NetPaySectionTitle}" Foreground="{StaticResource TextMutedBrush}" FontSize="14" Margin="0,0,0,6"/>
-                                                        <TextBlock Text="{Binding NetPay, StringFormat=$ {0:N2}}"
+                                                        <TextBlock Text="{Binding NetPayDisplayText, Mode=OneWay}"
                                                                    Foreground="#FF4ADE80"
                                                                    FontSize="34"
                                                                    FontWeight="Bold"/>
@@ -456,9 +453,9 @@
                                                 <StackPanel>
                                                     <TextBlock TextWrapping="Wrap"
                                                                Visibility="{Binding HasPaidReceiptDetail, Converter={StaticResource BoolToVisibilityConverter}}">
-                                                        <Run Text="Paid " FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                                        <Run Text="{Binding PaidPrefix, Mode=OneWay}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
                                                         <Run Text="{Binding PaidAmountDisplay, Mode=OneWay}" FontSize="26" FontWeight="Bold" Foreground="{StaticResource GoldAccentBrush}"/>
-                                                        <Run Text="  on  " FontSize="18" Foreground="{StaticResource TextMutedBrush}"/>
+                                                        <Run Text="{Binding PaidOnSeparator, Mode=OneWay}" FontSize="18" Foreground="{StaticResource TextMutedBrush}"/>
                                                         <Run Text="{Binding PaidDateDisplay, Mode=OneWay}" FontSize="20" FontWeight="SemiBold" Foreground="#FFB8E6C1"/>
                                                     </TextBlock>
                                                     <TextBlock Text="{Binding StatusText}"
@@ -521,28 +518,28 @@
                           VirtualizingStackPanel.IsVirtualizing="False"
                           RowHeight="{x:Static sys:Double.NaN}">
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="Employee" Binding="{Binding EmployeeName}" Width="140" MinWidth="100">
+                        <DataGridTextColumn Header="{Binding DataContext.ColEmployeeLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Binding="{Binding EmployeeName}" Width="140" MinWidth="100">
                             <DataGridTextColumn.ElementStyle>
                                 <Style TargetType="TextBlock" BasedOn="{StaticResource SalaryDataGridCellTextWrap}"/>
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
-                        <DataGridTextColumn Header="ID" Binding="{Binding UniqueId}" Width="100" MinWidth="72">
+                        <DataGridTextColumn Header="{Binding DataContext.ColIdLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Binding="{Binding UniqueId}" Width="100" MinWidth="72">
                             <DataGridTextColumn.ElementStyle>
                                 <Style TargetType="TextBlock" BasedOn="{StaticResource SalaryDataGridCellTextWrap}"/>
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
-                        <DataGridTextColumn Header="Monthly" Binding="{Binding RateColumnText}" Width="100" MinWidth="88"/>
-                        <DataGridTextColumn Header="Hrs" Binding="{Binding ScheduledHoursMonth, StringFormat=F1}" Width="56" MinWidth="48"/>
-                        <DataGridTextColumn Header="Days" Binding="{Binding ScheduledWorkdays}" Width="52" MinWidth="44"/>
-                        <DataGridTextColumn Header="Base" Binding="{Binding BaseGrossUsd, StringFormat=$ {0:N2}}" Width="88" MinWidth="72"/>
-                        <DataGridTextColumn Header="Abs" Binding="{Binding AbsenceDays}" Width="44" MinWidth="40"/>
-                        <DataGridTextColumn Header="Late" Binding="{Binding LateDays}" Width="44" MinWidth="40"/>
-                        <DataGridTextColumn Header="L→U" Binding="{Binding LatePenaltyAbsences}" Width="48" MinWidth="40"/>
-                        <DataGridTextColumn Header="Units" Binding="{Binding TotalDeductionUnits}" Width="52" MinWidth="44"/>
-                        <DataGridTemplateColumn Header="Shift history" Width="108" MinWidth="96">
+                        <DataGridTextColumn Header="{Binding DataContext.ColMonthlyLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Binding="{Binding RateColumnText}" Width="100" MinWidth="88"/>
+                        <DataGridTextColumn Header="{Binding DataContext.ColHrsLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Binding="{Binding ScheduledHoursMonth, StringFormat=F1}" Width="56" MinWidth="48"/>
+                        <DataGridTextColumn Header="{Binding DataContext.ColDaysLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Binding="{Binding ScheduledWorkdays}" Width="52" MinWidth="44"/>
+                        <DataGridTextColumn Header="{Binding DataContext.ColBaseLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Binding="{Binding TableBaseGrossText}" Width="88" MinWidth="72"/>
+                        <DataGridTextColumn Header="{Binding DataContext.ColAbsLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Binding="{Binding AbsenceDays}" Width="44" MinWidth="40"/>
+                        <DataGridTextColumn Header="{Binding DataContext.ColLateLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Binding="{Binding LateDays}" Width="44" MinWidth="40"/>
+                        <DataGridTextColumn Header="{Binding DataContext.ColLateUnitsLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Binding="{Binding LatePenaltyAbsences}" Width="48" MinWidth="40"/>
+                        <DataGridTextColumn Header="{Binding DataContext.ColUnitsLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Binding="{Binding TotalDeductionUnits}" Width="52" MinWidth="44"/>
+                        <DataGridTemplateColumn Header="{Binding DataContext.ShiftHistoryLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Width="108" MinWidth="96">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <Button Content="Shift history"
+                                    <Button Content="{Binding DataContext.ShiftHistoryLabel, RelativeSource={RelativeSource AncestorType=DataGrid}, Mode=OneWay}"
                                             Margin="4,2"
                                             Padding="8,4"
                                             FontSize="12"
@@ -552,12 +549,12 @@
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTextColumn Header="After att." Binding="{Binding BaseAfterAttendanceUsd, StringFormat=$ {0:N2}}" Width="92" MinWidth="78"/>
-                        <DataGridTextColumn Header="Sales" Binding="{Binding MoneyGeneratedUsd, StringFormat=$ {0:N2}}" Width="88" MinWidth="72"/>
-                        <DataGridTextColumn Header="Bonus" Binding="{Binding BonusFivePercentUsd, StringFormat=$ {0:N2}}" Width="78" MinWidth="64"/>
-                        <DataGridTextColumn Header="Advances" Binding="{Binding AdvancesDeductUsd, StringFormat=$ {0:N2}}" Width="84" MinWidth="68"/>
-                        <DataGridTextColumn Header="Owed" Binding="{Binding NetPay, StringFormat=$ {0:N2}}" Width="82" MinWidth="68"/>
-                        <DataGridTemplateColumn Header="Pay" Width="108" MinWidth="96">
+                        <DataGridTextColumn Header="{Binding DataContext.ColAfterAttLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Binding="{Binding TableAfterAttText}" Width="92" MinWidth="78"/>
+                        <DataGridTextColumn Header="{Binding DataContext.ColSalesLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Binding="{Binding TableSalesText}" Width="88" MinWidth="72"/>
+                        <DataGridTextColumn Header="{Binding DataContext.ColBonusLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Binding="{Binding TableBonusText}" Width="78" MinWidth="64"/>
+                        <DataGridTextColumn Header="{Binding DataContext.ColAdvancesLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Binding="{Binding TableAdvancesText}" Width="84" MinWidth="68"/>
+                        <DataGridTextColumn Header="{Binding DataContext.ColOwedLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Binding="{Binding TableNetPayText}" Width="82" MinWidth="68"/>
+                        <DataGridTemplateColumn Header="{Binding DataContext.ColPayLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Width="108" MinWidth="96">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <Button Style="{StaticResource SalaryConfirmButtonTable}"
@@ -566,16 +563,16 @@
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTemplateColumn Header="Status" Width="*" MinWidth="220">
+                        <DataGridTemplateColumn Header="{Binding DataContext.ColStatusLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Width="*" MinWidth="220">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <StackPanel>
                                         <TextBlock TextWrapping="Wrap"
                                                    Margin="4,6"
                                                    Visibility="{Binding HasPaidReceiptDetail, Converter={StaticResource BoolToVisibilityConverter}}">
-                                            <Run Text="Paid " FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                            <Run Text="{Binding PaidPrefix, Mode=OneWay}" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
                                             <Run Text="{Binding PaidAmountDisplay, Mode=OneWay}" FontSize="17" FontWeight="Bold" Foreground="{StaticResource GoldAccentBrush}"/>
-                                            <Run Text="  on  " FontSize="14" Foreground="{StaticResource TextMutedBrush}"/>
+                                            <Run Text="{Binding PaidOnSeparator, Mode=OneWay}" FontSize="14" Foreground="{StaticResource TextMutedBrush}"/>
                                             <Run Text="{Binding PaidDateDisplay, Mode=OneWay}" FontSize="15" FontWeight="SemiBold" Foreground="#FFB8E6C1"/>
                                         </TextBlock>
                                         <TextBlock Text="{Binding StatusText}"
@@ -624,7 +621,7 @@
                         BorderThickness="1"
                         Padding="24,20">
                     <StackPanel>
-                        <TextBlock Text="Record payroll payment"
+                        <TextBlock Text="{Binding PaymentDialogTitle, Mode=OneWay}"
                                    FontSize="20"
                                    FontWeight="SemiBold"
                                    Foreground="{StaticResource GoldAccentBrush}"/>
@@ -641,7 +638,7 @@
                                    Margin="0,14,0,0"
                                    FontSize="14"
                                    Foreground="{StaticResource TextSecondaryBrush}"/>
-                        <TextBlock Text="Amount to pay (USD)"
+                        <TextBlock Text="{Binding AmountToPayLabel, Mode=OneWay}"
                                    Margin="0,16,0,6"
                                    FontSize="14"
                                    Foreground="{StaticResource TextMutedBrush}"/>
@@ -651,12 +648,12 @@
                         <StackPanel Orientation="Horizontal"
                                     Margin="0,20,0,0"
                                     HorizontalAlignment="Right">
-                            <Button Content="Cancel"
+                            <Button Content="{Binding CancelLabel, Mode=OneWay}"
                                     Command="{Binding CancelPayrollPaymentDialogCommand}"
                                     Style="{StaticResource GhostButton}"
                                     Padding="16,10"
                                     Margin="0,0,10,0"/>
-                            <Button Content="Record payment"
+                            <Button Content="{Binding RecordPaymentLabel, Mode=OneWay}"
                                     Command="{Binding SubmitPayrollPaymentDialogCommand}"
                                     Style="{StaticResource GoldPrimaryButton}"
                                     Padding="18,10"/>

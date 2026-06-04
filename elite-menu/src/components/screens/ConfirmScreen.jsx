@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import { Check } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 function Particles() {
   const dots = Array.from({ length: 12 }, (_, i) => ({
@@ -54,9 +55,10 @@ export function ConfirmScreen({
   confirmationCode,
   receipt,
 }) {
-  const headingText = heading ?? 'We received it'
-  const primaryLabel = primaryCtaLabel ?? 'Order more'
-  const secondaryLabel = secondaryCtaLabel ?? 'Back to start'
+  const { t } = useTranslation()
+  const headingText = heading ?? t('guest.confirm.heading')
+  const primaryLabel = primaryCtaLabel ?? t('guest.confirm.orderMore')
+  const secondaryLabel = secondaryCtaLabel ?? t('guest.confirm.backToStart')
   const ringAccent =
     accent === 'gold'
       ? 'border-amber-400/45 bg-amber-500/10 shadow-[0_0_32px_rgba(200,168,76,0.22)]'
@@ -87,18 +89,18 @@ export function ConfirmScreen({
 
         <h2 className="text-center font-display text-2xl italic font-semibold text-champagne">{headingText}</h2>
         <p className="mt-2 max-w-[300px] text-center font-body text-sm leading-relaxed text-[var(--text-muted)]">
-          {message || 'The kitchen and your server can see this order as a request.'}
+          {t('guest.confirm.message')}
         </p>
         {confirmationCode ? (
           <div className="mt-6 w-full max-w-[320px] rounded-2xl border border-gold/30 bg-[var(--gold-dim)] px-6 py-5 text-center shadow-[0_12px_40px_rgba(0,0,0,0.2)]">
             <p className="font-body text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-gold/85">
-              Your confirmation code
+              {t('guest.confirm.confirmationCode')}
             </p>
             <p className="mt-3 font-mono text-[2.5rem] font-bold leading-none tracking-[0.2em] text-champagne">
               {confirmationCode}
             </p>
             <p className="mt-3 font-body text-xs leading-relaxed text-champagne/55">
-              Save or screenshot this code. You will need it at pickup or for delivery.
+              {t('guest.confirm.codeHint')}
             </p>
           </div>
         ) : null}
@@ -120,17 +122,19 @@ export function ConfirmScreen({
         ) : null}
         {label ? (
           <div className="mt-6 rounded-2xl border border-gold/20 bg-[var(--gold-dim)] px-6 py-3 text-center">
-            <p className="font-body text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-gold/80">Reference</p>
+            <p className="font-body text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-gold/80">
+              {t('guest.general.reference')}
+            </p>
             <p className="mt-1 font-mono text-lg font-medium text-champagne">{label}</p>
           </div>
         ) : null}
         {estimatedPrepMinutes != null && estimatedPrepMinutes > 0 ? (
           <div className="mt-4 max-w-[300px] rounded-2xl border border-champagne/15 bg-midnight-2 px-5 py-3 text-center">
             <p className="font-body text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-gold/80">
-              Estimated kitchen time
+              {t('guest.confirm.estPrepTitle')}
             </p>
             <p className="mt-1 font-body text-base font-semibold text-champagne">
-              About {estimatedPrepMinutes} minutes
+              {t('guest.confirm.estPrepMinutes', { minutes: estimatedPrepMinutes })}
             </p>
           </div>
         ) : null}

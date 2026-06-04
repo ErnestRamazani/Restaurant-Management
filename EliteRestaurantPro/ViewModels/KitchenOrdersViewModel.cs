@@ -385,7 +385,8 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
         DetailTable = OrderRecordUiLabels.TableCaption(order);
         DetailServer = OrderRecordUiLabels.ServerCaption(order);
         DetailStatus = order.Status;
-        DetailTime = order.CreatedAt.ToString("MMM d, yyyy · HH:mm");
+        var tz = SettingsManager.Load().BusinessProfile.RestaurantTimeZoneId;
+        DetailTime = RestaurantTimeZone.FormatOrderCreatedAt(order.CreatedAt, tz);
         var lineSubtotal = order.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
         var totals = OrderTotalsHelper.ComputeTotals(lineSubtotal, order.DiscountMode, order.DiscountValue);
         DetailTotal = $"$ {totals.GrandTotal:N2}";
@@ -599,6 +600,7 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
 
         var awaitsRelease = OrderWorkflow.AwaitsCashierOrApprovalBeforeKitchen(order.Status);
         var work = KitchenLineVisibility.Summarize(lines);
+        var tz = SettingsManager.Load().BusinessProfile.RestaurantTimeZoneId;
         return new OrderEntry
         {
             Id = order.Id,
@@ -611,7 +613,7 @@ public sealed class KitchenOrdersViewModel : AdminBaseViewModel
             AllergyNotes = order.AllergyNotes ?? string.Empty,
             Status = order.Status,
             CreatedAt = order.CreatedAt,
-            Time = order.CreatedAt.ToString("HH:mm"),
+            Time = RestaurantTimeZone.FormatUtc(order.CreatedAt, tz, "HH:mm"),
             Total = totals.GrandTotal,
             StatusColor = StatusColorFor(order.Status),
             OrderOrigin = order.OrderOrigin,

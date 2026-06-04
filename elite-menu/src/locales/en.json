@@ -14,13 +14,23 @@
     "checkingCloud": "Checking cloud"
   },
   "menu": {
+    "welcome": "Welcome",
     "browseMenu": "View menu",
     "orderOnline": "Order online",
     "reservation": "Reservation",
     "staffLogin": "Staff",
+    "about": "About",
+    "contact": "Contact",
+    "notes": "Notes",
     "cart": "Cart",
+    "yourCart": "Your cart",
+    "emptyCart": "Your cart is empty",
+    "addToCart": "Add to cart",
     "placeOrder": "Place order",
     "orderConfirmed": "Order confirmed"
+  },
+  "reservation": {
+    "reservationFloor": "Reservation floor"
   },
   "staff": {
     "hubTitle": "Workspace",

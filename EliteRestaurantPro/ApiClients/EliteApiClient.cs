@@ -72,6 +72,25 @@ public sealed class EliteApiClient
         return await response.Content.ReadFromJsonAsync<T>(JsonOptions, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<bool> PutAsync<TRequest>(string path, TRequest payload, CancellationToken cancellationToken = default)
+    {
+        using var response = await SendWithRetryAsync(
+                () =>
+                {
+                    var r = new HttpRequestMessage(HttpMethod.Put, BuildRequestUri(path))
+                    {
+                        Content = JsonContent.Create(payload, options: JsonOptions)
+                    };
+                    ApplyBearer(r, _bearerToken);
+                    ApplyTenantHeaders(r);
+                    return r;
+                },
+                cancellationToken)
+            .ConfigureAwait(false);
+        await EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
     public async Task<bool> DeleteAsync(string path, CancellationToken cancellationToken = default)
     {
         using var response = await SendWithRetryAsync(

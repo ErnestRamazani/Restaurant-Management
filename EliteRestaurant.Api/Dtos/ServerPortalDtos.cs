@@ -27,6 +27,7 @@ public sealed record ServerCreateOrderRequest(
     string? NewCheckKind,
     string CustomerNotes,
     string AllergyNotes,
+    int? RestaurantClientId,
     IReadOnlyList<ServerOrderLineRequest> Lines);
 
 public sealed record ServerOpenCheckLineDto(
@@ -67,13 +68,17 @@ public sealed record ServerPortalConfigDto(
     decimal UsdToFcRate,
     decimal TaxPercent,
     decimal ServicePercent,
-    string MenuTaxonomyJson);
+    string MenuTaxonomyJson,
+    string RestaurantTimeZoneId);
 
 public sealed record ServerReadyOrderLineDto(
     int ProductId,
     string Name,
     int Quantity,
-    string? PhotoUrl);
+    string? PhotoUrl,
+    bool IsPrepared,
+    bool IsServed,
+    bool IsDrink);
 
 public sealed record ServerReadyOrderDto(
     int Id,
@@ -94,7 +99,18 @@ public sealed record ServerReadyOrderDto(
     string OrderOrigin,
     string OrderSource,
     bool IsOnlineMenuOrder,
+    bool IsFullyReady,
+    bool FoodStationReady,
+    bool BarStationReady,
+    bool FoodStationServed,
+    bool BarStationServed,
+    bool CanServeFoodStation,
+    bool CanServeBarStation,
+    bool CanMarkServed,
+    string PrepSummary,
     IReadOnlyList<ServerReadyOrderLineDto> Lines);
+
+public sealed record ServerServeStationRequest(string Station);
 
 /// <summary>Server's dine-in pipeline for assigned tables (Waiting → Completed).</summary>
 public sealed record ServerOngoingOrderDto(
@@ -120,6 +136,14 @@ public sealed record ServerOngoingOrderDto(
     string OrderSource,
     bool IsOnlineMenuOrder,
     bool CanMarkServed,
+    bool IsFullyReady,
+    bool FoodStationReady,
+    bool BarStationReady,
+    bool FoodStationServed,
+    bool BarStationServed,
+    bool CanServeFoodStation,
+    bool CanServeBarStation,
+    string PrepSummary,
     IReadOnlyList<ServerReadyOrderLineDto> Lines);
 
 public sealed record ServerMarkServedResponse(

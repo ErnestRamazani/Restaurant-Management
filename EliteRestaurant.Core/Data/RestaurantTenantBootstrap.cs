@@ -46,6 +46,8 @@ public static class RestaurantTenantBootstrap
         db.Database.ExecuteSqlRaw("""UPDATE "PublicMenuAssets" SET "RestaurantId" = {0} WHERE "RestaurantId" = 0 OR "RestaurantId" IS NULL""", restaurantId);
         db.Database.ExecuteSqlRaw("""UPDATE "Transactions" SET "RestaurantId" = {0} WHERE "RestaurantId" = 0 OR "RestaurantId" IS NULL""", restaurantId);
         db.Database.ExecuteSqlRaw("""UPDATE "SyncOutbox" SET "RestaurantId" = {0} WHERE "RestaurantId" = 0 OR "RestaurantId" IS NULL""", restaurantId);
+        db.Database.ExecuteSqlRaw("""UPDATE "RestaurantClients" SET "RestaurantId" = {0} WHERE "RestaurantId" = 0 OR "RestaurantId" IS NULL""", restaurantId);
+        db.Database.ExecuteSqlRaw("""UPDATE "ClientDebtLedgerEntries" SET "RestaurantId" = {0} WHERE "RestaurantId" = 0 OR "RestaurantId" IS NULL""", restaurantId);
     }
 
     private static void BackfillRestaurantIdInMemory(AppDbContext db, int restaurantId)
@@ -65,6 +67,8 @@ public static class RestaurantTenantBootstrap
         StampIfUnset(db.PublicMenuAssets.IgnoreQueryFilters(), restaurantId);
         StampIfUnset(db.Transactions.IgnoreQueryFilters(), restaurantId);
         StampIfUnset(db.SyncOutbox.IgnoreQueryFilters(), restaurantId);
+        StampIfUnset(db.RestaurantClients.IgnoreQueryFilters(), restaurantId);
+        StampIfUnset(db.ClientDebtLedgerEntries.IgnoreQueryFilters(), restaurantId);
         db.SaveChanges();
     }
 

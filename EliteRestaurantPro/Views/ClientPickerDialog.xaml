@@ -1,0 +1,150 @@
+<Window x:Class="EliteRestaurantPro.Views.ClientPickerDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{Binding DialogTitle, Mode=OneWay}"
+        Width="400"
+        Height="500"
+        MinWidth="400"
+        MinHeight="500"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        WindowStyle="None"
+        AllowsTransparency="False"
+        Background="#FF12121F">
+    <Border CornerRadius="14"
+            Background="#FF12121F"
+            BorderBrush="{StaticResource BorderSubtleBrush}"
+            BorderThickness="1"
+            ClipToBounds="True">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="28" ShadowDepth="6" Direction="270" Color="#99000000" Opacity="0.8"/>
+        </Border.Effect>
+        <Border Background="#FF12121F" Margin="16" Padding="22,20" CornerRadius="10" ClipToBounds="True">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0"
+                        Background="Transparent"
+                        Padding="0,0,0,10"
+                        Cursor="Hand"
+                        MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                    <TextBlock Style="{StaticResource HeadingMedium}"
+                               Text="{Binding DialogTitle, Mode=OneWay}"/>
+                </Border>
+
+                <TextBlock Grid.Row="1"
+                           Style="{StaticResource BodyText}"
+                           Text="{Binding SearchPlaceholder, Mode=OneWay}"
+                           Foreground="{StaticResource TextSecondaryBrush}"
+                           FontSize="11"
+                           Margin="0,0,0,6"/>
+                <TextBox x:Name="SearchBox"
+                         Grid.Row="2"
+                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource EliteTextBox}"
+                         Height="40"
+                         Margin="0,0,0,8"/>
+
+                <TextBlock Grid.Row="3"
+                           Style="{StaticResource BodyText}"
+                           Text="{Binding StatusMessage, Mode=OneWay}"
+                           TextWrapping="Wrap"
+                           Foreground="{StaticResource TextSecondaryBrush}"
+                           FontSize="12"
+                           Margin="0,0,0,8"
+                           MinHeight="18"/>
+
+                <Border Grid.Row="4"
+                        CornerRadius="10"
+                        BorderBrush="{StaticResource BorderSubtleBrush}"
+                        BorderThickness="1"
+                        Background="#FF161C28"
+                        Margin="0,0,0,14"
+                        ClipToBounds="True">
+                    <ListBox x:Name="ResultsList"
+                             ItemsSource="{Binding Results}"
+                             SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
+                             BorderThickness="0"
+                             Background="#FF161C28"
+                             Padding="4"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             MouseDoubleClick="ResultsList_MouseDoubleClick">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="Margin" Value="0,0,0,8"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <Border x:Name="RowBorder"
+                                                    CornerRadius="10"
+                                                    Padding="12,10"
+                                                    BorderBrush="{StaticResource BorderSubtleBrush}"
+                                                    BorderThickness="1"
+                                                    Background="#161c28"
+                                                    Cursor="Hand">
+                                                <ContentPresenter/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="RowBorder" Property="BorderBrush" Value="{StaticResource GoldAccentBrush}"/>
+                                                    <Setter TargetName="RowBorder" Property="Background" Value="#22E8A838"/>
+                                                </Trigger>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="RowBorder" Property="Background" Value="#1c2433"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel>
+                                    <TextBlock Text="{Binding FullName}"
+                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               FontWeight="SemiBold"
+                                               FontSize="14"/>
+                                    <TextBlock Text="{Binding MetaLine}"
+                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                               FontSize="12"
+                                               Margin="0,4,0,0"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Border>
+
+                <Grid Grid.Row="5">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Button Grid.Column="0"
+                            Content="{Binding CancelButtonLabel, Mode=OneWay}"
+                            Style="{StaticResource GhostButton}"
+                            IsCancel="True"
+                            Click="Cancel_Click"/>
+                    <Button Grid.Column="2"
+                            Content="{Binding SelectButtonLabel, Mode=OneWay}"
+                            Style="{StaticResource GoldPrimaryButton}"
+                            IsDefault="True"
+                            IsEnabled="{Binding CanConfirm}"
+                            Click="Select_Click"/>
+                </Grid>
+            </Grid>
+        </Border>
+    </Border>
+</Window>

@@ -8,6 +8,7 @@ using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Utils;
 using EliteRestaurantPro.ApiClients;
+using EliteRestaurantPro.Localization;
 
 namespace EliteRestaurantPro.ViewModels;
 
@@ -33,7 +34,46 @@ public sealed class DashboardStaffPresenceItem
     public string Name { get; init; } = string.Empty;
     public string Role { get; init; } = string.Empty;
     public bool IsClockedIn { get; init; }
-    public string OnDutyLabel => IsClockedIn ? "Active" : "Off duty";
+    public string OnDutyLabel { get; init; } = string.Empty;
+}
+
+internal sealed class DashboardLoadedSnapshot
+{
+    public bool DbOk { get; init; }
+    public decimal TodayRevenueUsdValue { get; init; }
+    public decimal YesterdayRevenueUsdValue { get; init; }
+    public decimal TodayRevenueFcValue { get; init; }
+    public decimal YesterdayRevenueFcValue { get; init; }
+    public decimal TodayExpensesUsdValue { get; init; }
+    public decimal YesterdayExpensesUsdValue { get; init; }
+    public decimal RevenueUsdDelta { get; init; }
+    public decimal RevenueFcDelta { get; init; }
+    public decimal ExpensesUsdDelta { get; init; }
+    public int OrdersCompletedToday { get; init; }
+    public int OrdersCompletedYesterday { get; init; }
+    public decimal CompletedDelta { get; init; }
+    public int ActiveOrdersCount { get; init; }
+    public int InKitchenCount { get; init; }
+    public int TotalActiveEmployees { get; init; }
+    public int ClockedInCount { get; init; }
+    public int OccupiedTables { get; init; }
+    public int TotalTables { get; init; }
+    public IReadOnlyList<decimal> RevenueByDay { get; init; } = [];
+    public IReadOnlyList<decimal> RevenueLast7 { get; init; } = [];
+    public decimal[] HourlySales { get; init; } = [];
+    public List<ActivityItem> Activities { get; init; } = [];
+    public List<DashboardDrilldownItem> SalesItems { get; init; } = [];
+    public List<DashboardDrilldownItem> ActiveOrderItems { get; init; } = [];
+    public List<DashboardDrilldownItem> LowStockItems { get; init; } = [];
+    public List<DashboardDrilldownItem> AttendanceItems { get; init; } = [];
+    public List<DashboardDrilldownItem> RevenueItems { get; init; } = [];
+    public List<DashboardDrilldownItem> ActivityItems { get; init; } = [];
+    public List<DashboardInventoryRowItem> InventoryRows { get; init; } = [];
+    public List<DashboardStaffPresenceItem> StaffPresence { get; init; } = [];
+    public List<DashboardTopDishItem> TopDishVms { get; init; } = [];
+    public bool SalaryWarningShow { get; init; }
+    public string SalaryWarningMessage { get; init; } = string.Empty;
+    public int SalaryDaysPast { get; init; }
 }
 
 public class AdminDashboardViewModel : AdminBaseViewModel
@@ -41,10 +81,47 @@ public class AdminDashboardViewModel : AdminBaseViewModel
     private readonly Dictionary<DashboardDrilldownType, List<DashboardDrilldownItem>> _drilldownCache = [];
     private bool _isNavigatingToShortcut;
     private DispatcherTimer? _clockTimer;
+    private DashboardLoadedSnapshot? _lastSnapshot;
 
     public override string ActivePage => "Dashboard";
 
-    public string WelcomeName { get; } = "Ernest";
+    public string WelcomeTitle
+    {
+        get
+        {
+            var name = !string.IsNullOrWhiteSpace(AppSession.AdminLoginDisplayName)
+                ? AppSession.AdminLoginDisplayName!
+                : Loc.Admin("dashOwnerFallback", "Owner");
+            return Loc.Admin("dashWelcome", "Welcome, {{name}}", new Dictionary<string, string> { ["name"] = name });
+        }
+    }
+
+    public string DashSubtitle => Loc.Admin("dashSubtitle", "Operations command center — today's performance, inventory risk, and team status.");
+    public string SalaryPayrollOverdueTitle => Loc.Admin("dashSalaryOverdueTitle", "Salary payroll overdue");
+    public string DaysPastMonthEndLabel => Loc.Admin("dashDaysPastMonthEnd", "Days past month end:");
+    public string KpiTodayUsdTitle => Loc.Admin("kpiTodayUsd", "Today's revenue (USD)");
+    public string KpiTodayUsdSub => Loc.Admin("kpiTodayUsdSub", "Money — entries in USD only");
+    public string KpiTodayFcTitle => Loc.Admin("kpiTodayFc", "Today's revenue (FC)");
+    public string KpiTodayFcSub => Loc.Admin("kpiTodayFcSub", "Money — entries in FC only (not converted from USD)");
+    public string KpiTodayExpTitle => Loc.Admin("kpiTodayExp", "Today's expenses");
+    public string KpiTodayExpSub => Loc.Admin("kpiTodayExpSub", "All expenses in USD (FC rows use stored USD equivalent)");
+    public string KpiTablesTitle => Loc.Admin("kpiTables", "Tables occupied");
+    public string KpiActiveOrdersTitle => Loc.Admin("kpiActiveOrders", "Active orders");
+    public string KpiCompletedTodayTitle => Loc.Admin("kpiCompletedToday", "Orders completed today");
+    public string KpiCompletedTodaySub => Loc.Admin("kpiCompletedTodaySub", "From orders (not Money ledger)");
+    public string DashSparklineCap => Loc.Admin("dashSparklineCap", "Sparkline: 7-day USD revenue (Money)");
+    public string DashInventoryTitle => Loc.Admin("dashInventoryAlerts", "Inventory alerts");
+    public string DashInventoryBtn => Loc.Admin("dashInventoryBtn", "Inventory");
+    public string DashSalesRhythmTitle => Loc.Admin("dashSalesRhythm", "Today's sales rhythm");
+    public string DashSalesCaption => Loc.Admin("dashSalesCaption", "Revenue by hour (completed & open orders created today).");
+    public string DashTopDishesTitle => Loc.Admin("dashTopDishes", "Top dishes today");
+    public string DashTeamRosterTitle => Loc.Admin("dashTeamRoster", "Team on roster");
+    public string DashAttendanceBtn => Loc.Admin("dashAttendance", "Attendance");
+    public string DashRecentActivityTitle => Loc.Admin("dashRecentActivity", "Recent activity");
+    public string DashWeeklyRevenueTitle => Loc.Admin("dashWeeklyRevenue", "Weekly revenue");
+    public string DashThisWeekLabel => Loc.Admin("dashThisWeek", "This week (Mon–Fri)");
+    public string DashRecentHint => Loc.Admin("dashRecentHint", "Last {{count}} events · tap a card to open orders, team, or inventory.",
+        new Dictionary<string, string> { ["count"] = DashboardDrilldownViewModel.RecentActivityMaxItems.ToString(CultureInfo.InvariantCulture) });
 
     public string TodayRevenueUsd { get; private set; } = CurrencyHelper.FormatAmount(0m, CurrencyHelper.Usd);
     public string TodayRevenueFc { get; private set; } = CurrencyHelper.FormatAmount(0m, CurrencyHelper.CongoleseFranc);
@@ -62,6 +139,7 @@ public class AdminDashboardViewModel : AdminBaseViewModel
     public string InKitchenNowText { get; private set; } = "0 in kitchen now";
     public string NotYetInText { get; private set; } = "0 not yet in";
     public string OccupiedTablesText { get; private set; } = "0/0 occupied";
+    public string ActiveOrdersSubText { get; private set; } = string.Empty;
     public double OccupiedTablesPercent { get; private set; }
 
     public bool DatabaseConnected { get; private set; } = true;
@@ -84,7 +162,7 @@ public class AdminDashboardViewModel : AdminBaseViewModel
     public ObservableCollection<DashboardInventoryRowItem> InventoryDashboardRows { get; } = [];
     public ObservableCollection<DashboardTopDishItem> TopSellingDishes { get; } = [];
     public ObservableCollection<DashboardStaffPresenceItem> StaffPresence { get; } = [];
-    public ObservableCollection<ActivityItem> RecentActivities { get; } = [];
+    public ObservableCollection<ActivityFeedItem> RecentActivities { get; } = [];
 
     public ICommand OpenTodaySalesCommand { get; }
     public ICommand OpenActiveOrdersCommand { get; }
@@ -102,7 +180,7 @@ public class AdminDashboardViewModel : AdminBaseViewModel
         OpenClockedInStaffCommand = new RelayCommand(_ => OpenDrilldown(DashboardDrilldownType.ClockedInStaff));
         OpenWeeklyRevenueCommand = new RelayCommand(_ => OpenDrilldown(DashboardDrilldownType.WeeklyRevenue));
         OpenRecentActivityCommand = new RelayCommand(_ => OpenDrilldown(DashboardDrilldownType.RecentActivity));
-        OpenActivityItemCommand = new RelayCommand(activity => OpenFromActivity(activity as ActivityItem));
+        OpenActivityItemCommand = new RelayCommand(activity => OpenFromActivity(activity as ActivityFeedItem));
 
         UpdateLiveClock();
         _clockTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
@@ -117,7 +195,48 @@ public class AdminDashboardViewModel : AdminBaseViewModel
     }
 
     private void UpdateLiveClock()
-        => LiveClockText = DateTime.Now.ToString("dddd, MMMM dd, yyyy  ·  HH:mm", CultureInfo.InvariantCulture);
+    {
+        var tz = SettingsManager.Load().BusinessProfile.RestaurantTimeZoneId;
+        var now = RestaurantTimeZone.UtcToRestaurant(DateTime.UtcNow, tz);
+        var culture = Loc.Language == "fr" ? "fr-FR" : "en-US";
+        LiveClockText = now.ToString("dddd, MMMM dd, yyyy  ·  HH:mm", CultureInfo.GetCultureInfo(culture));
+    }
+
+    protected override void RefreshLocalizedStrings()
+    {
+        UpdateLiveClock();
+        Notify(
+            nameof(WelcomeTitle),
+            nameof(DashSubtitle),
+            nameof(SalaryPayrollOverdueTitle),
+            nameof(DaysPastMonthEndLabel),
+            nameof(KpiTodayUsdTitle),
+            nameof(KpiTodayUsdSub),
+            nameof(KpiTodayFcTitle),
+            nameof(KpiTodayFcSub),
+            nameof(KpiTodayExpTitle),
+            nameof(KpiTodayExpSub),
+            nameof(KpiTablesTitle),
+            nameof(KpiActiveOrdersTitle),
+            nameof(KpiCompletedTodayTitle),
+            nameof(KpiCompletedTodaySub),
+            nameof(DashSparklineCap),
+            nameof(DashInventoryTitle),
+            nameof(DashInventoryBtn),
+            nameof(DashSalesRhythmTitle),
+            nameof(DashSalesCaption),
+            nameof(DashTopDishesTitle),
+            nameof(DashTeamRosterTitle),
+            nameof(DashAttendanceBtn),
+            nameof(DashRecentActivityTitle),
+            nameof(DashRecentHint),
+            nameof(DashWeeklyRevenueTitle),
+            nameof(DashThisWeekLabel),
+            nameof(LiveClockText));
+
+        if (_lastSnapshot is not null)
+            ApplySnapshotToUi(_lastSnapshot);
+    }
 
     private void OpenDrilldown(DashboardDrilldownType type)
     {
@@ -172,7 +291,7 @@ public class AdminDashboardViewModel : AdminBaseViewModel
         }
     }
 
-    private void OpenFromActivity(ActivityItem? activity)
+    private void OpenFromActivity(ActivityFeedItem? activity)
     {
         OpenDrilldown(DashboardDrilldownType.RecentActivity);
     }
@@ -185,6 +304,7 @@ public class AdminDashboardViewModel : AdminBaseViewModel
             {
                 var dbOk = true;
                 var today = DateTime.Today;
+                var tz = RestaurantTimeZone.NormalizeId(SettingsManager.Load().BusinessProfile.RestaurantTimeZoneId);
                 var data = new AdminDataApiClient();
                 List<OrderRecord> allOrders;
                 List<Table> dbTablesSnapshot;
@@ -375,7 +495,10 @@ public class AdminDashboardViewModel : AdminBaseViewModel
                     {
                         Name = emp.Name,
                         Role = emp.Role,
-                        IsClockedIn = todayAttendance.TryGetValue(emp.Id, out var a) && a.ClockInTime != null
+                        IsClockedIn = todayAttendance.TryGetValue(emp.Id, out var a) && a.ClockInTime != null,
+                        OnDutyLabel = todayAttendance.TryGetValue(emp.Id, out var att) && att.ClockInTime != null
+                            ? Loc.Admin("staffStatusActive", "Active")
+                            : Loc.Admin("staffStatusOffDuty", "Off duty")
                     })
                     .ToList();
 
@@ -408,7 +531,7 @@ public class AdminDashboardViewModel : AdminBaseViewModel
                     {
                         Title = string.IsNullOrWhiteSpace(order.UniqueId) ? $"Order #{order.Id:000}" : order.UniqueId,
                         Subtitle = $"{order.TableCode} · {order.TableName}",
-                        Detail = $"Status: {order.Status} · {order.CreatedAt:HH:mm}",
+                        Detail = $"Status: {order.Status} · {RestaurantTimeZone.FormatUtc(order.CreatedAt, tz, "HH:mm")}",
                         Meta = $"$ {GrandTotalForOrder(order, orderTotals.TryGetValue(order.Id, out var total) ? total : 0m):N2}",
                         AccentColor = "#2196F3"
                     })
@@ -497,137 +620,50 @@ public class AdminDashboardViewModel : AdminBaseViewModel
                     payrollSnapshot,
                     allMoneyRows);
 
-                return new
+                return new DashboardLoadedSnapshot
                 {
-                    dbOk,
-                    todaySalesValue,
-                    yesterdaySalesValue,
-                    todayRevenueUsdValue,
-                    yesterdayRevenueUsdValue,
-                    todayRevenueFcValue,
-                    yesterdayRevenueFcValue,
-                    todayExpensesUsdValue,
-                    yesterdayExpensesUsdValue,
-                    revenueUsdDelta,
-                    revenueFcDelta,
-                    expensesUsdDelta,
-                    ordersCompletedToday,
-                    ordersCompletedYesterday,
-                    completedDelta,
-                    activeOrdersCount,
-                    inKitchenCount,
-                    totalActiveEmployees,
-                    clockedInCount,
-                    occupiedTables,
-                    totalTables,
-                    revenueByDay,
-                    revenueLast7,
-                    hourlySales,
-                    activities,
-                    salesItems,
-                    activeOrderItems,
-                    lowStockItems,
-                    attendanceItems,
-                    revenueItems,
-                    activityItems,
-                    inventoryRows,
-                    staffPresence,
-                    topDishVms,
-                    salaryWarningShow = salaryOverdue.ShowWarning,
-                    salaryWarningMessage = salaryOverdue.Message,
-                    salaryDaysPast = salaryOverdue.DaysPastPayDay
+                    DbOk = dbOk,
+                    TodayRevenueUsdValue = todayRevenueUsdValue,
+                    YesterdayRevenueUsdValue = yesterdayRevenueUsdValue,
+                    TodayRevenueFcValue = todayRevenueFcValue,
+                    YesterdayRevenueFcValue = yesterdayRevenueFcValue,
+                    TodayExpensesUsdValue = todayExpensesUsdValue,
+                    YesterdayExpensesUsdValue = yesterdayExpensesUsdValue,
+                    RevenueUsdDelta = revenueUsdDelta,
+                    RevenueFcDelta = revenueFcDelta,
+                    ExpensesUsdDelta = expensesUsdDelta,
+                    OrdersCompletedToday = ordersCompletedToday,
+                    OrdersCompletedYesterday = ordersCompletedYesterday,
+                    CompletedDelta = completedDelta,
+                    ActiveOrdersCount = activeOrdersCount,
+                    InKitchenCount = inKitchenCount,
+                    TotalActiveEmployees = totalActiveEmployees,
+                    ClockedInCount = clockedInCount,
+                    OccupiedTables = occupiedTables,
+                    TotalTables = totalTables,
+                    RevenueByDay = revenueByDay,
+                    RevenueLast7 = revenueLast7,
+                    HourlySales = hourlySales,
+                    Activities = activities,
+                    SalesItems = salesItems,
+                    ActiveOrderItems = activeOrderItems,
+                    LowStockItems = lowStockItems,
+                    AttendanceItems = attendanceItems,
+                    RevenueItems = revenueItems,
+                    ActivityItems = activityItems,
+                    InventoryRows = inventoryRows,
+                    StaffPresence = staffPresence,
+                    TopDishVms = topDishVms,
+                    SalaryWarningShow = salaryOverdue.ShowWarning,
+                    SalaryWarningMessage = salaryOverdue.Message,
+                    SalaryDaysPast = salaryOverdue.DaysPastPayDay
                 };
             });
 
             await Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                DatabaseConnected = snapshot.dbOk;
-                DatabaseStatusText = snapshot.dbOk ? "Cloud API · Connected" : "Cloud API · Offline";
-
-                ShowSalaryPayrollWarning = snapshot.salaryWarningShow;
-                SalaryPayrollWarningText = snapshot.salaryWarningMessage;
-                SalaryPayrollDaysPastDue = snapshot.salaryDaysPast;
-
-                TodayRevenueUsd = CurrencyHelper.FormatAmount(snapshot.todayRevenueUsdValue, CurrencyHelper.Usd);
-                TodayRevenueFc = CurrencyHelper.FormatAmount(snapshot.todayRevenueFcValue, CurrencyHelper.CongoleseFranc);
-                TodayExpensesUsd = CurrencyHelper.FormatAmount(snapshot.todayExpensesUsdValue, CurrencyHelper.Usd);
-                RevenueUsdVsYesterdayText = snapshot.yesterdayRevenueUsdValue <= 0m && snapshot.todayRevenueUsdValue <= 0m
-                    ? "No USD revenue yesterday to compare"
-                    : $"{snapshot.revenueUsdDelta:+0.0;-0.0;0}% vs yesterday · Money (USD)";
-                RevenueFcVsYesterdayText = snapshot.yesterdayRevenueFcValue <= 0m && snapshot.todayRevenueFcValue <= 0m
-                    ? "No FC revenue yesterday to compare"
-                    : $"{snapshot.revenueFcDelta:+0.0;-0.0;0}% vs yesterday · Money (FC)";
-                ExpensesVsYesterdayText = snapshot.yesterdayExpensesUsdValue <= 0m && snapshot.todayExpensesUsdValue <= 0m
-                    ? "No expenses yesterday to compare"
-                    : $"{snapshot.expensesUsdDelta:+0.0;-0.0;0}% vs yesterday · all in USD";
-
-                OrdersCompletedToday = snapshot.ordersCompletedToday;
-                CompletedVsYesterdayText = snapshot.ordersCompletedYesterday == 0 && snapshot.ordersCompletedToday == 0
-                    ? "No completions yesterday"
-                    : $"{snapshot.completedDelta:+0.0;-0.0;0}% vs yesterday";
-
-                ActiveOrdersCount = snapshot.activeOrdersCount;
-                InKitchenNowText = $"{snapshot.inKitchenCount} in kitchen now";
-                ClockedInStaff = $"{snapshot.clockedInCount}/{Math.Max(snapshot.totalActiveEmployees, 0)}";
-                NotYetInText = $"{Math.Max(snapshot.totalActiveEmployees - snapshot.clockedInCount, 0)} not yet in";
-                OccupiedTablesText = $"{snapshot.occupiedTables}/{snapshot.totalTables} occupied";
-                OccupiedTablesPercent = snapshot.totalTables > 0
-                    ? 100.0 * snapshot.occupiedTables / snapshot.totalTables
-                    : 0;
-
-                BuildChart(snapshot.revenueByDay);
-                BuildSparkline(snapshot.revenueLast7);
-                BuildHourlyChart(snapshot.hourlySales);
-
-                InventoryDashboardRows.Clear();
-                foreach (var row in snapshot.inventoryRows)
-                    InventoryDashboardRows.Add(row);
-
-                TopSellingDishes.Clear();
-                foreach (var d in snapshot.topDishVms)
-                    TopSellingDishes.Add(d);
-
-                StaffPresence.Clear();
-                foreach (var s in snapshot.staffPresence)
-                    StaffPresence.Add(s);
-
-                RecentActivities.Clear();
-                foreach (var item in snapshot.activities)
-                    RecentActivities.Add(item);
-
-                _drilldownCache[DashboardDrilldownType.TodaySales] = snapshot.salesItems;
-                _drilldownCache[DashboardDrilldownType.ActiveOrders] = snapshot.activeOrderItems;
-                _drilldownCache[DashboardDrilldownType.LowStockAlerts] = snapshot.lowStockItems;
-                _drilldownCache[DashboardDrilldownType.ClockedInStaff] = snapshot.attendanceItems;
-                _drilldownCache[DashboardDrilldownType.WeeklyRevenue] = snapshot.revenueItems;
-                _drilldownCache[DashboardDrilldownType.RecentActivity] = snapshot.activityItems;
-
-                OnPropertyChanged(nameof(TodayRevenueUsd));
-                OnPropertyChanged(nameof(TodayRevenueFc));
-                OnPropertyChanged(nameof(TodayExpensesUsd));
-                OnPropertyChanged(nameof(RevenueUsdVsYesterdayText));
-                OnPropertyChanged(nameof(RevenueFcVsYesterdayText));
-                OnPropertyChanged(nameof(ExpensesVsYesterdayText));
-                OnPropertyChanged(nameof(SparklinePoints));
-                OnPropertyChanged(nameof(OrdersCompletedToday));
-                OnPropertyChanged(nameof(CompletedVsYesterdayText));
-                OnPropertyChanged(nameof(ActiveOrdersCount));
-                OnPropertyChanged(nameof(ClockedInStaff));
-                OnPropertyChanged(nameof(InKitchenNowText));
-                OnPropertyChanged(nameof(NotYetInText));
-                OnPropertyChanged(nameof(OccupiedTablesText));
-                OnPropertyChanged(nameof(OccupiedTablesPercent));
-                OnPropertyChanged(nameof(DatabaseConnected));
-                OnPropertyChanged(nameof(DatabaseStatusText));
-                OnPropertyChanged(nameof(ShowSalaryPayrollWarning));
-                OnPropertyChanged(nameof(SalaryPayrollWarningText));
-                OnPropertyChanged(nameof(SalaryPayrollDaysPastDue));
-                OnPropertyChanged(nameof(ChartAreaPoints));
-                OnPropertyChanged(nameof(ChartLinePoints));
-                OnPropertyChanged(nameof(WeeklyChartMaxLabel));
-                OnPropertyChanged(nameof(HourlyChartAreaPoints));
-                OnPropertyChanged(nameof(HourlyChartLinePoints));
-                OnPropertyChanged(nameof(HourlyChartMaxLabel));
+                _lastSnapshot = snapshot;
+                ApplySnapshotToUi(snapshot);
             });
         }
         catch (Exception ex)
@@ -635,7 +671,7 @@ public class AdminDashboardViewModel : AdminBaseViewModel
             await Application.Current.Dispatcher.InvokeAsync(() =>
             {
                 DatabaseConnected = false;
-                DatabaseStatusText = "Cloud API · Error";
+                DatabaseStatusText = Loc.Admin("dashApiError", "Cloud API · Error");
                 BuildHourlyChart(new decimal[24]);
                 OnPropertyChanged(nameof(DatabaseConnected));
                 OnPropertyChanged(nameof(DatabaseStatusText));
@@ -643,14 +679,153 @@ public class AdminDashboardViewModel : AdminBaseViewModel
                 OnPropertyChanged(nameof(HourlyChartLinePoints));
                 OnPropertyChanged(nameof(HourlyChartMaxLabel));
                 RecentActivities.Clear();
-                RecentActivities.Add(new ActivityItem
+                RecentActivities.Add(ActivityFeedItem.From(new ActivityItem
                 {
                     Time = DateTime.Now.ToString("HH:mm"),
-                    Title = "Dashboard load error",
+                    Title = Loc.Admin("dashLoadError", "Dashboard load error"),
                     Description = ex.Message
-                });
+                }));
             });
         }
+    }
+
+    private void ApplySnapshotToUi(DashboardLoadedSnapshot snapshot)
+    {
+        DatabaseConnected = snapshot.DbOk;
+        DatabaseStatusText = snapshot.DbOk
+            ? Loc.Admin("dashApiConnected", "Cloud API · Connected")
+            : Loc.Admin("dashApiOffline", "Cloud API · Offline");
+
+        ShowSalaryPayrollWarning = snapshot.SalaryWarningShow;
+        SalaryPayrollDaysPastDue = snapshot.SalaryDaysPast;
+        SalaryPayrollWarningText = snapshot.SalaryWarningShow
+            ? FormatSalaryPayrollWarningText(snapshot.SalaryDaysPast)
+            : string.Empty;
+
+        TodayRevenueUsd = CurrencyHelper.FormatAmount(snapshot.TodayRevenueUsdValue, CurrencyHelper.Usd);
+        TodayRevenueFc = CurrencyHelper.FormatAmount(snapshot.TodayRevenueFcValue, CurrencyHelper.CongoleseFranc);
+        TodayExpensesUsd = CurrencyHelper.FormatAmount(snapshot.TodayExpensesUsdValue, CurrencyHelper.Usd);
+
+        RevenueUsdVsYesterdayText = snapshot.YesterdayRevenueUsdValue <= 0m && snapshot.TodayRevenueUsdValue <= 0m
+            ? Loc.Admin("kpiNoCompareUsd", "No USD revenue yesterday to compare. Money — entries in USD only.")
+            : Loc.Admin("kpiDeltaUsd", "{{delta}}% vs yesterday · Money (USD).",
+                new Dictionary<string, string> { ["delta"] = snapshot.RevenueUsdDelta.ToString("+0.0;-0.0;0", CultureInfo.InvariantCulture) });
+        RevenueFcVsYesterdayText = snapshot.YesterdayRevenueFcValue <= 0m && snapshot.TodayRevenueFcValue <= 0m
+            ? Loc.Admin("kpiNoCompareFc", "No FC revenue yesterday to compare. Money — entries in FC only (not converted from USD).")
+            : Loc.Admin("kpiDeltaFc", "{{delta}}% vs yesterday · Money (FC).",
+                new Dictionary<string, string> { ["delta"] = snapshot.RevenueFcDelta.ToString("+0.0;-0.0;0", CultureInfo.InvariantCulture) });
+        ExpensesVsYesterdayText = snapshot.YesterdayExpensesUsdValue <= 0m && snapshot.TodayExpensesUsdValue <= 0m
+            ? Loc.Admin("kpiNoCompareExp", "No expenses yesterday to compare. All expenses in USD (FC rows use stored USD equivalent).")
+            : Loc.Admin("kpiDeltaExp", "{{delta}}% vs yesterday · all in USD.",
+                new Dictionary<string, string> { ["delta"] = snapshot.ExpensesUsdDelta.ToString("+0.0;-0.0;0", CultureInfo.InvariantCulture) });
+
+        OrdersCompletedToday = snapshot.OrdersCompletedToday;
+        CompletedVsYesterdayText = snapshot.OrdersCompletedYesterday == 0 && snapshot.OrdersCompletedToday == 0
+            ? Loc.Admin("kpiNoCompareCompleted", "No completions yesterday. From orders (not Money ledger).")
+            : Loc.Admin("kpiDeltaCompleted", "{{delta}}% vs yesterday.",
+                new Dictionary<string, string> { ["delta"] = snapshot.CompletedDelta.ToString("+0.0;-0.0;0", CultureInfo.InvariantCulture) });
+
+        ActiveOrdersCount = snapshot.ActiveOrdersCount;
+        InKitchenNowText = Loc.Admin("kpiActiveOrdersSub", "{{count}} in kitchen now",
+            new Dictionary<string, string> { ["count"] = snapshot.InKitchenCount.ToString(CultureInfo.InvariantCulture) });
+        ClockedInStaff = $"{snapshot.ClockedInCount}/{Math.Max(snapshot.TotalActiveEmployees, 0)}";
+        NotYetInText = Loc.Admin("dashNotYetIn", "{{count}} not yet in",
+            new Dictionary<string, string> { ["count"] = Math.Max(snapshot.TotalActiveEmployees - snapshot.ClockedInCount, 0).ToString(CultureInfo.InvariantCulture) });
+        OccupiedTablesText = Loc.Admin("kpiTablesPrimary", "{{occupied}}/{{total}} occupied",
+            new Dictionary<string, string>
+            {
+                ["occupied"] = snapshot.OccupiedTables.ToString(CultureInfo.InvariantCulture),
+                ["total"] = snapshot.TotalTables.ToString(CultureInfo.InvariantCulture)
+            });
+        ActiveOrdersSubText = Loc.Admin("kpiTablesSub", "{{count}} active orders",
+            new Dictionary<string, string> { ["count"] = snapshot.ActiveOrdersCount.ToString(CultureInfo.InvariantCulture) });
+        OccupiedTablesPercent = snapshot.TotalTables > 0
+            ? 100.0 * snapshot.OccupiedTables / snapshot.TotalTables
+            : 0;
+
+        BuildChart(snapshot.RevenueByDay);
+        BuildSparkline(snapshot.RevenueLast7);
+        BuildHourlyChart(snapshot.HourlySales);
+
+        InventoryDashboardRows.Clear();
+        foreach (var row in snapshot.InventoryRows)
+            InventoryDashboardRows.Add(row);
+
+        TopSellingDishes.Clear();
+        foreach (var d in snapshot.TopDishVms)
+            TopSellingDishes.Add(d);
+
+        StaffPresence.Clear();
+        foreach (var s in snapshot.StaffPresence.Select(RebuildStaffPresenceRow))
+            StaffPresence.Add(s);
+
+        RecentActivities.Clear();
+        foreach (var item in snapshot.Activities.Select(ActivityFeedItem.From))
+            RecentActivities.Add(item);
+
+        _drilldownCache[DashboardDrilldownType.TodaySales] = snapshot.SalesItems;
+        _drilldownCache[DashboardDrilldownType.ActiveOrders] = snapshot.ActiveOrderItems;
+        _drilldownCache[DashboardDrilldownType.LowStockAlerts] = snapshot.LowStockItems;
+        _drilldownCache[DashboardDrilldownType.ClockedInStaff] = snapshot.AttendanceItems;
+        _drilldownCache[DashboardDrilldownType.WeeklyRevenue] = snapshot.RevenueItems;
+        _drilldownCache[DashboardDrilldownType.RecentActivity] = snapshot.ActivityItems;
+
+        Notify(
+            nameof(TodayRevenueUsd),
+            nameof(TodayRevenueFc),
+            nameof(TodayExpensesUsd),
+            nameof(RevenueUsdVsYesterdayText),
+            nameof(RevenueFcVsYesterdayText),
+            nameof(ExpensesVsYesterdayText),
+            nameof(SparklinePoints),
+            nameof(OrdersCompletedToday),
+            nameof(CompletedVsYesterdayText),
+            nameof(ActiveOrdersCount),
+            nameof(ActiveOrdersSubText),
+            nameof(ClockedInStaff),
+            nameof(InKitchenNowText),
+            nameof(NotYetInText),
+            nameof(OccupiedTablesText),
+            nameof(OccupiedTablesPercent),
+            nameof(DatabaseConnected),
+            nameof(DatabaseStatusText),
+            nameof(ShowSalaryPayrollWarning),
+            nameof(SalaryPayrollWarningText),
+            nameof(SalaryPayrollDaysPastDue),
+            nameof(ChartAreaPoints),
+            nameof(ChartLinePoints),
+            nameof(WeeklyChartMaxLabel),
+            nameof(HourlyChartAreaPoints),
+            nameof(HourlyChartLinePoints),
+            nameof(HourlyChartMaxLabel));
+    }
+
+    private static DashboardStaffPresenceItem RebuildStaffPresenceRow(DashboardStaffPresenceItem row) => new()
+    {
+        Name = row.Name,
+        Role = AdminTextLocalizer.TranslateRole(row.Role),
+        IsClockedIn = row.IsClockedIn,
+        OnDutyLabel = row.IsClockedIn
+            ? Loc.Admin("staffStatusActive", "Active")
+            : Loc.Admin("staffStatusOffDuty", "Off duty")
+    };
+
+    private static string FormatSalaryPayrollWarningText(int daysPast)
+    {
+        var today = DateTime.Today;
+        var firstThisMonth = new DateTime(today.Year, today.Month, 1);
+        var lastDayPrevMonth = firstThisMonth.AddDays(-1);
+        var culture = Loc.Language == "fr" ? "fr-FR" : "en-US";
+        var monthYear = new DateTime(lastDayPrevMonth.Year, lastDayPrevMonth.Month, 1)
+            .ToString("MMMM yyyy", CultureInfo.GetCultureInfo(culture));
+        return Loc.Admin(
+            "dashSalaryOverdueBody",
+            "Payroll for {{monthYear}} is not fully posted. Use Salary to record payments ({{days}} day(s) past month end).",
+            new Dictionary<string, string>
+            {
+                ["monthYear"] = monthYear,
+                ["days"] = daysPast.ToString(CultureInfo.InvariantCulture)
+            });
     }
 
     private static string ChartPoint(double x, double y) =>

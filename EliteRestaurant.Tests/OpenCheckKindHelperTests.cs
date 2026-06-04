@@ -70,13 +70,46 @@ public class OpenCheckKindHelperTests
     }
 
     [Fact]
-    public void TryInferCheckKindFromProducts_returns_null_when_mixed()
+    public void TryValidateLinesForCheckKind_allows_mixed_lines_on_mixed_check()
+    {
+        var drink = new Product { Id = 1, Category = "Drink", Name = "Cola", Price = 2m };
+        var food = new Product { Id = 2, Category = "Main", Name = "Steak", Price = 20m };
+        var map = new Dictionary<int, Product> { [1] = drink, [2] = food };
+
+        var err = OpenCheckKindHelper.TryValidateLinesForCheckKind(
+            OpenCheckKindHelper.Mixed,
+            map,
+            [(1, 1), (2, 1)]);
+
+        Assert.Null(err);
+    }
+
+    [Fact]
+    public void TryInferCheckKindFromProducts_returns_Mixed_when_mixed()
     {
         var products = new[]
         {
             new Product { Category = "Drink" },
             new Product { Category = "Main" }
         };
-        Assert.Null(OpenCheckKindHelper.TryInferCheckKindFromProducts(products));
+        Assert.Equal(OpenCheckKindHelper.Mixed, OpenCheckKindHelper.TryInferCheckKindFromProducts(products));
+    }
+
+    [Fact]
+    public void TryInferCheckKindFromLines_returns_Mixed_when_mixed()
+    {
+        var drink = new Product { Id = 1, Category = "Drink", Name = "Cola", Price = 2m };
+        var food = new Product { Id = 2, Category = "Main", Name = "Steak", Price = 20m };
+        var map = new Dictionary<int, Product> { [1] = drink, [2] = food };
+
+        var kind = OpenCheckKindHelper.TryInferCheckKindFromLines(map, [(1, 1), (2, 1)]);
+
+        Assert.Equal(OpenCheckKindHelper.Mixed, kind);
+    }
+
+    [Fact]
+    public void NormalizeCheckKind_accepts_mixed()
+    {
+        Assert.Equal(OpenCheckKindHelper.Mixed, OpenCheckKindHelper.NormalizeCheckKind("mixed"));
     }
 }

@@ -18,6 +18,7 @@ public sealed class HealthController(AppDbContext db) : ControllerBase
     });
 
     [HttpGet("db")]
+    [Authorize(Policy = "AdminRead")]
     public IActionResult GetDb()
     {
         try

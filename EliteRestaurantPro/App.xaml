@@ -66,6 +66,10 @@
                 <views:AdminOrdersView/>
             </DataTemplate>
 
+            <DataTemplate DataType="{x:Type vm:ClientsViewModel}">
+                <views:ClientsView/>
+            </DataTemplate>
+
             <DataTemplate DataType="{x:Type vm:KitchenOrdersViewModel}">
                 <views:KitchenOrdersView/>
             </DataTemplate>

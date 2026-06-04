@@ -35,6 +35,6 @@ public static class DatabaseInitializer
         AdminWebLoginSeed.EnsureSeeded(db);
         PlacementUnitProvisioner.EnsureAllTablesHavePlacementsAsync(db).GetAwaiter().GetResult();
         SampleDataBootstrapper.SeedIfEnabled(db);
-        SharedOrderDraftStore.PurgeDraftsOlderThan(TimeSpan.FromDays(30));
+        SharedOrderDraftStore.PurgeDraftsOlderThan(db, TimeSpan.FromDays(30));
     }
 }

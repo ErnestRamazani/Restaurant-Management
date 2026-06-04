@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EliteRestaurant — System Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #080b12;
+  --grid: rgba(255,255,255,0.03);
+  --grid2: rgba(255,255,255,0.06);
+  --users:    #3b82f6;
+  --frontend: #06b6d4;
+  --backend:  #f59e0b;
+  --logic:    #a78bfa;
+  --database: #22c55e;
+  --infra:    #ec4899;
+  --services: #f97316;
+  --phase2:   #64748b;
+}
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  font-family: 'Rajdhani', sans-serif;
+  color: #e2e8f0;
+  cursor: default;
+  user-select: none;
+}
+#header {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 48px;
+  background: rgba(8,11,18,0.95);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 16px;
+  z-index: 1000;
+  backdrop-filter: blur(10px);
+}
+#header h1 { font-size: 1rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: #f8fafc; }
+#header h1 span { color: #f59e0b; }
+.hbadge {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.65rem;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #94a3b8;
+  letter-spacing: 0.1em;
+}
+#header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; font-family: 'Share Tech Mono', monospace; font-size: 0.65rem; color: #475569; }
+#zoom-display { color: #94a3b8; }
+#viewport { position: fixed; top: 48px; left: 0; right: 0; bottom: 0; overflow: hidden; cursor: grab; }
+#viewport.panning { cursor: grabbing; }
+#world { position: absolute; width: 4200px; height: 3200px; transform-origin: 0 0; }
+#grid-bg {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(var(--grid2) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid2) 1px, transparent 1px),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+}
+#svg-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.conn-path { fill: none; stroke-width: 1.5; opacity: 0.35; }
+.conn-path.active { opacity: 0.9; stroke-width: 2.5; }
+.conn-anim { fill: none; stroke-width: 3; opacity: 0; }
+.node {
+  position: absolute;
+  border-radius: 8px;
+  min-width: 168px;
+  cursor: pointer;
+  transition: box-shadow 0.2s, transform 0.15s;
+  z-index: 10;
+}
+.node:hover { transform: translateY(-2px); z-index: 100; }
+.node.dragging { cursor: grabbing; z-index: 200; transform: scale(1.03); }
+.node-header { padding: 8px 12px 6px; border-radius: 7px 7px 0 0; display: flex; align-items: center; gap: 7px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+.node-icon { font-size: 0.9rem; line-height: 1; }
+.node-body { background: rgba(10,12,20,0.93); border-radius: 0 0 7px 7px; padding: 8px 12px 10px; border: 1px solid; border-top: none; }
+.node-title { font-size: 0.86rem; font-weight: 600; color: #f1f5f9; line-height: 1.3; margin-bottom: 4px; }
+.node-sub { font-family: 'Share Tech Mono', monospace; font-size: 0.58rem; color: #475569; line-height: 1.5; }
+.node-tag { display: inline-block; font-family: 'Share Tech Mono', monospace; font-size: 0.54rem; padding: 1px 5px; border-radius: 3px; margin-top: 4px; opacity: 0.8; }
+.node-ports { display: flex; justify-content: space-between; padding: 4px 0 2px; }
+.port { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid; background: var(--bg); cursor: crosshair; }
+.cat-users    { --cat: var(--users); }
+.cat-frontend { --cat: var(--frontend); }
+.cat-backend  { --cat: var(--backend); }
+.cat-logic    { --cat: var(--logic); }
+.cat-database { --cat: var(--database); }
+.cat-infra    { --cat: var(--infra); }
+.cat-services { --cat: var(--services); }
+.cat-phase2   { --cat: var(--phase2); }
+.node .node-header { background: color-mix(in srgb, var(--cat) 18%, transparent); color: var(--cat); }
+.node .node-body   { border-color: color-mix(in srgb, var(--cat) 28%, transparent); }
+.node .port        { border-color: var(--cat); }
+.node .node-tag    { background: color-mix(in srgb, var(--cat) 14%, transparent); color: var(--cat); border: 1px solid color-mix(in srgb, var(--cat) 28%, transparent); }
+.node:hover        { box-shadow: 0 0 20px color-mix(in srgb, var(--cat) 25%, transparent), 0 8px 24px rgba(0,0,0,0.4); }
+.node.selected     { box-shadow: 0 0 0 2px var(--cat), 0 0 24px color-mix(in srgb, var(--cat) 40%, transparent); }
+.cluster-label { position: absolute; font-family: 'Share Tech Mono', monospace; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; opacity: 0.22; pointer-events: none; z-index: 1; border-left: 2px solid currentColor; padding-left: 8px; }
+#legend { position: fixed; bottom: 16px; left: 16px; background: rgba(8,11,18,0.92); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 12px 14px; z-index: 1000; backdrop-filter: blur(10px); min-width: 180px; }
+#legend h3 { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: #475569; margin-bottom: 8px; font-family: 'Share Tech Mono', monospace; }
+.legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-size: 0.78rem; font-weight: 500; color: #94a3b8; cursor: pointer; padding: 2px 4px; border-radius: 4px; transition: background 0.15s; }
+.legend-item:hover { background: rgba(255,255,255,0.04); }
+.legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+#controls { position: fixed; bottom: 16px; right: 16px; display: flex; flex-direction: column; gap: 6px; z-index: 1000; }
+.ctrl-btn { width: 36px; height: 36px; background: rgba(8,11,18,0.92); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; color: #94a3b8; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; backdrop-filter: blur(10px); }
+.ctrl-btn:hover { background: rgba(255,255,255,0.06); color: #f1f5f9; }
+#tooltip { position: fixed; background: rgba(8,11,18,0.96); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px 14px; font-size: 0.8rem; z-index: 2000; pointer-events: none; opacity: 0; transition: opacity 0.15s; max-width: 280px; backdrop-filter: blur(10px); }
+#tooltip.visible { opacity: 1; }
+#tooltip h4 { font-size: 0.85rem; font-weight: 700; margin-bottom: 4px; }
+#tooltip p { color: #94a3b8; font-size: 0.75rem; line-height: 1.5; }
+#tooltip .tt-tech { margin-top: 6px; font-family: 'Share Tech Mono', monospace; font-size: 0.6rem; color: #475569; }
+#minimap { position: fixed; top: 60px; right: 16px; width: 160px; height: 110px; background: rgba(8,11,18,0.85); border: 1px solid rgba(255,255,255,0.06); border-radius: 6px; z-index: 1000; overflow: hidden; backdrop-filter: blur(10px); }
+#minimap-viewport { position: absolute; border: 1.5px solid rgba(245,158,11,0.6); background: rgba(245,158,11,0.04); border-radius: 2px; pointer-events: none; }
+#minimap canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+@keyframes phase2pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.8; } }
+.cat-phase2 { animation: phase2pulse 3s infinite; }
+</style>
+</head>
+<body>
+<div id="header">
+  <h1>Elite<span>Restaurant</span></h1>
+  <span class="hbadge">SYSTEM ARCHITECTURE</span>
+  <span class="hbadge">ASP.NET CORE 8 · POSTGRESQL · SIGNALR</span>
+  <div id="header-right">
+    <span>DRAG TO PAN · SCROLL TO ZOOM · CLICK NODE FOR DETAILS</span>
+    <span id="zoom-display">100%</span>
+  </div>
+</div>
+<div id="viewport">
+  <div id="world">
+    <div id="grid-bg"></div>
+    <svg id="svg-layer" xmlns="http://www.w3.org/2000/svg"></svg>
+    <div id="nodes-container"></div>
+  </div>
+</div>
+<div id="legend">
+  <h3>Node Categories</h3>
+  <div class="legend-item" data-cat="users"><div class="legend-dot" style="background:var(--users)"></div>Staff Roles</div>
+  <div class="legend-item" data-cat="frontend"><div class="legend-dot" style="background:var(--frontend)"></div>Frontend Portals</div>
+  <div class="legend-item" data-cat="backend"><div class="legend-dot" style="background:var(--backend)"></div>Backend API</div>
+  <div class="legend-item" data-cat="logic"><div class="legend-dot" style="background:var(--logic)"></div>Business Logic</div>
+  <div class="legend-item" data-cat="database"><div class="legend-dot" style="background:var(--database)"></div>Data Layer</div>
+  <div class="legend-item" data-cat="infra"><div class="legend-dot" style="background:var(--infra)"></div>Infrastructure</div>
+  <div class="legend-item" data-cat="services"><div class="legend-dot" style="background:var(--services)"></div>External Services</div>
+  <div class="legend-item" data-cat="phase2"><div class="legend-dot" style="background:var(--phase2)"></div>Phase 2 (Upgrade)</div>
+</div>
+<div id="controls">
+  <button class="ctrl-btn" id="btn-fit" title="Fit to screen">⊡</button>
+  <button class="ctrl-btn" id="btn-zoomin" title="Zoom in">+</button>
+  <button class="ctrl-btn" id="btn-zoomout" title="Zoom out">−</button>
+  <button class="ctrl-btn" id="btn-reset" title="Reset">↺</button>
+</div>
+<div id="tooltip">
+  <h4 id="tt-title"></h4>
+  <p id="tt-desc"></p>
+  <div class="tt-tech" id="tt-tech"></div>
+</div>
+<div id="minimap">
+  <canvas id="minimap-canvas"></canvas>
+  <div id="minimap-viewport"></div>
+</div>
+<script>
+const WORLD_W = 4200;
+const WORLD_H = 3200;
+
+const NODES = [
+  // ── STAFF ROLES (x: 60) ──────────────────────────────
+  { id:'admin_mgr',      cat:'users',    x:60,  y:80,   icon:'👑', title:'Admin / Manager',       sub:'Full system control\nAll portals + reports',     tech:'AdminOnly policy\nAll operations allowed',      desc:'Full access to all system features. Configures appearance, manages employees, views all reports, overrides orders, manages client accounts, and pushes cloud settings. Manager has same operational power.' },
+  { id:'server_role',    cat:'users',    x:60,  y:220,  icon:'🍽️', title:'Server',                 sub:'Table service\nOrder creation + serve',           tech:'ServerOnly policy\nAssigned-table scoped',       desc:'Creates and manages table orders, submits to cashier, marks food and drinks served via partial station serve. Can only access orders for their assigned tables. Sees customer QR drafts for their tables.' },
+  { id:'cashier_role',   cat:'users',    x:60,  y:360,  icon:'💵', title:'Cashier',                sub:'Payment + release\nQueue management',             tech:'CashierOnly policy\nOrder lifecycle gate',       desc:'Releases orders to kitchen after approval, processes payments (USD/FC/Mixed currency), handles client on-account completion, manages pending and active queues. Gate between front-of-house and kitchen.' },
+  { id:'chef_role',      cat:'users',    x:60,  y:500,  icon:'👨‍🍳', title:'Chef / Sous Chef',       sub:'Kitchen KDS\nFood prep station',                 tech:'KitchenOnly policy\nFood lines only',            desc:'Views food-line orders on Kitchen KDS. Advances orders Waiting→In Kitchen→Ready. On mixed orders, stamps only food lines prepared. Order moves to Ready only when Bar also finishes drink lines.' },
+  { id:'barman_role',    cat:'users',    x:60,  y:640,  icon:'🍹', title:'Barman / Bartender',     sub:'Bar KDS\nDrink prep station',                    tech:'BarOnly policy\nDrink lines only',               desc:'Views drink-line orders on Bar KDS. Marks drink lines prepared on mixed tickets. Order moves to Ready only when Kitchen has also finished food lines. Can cancel orders via cancel passcode.' },
+  { id:'frontdesk_role', cat:'users',    x:60,  y:780,  icon:'🛎️', title:'Front Desk',             sub:'Reservations + delivery\nOnline order tracking', tech:'ReceptionDesk policy\nPickup/delivery view',     desc:'Manages reservations via reception portal, monitors online pickup and delivery orders, tracks fulfillment status via SignalR. Can also access some cashier-level endpoints for reservation desk overlap.' },
+  { id:'adminweb_role',  cat:'users',    x:60,  y:920,  icon:'📊', title:'AdminWeb (Read-only)',   sub:'Dashboard + reports\nNo write access',           tech:'AdminWeb role\nGET-only via middleware',         desc:'Read-only admin access via /admin/ portal. AdminWebReadOnlyApiMiddleware blocks all POST/PUT/DELETE/PATCH verbs automatically. Can view orders, revenue charts, and reporting dashboards.' },
+  { id:'guest_role',     cat:'users',    x:60,  y:1060, icon:'📱', title:'Guest / Customer',       sub:'QR table orders\nOnline pickup + delivery',       tech:'Anonymous · Rate limited\n/api/public/menu/*',   desc:'Scans table QR code to browse menu, submit table orders (PendingApproval), call server, or submit online pickup/delivery orders. No login required. Rate limited: 60 reads/min, 10 orders/min.' },
+
+  // ── FRONTEND PORTALS (x: 380) ─────────────────────────
+  { id:'pro_desktop',    cat:'frontend', x:380, y:80,   icon:'🖥️', title:'EliteRestaurantPro',     sub:'WPF Desktop · Windows\nFirst-time setup wizard', tech:'WPF .NET 8 · MVVM\nHTTP + SignalR client',       desc:'Windows desktop application for full admin management. First-time setup wizard creates first restaurant. Appearance push to cloud, order management, kitchen KDS view, employee management, payroll, client accounts, PDF receipt printing.' },
+  { id:'portal_server',  cat:'frontend', x:380, y:230,  icon:'🍽️', title:'Server Portal',          sub:'/server/ · HTML+JS\n~4820 lines · Vanilla',      tech:'SignalR · OrderHub\nGroup: Server',               desc:'Server tablet web portal. Table management, POS order creation, open check handling (Food/Drink/Mixed), partial station serve (food or drinks independently), draft management, customer QR draft inbox.' },
+  { id:'portal_cashier', cat:'frontend', x:380, y:380,  icon:'💵', title:'Cashier Portal',         sub:'/cashier/ · HTML+JS\nPayment numpad',             tech:'cashier-app.js\nGroup: Cashier',                 desc:'Cashier web portal. Pending order queue (in-store + online), release to kitchen, USD/FC/Mixed currency payment numpad, on-account client settlement, receipt generation (PDF + HTML), client picker modal.' },
+  { id:'portal_kitchen', cat:'frontend', x:380, y:530,  icon:'🔥', title:'Kitchen Portal',         sub:'/kitchen/ · HTML+JS\nKDS food lines · 3 columns', tech:'Calls /api/admin/orders/advance\nGroup: Kitchen',  desc:'Kitchen tablet KDS. Shows only food-line orders. Three columns: Waiting → In Kitchen → Ready. Advance button with prepStationPortal=Kitchen. Menu catalog with ingredient stock levels. Cancel order button.' },
+  { id:'portal_bar',     cat:'frontend', x:380, y:680,  icon:'🍹', title:'Bar Portal',             sub:'/bar/ · HTML+JS\nKDS drink lines · 3 columns',   tech:'prepStationPortal: Bar\nSame KDS as kitchen',    desc:'Bar KDS identical to kitchen portal but filtered for drink-line orders. Same advance flow with prepStationPortal=Bar. Marks drink lines prepared on mixed tickets independently from kitchen.' },
+  { id:'portal_recep',   cat:'frontend', x:380, y:830,  icon:'🛎️', title:'Reception Portal',       sub:'/reception/ · HTML+JS\nDelivery + pickup tracker', tech:'reception-app.js\nGroup: Reception',             desc:'Front desk portal. Real-time tracking of online delivery and pickup orders. Fulfillment status display, customer confirmation codes, live order stage via SignalR. Aliases to /front-desk/.' },
+  { id:'portal_admin',   cat:'frontend', x:380, y:980,  icon:'⚙️', title:'Admin Web Portal',        sub:'/admin/ · HTML+JS\nDashboard + reports',          tech:'AdminRead policy\nEN/FR login screen (partial)',  desc:'Admin web dashboard. Order history, revenue charts, staff activity. AdminWeb role gets GET-only. Admin/Manager get full write. Language toggle (EN/FR) implemented on login screen only.' },
+  { id:'guest_menu',     cat:'frontend', x:380, y:1120, icon:'🌐', title:'Guest Menu',             sub:'/menu/ · React + Vite\nQR code entry point',      tech:'React 18 · i18next\nEN/FR · Mixed cart',         desc:'Public-facing guest menu SPA. Browse products by category, add to mixed cart (food+drinks together), submit QR table orders, online pickup/delivery checkout, call server button. Built into wwwroot/menu.' },
+
+  // ── BACKEND API (x: 740) ──────────────────────────────
+  { id:'api_core',       cat:'backend',  x:740, y:80,   icon:'⚡', title:'ASP.NET Core 8 API',     sub:'.NET 8 · C# 12\nREST + SignalR + JWT',            tech:'Serilog · QuestPDF · Npgsql\nTenantResolutionMiddleware', desc:'Main API server. Multi-tenant via TenantResolutionMiddleware (host-based domain resolution). JWT authentication, role-based authorization, rate limiting on public endpoints, CORS, response compression, correlation IDs.' },
+  { id:'ctrl_auth',      cat:'backend',  x:740, y:250,  icon:'🔐', title:'Auth Controller',         sub:'PIN + SignInId login\nPortal-scoped JWT',         tech:'POST /api/auth/login\nJWT · lang · portal claims', desc:'Staff login with SignInId + PIN + Portal type. Generates JWT with role, portal, employeeId, lang claims. Resolves portal type for redirect. TenantJwtAlignmentMiddleware cross-checks JWT restaurant vs resolved host.' },
+  { id:'ctrl_server',    cat:'backend',  x:740, y:390,  icon:'🍽️', title:'Server Portal Controller',sub:'Order submit + append\nOpen check + drafts',     tech:'POST /api/server/orders\nStaffAny + session check', desc:'Handles server order submission, open check management (Food/Drink/Mixed validation), append to open check, partial station serve (serve-station endpoint), draft CRUD, customer draft inbox, table call management.' },
+  { id:'ctrl_cashier',   cat:'backend',  x:740, y:530,  icon:'💵', title:'Cashier Controller',      sub:'Queue + payment\nClient account ops',            tech:'POST /api/cashier/orders/{id}/complete\nCashierOnly', desc:'Pending queue listing, release to kitchen, payment completion (USD/FC/Mixed/OnAccount), order cancellation with passcode, order detail with client info, ticket PDF/HTML generation for printing.' },
+  { id:'ctrl_kitchen',   cat:'backend',  x:740, y:670,  icon:'🔥', title:'Kitchen Controller',      sub:'Config + menu catalog\nKitchenOnly policy',      tech:'GET /api/kitchen/config\nGET /api/kitchen/menu-catalog', desc:'Minimal controller — only config (restaurant name, logo, timezone) and menu catalog with ingredient stock. Actual order advancement uses AdminOrdersController via /api/admin/orders/{id}/advance.' },
+  { id:'ctrl_bar',       cat:'backend',  x:740, y:810,  icon:'🍹', title:'Bar Controller',          sub:'Config + menu catalog\nBarOnly policy',          tech:'GET /api/bar/config\nMirror of kitchen controller', desc:'Mirror of Kitchen controller for Bar portal. Returns bar config and product catalog with ingredient stock levels. Advancement calls AdminOrdersController with prepStationPortal=Bar.' },
+  { id:'ctrl_adm_ord',   cat:'backend',  x:740, y:950,  icon:'📋', title:'Admin Orders Controller', sub:'Advance + cancel + complete\nOperationalWrite',   tech:'POST /api/admin/orders/{id}/advance\nStation-scoped prep', desc:'Central order operations hub used by Kitchen, Bar, and Admin portals. Status advancement with prep-station scoping (Kitchen/Bar/KitchenBar), passcode cancellations, status override, walk-in order creation with inventory deduction.' },
+  { id:'ctrl_pubmenu',   cat:'backend',  x:740, y:1090, icon:'🌐', title:'Public Menu Controller',  sub:'Anonymous guest API\nRate limited endpoints',    tech:'GET /api/public/menu/*\nAllowAnonymous · 60/min', desc:'Anonymous endpoints for guest menu. Config (tax/service/branding), product catalog, table list with server assignment, QR order submit, online pickup/delivery order, draft creation, call server trigger.' },
+  { id:'ctrl_clients',   cat:'backend',  x:740, y:1230, icon:'👤', title:'Clients Controller',      sub:'CRUD + debt + settlement\nStaff client mirror',   tech:'GET/POST /api/clients\nOperationalWrite policy',  desc:'Restaurant client CRUD, automatic staff client mirroring from Employee records, order-to-client linking with staff discount auto-apply, on-account completion, debt settlement with passcode, ledger history display.' },
+  { id:'ctrl_reserve',   cat:'backend',  x:740, y:1370, icon:'📅', title:'Reservations Controller', sub:'Booking + floor plan\nPublic + staff access',    tech:'/api/reservations\n/api/floor-reservation',       desc:'Reservation booking for public and staff, floor plan management, SignalR reservation floor hub, automated no-show/reminder/lifecycle background processors running as IHostedService.' },
+  { id:'ctrl_settings',  cat:'backend',  x:740, y:1510, icon:'⚙️', title:'Admin Settings Controller',sub:'Cloud push from WPF\nAppearance sync',           tech:'POST /api/admin/settings\nAdminWrite policy',     desc:'Syncs appearance settings from WPF desktop to cloud PublicMenuSettings DB row: tax/service rates, IANA timezone, branding, menu taxonomy JSON, order cancel passcode, client debt cap, currency exchange rate.' },
+  { id:'hub_order',      cat:'backend',  x:740, y:1650, icon:'🔔', title:'SignalR Order Hub',        sub:'Real-time order events\n/hubs/order',             tech:'Groups: Server, Cashier\nKitchen, Reception',     desc:'Real-time event bus for order lifecycle. Groups scoped by role: Server (ready/draft alerts), Cashier (board updates), Kitchen (queue changes), Reception (delivery/pickup). StartPreparation and MarkOrderReady hub methods.' },
+  { id:'hub_floor',      cat:'backend',  x:740, y:1790, icon:'🗺️', title:'Reservation Floor Hub',   sub:'Real-time floor plan\n/hubs/reservation-floor',  tech:'CashierOrAdmin policy\nFloor snapshot push',      desc:'Real-time reservation floor plan updates pushed to Admin and Cashier clients. Broadcasts floor snapshots when reservation status changes via ReservationFloorRealtimePublisher.' },
+  { id:'hosted_svc',     cat:'backend',  x:740, y:1930, icon:'⏰', title:'Reservation Hosted Services',sub:'NoShow · Reminder\nLifecycle automation',      tech:'IHostedService x3\nBackground processors',        desc:'Three background IHostedService processors. NoShowProcessor marks no-show reservations. ReminderProcessor sends pre-arrival reminders. LifecycleProcessor handles automated status transitions. Disabled in test environment.' },
+
+  // ── BUSINESS LOGIC (x: 1120) ──────────────────────────
+  { id:'order_wf',       cat:'logic',    x:1120,y:80,   icon:'🔄', title:'Order Workflow Engine',   sub:'Status constants + rules\nKDS visibility logic', tech:'PendingCashier → Waiting\n→ InKitchen → Ready → Served', desc:'Core order state machine. Defines all status constants, KDS visibility rules, open check validity (one per table), CanCashierComplete (in-store requires Served; online allows Ready), OccupiesTable logic, and admin advance permissions.' },
+  { id:'adm_ord_ops',    cat:'logic',    x:1120,y:240,  icon:'🛠️', title:'Admin Order Operations',  sub:'Release + advance\nCancel + complete + pay',     tech:'TryReleasePendingToKitchen\nTryMarkPrepStationReady', desc:'Core domain service for all order mutations. Inventory deduction on release (atomic SQL), concurrent-safe In Kitchen→Ready transition, per-station prep line stamping, cancel with passcode validation, payment completion with change validation.' },
+  { id:'open_check',     cat:'logic',    x:1120,y:400,  icon:'📑', title:'Open Check Kind Helper',  sub:'Food / Drink / Mixed\nCart validation rules',    tech:'TryValidateLinesForCheckKind\nMenuTaxonomy aware',   desc:'Validates that cart lines match the check type. Food-only checks reject drink items. Drink-only checks reject food. Infers check kind from product taxonomy when not specified. One open check per table enforced.' },
+  { id:'kitch_filter',   cat:'logic',    x:1120,y:550,  icon:'🔽', title:'Kitchen Queue Filter',    sub:'Portal queue routing\nFood vs drink split',      tech:'OrderMatchesPortalQueue\nFilterItemsForPortal',      desc:'Routes orders to correct KDS portal. Kitchen portal sees food-line orders; Bar portal sees drink-line orders; mixed tickets appear on BOTH portals. Legacy KitchenBar portal sees everything unfiltered.' },
+  { id:'station_stat',   cat:'logic',    x:1120,y:700,  icon:'📍', title:'Server Station Status',   sub:'Partial serve state\nFood + drink readiness',    tech:'ServerOrderStationStatus.Compute\nCanServeFoodStation', desc:'Computes per-station readiness for partial serve. Determines if food or drinks are independently ready before the full ticket is Ready. Builds prep summary labels like "Drinks ready · Food cooking" for server portal.' },
+  { id:'pricing_res',    cat:'logic',    x:1120,y:850,  icon:'💲', title:'Pricing Resolver',        sub:'Cloud vs local merge\nTax + service rates',      tech:'ResolveEffectiveRestaurantPricing\nCloud → file fallback', desc:'Merges cloud PublicMenuSettings with local app-settings.json. Cloud values win. appsettings.json provides server/cashier host-level overrides. Guest menu always uses resolved pricing. Throws InvalidOperationException if no valid rate.' },
+  { id:'order_totals',   cat:'logic',    x:1120,y:1000, icon:'🧮', title:'Order Totals Calculator', sub:'Discount + tax + service\nRounding modes',        tech:'ComputeTotals · decimal type\nUp/Down/Nearest/None', desc:'Computes order financials: discount (Percent/USD), taxable subtotal, tax, service charge, grand total. Four rounding modes configurable per component. Uses C# decimal (not float) to prevent floating-point errors. Delivery fee added separately.' },
+  { id:'client_svc',     cat:'logic',    x:1120,y:1150, icon:'👤', title:'Client Account Service',  sub:'On-account + debt\nFIFO settlement + ledger',    tech:'TryCompleteOrderOnAccount\nTrySettleDebt (Serializable)', desc:'Manages client debt lifecycle. On-account order completion with debt cap enforcement. FIFO settlement across oldest open orders with Serializable isolation level. Ledger entries: Charge, Payment, RevenueRecognized. Staff client auto-mirror from employees.' },
+  { id:'fin_tx',         cat:'logic',    x:1120,y:1300, icon:'📒', title:'Financial Transaction Svc',sub:'Revenue ledger\nSalary + payroll posting',      tech:'RecordCompletedOrderRevenue\nPayrollPaymentRecord',   desc:'Posts sale revenue to MoneyTransaction ledger on payment confirmation. Handles delivery fee split proportionally. Payroll payment with attendance deductions, bonus calculation, salary advance deduction. Change-given expense posting.' },
+  { id:'menu_tax',       cat:'logic',    x:1120,y:1450, icon:'🏷️', title:'Menu Taxonomy Helper',    sub:'Drink vs food classify\nConfigurable JSON',      tech:'IsDrinkProduct(product, taxonomy)\nCloud taxonomy JSON', desc:'Classifies products as food or drink using configurable taxonomy from cloud PublicMenuSettings. Falls back to legacy category string "Drink" check. Used by Kitchen/Bar KDS split, open check validation, and inventory assignment.' },
+  { id:'perm_engine',    cat:'logic',    x:1120,y:1590, icon:'🛡️', title:'Permission & Auth Engine', sub:'JWT policies + tenant\nRole + middleware stack', tech:'TenantResolutionMiddleware\nTenantJwtAlignmentMiddleware', desc:'Multi-layer auth. TenantResolutionMiddleware resolves restaurant from Host header (dev: fallback to first restaurant). TenantJwtAlignmentMiddleware verifies JWT restaurant matches resolved tenant. AdminWebReadOnlyApiMiddleware blocks writes for AdminWeb.' },
+  { id:'reserve_svc',    cat:'logic',    x:1120,y:1730, icon:'📅', title:'Reservation Scheduling',  sub:'Conflict detection\nCapacity + placement',      tech:'ReservationOverlapMath\nPlacementUnitClusterResolver', desc:'Handles reservation booking with overlap detection, party size validation, placement unit (table cluster) management, confirmation code generation, reservation status transitions.' },
+
+  // ── DATA LAYER (x: 1500) ──────────────────────────────
+  { id:'postgres',       cat:'database', x:1500,y:80,   icon:'🐘', title:'PostgreSQL 16',           sub:'Primary DB · Multi-tenant\nRestaurantId on all tables', tech:'Npgsql · EnableRetryOnFailure\nIRestaurantScoped reflection filter', desc:'Single PostgreSQL database with multi-tenant isolation. RestaurantId column on every table. EF Core global query filter applied via reflection to all IRestaurantScoped entities automatically. Unique composite indexes on (RestaurantId, UniqueId).' },
+  { id:'ef_core',        cat:'database', x:1500,y:290,  icon:'🔗', title:'EF Core 8 + Migrations',  sub:'ORM · Code-first\nAuto tenant filter injection', tech:'AppDbContext · ConfigureTenantFilter<T>\nMigrations in Core project', desc:'Entity Framework Core 8. Global query filters applied via MakeGenericMethod reflection to every IRestaurantScoped entity — one method call handles all tables. Code-first migrations in EliteRestaurant.Core/Migrations. Applied on API startup via DatabaseInitializer.' },
+  { id:'settings_file',  cat:'database', x:1500,y:490,  icon:'📁', title:'Settings Manager',         sub:'Local JSON file\napp-settings.json · DPAPI',     tech:'%LocalAppData%\\EliteRestaurantPro\nReads disk on every call — no cache', desc:'Reads/writes app-settings.json from LocalAppData/EliteRestaurantPro/settings/. Stores tax rates, currency settings, business profile, cloud API URL, staff JWT token. DPAPI-encrypted on Windows. No in-memory cache — reads disk on every request (known performance issue).' },
+  { id:'draft_store',    cat:'database', x:1500,y:670,  icon:'💾', title:'Shared Order Draft Store', sub:'DB-backed drafts\nCustomer + server drafts',     tech:'SharedOrderDrafts table · Max 30/employee\nnew AppDbContext() — tenant bug', desc:'Stores server portal drafts and customer QR drafts in PostgreSQL SharedOrderDrafts table. Customer drafts scoped by table server assignment. Uses new AppDbContext() with NullTenantContext — bypasses tenant filter. Cross-tenant leak on multi-restaurant deployments (known bug).' },
+  { id:'pub_settings',   cat:'database', x:1500,y:850,  icon:'☁️', title:'Public Menu Settings',     sub:'Cloud config · Key=default\nOne row per tenant',  tech:'PublicMenuSetting DB table\nPushed from WPF Appearance screen', desc:'Single DB row per restaurant (Key="default"). Stores tax/service rates, IANA timezone, branding, menu taxonomy JSON, cancel passcode, client debt cap, USD→FC exchange rate. Pushed from EliteRestaurantPro Appearance settings. Source of truth for guest menu pricing.' },
+
+  // ── INFRASTRUCTURE (x: 1860) ──────────────────────────
+  { id:'do_app',         cat:'infra',    x:1860,y:80,   icon:'🌊', title:'DigitalOcean App Platform',sub:'Container hosting\nbasic-xxs · 1 instance',     tech:'instance_count: 1 · deploy_on_push: main\nHealth check: /api/health', desc:'Hosts ASP.NET Core API container. Auto-deploys on push to main branch from GitHub. Health check on /api/health for auto-restart. Currently basic-xxs (512MB RAM, 0.5 vCPU). Single instance — no horizontal scaling yet due to in-memory SignalR backplane.' },
+  { id:'do_postgres',    cat:'infra',    x:1860,y:280,  icon:'🗄️', title:'DO Managed PostgreSQL',    sub:'Managed DB cluster · NYC\nSSL required · Auto-backups', tech:'DATABASE_URL env var\nSSL Mode=Require · Daily backups', desc:'DigitalOcean Managed PostgreSQL cluster. Connection via DATABASE_URL environment variable. SSL required. Daily automated backups included. PITR (point-in-time recovery) available on higher tiers. Pool size not explicitly configured — uses Npgsql default (100).' },
+  { id:'docker',         cat:'infra',    x:1860,y:480,  icon:'🐳', title:'Docker',                   sub:'Multi-stage build\nNode → SDK → ASP.NET runtime', tech:'node:22 → sdk:8.0 → aspnet:8.0\nVite build included in container', desc:'Three-stage Dockerfile. Stage 1: Node.js 22 builds elite-menu Vite SPA. Stage 2: .NET 8 SDK publishes API with built menu copied to wwwroot. Stage 3: Minimal ASP.NET runtime image only. Production container has no dev tools or source code.' },
+  { id:'github_ci',      cat:'infra',    x:1860,y:680,  icon:'🐙', title:'GitHub Actions CI/CD',     sub:'Windows + Linux jobs\n20% coverage gate · auto-deploy', tech:'dotnet test · coverage check\nDeploy on push to main', desc:'Two CI jobs. Windows: full test suite with code coverage report (20% minimum gate, 40% milestone). Linux: build + test without WPF. Auto-deploy to DigitalOcean on main branch push. Coverage artifact uploaded. No staging environment currently.' },
+
+  // ── EXTERNAL SERVICES (x: 1860 lower) ─────────────────
+  { id:'questpdf',       cat:'services', x:1860,y:880,  icon:'📄', title:'QuestPDF',                 sub:'PDF generation\nTickets + receipts',             tech:'QuestPDF Community license\nOrderTicketPdfBuilder', desc:'Generates client ticket PDFs (pre-payment) and payment receipt PDFs (post-payment). Used by cashier portal via /api/cashier/orders/{id}/ticket.pdf, admin portal, and WPF desktop receipt printing. Declarative layout engine.' },
+  { id:'serilog',        cat:'services', x:1860,y:1030, icon:'📝', title:'Serilog',                  sub:'Structured logging\nConsole + rolling file',     tech:'14-day retention · Correlation IDs\nContainer filesystem (ephemeral)', desc:'Serilog with console and rolling file sinks. Request logging with timing via UseSerilogRequestLogging. Correlation IDs via X-Correlation-ID header. 14-day log file retention. Logs write to container filesystem — lost on every redeploy (known operational gap).' },
+
+  // ── PHASE 2 UPGRADES (x: 1860 bottom) ─────────────────
+  { id:'redis_p2',       cat:'phase2',   x:1860,y:1200, icon:'⚡', title:'Redis — Phase 2',          sub:'SignalR backplane\nSettings + config cache',     tech:'$15/mo · DO Managed Redis\nUnlocks instance_count: 2', desc:'Required for horizontal scaling. SignalR Redis backplane routes real-time order events across multiple API instances. Also caches PublicMenuSettings (5min TTL) and SettingsManager disk reads (60s TTL) to eliminate per-request I/O.' },
+  { id:'spaces_p2',      cat:'phase2',   x:1860,y:1380, icon:'🗃️', title:'DO Spaces + CDN — Phase 2',sub:'Image object storage\n$5/mo · S3-compatible CDN', tech:'Move from DB byte[]\nCDN edge delivery · Presigned URLs', desc:'Move product photos and branding assets out of PostgreSQL byte[] columns into Spaces object storage. CDN serves images from edge nodes. Eliminates binary DB reads during guest menu loads. Add ContentUrl column to PublicMenuAsset.' },
+  { id:'sentry_p2',      cat:'phase2',   x:1860,y:1560, icon:'🚨', title:'Sentry — Phase 2',         sub:'Error tracking\nFree tier: 5k errors/month',     tech:'Sentry.AspNetCore NuGet\nAuto-capture + email alerts', desc:'Captures unhandled exceptions with full stack trace, request context, and correlation ID. Email alerts on first occurrence of new error types. Free tier is sufficient for a single restaurant. 15-minute setup via UseSentry() in Program.cs.' },
+  { id:'logtail_p2',     cat:'phase2',   x:1860,y:1740, icon:'📊', title:'Logtail / Logs — Phase 2', sub:'Persistent log storage\nSurvives container restarts', tech:'Serilog.Sinks.Logtail\n3-day free · $10/mo paid', desc:'Replaces ephemeral container log files with persistent searchable log storage. Logs survive deploys and restarts — critical since DigitalOcean App Platform container filesystem is wiped on every redeploy. Add Logtail sink to Serilog bootstrap configuration.' },
+];
+
+const CONNECTIONS = [
+  // Staff → Portals
+  ['admin_mgr',      'pro_desktop',    null],
+  ['admin_mgr',      'portal_admin',   null],
+  ['admin_mgr',      'portal_cashier', null],
+  ['server_role',    'portal_server',  null],
+  ['cashier_role',   'portal_cashier', null],
+  ['chef_role',      'portal_kitchen', null],
+  ['barman_role',    'portal_bar',     null],
+  ['frontdesk_role', 'portal_recep',   null],
+  ['adminweb_role',  'portal_admin',   null],
+  ['guest_role',     'guest_menu',     null],
+
+  // Portals → API
+  ['pro_desktop',    'api_core',       null],
+  ['portal_server',  'api_core',       null],
+  ['portal_cashier', 'api_core',       null],
+  ['portal_kitchen', 'api_core',       null],
+  ['portal_bar',     'api_core',       null],
+  ['portal_recep',   'api_core',       null],
+  ['portal_admin',   'api_core',       null],
+  ['guest_menu',     'api_core',       null],
+
+  // API → Controllers
+  ['api_core',       'ctrl_auth',      null],
+  ['api_core',       'ctrl_server',    null],
+  ['api_core',       'ctrl_cashier',   null],
+  ['api_core',       'ctrl_kitchen',   null],
+  ['api_core',       'ctrl_bar',       null],
+  ['api_core',       'ctrl_adm_ord',   null],
+  ['api_core',       'ctrl_pubmenu',   null],
+  ['api_core',       'ctrl_clients',   null],
+  ['api_core',       'ctrl_reserve',   null],
+  ['api_core',       'ctrl_settings',  null],
+  ['api_core',       'hub_order',      null],
+  ['api_core',       'hub_floor',      null],
+  ['api_core',       'hosted_svc',     null],
+
+  // Controllers → Business Logic
+  ['ctrl_auth',      'perm_engine',    null],
+  ['ctrl_server',    'order_wf',       null],
+  ['ctrl_server',    'open_check',     null],
+  ['ctrl_server',    'station_stat',   null],
+  ['ctrl_server',    'kitch_filter',   null],
+  ['ctrl_cashier',   'adm_ord_ops',    null],
+  ['ctrl_cashier',   'client_svc',     null],
+  ['ctrl_cashier',   'pricing_res',    null],
+  ['ctrl_kitchen',   'kitch_filter',   null],
+  ['ctrl_bar',       'kitch_filter',   null],
+  ['ctrl_adm_ord',   'adm_ord_ops',    null],
+  ['ctrl_adm_ord',   'order_wf',       null],
+  ['ctrl_pubmenu',   'pricing_res',    null],
+  ['ctrl_pubmenu',   'order_totals',   null],
+  ['ctrl_clients',   'client_svc',     null],
+  ['ctrl_settings',  'menu_tax',       null],
+  ['ctrl_settings',  'pricing_res',    null],
+  ['hub_order',      'adm_ord_ops',    null],
+  ['hub_order',      'perm_engine',    null],
+  ['hosted_svc',     'reserve_svc',    null],
+  ['ctrl_reserve',   'reserve_svc',    null],
+
+  // Business Logic → Business Logic
+  ['adm_ord_ops',    'order_wf',       null],
+  ['adm_ord_ops',    'kitch_filter',   null],
+  ['adm_ord_ops',    'fin_tx',         null],
+  ['open_check',     'menu_tax',       null],
+  ['kitch_filter',   'menu_tax',       null],
+  ['station_stat',   'kitch_filter',   null],
+  ['pricing_res',    'order_totals',   null],
+  ['client_svc',     'fin_tx',         null],
+  ['client_svc',     'order_totals',   null],
+
+  // Business Logic → Data Layer
+  ['order_wf',       'postgres',       null],
+  ['adm_ord_ops',    'postgres',       null],
+  ['open_check',     'postgres',       null],
+  ['pricing_res',    'settings_file',  null],
+  ['pricing_res',    'pub_settings',   null],
+  ['order_totals',   'settings_file',  null],
+  ['client_svc',     'postgres',       null],
+  ['fin_tx',         'postgres',       null],
+  ['menu_tax',       'pub_settings',   null],
+  ['perm_engine',    'postgres',       null],
+  ['reserve_svc',    'postgres',       null],
+  ['ctrl_server',    'draft_store',    null],
+  ['ef_core',        'postgres',       null],
+  ['ctrl_settings',  'pub_settings',   null],
+
+  // Data → Infrastructure
+  ['postgres',       'do_postgres',    null],
+  ['do_postgres',    'do_app',         null],
+  ['api_core',       'do_app',         null],
+  ['docker',         'do_app',         null],
+  ['github_ci',      'do_app',         null],
+  ['github_ci',      'docker',         null],
+
+  // Business Logic → External Services
+  ['adm_ord_ops',    'questpdf',       null],
+  ['ctrl_cashier',   'questpdf',       null],
+  ['api_core',       'serilog',        null],
+
+  // Phase 2 connections
+  ['hub_order',      'redis_p2',       null],
+  ['api_core',       'redis_p2',       null],
+  ['ctrl_settings',  'spaces_p2',      null],
+  ['api_core',       'sentry_p2',      null],
+  ['api_core',       'logtail_p2',     null],
+];
+
+const CAT_COLORS = {
+  users:    '#3b82f6',
+  frontend: '#06b6d4',
+  backend:  '#f59e0b',
+  logic:    '#a78bfa',
+  database: '#22c55e',
+  infra:    '#ec4899',
+  services: '#f97316',
+  phase2:   '#64748b',
+};
+
+let scale = 0.5;
+let panX = -100, panY = -40;
+let isPanning = false;
+let panStartX = 0, panStartY = 0, panStartPX = 0, panStartPY = 0;
+let draggingNode = null, dragOffX = 0, dragOffY = 0;
+let selectedNode = null;
+let hiddenCats = new Set();
+let nodeMap = {}, nodeEls = {};
+
+window.addEventListener('DOMContentLoaded', () => {
+  buildNodes();
+  buildConnections();
+  applyTransform();
+  setupPan();
+  setupControls();
+  setupLegend();
+  setupMinimap();
+  animateParticles();
+  buildClusterLabels();
+  setTimeout(fitToScreen, 100);
+});
+
+function buildNodes() {
+  const c = document.getElementById('nodes-container');
+  NODES.forEach(n => {
+    nodeMap[n.id] = n;
+    const el = document.createElement('div');
+    el.className = `node cat-${n.cat}`;
+    el.id = `node-${n.id}`;
+    el.style.left = n.x + 'px';
+    el.style.top  = n.y + 'px';
+    const tagText = n.tech.split('\n')[0];
+    el.innerHTML = `
+      <div class="node-header"><span class="node-icon">${n.icon}</span><span>${n.cat.toUpperCase()}</span></div>
+      <div class="node-body">
+        <div class="node-ports"><div class="port"></div><div class="port"></div></div>
+        <div class="node-title">${n.title}</div>
+        <div class="node-sub">${n.sub.replace(/\n/g,'<br>')}</div>
+        <div class="node-tag">${tagText}</div>
+      </div>`;
+    el.addEventListener('mousedown', e => startDrag(e, n.id));
+    el.addEventListener('click', e => { e.stopPropagation(); selectNode(n.id, el); });
+    c.appendChild(el);
+    nodeEls[n.id] = el;
+  });
+}
+
+function buildConnections() {
+  const svg = document.getElementById('svg-layer');
+  svg.setAttribute('viewBox', `0 0 ${WORLD_W} ${WORLD_H}`);
+  CONNECTIONS.forEach((conn, i) => {
+    const [s, t] = conn;
+    if (!nodeMap[s] || !nodeMap[t]) return;
+    const color = CAT_COLORS[nodeMap[s].cat] || '#888';
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('class','conn-path');
+    path.setAttribute('stroke', color);
+    path.id = `conn-${s}-${t}`;
+    path.dataset.src = s; path.dataset.tgt = t;
+    svg.appendChild(path);
+    const anim = document.createElementNS('http://www.w3.org/2000/svg','path');
+    anim.setAttribute('class','conn-anim');
+    anim.setAttribute('stroke', color);
+    anim.setAttribute('stroke-dasharray','6 994');
+    anim.dataset.src = s; anim.dataset.tgt = t;
+    anim.id = `anim-${i}`;
+    svg.appendChild(anim);
+  });
+  updateConnections();
+}
+
+function getNodeCenter(id) {
+  const el = nodeEls[id];
+  if (!el) return {x:0,y:0};
+  return { x: parseFloat(el.style.left) + el.offsetWidth/2, y: parseFloat(el.style.top) + el.offsetHeight/2 };
+}
+
+function updateConnections() {
+  CONNECTIONS.forEach((conn, i) => {
+    const [s, t] = conn;
+    const src = getNodeCenter(s), tgt = getNodeCenter(t);
+    const dx = tgt.x - src.x, dy = tgt.y - src.y;
+    const d = `M ${src.x} ${src.y} C ${src.x + dx*0.4} ${src.y} ${tgt.x - dx*0.4} ${tgt.y} ${tgt.x} ${tgt.y}`;
+    const pe = document.getElementById(`conn-${s}-${t}`);
+    if (pe) pe.setAttribute('d', d);
+    const ae = document.getElementById(`anim-${i}`);
+    if (ae) ae.setAttribute('d', d);
+  });
+}
+
+let particleFrame = 0;
+function animateParticles() {
+  particleFrame++;
+  CONNECTIONS.forEach((conn, i) => {
+    const ae = document.getElementById(`anim-${i}`);
+    if (!ae) return;
+    const [s, t] = conn;
+    if (hiddenCats.has(nodeMap[s]?.cat) || hiddenCats.has(nodeMap[t]?.cat)) { ae.style.opacity='0'; return; }
+    const offset = ((particleFrame * 0.5) + i * 37) % 1000;
+    ae.setAttribute('stroke-dashoffset', 1000 - offset);
+    ae.style.opacity = '0.65';
+  });
+  requestAnimationFrame(animateParticles);
+}
+
+function startDrag(e, id) {
+  if (e.button !== 0) return;
+  e.stopPropagation();
+  draggingNode = id;
+  nodeEls[id].classList.add('dragging');
+  const wp = screenToWorld(e.clientX, e.clientY);
+  dragOffX = wp.x - parseFloat(nodeEls[id].style.left);
+  dragOffY = wp.y - parseFloat(nodeEls[id].style.top);
+  window.addEventListener('mousemove', onDragMove);
+  window.addEventListener('mouseup', onDragEnd);
+}
+function onDragMove(e) {
+  if (!draggingNode) return;
+  const wp = screenToWorld(e.clientX, e.clientY);
+  nodeEls[draggingNode].style.left = (wp.x - dragOffX) + 'px';
+  nodeEls[draggingNode].style.top  = (wp.y - dragOffY) + 'px';
+  nodeMap[draggingNode].x = parseFloat(nodeEls[draggingNode].style.left);
+  nodeMap[draggingNode].y = parseFloat(nodeEls[draggingNode].style.top);
+  updateConnections(); updateMinimap();
+}
+function onDragEnd() {
+  if (draggingNode) { nodeEls[draggingNode].classList.remove('dragging'); draggingNode = null; }
+  window.removeEventListener('mousemove', onDragMove);
+  window.removeEventListener('mouseup', onDragEnd);
+}
+
+function selectNode(id, el) {
+  if (selectedNode && nodeEls[selectedNode]) nodeEls[selectedNode].classList.remove('selected');
+  selectedNode = id;
+  el.classList.add('selected');
+  const n = nodeMap[id];
+  const tt = document.getElementById('tooltip');
+  document.getElementById('tt-title').textContent = n.title;
+  document.getElementById('tt-desc').textContent  = n.desc;
+  document.getElementById('tt-tech').textContent  = n.tech.replace(/\n/g,' · ');
+  tt.querySelector('h4').style.color = CAT_COLORS[n.cat];
+  tt.classList.add('visible');
+  const rect = el.getBoundingClientRect();
+  let tx = rect.right + 12, ty = rect.top;
+  if (tx + 300 > window.innerWidth) tx = rect.left - 300;
+  if (ty + 140 > window.innerHeight) ty = window.innerHeight - 150;
+  tt.style.left = tx + 'px'; tt.style.top = ty + 'px';
+  document.querySelectorAll('.conn-path').forEach(p => p.classList.remove('active'));
+  CONNECTIONS.forEach(c => {
+    if (c[0] === id || c[1] === id) {
+      const p = document.getElementById(`conn-${c[0]}-${c[1]}`);
+      if (p) p.classList.add('active');
+    }
+  });
+}
+document.addEventListener('click', () => {
+  document.getElementById('tooltip').classList.remove('visible');
+  document.querySelectorAll('.conn-path').forEach(p => p.classList.remove('active'));
+  if (selectedNode && nodeEls[selectedNode]) { nodeEls[selectedNode].classList.remove('selected'); selectedNode = null; }
+});
+
+function applyTransform() {
+  document.getElementById('world').style.transform = `translate(${panX}px,${panY}px) scale(${scale})`;
+  document.getElementById('zoom-display').textContent = Math.round(scale*100)+'%';
+  updateMinimap();
+}
+function screenToWorld(sx, sy) {
+  const vp = document.getElementById('viewport').getBoundingClientRect();
+  return { x: (sx - vp.left - panX)/scale, y: (sy - vp.top - panY)/scale };
+}
+function setupPan() {
+  const vp = document.getElementById('viewport');
+  vp.addEventListener('mousedown', e => {
+    if (draggingNode) return;
+    if (e.button === 0 || e.button === 1) {
+      isPanning=true; vp.classList.add('panning');
+      panStartX=e.clientX; panStartY=e.clientY; panStartPX=panX; panStartPY=panY;
+    }
+  });
+  window.addEventListener('mousemove', e => {
+    if (!isPanning||draggingNode) return;
+    panX = panStartPX+(e.clientX-panStartX); panY = panStartPY+(e.clientY-panStartY);
+    applyTransform();
+  });
+  window.addEventListener('mouseup', () => { isPanning=false; document.getElementById('viewport').classList.remove('panning'); });
+  vp.addEventListener('wheel', e => {
+    e.preventDefault();
+    const d = e.deltaY>0?0.9:1.1;
+    const ns = Math.max(0.12,Math.min(2.2,scale*d));
+    const vr = vp.getBoundingClientRect();
+    const mx=e.clientX-vr.left, my=e.clientY-vr.top;
+    panX = mx-(mx-panX)*(ns/scale); panY = my-(my-panY)*(ns/scale);
+    scale=ns; applyTransform();
+  },{passive:false});
+}
+function setupControls() {
+  document.getElementById('btn-fit').addEventListener('click', fitToScreen);
+  document.getElementById('btn-zoomin').addEventListener('click', ()=>zoom(1.2));
+  document.getElementById('btn-zoomout').addEventListener('click', ()=>zoom(0.8));
+  document.getElementById('btn-reset').addEventListener('click', ()=>{scale=0.5;panX=-100;panY=-40;applyTransform();});
+}
+function zoom(f) {
+  const vp=document.getElementById('viewport'), cx=vp.clientWidth/2, cy=vp.clientHeight/2;
+  const ns=Math.max(0.12,Math.min(2.2,scale*f));
+  panX=cx-(cx-panX)*(ns/scale); panY=cy-(cy-panY)*(ns/scale); scale=ns; applyTransform();
+}
+function fitToScreen() {
+  const vp=document.getElementById('viewport');
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  NODES.forEach(n=>{minX=Math.min(minX,n.x);minY=Math.min(minY,n.y);maxX=Math.max(maxX,n.x+180);maxY=Math.max(maxY,n.y+100);});
+  const cw=maxX-minX+80, ch=maxY-minY+80;
+  scale=Math.min(vp.clientWidth/cw,vp.clientHeight/ch,1)*0.88;
+  panX=(vp.clientWidth-cw*scale)/2-minX*scale;
+  panY=(vp.clientHeight-ch*scale)/2-minY*scale;
+  applyTransform();
+}
+function setupLegend() {
+  document.querySelectorAll('.legend-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const cat = item.dataset.cat;
+      if (hiddenCats.has(cat)) { hiddenCats.delete(cat); item.style.opacity='1'; }
+      else { hiddenCats.add(cat); item.style.opacity='0.35'; }
+      NODES.forEach(n => {
+        if (n.cat===cat) { nodeEls[n.id].style.opacity=hiddenCats.has(cat)?'0.08':'1'; nodeEls[n.id].style.pointerEvents=hiddenCats.has(cat)?'none':'auto'; }
+      });
+      document.querySelectorAll('.conn-path').forEach(p => {
+        const sc=nodeMap[p.dataset.src]?.cat, tc=nodeMap[p.dataset.tgt]?.cat;
+        p.style.opacity=(hiddenCats.has(sc)||hiddenCats.has(tc))?'0':'0.35';
+      });
+    });
+  });
+}
+function setupMinimap() { updateMinimap(); }
+function updateMinimap() {
+  const canvas=document.getElementById('minimap-canvas'), mm=document.getElementById('minimap');
+  const mmW=mm.clientWidth, mmH=mm.clientHeight;
+  canvas.width=mmW; canvas.height=mmH;
+  const ctx=canvas.getContext('2d');
+  const sX=mmW/WORLD_W, sY=mmH/WORLD_H;
+  ctx.clearRect(0,0,mmW,mmH);
+  NODES.forEach(n => {
+    if(hiddenCats.has(n.cat)) return;
+    ctx.fillStyle=CAT_COLORS[n.cat]||'#888'; ctx.globalAlpha=0.7;
+    ctx.fillRect(n.x*sX,n.y*sY,8*sX*5,4*sY*8);
+  });
+  ctx.globalAlpha=1;
+  const vp=document.getElementById('viewport');
+  const vx=(-panX/scale)*sX, vy=(-panY/scale)*sY;
+  const vw=(vp.clientWidth/scale)*sX, vh=(vp.clientHeight/scale)*sY;
+  const mv=document.getElementById('minimap-viewport');
+  mv.style.left=Math.max(0,vx)+'px'; mv.style.top=Math.max(0,vy)+'px';
+  mv.style.width=Math.min(mmW,vw)+'px'; mv.style.height=Math.min(mmH,vh)+'px';
+}
+function buildClusterLabels() {
+  const labels = [
+    {x:60,   y:42, text:'STAFF ROLES',       color:'#3b82f6'},
+    {x:380,  y:42, text:'FRONTEND PORTALS',  color:'#06b6d4'},
+    {x:740,  y:42, text:'BACKEND API',        color:'#f59e0b'},
+    {x:1120, y:42, text:'BUSINESS LOGIC',     color:'#a78bfa'},
+    {x:1500, y:42, text:'DATA LAYER',         color:'#22c55e'},
+    {x:1860, y:42, text:'INFRA + SERVICES',   color:'#ec4899'},
+  ];
+  const c = document.getElementById('nodes-container');
+  labels.forEach(l => {
+    const el=document.createElement('div');
+    el.className='cluster-label';
+    el.style.left=l.x+'px'; el.style.top=l.y+'px'; el.style.color=l.color;
+    el.textContent=l.text; c.appendChild(el);
+  });
+}
+</script>
+</body>
+</html>

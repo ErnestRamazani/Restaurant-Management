@@ -32,6 +32,59 @@ public sealed class AdminOrdersViewMapperTests
         Assert.True(entry.Total > 10m, "Delivery orders should show a total above merchandise-only subtotal.");
     }
 
+    [Fact]
+    public void MapOrder_Time_uses_restaurant_timezone()
+    {
+        var order = new OrderRecord
+        {
+            CreatedAt = new DateTime(2026, 6, 1, 7, 33, 0, DateTimeKind.Utc),
+            Status = "Waiting",
+            Items = []
+        };
+
+        var entry = AdminOrdersViewMapper.MapOrder(
+            order,
+            isPast: false,
+            showAdminAdvance: false,
+            canViewTicket: true,
+            restaurantTimeZoneId: "Africa/Kinshasa");
+
+        Assert.Equal("08:33", entry.Time);
+    }
+
+    [Fact]
+    public void MapOrder_OpenOnAccountDebt_ShowsDebtStatus()
+    {
+        var order = new OrderRecord
+        {
+            Status = "Completed",
+            ClientSettlement = ClientSettlement.OnAccount,
+            AmountOnAccountUsd = 40.16m,
+            ClientDebtSettledUsd = 0m
+        };
+
+        var entry = AdminOrdersViewMapper.MapOrder(order, isPast: true, showAdminAdvance: false, canViewTicket: true);
+
+        Assert.Equal(OrderDisplayStatus.Debt, entry.Status);
+        Assert.Equal("#F59E0B", entry.StatusColor);
+    }
+
+    [Fact]
+    public void MapOrder_SettledOnAccount_ShowsCompletedStatus()
+    {
+        var order = new OrderRecord
+        {
+            Status = "Completed",
+            ClientSettlement = ClientSettlement.OnAccount,
+            AmountOnAccountUsd = 40.16m,
+            ClientDebtSettledUsd = 40.16m
+        };
+
+        var entry = AdminOrdersViewMapper.MapOrder(order, isPast: true, showAdminAdvance: false, canViewTicket: true);
+
+        Assert.Equal("Completed", entry.Status);
+    }
+
     [Theory]
     [InlineData(OrderOrigin.Online, "Delivery", "DELIVERY", "Online · Delivery")]
     [InlineData(OrderOrigin.Online, "Pickup", "TO GO", "Online · Pickup")]

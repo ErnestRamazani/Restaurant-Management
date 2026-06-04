@@ -19,7 +19,7 @@ namespace EliteRestaurant.Api.Controllers;
 [ApiController]
 [Route("api/admin/data")]
 [Authorize(Policy = "StaffAny")]
-public sealed class AdminDataController(AppDbContext db) : ControllerBase
+public sealed class AdminDataController(AppDbContext db, SharedOrderDraftService draftStore) : ControllerBase
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -175,7 +175,7 @@ public sealed class AdminDataController(AppDbContext db) : ControllerBase
 
         try
         {
-            var rows = SharedOrderDraftStore.ListServerDrafts(employeeId, tableId, restrictCustomer)
+            var rows = draftStore.ListServerDrafts(employeeId, tableId, restrictCustomer)
                 .Select(d => new AdminOrderDraftDto(
                     d.Id,
                     d.Label,
@@ -213,8 +213,8 @@ public sealed class AdminDataController(AppDbContext db) : ControllerBase
 
         try
         {
-            var tableId = SharedOrderDraftStore.ParseTableIdFromSnapshotJson(snapshot);
-            var saved = SharedOrderDraftStore.SaveServerDraft(
+            var tableId = SharedOrderDraftService.ParseTableIdFromSnapshotJson(snapshot);
+            var saved = draftStore.SaveServerDraft(
                 request.EmployeeId,
                 request.EmployeeName ?? string.Empty,
                 request.Label ?? string.Empty,
@@ -249,7 +249,7 @@ public sealed class AdminDataController(AppDbContext db) : ControllerBase
 
         try
         {
-            var deleted = SharedOrderDraftStore.DeleteServerDraft(employeeId, draftId, tableId, restrictCustomer);
+            var deleted = draftStore.DeleteServerDraft(employeeId, draftId, tableId, restrictCustomer);
             if (!deleted)
                 return NotFound(new { message = "Draft not found." });
 

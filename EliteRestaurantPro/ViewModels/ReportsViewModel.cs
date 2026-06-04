@@ -7,6 +7,7 @@ using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Orders;
 using EliteRestaurant.Core.Reporting;
 using EliteRestaurantPro.ApiClients;
+using EliteRestaurantPro.Localization;
 using Microsoft.Win32;
 
 namespace EliteRestaurantPro.ViewModels;
@@ -16,34 +17,29 @@ public sealed class ReportEntityItem
     public int Id { get; init; }
     public string UniqueId { get; init; } = string.Empty;
     public string Name { get; init; } = string.Empty;
-    public string Subtitle { get; init; } = string.Empty;
+    public string RawSubtitle { get; init; } = string.Empty;
+    public string Subtitle { get; set; } = string.Empty;
 }
 
 public sealed class ReportTimeEntryDto
 {
     public DateTime EventTime { get; init; }
-    public string EventType { get; init; } = string.Empty;
-    public string Summary { get; init; } = string.Empty;
-    public string RelatedInfo { get; init; } = string.Empty;
-    public string EntityContext { get; init; } = string.Empty;
+    public string EventType { get; set; } = string.Empty;
+    public string Summary { get; set; } = string.Empty;
+    public string RelatedInfo { get; set; } = string.Empty;
+    public string EntityContext { get; set; } = string.Empty;
     public int OrdersCount { get; init; }
     public int ItemCount { get; init; }
     public decimal UnitUsage { get; init; }
-    public string EventTimeText => EventTime.ToString("HH:mm", CultureInfo.InvariantCulture);
-    public string MetricsText => UnitUsage > 0m
-        ? $"{UnitUsage:0.##} units"
-        : ItemCount > 0
-            ? $"{ItemCount} items"
-            : OrdersCount > 0
-                ? $"{OrdersCount} order(s)"
-                : "-";
+    public string EventTimeText => EventTime.ToString("HH:mm", AdminTextLocalizer.UiCulture);
+    public string MetricsText { get; set; } = "—";
 }
 
 public sealed class ReportDayGroupDto
 {
     public DateTime Day { get; init; }
-    public string DayText { get; init; } = string.Empty;
-    public string TotalsText { get; init; } = string.Empty;
+    public string DayText { get; set; } = string.Empty;
+    public string TotalsText { get; set; } = string.Empty;
     public ObservableCollection<ReportTimeEntryDto> Entries { get; init; } = new();
 }
 
@@ -57,23 +53,57 @@ public sealed class ReportsViewModel : AdminBaseViewModel
     private ReportEntityItem? _selectedInventoryItem;
     private ReportEntityItem? _selectedMenuItem;
 
-    private string _employeeSummary = "Select an employee to view details.";
-    private string _tableSummary = "Select a table to view details.";
-    private string _inventorySummary = "Select an inventory item to view details.";
-    private string _menuSummary = "Select a menu item to view details.";
-    private string _dailySummary = "Daily report is ready.";
-    private string _ordersSummary = "Orders report is ready.";
+    private string _employeeSummary = string.Empty;
+    private string _tableSummary = string.Empty;
+    private string _inventorySummary = string.Empty;
+    private string _menuSummary = string.Empty;
+    private string _dailySummary = string.Empty;
+    private string _ordersSummary = string.Empty;
 
     private string _employeeNotes = "-";
     private string _employeePayrollHistory = "-";
     private string _tableCurrentServer = "-";
     private string _inventoryNotes = "-";
+    private string? _rawInventoryNotes;
     private string _menuIngredientsSummary = "-";
     private DateTime _reportStartDate = DateTime.Today.AddDays(-14);
     private DateTime _reportEndDate = DateTime.Today;
-    private string _selectedExportReportType = "Daily";
+    private string _exportReportTypeCanonical = "Daily";
+    private LocalizedSelectOption? _selectedExportReportTypeOption;
 
     public override string ActivePage => "Reports";
+
+    public string PageTitle => Loc.Admin("repGeneralTitle", "General Reports");
+    public string PageSubtitle => Loc.Admin("repSubtitle", "Daily timeline and entity activity across orders, staff, tables, inventory, and menu.");
+    public string StartDateLabel => Loc.Admin("startDate", "Start date");
+    public string EndDateLabel => Loc.Admin("endDate", "End date");
+    public string ReportTypeLabel => Loc.Admin("reportType", "Report type");
+    public string ExportExcelLabel => Loc.Admin("exportExcel", "Export Excel");
+    public string BulkExcelLabel => Loc.Admin("bulkExcel", "Bulk Excel");
+    public string RefreshLabel => Loc.Admin("refresh", "Refresh");
+    public string LoadingLabel => Loc.Admin("repLoading", "Loading reports…");
+    public string TabDailyLabel => Loc.Admin("dailyReport", "Daily report");
+    public string TabOrdersLabel => Loc.Admin("ordersReport", "Orders");
+    public string TabEmployeesLabel => Loc.Admin("employeesReport", "Employees");
+    public string TabTablesLabel => Loc.Admin("tablesReport", "Tables");
+    public string TabInventoryLabel => Loc.Admin("inventoryReport", "Inventory");
+    public string TabMenuLabel => Loc.Admin("menuReport", "Menu");
+    public string TabPayrollLabel => Loc.Admin("payroll", "Payroll");
+    public string DailyFeedTitle => Loc.Admin("repTabDailyFeed", "Chronological daily feed across all entities");
+    public string OrdersByDayTitle => Loc.Admin("repTabOrdersByDay", "Orders by day (uses date range above)");
+    public string EmployeeDirectoryTitle => Loc.Admin("repEmployeeDirectory", "Employee Directory");
+    public string EmployeeDetailsTitle => Loc.Admin("repEmployeeDetails", "Employee Details");
+    public string TableDirectoryTitle => Loc.Admin("repTableDirectory", "Table Directory");
+    public string TableDetailsTitle => Loc.Admin("repTableDetails", "Table Details");
+    public string InventoryDirectoryTitle => Loc.Admin("repInventoryDirectory", "Inventory Directory");
+    public string InventoryDetailsTitle => Loc.Admin("repInventoryDetails", "Inventory Details");
+    public string MenuDirectoryTitle => Loc.Admin("repMenuDirectory", "Menu Directory");
+    public string MenuItemDetailsTitle => Loc.Admin("repMenuItemDetails", "Menu Item Details");
+    public string NotesSectionTitle => Loc.Admin("repNotes", "Notes");
+    public string PayrollHistoryTitle => Loc.Admin("repPayrollHistory", "Payroll history (USD)");
+    public string AssignedServerLabel => Loc.Admin("repAssignedServer", "Assigned Server: ");
+    public string InventoryNotesTitle => Loc.Admin("repInventoryNotesTitle", "Inventory Notes");
+    public string IngredientsTitle => Loc.Admin("repIngredients", "Ingredients");
 
     public ObservableCollection<ReportEntityItem> Employees { get; } = new();
     public ObservableCollection<ReportEntityItem> Tables { get; } = new();
@@ -86,7 +116,7 @@ public sealed class ReportsViewModel : AdminBaseViewModel
     public ObservableCollection<ReportDayGroupDto> MenuTimelineDays { get; } = new();
     public ObservableCollection<ReportDayGroupDto> DailyTimelineDays { get; } = new();
     public ObservableCollection<ReportDayGroupDto> OrderTimelineDays { get; } = new();
-    public ObservableCollection<string> ExportReportTypes { get; } = new(["Daily", "Orders", "Employees", "Tables", "Inventory", "Menu", "All Reports"]);
+    public ObservableCollection<LocalizedSelectOption> ExportReportTypeOptions { get; } = new();
 
     public ReportEntityItem? SelectedEmployee
     {
@@ -222,10 +252,15 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         }
     }
 
-    public string SelectedExportReportType
+    public LocalizedSelectOption? SelectedExportReportTypeOption
     {
-        get => _selectedExportReportType;
-        set => SetField(ref _selectedExportReportType, value);
+        get => _selectedExportReportTypeOption;
+        set
+        {
+            if (!SetField(ref _selectedExportReportTypeOption, value) || value is null)
+                return;
+            _exportReportTypeCanonical = value.Value;
+        }
     }
 
     public ICommand RefreshCommand { get; }
@@ -237,7 +272,152 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         RefreshCommand = new RelayCommand(_ => _ = LoadReportListsAsync());
         ExportExcelCommand = new RelayCommand(_ => _ = ExportExcelAsync());
         BulkExportExcelCommand = new RelayCommand(_ => _ = ExportBulkExcelAsync());
+        RebuildExportReportTypes();
         _ = LoadReportListsAsync();
+        ResetPlaceholderSummaries();
+    }
+
+    private void ResetPlaceholderSummaries()
+    {
+        if (SelectedEmployee is null)
+            EmployeeSummary = Loc.Admin("repSelectEmployee", "Select an employee to view details.");
+        if (SelectedTable is null)
+            TableSummary = Loc.Admin("repSelectTable", "Select a table to view details.");
+        if (SelectedInventoryItem is null)
+            InventorySummary = Loc.Admin("repSelectInventory", "Select an inventory item to view details.");
+        if (SelectedMenuItem is null)
+            MenuSummary = Loc.Admin("repSelectMenu", "Select a menu item to view details.");
+        DailySummary = Loc.Admin("repDailyReady", "Daily report is ready.");
+        OrdersSummary = Loc.Admin("repOrdersReady", "Orders report is ready.");
+    }
+
+    protected override void RefreshLocalizedStrings()
+    {
+        base.RefreshLocalizedStrings();
+        RebuildExportReportTypes();
+        RelocalizeDirectoryLists();
+        RelocalizeTimelineCollections();
+        RelocalizeInventoryDetailNotes();
+        Notify(
+            nameof(PageTitle),
+            nameof(PageSubtitle),
+            nameof(StartDateLabel),
+            nameof(EndDateLabel),
+            nameof(ReportTypeLabel),
+            nameof(ExportExcelLabel),
+            nameof(BulkExcelLabel),
+            nameof(RefreshLabel),
+            nameof(LoadingLabel),
+            nameof(TabDailyLabel),
+            nameof(TabOrdersLabel),
+            nameof(TabEmployeesLabel),
+            nameof(TabTablesLabel),
+            nameof(TabInventoryLabel),
+            nameof(TabMenuLabel),
+            nameof(TabPayrollLabel),
+            nameof(DailyFeedTitle),
+            nameof(OrdersByDayTitle),
+            nameof(EmployeeDirectoryTitle),
+            nameof(EmployeeDetailsTitle),
+            nameof(TableDirectoryTitle),
+            nameof(TableDetailsTitle),
+            nameof(InventoryDirectoryTitle),
+            nameof(InventoryDetailsTitle),
+            nameof(MenuDirectoryTitle),
+            nameof(MenuItemDetailsTitle),
+            nameof(NotesSectionTitle),
+            nameof(PayrollHistoryTitle),
+            nameof(AssignedServerLabel),
+            nameof(InventoryNotesTitle),
+            nameof(IngredientsTitle));
+        ResetPlaceholderSummaries();
+        _ = RelocalizeEntityDetailsAsync();
+    }
+
+    private void RebuildExportReportTypes()
+    {
+        var canonical = _exportReportTypeCanonical;
+        ExportReportTypeOptions.Clear();
+        foreach (var value in new[] { "Daily", "Orders", "Employees", "Tables", "Inventory", "Menu", "All Reports" })
+        {
+            ExportReportTypeOptions.Add(new LocalizedSelectOption
+            {
+                Value = value,
+                Label = ReportsUiLocalizer.TranslateExportReportType(value)
+            });
+        }
+
+        SelectedExportReportTypeOption = ExportReportTypeOptions.FirstOrDefault(o =>
+            o.Value.Equals(canonical, StringComparison.OrdinalIgnoreCase))
+            ?? ExportReportTypeOptions.FirstOrDefault();
+    }
+
+    private void RelocalizeDirectoryLists()
+    {
+        foreach (var item in Employees)
+            ReportsUiLocalizer.ApplyEntityItem(item, "employee");
+        foreach (var item in Tables)
+            ReportsUiLocalizer.ApplyEntityItem(item, "table");
+    }
+
+    private void RelocalizeInventoryDetailNotes()
+    {
+        if (_rawInventoryNotes is null)
+            return;
+
+        InventoryNotes = FormatInventoryNotesForDisplay(_rawInventoryNotes);
+    }
+
+    private static string FormatInventoryNotesForDisplay(string? notes) =>
+        string.IsNullOrWhiteSpace(notes)
+            ? "-"
+            : ReportsUiLocalizer.TranslateInventoryNotes(notes);
+
+    private void RelocalizeTimelineCollections()
+    {
+        foreach (var day in DailyTimelineDays)
+            ReportsUiLocalizer.ApplyDayGroup(day);
+        foreach (var day in OrderTimelineDays)
+            ReportsUiLocalizer.ApplyDayGroup(day);
+        foreach (var day in EmployeeTimelineDays)
+            ReportsUiLocalizer.ApplyDayGroup(day);
+        foreach (var day in TableTimelineDays)
+            ReportsUiLocalizer.ApplyDayGroup(day);
+        foreach (var day in InventoryTimelineDays)
+            ReportsUiLocalizer.ApplyDayGroup(day);
+        foreach (var day in MenuTimelineDays)
+            ReportsUiLocalizer.ApplyDayGroup(day);
+
+        if (DailyTimelineDays.Count > 0 || OrderTimelineDays.Count > 0)
+        {
+            var start = ReportStartDate.Date;
+            var end = ReportEndDate.Date;
+            if (DailyTimelineDays.Count > 0)
+            {
+                var dailyCount = DailyTimelineDays.Sum(d => d.Entries.Count);
+                DailySummary = ReportsUiLocalizer.FormatDailyRangeSummary(start, end, dailyCount);
+            }
+
+            if (OrderTimelineDays.Count > 0)
+            {
+                var orderCount = OrderTimelineDays.Sum(d => d.Entries.Sum(e => e.OrdersCount));
+                var dayCount = OrderTimelineDays.Count;
+                var itemCount = OrderTimelineDays.Sum(d => d.Entries.Sum(e => e.ItemCount));
+                OrdersSummary = ReportsUiLocalizer.FormatOrdersRangeSummary(start, end, orderCount, dayCount, itemCount);
+            }
+        }
+    }
+
+    private async Task RelocalizeEntityDetailsAsync()
+    {
+        if (SelectedEmployee is not null)
+            await LoadEmployeeDetailsAsync(SelectedEmployee.Id).ConfigureAwait(true);
+        if (SelectedTable is not null)
+            await LoadTableDetailsAsync(SelectedTable.Id).ConfigureAwait(true);
+        if (SelectedInventoryItem is not null)
+            await LoadInventoryDetailsAsync(SelectedInventoryItem.Id).ConfigureAwait(true);
+        if (SelectedMenuItem is not null)
+            await LoadMenuDetailsAsync(SelectedMenuItem.Id).ConfigureAwait(true);
     }
 
     private async Task<Dictionary<int, Product>> LoadProductsByIdAsync() =>
@@ -280,26 +460,30 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         Employees.Clear();
         foreach (var employee in employees)
         {
-            Employees.Add(new ReportEntityItem
+            var empItem = new ReportEntityItem
             {
                 Id = employee.Id,
                 UniqueId = employee.UniqueId,
                 Name = employee.Name,
-                Subtitle = employee.Role
-            });
+                RawSubtitle = employee.Role
+            };
+            ReportsUiLocalizer.ApplyEntityItem(empItem, "employee");
+            Employees.Add(empItem);
         }
 
         var tables = (await tablesTask.ConfigureAwait(true)).OrderBy(t => t.TableNumber).ToList();
         Tables.Clear();
         foreach (var table in tables)
         {
-            Tables.Add(new ReportEntityItem
+            var tableItem = new ReportEntityItem
             {
                 Id = table.Id,
                 UniqueId = table.UniqueId,
-                Name = $"Table {table.TableNumber} - {table.Name}",
-                Subtitle = table.Status
-            });
+                Name = ReportsUiLocalizer.TranslateTableListCaption(table.TableNumber, table.Name),
+                RawSubtitle = table.Status
+            };
+            ReportsUiLocalizer.ApplyEntityItem(tableItem, "table");
+            Tables.Add(tableItem);
         }
 
         var inv = (await invTask.ConfigureAwait(true)).OrderBy(i => i.Name).ToList();
@@ -343,7 +527,7 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         var endExclusive = ReportEndDate.Date.AddDays(1);
         if (endExclusive <= start)
         {
-            OrdersSummary = "Set a valid date range (end on or after start).";
+            OrdersSummary = Loc.Admin("repInvalidDateRange", "Set a valid date range (end on or after start).");
             return;
         }
 
@@ -370,7 +554,7 @@ public sealed class ReportsViewModel : AdminBaseViewModel
                 EventType = string.IsNullOrWhiteSpace(order.Status) ? "Order" : order.Status,
                 Summary = $"Order {DisplayOrFallback(order.UniqueId, $"#{order.Id}")} · {totalQty} item(s)",
                 RelatedInfo =
-                    $"{OrderRecordUiLabels.ServerCaption(order)} | {OrderRecordUiLabels.TableCaption(order)} | {DisplayOrFallback(menu, "No line items")}",
+                    $"{OrderRecordUiLabels.ServerCaption(order)} | {OrderRecordUiLabels.TableCaption(order)} | {DisplayOrFallback(menu, Loc.Admin("repNoLineItems", "No line items"))}",
                 EntityContext = paymentText,
                 OrdersCount = 1,
                 ItemCount = totalQty
@@ -380,14 +564,18 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         ApplyOrderDayGroups(OrderTimelineDays, entries);
 
         var dayCount = entries.Count == 0 ? 0 : entries.GroupBy(e => e.EventTime.Date).Count();
-        OrdersSummary =
-            $"Range {start:yyyy-MM-dd} → {ReportEndDate:yyyy-MM-dd}. {orders.Count} order(s) over {dayCount} day(s), {entries.Sum(e => e.ItemCount)} items total.";
+        OrdersSummary = ReportsUiLocalizer.FormatOrdersRangeSummary(
+            start,
+            ReportEndDate.Date,
+            orders.Count,
+            dayCount,
+            entries.Sum(e => e.ItemCount));
     }
 
     private async Task LoadEmployeeDetailsAsync(int? employeeId)
     {
         EmployeeTimelineDays.Clear();
-        EmployeeSummary = "Select an employee to view details.";
+        EmployeeSummary = Loc.Admin("repSelectEmployee", "Select an employee to view details.");
         EmployeeNotes = "-";
         EmployeePayrollHistory = "-";
 
@@ -407,16 +595,32 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             .Take(18)
             .ToList();
         EmployeePayrollHistory = payrollLines.Count == 0
-            ? "No saved payroll yet. Confirm monthly payment on the Salary screen to record pay here."
+            ? Loc.Admin("repNoPayrollSaved", "No saved payroll yet. Confirm monthly payment on the Salary screen to record pay here.")
             : string.Join(
                 "\n",
                 payrollLines.Select(p =>
                 {
                     var paidLine = p.PaidToDateUsd >= p.NetPayUsd - 0.005m
-                        ? $"Paid in full ${p.NetPayUsd:N2} USD"
-                        : $"Partial: ${p.PaidToDateUsd:N2} of ${p.NetPayUsd:N2} USD net";
-                    return
-                        $"{PayrollCalculator.FormatPayrollMonthLabel(p.Year, p.Month)}: {paidLine} (base gross ${p.MonthlySalaryUsd:N2}, sales ${p.MoneyGeneratedUsd:N2}, sales bonus ${p.BonusFivePercentUsd:N2}, advances -${p.AdvancesDeductedUsd:N2}) — last posting {p.PaidAtUtc.ToLocalTime():yyyy-MM-dd}";
+                        ? Loc.Admin("repPayrollPaidFull", "Paid in full ${{amount}} USD",
+                            new Dictionary<string, string> { ["amount"] = p.NetPayUsd.ToString("N2", CultureInfo.InvariantCulture) })
+                        : Loc.Admin("repPayrollPartial", "Partial: ${{paid}} of ${{net}} USD net",
+                            new Dictionary<string, string>
+                            {
+                                ["paid"] = p.PaidToDateUsd.ToString("N2", CultureInfo.InvariantCulture),
+                                ["net"] = p.NetPayUsd.ToString("N2", CultureInfo.InvariantCulture)
+                            });
+                    return Loc.Admin("repPayrollMonthLine",
+                        "{{month}}: {{paidLine}} (base gross ${{base}}, sales ${{sales}}, sales bonus ${{bonus}}, advances -${{advances}}) — last posting {{date}}",
+                        new Dictionary<string, string>
+                        {
+                            ["month"] = PayrollCalculator.FormatPayrollMonthLabel(p.Year, p.Month),
+                            ["paidLine"] = paidLine,
+                            ["base"] = p.MonthlySalaryUsd.ToString("N2", CultureInfo.InvariantCulture),
+                            ["sales"] = p.MoneyGeneratedUsd.ToString("N2", CultureInfo.InvariantCulture),
+                            ["bonus"] = p.BonusFivePercentUsd.ToString("N2", CultureInfo.InvariantCulture),
+                            ["advances"] = p.AdvancesDeductedUsd.ToString("N2", CultureInfo.InvariantCulture),
+                            ["date"] = p.PaidAtUtc.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                        });
                 }));
         var entries = new List<ReportTimeEntryDto>();
 
@@ -459,7 +663,7 @@ public sealed class ReportsViewModel : AdminBaseViewModel
                 EventTime = anchor,
                 EventType = "Served Order",
                 Summary = $"Order {order.UniqueId} ({order.Status})",
-                RelatedInfo = $"{OrderRecordUiLabels.TableCaption(order)} | {DisplayOrFallback(items, "No order items.")}",
+                RelatedInfo = $"{OrderRecordUiLabels.TableCaption(order)} | {DisplayOrFallback(items, Loc.Admin("repNoOrderItems", "No order items."))}",
                 EntityContext = employee.Name,
                 OrdersCount = 1,
                 ItemCount = totalItems
@@ -482,7 +686,8 @@ public sealed class ReportsViewModel : AdminBaseViewModel
                 EventTime = MoneyTransactionReportHelper.ToLocalInstant(t.Date),
                 EventType = MoneyTransactionReportHelper.LedgerEventType(t),
                 Summary = t.Justification ?? string.Empty,
-                RelatedInfo = $"USD $ {t.AmountUsd:0.00}",
+                RelatedInfo = Loc.Admin("repMoneyAmountUsd", "USD $ {{amount}}",
+                    new Dictionary<string, string> { ["amount"] = t.AmountUsd.ToString("0.00", CultureInfo.InvariantCulture) }),
                 EntityContext = employee.Name
             });
         }
@@ -497,15 +702,25 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         {
             var period = adv.ForPayrollYear.HasValue && adv.ForPayrollMonth.HasValue
                 ? PayrollCalculator.FormatPayrollMonthLabel(adv.ForPayrollYear.Value, adv.ForPayrollMonth.Value)
-                : "(by date)";
+                : Loc.Admin("repAdvanceByDate", "(by date)");
             var applied = adv.AppliedPayrollYear.HasValue && adv.AppliedPayrollMonth.HasValue
-                ? $"Applied to {PayrollCalculator.FormatPayrollMonthLabel(adv.AppliedPayrollYear.Value, adv.AppliedPayrollMonth.Value)}"
-                : "Pending deduction on payroll confirm";
+                ? Loc.Admin("repAdvanceApplied", "Applied to {{month}}",
+                    new Dictionary<string, string>
+                    {
+                        ["month"] = PayrollCalculator.FormatPayrollMonthLabel(adv.AppliedPayrollYear.Value, adv.AppliedPayrollMonth.Value)
+                    })
+                : Loc.Admin("repAdvancePending", "Pending deduction on payroll confirm");
             entries.Add(new ReportTimeEntryDto
             {
                 EventTime = adv.GivenAt,
                 EventType = "Salary advance (record)",
-                Summary = $"${adv.AmountUsd:0.00} for payroll {period} — {applied}",
+                Summary = Loc.Admin("repAdvancePayrollFor", "${{amount}} for payroll {{period}} — {{applied}}",
+                    new Dictionary<string, string>
+                    {
+                        ["amount"] = adv.AmountUsd.ToString("0.00", CultureInfo.InvariantCulture),
+                        ["period"] = period,
+                        ["applied"] = applied
+                    }),
                 RelatedInfo = DisplayOrFallback(adv.Note, "—"),
                 EntityContext = employee.Name
             });
@@ -513,14 +728,23 @@ public sealed class ReportsViewModel : AdminBaseViewModel
 
         ApplyDayGroups(EmployeeTimelineDays, entries);
 
-        EmployeeSummary =
-            $"Name: {employee.Name}\nID: {employee.UniqueId}\nRole: {employee.Role}\nStatus: {employee.EmploymentStatus}\nPhone: {employee.PhoneNumber}\nClock-in / sign-in events: {attendanceRows.Count}\nOrders Served: {servedOrders.Count}\nItems Served: {servedOrders.Sum(o => o.Items.Sum(i => i.Quantity))}";
+        EmployeeSummary = string.Join("\n",
+        [
+            Loc.Admin("repDetailName", "Name: {{name}}", new Dictionary<string, string> { ["name"] = employee.Name }),
+            Loc.Admin("repDetailId", "ID: {{id}}", new Dictionary<string, string> { ["id"] = employee.UniqueId }),
+            Loc.Admin("repDetailRole", "Role: {{role}}", new Dictionary<string, string> { ["role"] = AdminTextLocalizer.TranslateRole(employee.Role) }),
+            Loc.Admin("repDetailStatus", "Status: {{status}}", new Dictionary<string, string> { ["status"] = AdminTextLocalizer.TranslateEmploymentStatus(employee.EmploymentStatus) }),
+            Loc.Admin("repDetailPhone", "Phone: {{phone}}", new Dictionary<string, string> { ["phone"] = employee.PhoneNumber }),
+            Loc.Admin("repEmpClockEvents", "Clock-in / sign-in events: {{count}}", new Dictionary<string, string> { ["count"] = attendanceRows.Count.ToString(CultureInfo.InvariantCulture) }),
+            Loc.Admin("repEmpOrdersServed", "Orders Served: {{count}}", new Dictionary<string, string> { ["count"] = servedOrders.Count.ToString(CultureInfo.InvariantCulture) }),
+            Loc.Admin("repEmpItemsServed", "Items Served: {{count}}", new Dictionary<string, string> { ["count"] = servedOrders.Sum(o => o.Items.Sum(i => i.Quantity)).ToString(CultureInfo.InvariantCulture) })
+        ]);
     }
 
     private async Task LoadTableDetailsAsync(int? tableId)
     {
         TableTimelineDays.Clear();
-        TableSummary = "Select a table to view details.";
+        TableSummary = Loc.Admin("repSelectTable", "Select a table to view details.");
         TableCurrentServer = "-";
 
         if (tableId is null)
@@ -584,17 +808,30 @@ public sealed class ReportsViewModel : AdminBaseViewModel
 
         ApplyDayGroups(TableTimelineDays, entries);
 
-        TableSummary =
-            $"Table: {table.TableNumber} ({table.Name})\nID: {table.UniqueId}\nCapacity: {table.Capacity}\nStatus: {table.Status}\nOrders Logged: {relatedOrders.Count}\nItems Served: {relatedOrders.Sum(o => o.Items.Sum(i => i.Quantity))}";
+        TableSummary = string.Join("\n",
+        [
+            Loc.Admin("repTableCaption", "Table: {{num}} ({{name}})",
+                new Dictionary<string, string>
+                {
+                    ["num"] = table.TableNumber.ToString(CultureInfo.InvariantCulture),
+                    ["name"] = table.Name
+                }),
+            Loc.Admin("repDetailId", "ID: {{id}}", new Dictionary<string, string> { ["id"] = table.UniqueId }),
+            Loc.Admin("repTableCapacity", "Capacity: {{count}}", new Dictionary<string, string> { ["count"] = table.Capacity.ToString(CultureInfo.InvariantCulture) }),
+            Loc.Admin("repDetailStatus", "Status: {{status}}", new Dictionary<string, string> { ["status"] = AdminTextLocalizer.TranslateTableStatus(table.Status) }),
+            Loc.Admin("repTableOrdersLogged", "Orders Logged: {{count}}", new Dictionary<string, string> { ["count"] = relatedOrders.Count.ToString(CultureInfo.InvariantCulture) }),
+            Loc.Admin("repTableItemsServed", "Items Served: {{count}}", new Dictionary<string, string> { ["count"] = relatedOrders.Sum(o => o.Items.Sum(i => i.Quantity)).ToString(CultureInfo.InvariantCulture) })
+        ]);
         TableCurrentServer = assignedServer is null
-            ? "Unassigned"
+            ? Loc.Admin("invActorUnassigned", "Unassigned")
             : $"{assignedServer.Name} ({assignedServer.UniqueId})";
     }
 
     private async Task LoadInventoryDetailsAsync(int? inventoryId)
     {
         InventoryTimelineDays.Clear();
-        InventorySummary = "Select an inventory item to view details.";
+        InventorySummary = Loc.Admin("repSelectInventory", "Select an inventory item to view details.");
+        _rawInventoryNotes = null;
         InventoryNotes = "-";
 
         if (inventoryId is null)
@@ -604,7 +841,8 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         if (item is null)
             return;
 
-        InventoryNotes = string.IsNullOrWhiteSpace(item.Notes) ? "-" : item.Notes;
+        _rawInventoryNotes = item.Notes;
+        InventoryNotes = FormatInventoryNotesForDisplay(_rawInventoryNotes);
 
         var productsById = await LoadProductsByIdAsync().ConfigureAwait(true);
         var ingredients = (await _data.GetProductIngredientsAsync().ConfigureAwait(true))
@@ -621,14 +859,29 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         AppendInventoryNotesTimeline(item.Notes, entries, item.Name);
         ApplyDayGroups(InventoryTimelineDays, entries);
 
-        InventorySummary =
-            $"Item: {item.Name}\nID: {item.UniqueId}\nQuantity: {item.StockQuantity:0.##} {item.Unit}\nExpiration: {item.ExpirationDate?.ToString("yyyy-MM-dd") ?? "Not set"}\nLinked Menu Items: {ingredients.Select(i => i.ProductId).Distinct().Count()}";
+        InventorySummary = string.Join("\n",
+        [
+            Loc.Admin("repInvItemLabel", "Item: {{name}}", new Dictionary<string, string> { ["name"] = item.Name }),
+            Loc.Admin("repDetailId", "ID: {{id}}", new Dictionary<string, string> { ["id"] = item.UniqueId }),
+            Loc.Admin("repInvQuantity", "Quantity: {{qty}} {{unit}}",
+                new Dictionary<string, string>
+                {
+                    ["qty"] = item.StockQuantity.ToString("0.##", CultureInfo.InvariantCulture),
+                    ["unit"] = item.Unit
+                }),
+            item.ExpirationDate is DateTime exp
+                ? Loc.Admin("repInvExpiration", "Expiration: {{date}}",
+                    new Dictionary<string, string> { ["date"] = exp.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) })
+                : Loc.Admin("repInvExpirationNotSet", "Expiration: Not set"),
+            Loc.Admin("repInvLinkedMenu", "Linked Menu Items: {{count}}",
+                new Dictionary<string, string> { ["count"] = ingredients.Select(i => i.ProductId).Distinct().Count().ToString(CultureInfo.InvariantCulture) })
+        ]);
     }
 
     private async Task LoadMenuDetailsAsync(int? productId)
     {
         MenuTimelineDays.Clear();
-        MenuSummary = "Select a menu item to view details.";
+        MenuSummary = Loc.Admin("repSelectMenu", "Select a menu item to view details.");
         MenuIngredientsSummary = "-";
 
         if (productId is null)
@@ -649,8 +902,8 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         }
 
         MenuIngredientsSummary = ingredients.Count == 0
-            ? "No ingredients linked."
-            : string.Join(", ", ingredients.Select(i => $"{i.InventoryItem?.Name ?? "Unknown"} ({i.Quantity:0.##} {i.InventoryItem?.Unit ?? "unit"})"));
+            ? Loc.Admin("repNoIngredients", "No ingredients linked.")
+            : string.Join(", ", ingredients.Select(i => $"{i.InventoryItem?.Name ?? Loc.Admin("repUnknownProduct", "Unknown")} ({i.Quantity:0.##} {i.InventoryItem?.Unit ?? "unit"})"));
 
         var entries = new List<ReportTimeEntryDto>();
         var productsById = await LoadProductsByIdAsync().ConfigureAwait(true);
@@ -684,8 +937,16 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         ApplyDayGroups(MenuTimelineDays, entries);
 
         var totalQty = servedLines.Sum(l => l.Item.Quantity);
-        MenuSummary =
-            $"Menu Item: {product.Name}\nID: {product.UniqueId}\nCategory: {product.Category}\nSub Category: {product.SubCategory}\nPrice: $ {product.Price:0.00}\nTimes Ordered: {servedLines.Count}\nUnits Ordered: {totalQty}";
+        MenuSummary = string.Join("\n",
+        [
+            Loc.Admin("repMenuItemLabel", "Menu Item: {{name}}", new Dictionary<string, string> { ["name"] = product.Name }),
+            Loc.Admin("repDetailId", "ID: {{id}}", new Dictionary<string, string> { ["id"] = product.UniqueId }),
+            Loc.Admin("repMenuCategory", "Category: {{category}}", new Dictionary<string, string> { ["category"] = product.Category }),
+            Loc.Admin("repMenuSubCategory", "Sub Category: {{sub}}", new Dictionary<string, string> { ["sub"] = product.SubCategory }),
+            Loc.Admin("repMenuPrice", "Price: $ {{price}}", new Dictionary<string, string> { ["price"] = product.Price.ToString("0.00", CultureInfo.InvariantCulture) }),
+            Loc.Admin("repMenuTimesOrdered", "Times Ordered: {{count}}", new Dictionary<string, string> { ["count"] = servedLines.Count.ToString(CultureInfo.InvariantCulture) }),
+            Loc.Admin("repMenuUnitsOrdered", "Units Ordered: {{count}}", new Dictionary<string, string> { ["count"] = totalQty.ToString(CultureInfo.InvariantCulture) })
+        ]);
     }
 
     private async Task LoadDailyReportAsync()
@@ -695,7 +956,7 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         var endExclusive = ReportEndDate.Date.AddDays(1);
         if (endExclusive <= start)
         {
-            DailySummary = "Set a valid date range (end on or after start) for the Daily tab.";
+            DailySummary = Loc.Admin("repInvalidDateRangeDaily", "Set a valid date range (end on or after start) for the Daily tab.");
             return;
         }
 
@@ -853,15 +1114,26 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             var advName = adv.Employee?.Name ?? $"Employee #{adv.EmployeeId}";
             var period = adv.ForPayrollYear.HasValue && adv.ForPayrollMonth.HasValue
                 ? PayrollCalculator.FormatPayrollMonthLabel(adv.ForPayrollYear.Value, adv.ForPayrollMonth.Value)
-                : "(by date)";
+                : Loc.Admin("repAdvanceByDate", "(by date)");
             var applied = adv.AppliedPayrollYear.HasValue && adv.AppliedPayrollMonth.HasValue
-                ? $"Applied to {PayrollCalculator.FormatPayrollMonthLabel(adv.AppliedPayrollYear.Value, adv.AppliedPayrollMonth.Value)}"
-                : "Pending deduction on payroll confirm";
+                ? Loc.Admin("repAdvanceApplied", "Applied to {{month}}",
+                    new Dictionary<string, string>
+                    {
+                        ["month"] = PayrollCalculator.FormatPayrollMonthLabel(adv.AppliedPayrollYear.Value, adv.AppliedPayrollMonth.Value)
+                    })
+                : Loc.Admin("repAdvancePending", "Pending deduction on payroll confirm");
             entries.Add(new ReportTimeEntryDto
             {
                 EventTime = givenLocal,
                 EventType = "Salary advance (record)",
-                Summary = $"{advName} · ${adv.AmountUsd:0.00} USD for payroll {period} — {applied}",
+                Summary = Loc.Admin("repAdvanceFeedSummary", "{{name}} · ${{amount}} USD for payroll {{period}} — {{applied}}",
+                    new Dictionary<string, string>
+                    {
+                        ["name"] = advName,
+                        ["amount"] = adv.AmountUsd.ToString("0.00", CultureInfo.InvariantCulture),
+                        ["period"] = period,
+                        ["applied"] = applied
+                    }),
                 RelatedInfo = DisplayOrFallback(adv.Note, "—"),
                 EntityContext = "Salary advances"
             });
@@ -893,14 +1165,14 @@ public sealed class ReportsViewModel : AdminBaseViewModel
                 Summary = string.IsNullOrWhiteSpace(who)
                     ? (t.Justification ?? string.Empty)
                     : $"{who} · {t.Justification}",
-                RelatedInfo = $"USD $ {t.AmountUsd:0.00} (Money ledger)",
+                RelatedInfo = Loc.Admin("repMoneyLedgerLine", "USD $ {{amount}} (Money ledger)",
+                    new Dictionary<string, string> { ["amount"] = t.AmountUsd.ToString("0.00", CultureInfo.InvariantCulture) }),
                 EntityContext = "Money"
             });
         }
 
         ApplyDayGroups(DailyTimelineDays, entries, dailyPayrollPinnedDaySort: true);
-        DailySummary =
-            $"Daily timeline {start:yyyy-MM-dd} → {ReportEndDate:yyyy-MM-dd}: {entries.Count} events (clock-ins/sign-ins, orders, reservations, menu, inventory, payroll records, salary advances, Money salary ledger).";
+        DailySummary = ReportsUiLocalizer.FormatDailyRangeSummary(start, ReportEndDate.Date, entries.Count);
     }
 
     private static void ApplyDayGroups(
@@ -921,14 +1193,15 @@ public sealed class ReportsViewModel : AdminBaseViewModel
                     a.EventType,
                     b.EventTime,
                     b.EventType));
-                target.Add(new ReportDayGroupDto
+                var group = new ReportDayGroupDto
                 {
                     Day = dayGroup.Key,
-                    DayText = dayGroup.Key.ToString("dddd, MMM dd yyyy", CultureInfo.InvariantCulture),
                     TotalsText =
                         $"{rows.Count} events | {rows.Sum(r => r.OrdersCount)} orders | {rows.Sum(r => r.ItemCount)} items | {rows.Sum(r => r.UnitUsage):0.##} units",
                     Entries = new ObservableCollection<ReportTimeEntryDto>(rows)
-                });
+                };
+                ReportsUiLocalizer.ApplyDayGroup(group);
+                target.Add(group);
             }
 
             return;
@@ -944,14 +1217,15 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             .OrderByDescending(g => g.Key))
         {
             var rows = dayGroup.ToList();
-            target.Add(new ReportDayGroupDto
+            var group = new ReportDayGroupDto
             {
                 Day = dayGroup.Key,
-                DayText = dayGroup.Key.ToString("dddd, MMM dd yyyy", CultureInfo.InvariantCulture),
                 TotalsText =
                     $"{rows.Count} events | {rows.Sum(r => r.OrdersCount)} orders | {rows.Sum(r => r.ItemCount)} items | {rows.Sum(r => r.UnitUsage):0.##} units",
                 Entries = new ObservableCollection<ReportTimeEntryDto>(rows)
-            });
+            };
+            ReportsUiLocalizer.ApplyDayGroup(group);
+            target.Add(group);
         }
     }
 
@@ -963,13 +1237,14 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         {
             var rows = dayGroup.OrderBy(e => e.EventTime).ThenBy(e => e.Summary).ToList();
             var orderCount = rows.Sum(r => r.OrdersCount);
-            target.Add(new ReportDayGroupDto
+            var group = new ReportDayGroupDto
             {
                 Day = dayGroup.Key,
-                DayText = dayGroup.Key.ToString("dddd, MMM dd yyyy", CultureInfo.InvariantCulture),
                 TotalsText = $"{orderCount} order(s) | {rows.Sum(r => r.ItemCount)} items",
                 Entries = new ObservableCollection<ReportTimeEntryDto>(rows)
-            });
+            };
+            ReportsUiLocalizer.ApplyDayGroup(group);
+            target.Add(group);
         }
     }
 
@@ -1064,7 +1339,7 @@ public sealed class ReportsViewModel : AdminBaseViewModel
         if (range is null)
             return;
 
-        if (SelectedExportReportType == "All Reports")
+        if (_exportReportTypeCanonical == "All Reports")
         {
             await ExportBulkExcelAsync().ConfigureAwait(true);
             return;
@@ -1076,14 +1351,14 @@ public sealed class ReportsViewModel : AdminBaseViewModel
             Filter = "Excel Workbook (*.xlsx)|*.xlsx",
             DefaultExt = ".xlsx",
             AddExtension = true,
-            FileName = $"{SelectedExportReportType.ToLowerInvariant()}-report-{ReportStartDate:yyyyMMdd}-{ReportEndDate:yyyyMMdd}.xlsx"
+            FileName = $"{_exportReportTypeCanonical.ToLowerInvariant()}-report-{ReportStartDate:yyyyMMdd}-{ReportEndDate:yyyyMMdd}.xlsx"
         };
 
         if (saveDialog.ShowDialog() != true)
             return;
 
-        var data = await BuildExportRowsAsync(SelectedExportReportType, range.Value.Start, range.Value.EndExclusive).ConfigureAwait(true);
-        ExcelExportService.ExportSingleSheet(saveDialog.FileName, SelectedExportReportType, data.Headers, data.Rows);
+        var data = await BuildExportRowsAsync(_exportReportTypeCanonical, range.Value.Start, range.Value.EndExclusive).ConfigureAwait(true);
+        ExcelExportService.ExportSingleSheet(saveDialog.FileName, _exportReportTypeCanonical, data.Headers, data.Rows);
     }
 
     private async Task ExportBulkExcelAsync()

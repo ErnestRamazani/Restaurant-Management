@@ -1,5 +1,7 @@
 import { ChevronLeft, Search, X } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { translateFilterLabel } from '../../utils/i18nLabels'
 import { productMatchesCourse } from '../../utils/courseBucket'
 import { productMatchesDrinkAlcohol } from '../../utils/drinkAlcoholBucket'
 import {
@@ -56,13 +58,14 @@ function subcategoryOptionsForSection(inSection) {
 }
 
 export function MenuScreen({ config, products, guestOrderMode = 'browse', onBack, onOpenProduct, cart, onViewCart }) {
+  const { t } = useTranslation()
   const taxonomy = useMemo(() => parseMenuTaxonomy(config), [config?.menuTaxonomyJson])
 
   const foodType = useMemo(() => taxonomy?.types?.find((t) => !t.isDrink) ?? null, [taxonomy])
   const drinkType = useMemo(() => taxonomy?.types?.find((t) => t.isDrink) ?? null, [taxonomy])
 
-  const foodTabLabel = foodType?.name?.trim() ? String(foodType.name).trim() : 'Food'
-  const drinkTabLabel = drinkType?.name?.trim() ? String(drinkType.name).trim() : 'Drinks'
+  const foodTabLabel = foodType?.name?.trim() ? String(foodType.name).trim() : t('guest.menu.food')
+  const drinkTabLabel = drinkType?.name?.trim() ? String(drinkType.name).trim() : t('guest.menu.drinks')
 
   const foodCourseTabs = useMemo(() => {
     if (foodType?.sections?.length) return ['All', ...foodType.sections.map((s) => String(s.name || '').trim()).filter(Boolean)]
@@ -134,7 +137,9 @@ export function MenuScreen({ config, products, guestOrderMode = 'browse', onBack
     })
   }, [afterMainFilter, resolvedSub, q])
 
-  const restaurantTitle = config?.restaurantName?.trim() ? String(config.restaurantName).trim() : 'Menu'
+  const restaurantTitle = config?.restaurantName?.trim()
+    ? String(config.restaurantName).trim()
+    : t('guest.general.menuTitle')
 
   return (
     <div
@@ -150,7 +155,7 @@ export function MenuScreen({ config, products, guestOrderMode = 'browse', onBack
           type="button"
           onClick={onBack}
           className="flex h-11 min-w-[44px] items-center justify-center text-champagne"
-          aria-label="Back"
+          aria-label={t('guest.general.back')}
         >
           <ChevronLeft className="h-6 w-6" />
         </button>
@@ -161,19 +166,19 @@ export function MenuScreen({ config, products, guestOrderMode = 'browse', onBack
         </div>
         {guestOrderMode === 'online' ? (
           <p className="border-t border-amber-500/20 bg-amber-500/10 px-3 py-2 text-center font-body text-[0.62rem] font-semibold uppercase leading-snug tracking-[0.14em] text-amber-100/95">
-            Online order — pickup or delivery. Your cart is for off‑premise service.
+            {t('guest.menu.onlineBanner')}
           </p>
         ) : null}
       </header>
 
       <div className="shrink-0 border-b border-champagne/10 bg-midnight-2 px-4 pb-3 pt-2">
         <p className="mb-1.5 text-center font-body text-[0.65rem] font-medium uppercase tracking-[0.2em] text-gold/80">
-          Order from one section
+          {t('guest.menu.orderFromSection')}
         </p>
         <div
           className="flex rounded-2xl border border-champagne/12 bg-midnight-3 p-1"
           role="tablist"
-          aria-label="Food or drinks"
+          aria-label={t('guest.menu.foodOrDrinksAria')}
         >
           <button
             type="button"
@@ -203,24 +208,31 @@ export function MenuScreen({ config, products, guestOrderMode = 'browse', onBack
           </button>
         </div>
         <p className="mt-1.5 text-center font-body text-[0.7rem] leading-snug text-[var(--text-muted)]">
-          Food and drinks are separate orders. Adding the other type clears your cart.
+          {t('guest.menu.browseHint')}
         </p>
       </div>
 
       {section === 'food' ? (
-        <CategoryBar categories={foodCourseTabs} active={course} onSelect={onCourseSelect} sectionKind="food" />
+        <CategoryBar
+          categories={foodCourseTabs}
+          active={course}
+          onSelect={onCourseSelect}
+          sectionKind="food"
+          translateLabel={(label) => translateFilterLabel(t, label)}
+        />
       ) : (
         <CategoryBar
           categories={drinkSecondTabs}
           active={drinkAlcohol}
           onSelect={onDrinkAlcoholSelect}
           sectionKind="drink"
+          translateLabel={(label) => translateFilterLabel(t, label)}
         />
       )}
 
       <div className="shrink-0 border-b border-champagne/10 bg-midnight-2 px-4 pb-3 pt-3">
         <MenuSelect
-          label="Subcategory"
+          label={t('guest.menu.subcategory')}
           options={subOptions}
           value={resolvedSub}
           onChange={setSubCat}
@@ -234,16 +246,16 @@ export function MenuScreen({ config, products, guestOrderMode = 'browse', onBack
             id="menu-search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search menu…"
+            placeholder={t('guest.menu.searchPlaceholder')}
             className="h-[42px] w-full rounded-[10px] border border-champagne/10 bg-champagne/[0.06] pl-10 pr-10 font-body text-[0.9rem] text-champagne placeholder:text-champagne/30"
-            aria-label="Search menu"
+            aria-label={t('guest.menu.searchAria')}
           />
           {q ? (
             <button
               type="button"
               className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center text-champagne/50"
               onClick={() => setQ('')}
-              aria-label="Clear search"
+              aria-label={t('guest.menu.clearSearchAria')}
             >
               <X className="h-4 w-4" />
             </button>
@@ -271,7 +283,7 @@ export function MenuScreen({ config, products, guestOrderMode = 'browse', onBack
         })}
         {filtered.length === 0 ? (
           <p className="py-12 text-center font-body text-sm text-[var(--text-muted)]">
-            Nothing here yet. Try another filter, type, or search.
+            {t('guest.menu.emptyResults')}
           </p>
         ) : null}
       </div>

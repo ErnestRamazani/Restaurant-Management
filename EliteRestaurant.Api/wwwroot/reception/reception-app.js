@@ -1,5 +1,6 @@
 (function () {
   const PORTAL_ID = "Reception";
+  let hubPillState = "off";
   let token = "";
   let me = null;
   let tables = [];
@@ -22,7 +23,226 @@
   let pollTimer = null;
   let deliveryReadyFlashTimer = null;
 
+  function t(key, fallback, vars) {
+    const full = key.indexOf("portals.") === 0 || key.indexOf("auth.") === 0 || key.indexOf("common.") === 0 || key.indexOf("orders.") === 0 || key.indexOf("tables.") === 0
+      ? key
+      : "portals.reception." + key;
+    return (window.EliteI18n && EliteI18n.t) ? EliteI18n.t(full, fallback, vars) : (fallback != null ? String(fallback) : full);
+  }
+
+  function metaSlug(value) {
+    return String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+  }
+
+  function normalizeStatusKey(status) {
+    const raw = String(status ?? "").trim();
+    if (!raw) return "";
+    const spaced = raw.replace(/([a-z])([A-Z])/g, "$1 $2");
+    const n = spaced.replace(/\s+/g, " ").trim().toLowerCase();
+    const aliases = {
+      "waiting": "waiting",
+      "pending approval": "pending_approval",
+      "pending cashier": "pending_cashier",
+      "in kitchen": "in_kitchen",
+      "ready": "ready",
+      "served": "served",
+      "completed": "completed",
+      "cancelled": "cancelled",
+      "canceled": "cancelled",
+      "pending": "pending",
+      "on account": "on_account",
+      "debt": "on_account",
+      "scheduled": "scheduled",
+      "checked in": "checkedin",
+      "checkedin": "checkedin"
+    };
+    return aliases[n] || metaSlug(n);
+  }
+
+  const STATUS_FALLBACK_EN = {
+    pending_approval: "Pending approval",
+    pending_cashier: "Pending cashier",
+    waiting: "Waiting",
+    in_kitchen: "In kitchen",
+    ready: "Ready",
+    served: "Served",
+    completed: "Completed",
+    cancelled: "Cancelled",
+    pending: "Pending",
+    on_account: "On account",
+    scheduled: "Scheduled",
+    checkedin: "Checked in"
+  };
+
+  const STATUS_FALLBACK_FR = {
+    pending_approval: "En attente d'approbation",
+    pending_cashier: "En attente caisse",
+    waiting: "En attente",
+    in_kitchen: "En cuisine",
+    ready: "Prête",
+    served: "Servie",
+    completed: "Terminée",
+    cancelled: "Annulée",
+    pending: "En attente",
+    on_account: "En compte",
+    scheduled: "Planifiée",
+    checkedin: "Enregistré"
+  };
+
+  const STATUS_ORDERS_KEY = {
+    pending_approval: "orders.pendingApproval",
+    pending_cashier: "orders.pendingCashier",
+    waiting: "orders.waiting",
+    in_kitchen: "orders.inKitchen",
+    ready: "orders.ready",
+    served: "orders.served",
+    completed: "orders.completed",
+    cancelled: "orders.cancelled",
+    pending: "orders.pending"
+  };
+
+  const META_FALLBACK_FR = {
+    payment: { deferred: "Différé", immediate: "Immédiat", pay_now: "Payer maintenant", on_account: "En compte" },
+    origin: { online: "En ligne", dine_in: "Sur place", walk_in: "Sans réservation" },
+    source: { delivery: "Livraison", pickup: "À emporter", dine_in: "Sur place", table: "Table" },
+    table: { online: "En ligne" }
+  };
+
+  const META_FALLBACK_EN = {
+    payment: { deferred: "Deferred", immediate: "Immediate", pay_now: "Pay now", on_account: "On account" },
+    origin: { online: "Online", dine_in: "Dine-in", walk_in: "Walk-in" },
+    source: { delivery: "Delivery", pickup: "Pickup", dine_in: "Dine-in", table: "Table" },
+    table: { online: "Online" }
+  };
+
+  function currentLangCode() {
+    return (window.EliteI18n && EliteI18n.lang) || "fr";
+  }
+
+  function translateOrderStatus(status) {
+    const raw = String(status ?? "").trim();
+    if (!raw) return raw;
+    const key = normalizeStatusKey(raw);
+    if (!key) return raw;
+    const lang = currentLangCode();
+    const fb = (lang === "fr" ? STATUS_FALLBACK_FR : STATUS_FALLBACK_EN)[key] || raw;
+    let translated = t("status." + key, fb);
+    if (translated && translated.indexOf("portals.reception.") !== 0) return translated;
+    const ordersKey = STATUS_ORDERS_KEY[key];
+    if (ordersKey) {
+      translated = t(ordersKey, fb);
+      if (translated && translated.indexOf("orders.") !== 0) return translated;
+    }
+    return fb;
+  }
+
+  function normalizeMetaKey(kind, value) {
+    const raw = String(value ?? "").trim();
+    if (!raw) return "";
+    const spaced = raw.replace(/([a-z])([A-Z])/g, "$1 $2");
+    const n = spaced.replace(/\s+/g, " ").trim().toLowerCase();
+    const aliases = {
+      payment: {
+        deferred: "deferred",
+        immediate: "immediate",
+        "pay now": "pay_now",
+        "on account": "on_account"
+      },
+      origin: {
+        online: "online",
+        "dine in": "dine_in",
+        "dine-in": "dine_in",
+        "walk in": "walk_in",
+        "walk-in": "walk_in"
+      },
+      source: {
+        delivery: "delivery",
+        pickup: "pickup",
+        "dine in": "dine_in",
+        "dine-in": "dine_in",
+        table: "table"
+      },
+      table: {
+        online: "online"
+      }
+    };
+    return (aliases[kind] && aliases[kind][n]) || metaSlug(n);
+  }
+
+  function translateMetaValue(kind, value) {
+    const raw = String(value ?? "").trim();
+    if (!raw) return raw;
+    if (raw.includes("·")) {
+      return raw.split("·").map(part => translateMetaValue(kind, part.trim())).join(" · ");
+    }
+    const slug = normalizeMetaKey(kind, raw);
+    if (!slug) return raw;
+    const lang = currentLangCode();
+    const fbMap = lang === "fr" ? META_FALLBACK_FR : META_FALLBACK_EN;
+    const fb = (fbMap[kind] && fbMap[kind][slug]) || raw;
+    const translated = t("meta." + kind + "." + slug, fb);
+    if (translated && translated.indexOf("portals.reception.") !== 0) return translated;
+    return fb;
+  }
+
+  function translateEngagementStatus(st) {
+    const s = String(st || "").trim();
+    if (!s) return "—";
+    if (/^checkedin$/i.test(s)) return t("engagementCheckedIn", "Checked in");
+    if (/^scheduled$/i.test(s)) return t("engagementScheduled", "Scheduled");
+    return translateOrderStatus(s) || s;
+  }
+
+  function translateTableAvailability(status) {
+    const s = String(status || "").trim().toLowerCase();
+    if (s === "occupied") return t("tables.occupied", "Occupied");
+    if (s === "available") return t("tables.available", "Available");
+    return status || "—";
+  }
+
+  function applyReceptionStaticI18n(root) {
+    if (window.EliteI18n) EliteI18n.applyToDocument(root || document);
+    document.title = t("pageTitle", "Elite Reception");
+  }
+
+  function refreshReceptionDynamicLabels() {
+    setHubPill(hubPillState);
+    if (token) {
+      if (currentView === "tableMenu") renderTableMenuList();
+      if (currentView === "menu") renderMenuFromCatalog();
+      if (currentView === "reservations") loadReservations();
+      if (currentView === "deliveryPickup") renderDeliveryPickupList();
+      populateResCreateTableSelect();
+      if (resDetailCache) {
+        const id = resDetailCache.id ?? resDetailCache.Id;
+        if (id != null) void openReservationDetail(Number(id));
+      }
+      if (tableDetailCache) {
+        const id = tableDetailCache.id;
+        if (id != null) void openTableDetail(Number(id));
+      }
+    }
+  }
+
+  document.addEventListener("elite-language-changed", function () {
+    applyReceptionStaticI18n();
+    refreshReceptionDynamicLabels();
+  });
+
   function $(id) { return document.getElementById(id); }
+
+  function formatRestaurantTs(iso) {
+    if (!iso) return "—";
+    if (window.EliteRestaurantDateTime) {
+      return EliteRestaurantDateTime.formatRestaurantDateTimeMedium(iso) || "—";
+    }
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString();
+  }
 
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]));
@@ -54,7 +274,9 @@
     const txt = await res.text();
     let json;
     try { json = JSON.parse(txt); } catch { json = { raw: txt }; }
-    return { ok: res.ok, status: res.status, body: json };
+    var result = { ok: res.ok, status: res.status, body: json };
+    if (window.EliteApiError) window.EliteApiError.wrap(result);
+    return result;
   }
 
   function revokeImgBlob(el) {
@@ -103,7 +325,8 @@
     }
     if (!rows.length) {
       $("menuBody").innerHTML =
-        q ? '<p class="muted">No dishes match your search.</p>' : '<p class="muted">No products.</p>';
+        q ? '<p class="muted">' + escapeHtml(t("noDishesSearch", "No dishes match your search.")) + '</p>'
+          : '<p class="muted">' + escapeHtml(t("noProducts", "No products.")) + '</p>';
       return;
     }
     const byCat = {};
@@ -141,9 +364,9 @@
           html += '<div class="price">$ ' + p.price.toFixed(2) + '</div>';
           if (p.description)
             html += '<div class="muted menu-card-desc">' + escapeHtml(p.description) + '</div>';
-          html += '<div class="ing"><strong>Ingredients</strong> · ' + escapeHtml(row.ingText || "—") + '</div>';
+          html += '<div class="ing"><strong>' + escapeHtml(t("ingredients", "Ingredients")) + '</strong> · ' + escapeHtml(row.ingText || "—") + '</div>';
           if (p.composition)
-            html += '<div class="comp"><strong>Composition</strong> · ' + escapeHtml(p.composition) + '</div>';
+            html += '<div class="comp"><strong>' + escapeHtml(t("composition", "Composition")) + '</strong> · ' + escapeHtml(p.composition) + '</div>';
           html += '</div></div>';
         }
         html += '</div>';
@@ -160,8 +383,8 @@
       api("/api/admin/data/inventory", "GET", null, true),
       api("/api/public/menu/products", "GET", null, false)
     ]);
-    if (!rp.ok) throw new Error(rp.body?.message || "Failed to load products");
-    if (!rpi.ok) throw new Error(rpi.body?.message || "Failed to load product ingredients");
+    if (!rp.ok) throw new Error(rp.body?.message || t("failedLoadProducts", "Failed to load products"));
+    if (!rpi.ok) throw new Error(rpi.body?.message || t("failedLoadIngredients", "Failed to load product ingredients"));
     const photoById = {};
     if (rpub.ok && Array.isArray(rpub.body)) {
       for (const x of rpub.body) {
@@ -235,8 +458,12 @@
     config = {
       restaurantName: b.restaurantName ?? b.RestaurantName ?? "Elite Restaurant",
       restaurantLogoUrl: b.restaurantLogoUrl ?? b.RestaurantLogoUrl ?? "",
-      employeePhotoUrl: b.employeePhotoUrl ?? b.EmployeePhotoUrl ?? ""
+      employeePhotoUrl: b.employeePhotoUrl ?? b.EmployeePhotoUrl ?? "",
+      restaurantTimeZoneId: b.restaurantTimeZoneId ?? b.RestaurantTimeZoneId ?? ""
     };
+    if (window.EliteRestaurantDateTime) {
+      EliteRestaurantDateTime.setRestaurantTimeZone(config.restaurantTimeZoneId);
+    }
     $("brandText").textContent = (config.restaurantName || "Elite Restaurant").toUpperCase();
     const logoEl = $("brandLogo");
     if (config.restaurantLogoUrl) await setAuthImage(logoEl, config.restaurantLogoUrl);
@@ -249,17 +476,20 @@
 
   async function loadTables() {
     tableMenuLoadError = "";
-    const t = await api("/api/reception/tables", "GET");
-    if (!t.ok) {
-      const detail = (t.body && (t.body.message || t.body.title || t.body.detail)) || "";
+    const tablesRes = await api("/api/reception/tables", "GET");
+    if (!tablesRes.ok) {
+      const detail = (tablesRes.body && (tablesRes.body.message || tablesRes.body.title || tablesRes.body.detail)) || "";
       tableMenuLoadError =
-        "Could not load tables (" + String(t.status) + "). " + String(detail).trim();
+        t("couldNotLoadTables", "Could not load tables ({{status}}). {{detail}}", {
+          status: String(tablesRes.status),
+          detail: String(detail).trim()
+        });
       tables = [];
-      console.warn("[Reception] reception/tables", t.status, t.body);
+      console.warn("[Reception] reception/tables", tablesRes.status, tablesRes.body);
       populateResCreateTableSelect();
       return false;
     }
-    tables = Array.isArray(t.body) ? t.body.map(normalizeTable) : [];
+    tables = Array.isArray(tablesRes.body) ? tablesRes.body.map(normalizeTable) : [];
     if (!tables.length)
       tableMenuLoadError = "";
     populateResCreateTableSelect();
@@ -374,15 +604,17 @@
   }
 
   function validateResCreateWhenLocal(localValue) {
-    if (!localValue) return "Date and time are required.";
+    if (!localValue) return t("dateTimeRequired", "Date and time are required.");
     const d = new Date(localValue);
-    if (Number.isNaN(d.getTime())) return "Invalid date and time.";
+    if (Number.isNaN(d.getTime())) return t("invalidDateTime", "Invalid date and time.");
     const now = new Date();
-    if (d <= now) return "Reservation time must be in the future.";
+    if (d <= now) return t("reservationMustBeFuture", "Reservation time must be in the future.");
     if (!resScheduling) return null;
     const max = localDateTimeAtEndOfDayMonthsAhead(resScheduling.reservationMaxMonthsAhead);
     if (d > max) {
-      return "Reservations may be booked up to " + resScheduling.reservationMaxMonthsAhead + " month(s) ahead.";
+      return t("reservationMaxMonths", "Reservations may be booked up to {{months}} month(s) ahead.", {
+        months: resScheduling.reservationMaxMonthsAhead
+      });
     }
     return null;
   }
@@ -396,19 +628,23 @@
       return;
     }
     if (resCreateSuggestions.length > 0) {
-      el.textContent =
-        resCreateSuggestions.length + " table(s) available for party of " + party + " at this time.";
+      el.textContent = t("tablesAvailableParty", "{{count}} table(s) available for party of {{party}} at this time.", {
+        count: resCreateSuggestions.length,
+        party: party
+      });
       return;
     }
     if (!fitting.length) {
-      el.textContent = "No tables seat a party of " + party + ". Lower party size or leave table unassigned.";
+      el.textContent = t("noTablesSeatParty", "No tables seat a party of {{party}}. Lower party size or leave table unassigned.", { party: party });
       return;
     }
     el.textContent =
-      fitting.length + " table(s) fit party of " + party +
-      (resCreateSuggestions.length === 0 && $("resCreateWhen")?.value
-        ? " — none free at this time; pick another slot or leave unassigned."
-        : ".");
+      resCreateSuggestions.length === 0 && $("resCreateWhen")?.value
+        ? t("tablesFitPartyNoneFree", "{{count}} table(s) fit party of {{party}} — none free at this time; pick another slot or leave unassigned.", {
+          count: fitting.length,
+          party: party
+        })
+        : t("tablesFitParty", "{{count}} table(s) fit party of {{party}}.", { count: fitting.length, party: party });
   }
 
   function populateResCreateTableSelect() {
@@ -430,15 +666,15 @@
         })
       : tablesForPartySize(party);
     const rows = source.slice().sort((a, b) => (Number(a.tableNumber) || 0) - (Number(b.tableNumber) || 0));
-    sel.innerHTML = '<option value="">No table assigned</option>' +
-      rows.map(t => {
-        const id = t.id;
-        const cap = t.capacity != null ? " · seats " + t.capacity : "";
-        const label = "Table " + (t.tableNumber ?? "") + (t.name ? " · " + t.name : "") + cap;
+    sel.innerHTML = '<option value="">' + escapeHtml(t("noTableAssigned", "No table assigned")) + '</option>' +
+      rows.map(trow => {
+        const id = trow.id;
+        const cap = trow.capacity != null ? " · " + t("seatsSuffix", "seats {{count}}", { count: trow.capacity }) : "";
+        const label = t("tableNumberPrefix", "Table {{num}}", { num: trow.tableNumber ?? "" }) + (trow.name ? " · " + trow.name : "") + cap;
         const pid = t.placementUnitId != null ? ' data-placement="' + escapeHtml(String(t.placementUnitId)) + '"' : "";
         return '<option value="' + escapeHtml(String(id)) + '"' + pid + '>' + escapeHtml(label) + "</option>";
       }).join("");
-    if (prev && rows.some(t => String(t.id) === prev)) sel.value = prev;
+    if (prev && rows.some(trow => String(trow.id) === prev)) sel.value = prev;
     else if (prev) sel.value = "";
     updateResCreateTableHint(party);
   }
@@ -456,7 +692,7 @@
     el.innerHTML = slotRows.map((s, i) => {
       const st = s.startUtc ?? s.StartUtc;
       if (!st) return "";
-      const label = new Date(st).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" });
+      const label = formatRestaurantTs(st);
       return '<button type="button" class="btn btn-ghost btn-sm" data-res-slot-idx="' + i + '">' + escapeHtml(label) + "</button>";
     }).join("");
     el.querySelectorAll("[data-res-slot-idx]").forEach(btn => {
@@ -594,9 +830,7 @@
   }
 
   function engagementStatusLabel(st) {
-    const s = String(st || "");
-    if (/^checkedin$/i.test(s)) return "Checked in";
-    return s || "—";
+    return translateEngagementStatus(st);
   }
 
   function engagementPillClass(stRaw) {
@@ -630,28 +864,28 @@
     const actS = d.actualStartUtc ?? d.ActualStartUtc;
     const actE = d.actualEndUtc ?? d.ActualEndUtc;
     const stRaw = String(d.status ?? d.Status ?? "");
-    const visit = resSectionHtml("Visit", [
-      ["Arrival", startRaw ? new Date(startRaw).toLocaleString() : "—"],
-      ["End", endRaw ? new Date(endRaw).toLocaleString() : "—"],
-      ["Party size", String(d.partySize ?? d.PartySize ?? "—")],
-      ["Table", String(d.tableLabel ?? d.TableLabel ?? "—")],
+    const visit = resSectionHtml(t("sectionVisit", "Visit"), [
+      [t("arrival", "Arrival"), startRaw ? formatRestaurantTs(startRaw) : "—"],
+      [t("end", "End"), endRaw ? formatRestaurantTs(endRaw) : "—"],
+      [t("partySizeLabel", "Party size"), String(d.partySize ?? d.PartySize ?? "—")],
+      [t("tableLabel", "Table"), String(d.tableLabel ?? d.TableLabel ?? "—")],
     ]);
     const confirmCode = engagementConfirmationCode(d);
-    const guest = resSectionHtml("Guest", [
-      ["Confirmation code", confirmCode || "—"],
-      ["Phone", String(d.guestPhone ?? d.GuestPhone ?? "—")],
-      ["Email", String(d.guestEmail ?? d.GuestEmail ?? "—")],
-      ["Notes", String(d.userNotes ?? d.UserNotes ?? "—")],
+    const guest = resSectionHtml(t("sectionGuest", "Guest"), [
+      [t("confirmationCode", "Confirmation code"), confirmCode || "—"],
+      [t("phone", "Phone"), String(d.guestPhone ?? d.GuestPhone ?? "—")],
+      [t("email", "Email"), String(d.guestEmail ?? d.GuestEmail ?? "—")],
+      [t("notes", "Notes"), String(d.userNotes ?? d.UserNotes ?? "—")],
     ]);
-    const floor = resSectionHtml("Floor & record", [
-      ["Status", engagementStatusLabel(stRaw)],
-      ["Record id", String(d.id ?? d.Id ?? "—")],
-      ["Table id", String(d.tableId ?? d.TableId ?? "—")],
-      ["Placement unit", String(d.placementUnitId ?? d.PlacementUnitId ?? "—")],
-      ["Actual arrival", actS ? new Date(actS).toLocaleString() : "—"],
-      ["Actual release", actE ? new Date(actE).toLocaleString() : "—"],
-      ["Created", (d.createdAtUtc ?? d.CreatedAtUtc) ? new Date(d.createdAtUtc ?? d.CreatedAtUtc).toLocaleString() : "—"],
-      ["Updated", (d.updatedAtUtc ?? d.UpdatedAtUtc) ? new Date(d.updatedAtUtc ?? d.UpdatedAtUtc).toLocaleString() : "—"],
+    const floor = resSectionHtml(t("sectionFloorRecord", "Floor & record"), [
+      [t("orders.status", "Status"), engagementStatusLabel(stRaw)],
+      [t("recordId", "Record id"), String(d.id ?? d.Id ?? "—")],
+      [t("tableId", "Table id"), String(d.tableId ?? d.TableId ?? "—")],
+      [t("placementUnit", "Placement unit"), String(d.placementUnitId ?? d.PlacementUnitId ?? "—")],
+      [t("actualArrival", "Actual arrival"), actS ? formatRestaurantTs(actS) : "—"],
+      [t("actualRelease", "Actual release"), actE ? formatRestaurantTs(actE) : "—"],
+      [t("created", "Created"), (d.createdAtUtc ?? d.CreatedAtUtc) ? formatRestaurantTs(d.createdAtUtc ?? d.CreatedAtUtc) : "—"],
+      [t("updated", "Updated"), (d.updatedAtUtc ?? d.UpdatedAtUtc) ? formatRestaurantTs(d.updatedAtUtc ?? d.UpdatedAtUtc) : "—"],
     ]);
     return visit + guest + floor;
   }
@@ -674,11 +908,11 @@
 
   async function openReservationDetail(id) {
     const r = await api("/api/cashier/reservations/engagements/" + id, "GET");
-    if (!r.ok) { alert(r.body?.message || "Could not load reservation"); return; }
+    if (!r.ok) { alert(r.body?.message || t("couldNotLoadReservation", "Could not load reservation")); return; }
     const d = r.body;
     resDetailCache = d;
     const stRaw = String(d.status ?? d.Status ?? "");
-    $("resDetailTitle").textContent = d.guestName || d.GuestName || "Guest";
+    $("resDetailTitle").textContent = d.guestName || d.GuestName || t("guestFallback", "Guest");
     $("resDetailMeta").innerHTML =
       engagementRefMetaHtml(d) +
       "<span class='res-pill " + engagementPillClass(stRaw) + "'>" + escapeHtml(engagementStatusLabel(stRaw)) + "</span>";
@@ -688,19 +922,19 @@
     actions.innerHTML = "";
     if (st === "scheduled") {
       actions.innerHTML =
-        "<button type='button' class='btn btn-primary btn-sm' data-res-arrived='" + id + "'>Arrived</button>" +
-        "<button type='button' class='btn btn-ghost btn-sm' data-res-sched='" + id + "'>Reschedule</button>" +
-        "<button type='button' class='btn btn-ghost btn-sm' data-res-noshow='" + id + "'>No show</button>" +
-        "<button type='button' class='btn btn-danger btn-sm' data-res-cancel='" + id + "'>Cancelled</button>";
+        "<button type='button' class='btn btn-primary btn-sm' data-res-arrived='" + id + "'>" + escapeHtml(t("arrived", "Arrived")) + "</button>" +
+        "<button type='button' class='btn btn-ghost btn-sm' data-res-sched='" + id + "'>" + escapeHtml(t("reschedule", "Reschedule")) + "</button>" +
+        "<button type='button' class='btn btn-ghost btn-sm' data-res-noshow='" + id + "'>" + escapeHtml(t("noShow", "No show")) + "</button>" +
+        "<button type='button' class='btn btn-danger btn-sm' data-res-cancel='" + id + "'>" + escapeHtml(t("cancelled", "Cancelled")) + "</button>";
       actions.querySelector("[data-res-arrived]").onclick = () => resAction(id, "arrived");
       actions.querySelector("[data-res-sched]").onclick = () => openReschedulePanel(id);
       actions.querySelector("[data-res-noshow]").onclick = () => resAction(id, "no-show");
       actions.querySelector("[data-res-cancel]").onclick = () => resAction(id, "cancel");
     } else if (st === "checkedin") {
       actions.innerHTML =
-        "<p class='muted' style='margin:0;line-height:1.5;'>Checked in — use <strong>Reservation floor</strong> for seating timeline and release.</p>";
+        "<p class='muted' style='margin:0;line-height:1.5;'>" + escapeHtml(t("checkedInHint", "Checked in — use Reservation floor for seating timeline and release.")) + "</p>";
     } else {
-      actions.innerHTML = "<p class='muted' style='margin:0;'>No actions for this status.</p>";
+      actions.innerHTML = "<p class='muted' style='margin:0;'>" + escapeHtml(t("noActionsForStatus", "No actions for this status.")) + "</p>";
     }
     $("reschedulePanel").classList.add("hidden");
     $("resDetailModal").classList.remove("hidden");
@@ -710,13 +944,13 @@
     const path = kind === "arrived" ? "arrived" : kind === "cancel" ? "cancel" : "no-show";
     const msg =
       kind === "cancel"
-        ? "Cancel this reservation?"
+        ? t("confirmCancelReservation", "Cancel this reservation?")
         : kind === "no-show"
-          ? "Mark as no-show?"
-          : "Mark guest as arrived (check-in)?";
+          ? t("confirmNoShow", "Mark as no-show?")
+          : t("confirmArrived", "Mark guest as arrived (check-in)?");
     if (!confirm(msg)) return;
     const r = await api("/api/cashier/reservations/engagements/" + id + "/" + path, "POST", {});
-    if (!r.ok) { alert(r.body?.message || "Request failed"); return; }
+    if (!r.ok) { alert(r.body?.message || t("requestFailed", "Request failed")); return; }
     closeResDetail();
     await loadReservations();
   }
@@ -732,13 +966,13 @@
   async function loadReservations() {
     const el = $("reservationsList");
     const r = await api("/api/cashier/reservations/engagements", "GET");
-    if (!r.ok) { el.innerHTML = "<div class='danger' style='padding:12px;'>Could not load reservations.</div>"; return; }
+    if (!r.ok) { el.innerHTML = "<div class='danger' style='padding:12px;'>" + escapeHtml(t("couldNotLoadReservations", "Could not load reservations.")) + "</div>"; return; }
     const rows = Array.isArray(r.body) ? r.body : [];
     if (!rows.length) {
       el.innerHTML =
         "<div class='res-empty'>" +
-        "<p class='res-empty-title'>No upcoming reservations</p>" +
-        "<p class='res-empty-hint'>Scheduled and checked-in visits appear here. New guest bookings from the menu show up automatically.</p>" +
+        "<p class='res-empty-title'>" + escapeHtml(t("noUpcomingReservations", "No upcoming reservations")) + "</p>" +
+        "<p class='res-empty-hint'>" + escapeHtml(t("noUpcomingHint", "Scheduled and checked-in visits appear here. New guest bookings from the menu show up automatically.")) + "</p>" +
         "</div>";
       return;
     }
@@ -748,12 +982,12 @@
       const st = engagementStatusLabel(stRaw);
       const pill = engagementPillClass(stRaw);
       const rail = resEngagementRailClass(stRaw);
-      const name = x.guestName ?? x.GuestName ?? "Guest";
+      const name = x.guestName ?? x.GuestName ?? t("guestFallback", "Guest");
       const phone = x.guestPhone ?? x.GuestPhone ?? "";
       const tbl = x.tableLabel ?? x.TableLabel ?? "-";
       const ps = x.partySize ?? x.PartySize ?? "";
       const start = x.plannedStartUtc ?? x.PlannedStartUtc;
-      const when = start ? new Date(start).toLocaleString() : "";
+      const when = start ? formatRestaurantTs(start) : "";
       const sid = String(id);
       const ref = engagementGuestRef(x);
       const refLine = ref.primary === "—"
@@ -771,9 +1005,9 @@
         refLine +
         (when ? "<div class='res-eng-card__when'>" + escapeHtml(when) + "</div>" : "") +
         "<div class='res-eng-card__chips'>" +
-        "<span class='res-chip'><strong>Table</strong> " + escapeHtml(tbl) + "</span>" +
-        "<span class='res-chip'><strong>Party</strong> " + escapeHtml(String(ps)) + "</span>" +
-        (phone ? "<span class='res-chip'><strong>Tel</strong> " + escapeHtml(phone) + "</span>" : "") +
+        "<span class='res-chip'><strong>" + escapeHtml(t("tableLabel", "Table")) + "</strong> " + escapeHtml(tbl) + "</span>" +
+        "<span class='res-chip'><strong>" + escapeHtml(t("partyChip", "Party")) + "</strong> " + escapeHtml(String(ps)) + "</span>" +
+        (phone ? "<span class='res-chip'><strong>" + escapeHtml(t("telChip", "Tel")) + "</strong> " + escapeHtml(phone) + "</span>" : "") +
         "</div></div></button></div>");
     }).join("");
     el.querySelectorAll("[data-res-open]").forEach(b => {
@@ -787,9 +1021,9 @@
 
   function tableAvailFromStatus(status) {
     const s = String(status || "").trim().toLowerCase();
-    if (s === "occupied") return { label: "Occupied", cls: "tbl-avail-pill--occupied", rail: "" };
-    if (s === "available") return { label: "Available", cls: "tbl-avail-pill--available", rail: " tbl-card__rail--available" };
-    return { label: status || "—", cls: "tbl-avail-pill--other", rail: "" };
+    if (s === "occupied") return { label: translateTableAvailability("occupied"), cls: "tbl-avail-pill--occupied", rail: "" };
+    if (s === "available") return { label: translateTableAvailability("available"), cls: "tbl-avail-pill--available", rail: " tbl-card__rail--available" };
+    return { label: translateTableAvailability(status), cls: "tbl-avail-pill--other", rail: "" };
   }
 
   function formatUsd(n) {
@@ -797,38 +1031,38 @@
     return Number.isFinite(v) ? "$ " + v.toFixed(2) : "—";
   }
 
-  function buildTableDetailBody(t, checks, checksErr) {
-    const avail = tableAvailFromStatus(t.status);
-    const info = resSectionHtml("Table", [
-      ["Table number", String(t.tableNumber ?? "—")],
-      ["Name", t.name || "—"],
-      ["Capacity", t.capacity != null ? String(t.capacity) : "—"],
-      ["Floor status", t.status || "—"],
-      ["Availability", avail.label],
-      ["Table id", String(t.id ?? "—")],
-      ["Unique id", t.uniqueId || "—"],
+  function buildTableDetailBody(tbl, checks, checksErr) {
+    const avail = tableAvailFromStatus(tbl.status);
+    const info = resSectionHtml(t("sectionTable", "Table"), [
+      [t("tableNumber", "Table number"), String(tbl.tableNumber ?? "—")],
+      [t("name", "Name"), tbl.name || "—"],
+      [t("capacity", "Capacity"), tbl.capacity != null ? String(tbl.capacity) : "—"],
+      [t("floorStatus", "Floor status"), tbl.status || "—"],
+      [t("availability", "Availability"), avail.label],
+      [t("tableId", "Table id"), String(tbl.id ?? "—")],
+      [t("uniqueId", "Unique id"), tbl.uniqueId || "—"],
     ]);
-    const server = resSectionHtml("Service", [
-      ["Assigned server", t.assignedServerName || "—"],
-      ["Server id", t.assignedServerId != null ? String(t.assignedServerId) : "—"],
+    const server = resSectionHtml(t("sectionService", "Service"), [
+      [t("assignedServer", "Assigned server"), tbl.assignedServerName || "—"],
+      [t("serverId", "Server id"), tbl.assignedServerId != null ? String(tbl.assignedServerId) : "—"],
     ]);
     let checksHtml = "";
     if (checksErr) {
       checksHtml = "<p class='tbl-open-checks-loading'>" + escapeHtml(checksErr) + "</p>";
     } else if (!checks || !checks.length) {
-      checksHtml = "<p class='tbl-open-checks-loading'>No open checks on this table.</p>";
+      checksHtml = "<p class='tbl-open-checks-loading'>" + escapeHtml(t("noOpenChecks", "No open checks on this table.")) + "</p>";
     } else {
       checksHtml = checks.map(ch => {
         const code = ch.orderCode ?? ch.OrderCode ?? "";
-        const st = ch.status ?? ch.Status ?? "";
-        const kind = ch.checkKind ?? ch.CheckKind ?? "";
+        const st = translateOrderStatus(ch.status ?? ch.Status ?? "");
+        const kind = translateMetaValue("source", ch.checkKind ?? ch.CheckKind ?? "");
         const grand = ch.grandTotalUsd ?? ch.GrandTotalUsd ?? 0;
         const lines = (ch.lines ?? ch.Lines ?? []).map(ln => {
           const nm = ln.name ?? ln.Name ?? "Item";
           const qty = ln.quantity ?? ln.Quantity ?? 0;
           return nm + " ×" + qty;
         });
-        const lineText = lines.length ? lines.join(", ") : "No lines";
+        const lineText = lines.length ? lines.join(", ") : t("noLines", "No lines");
         return (
           "<div class='tbl-open-check'>" +
           "<div class='tbl-open-check__top'><span>" + escapeHtml(String(code)) + "</span>" +
@@ -839,11 +1073,11 @@
       }).join("");
     }
     const checksSection =
-      "<div class='res-detail-section'><p class='res-detail-section-title'>Open checks</p>" + checksHtml + "</div>";
-    const url = guestMenuUrlForTableId(t.id);
+      "<div class='res-detail-section'><p class='res-detail-section-title'>" + escapeHtml(t("sectionOpenChecks", "Open checks")) + "</p>" + checksHtml + "</div>";
+    const url = guestMenuUrlForTableId(tbl.id);
     const guest =
-      "<div class='res-detail-section'><p class='res-detail-section-title'>Guest menu</p>" +
-      "<div class='res-kv'><span class='res-kv-lbl'>Link</span>" +
+      "<div class='res-detail-section'><p class='res-detail-section-title'>" + escapeHtml(t("sectionGuestMenu", "Guest menu")) + "</p>" +
+      "<div class='res-kv'><span class='res-kv-lbl'>" + escapeHtml(t("link", "Link")) + "</span>" +
       "<span class='res-kv-val'><a class='tbl-guest-link' href='" + escapeHtml(url) + "' target='_blank' rel='noopener noreferrer'>" +
       escapeHtml(url) + "</a></span></div></div>";
     return info + server + checksSection + guest;
@@ -855,22 +1089,22 @@
   }
 
   async function openTableDetail(id) {
-    const t = tables.find(x => Number(x.id) === Number(id));
-    if (!t) return;
-    tableDetailCache = t;
-    const avail = tableAvailFromStatus(t.status);
-    const num = t.tableNumber ?? "";
-    const name = t.name ? " · " + t.name : "";
-    $("tableDetailTitle").textContent = "Table " + num + name;
+    const tbl = tables.find(x => Number(x.id) === Number(id));
+    if (!tbl) return;
+    tableDetailCache = tbl;
+    const avail = tableAvailFromStatus(tbl.status);
+    const num = tbl.tableNumber ?? "";
+    const name = tbl.name ? " · " + tbl.name : "";
+    $("tableDetailTitle").textContent = t("tableNumberPrefix", "Table {{num}}", { num: num }) + name;
     $("tableDetailMeta").innerHTML =
-      "<span class='tbl-ref'>#" + escapeHtml(String(t.id)) + "</span>" +
+      "<span class='tbl-ref'>#" + escapeHtml(String(tbl.id)) + "</span>" +
       "<span class='tbl-avail-pill " + avail.cls + "'>" + escapeHtml(avail.label) + "</span>";
-    $("tableDetailBody").innerHTML = buildTableDetailBody(t, null, "Loading open checks…");
+    $("tableDetailBody").innerHTML = buildTableDetailBody(tbl, null, t("loadingOpenChecks", "Loading open checks…"));
     const actions = $("tableDetailActions");
-    const sid = String(t.id);
+    const sid = String(tbl.id);
     actions.innerHTML =
-      "<button type='button' class='btn btn-primary btn-sm' data-tbl-open-guest='" + sid + "'>Open guest menu</button>" +
-      "<button type='button' class='btn btn-ghost btn-sm' data-tbl-copy-link='" + sid + "'>Copy guest link</button>";
+      "<button type='button' class='btn btn-primary btn-sm' data-tbl-open-guest='" + sid + "'>" + escapeHtml(t("openGuestMenu", "Open guest menu")) + "</button>" +
+      "<button type='button' class='btn btn-ghost btn-sm' data-tbl-copy-link='" + sid + "'>" + escapeHtml(t("copyGuestLink", "Copy guest link")) + "</button>";
     actions.querySelector("[data-tbl-open-guest]").onclick = () => {
       window.open(guestMenuUrlForTableId(sid), "_blank", "noopener,noreferrer");
     };
@@ -880,10 +1114,10 @@
       try {
         await navigator.clipboard.writeText(url);
         const prev = btn.textContent;
-        btn.textContent = "Copied!";
+        btn.textContent = t("copied", "Copied!");
         setTimeout(() => { btn.textContent = prev; }, 2000);
       } catch {
-        window.prompt("Copy this URL:", url);
+        window.prompt(t("copyUrlPrompt", "Copy this URL:"), url);
       }
     };
     $("tableDetailModal").classList.remove("hidden");
@@ -892,13 +1126,13 @@
     let checksErr = "";
     const r = await api("/api/server/tables/" + encodeURIComponent(String(id)) + "/open-checks", "GET");
     if (!r.ok) {
-      checksErr = (r.body && (r.body.message || r.body.title)) || "Could not load open checks.";
+      checksErr = (r.body && (r.body.message || r.body.title)) || t("couldNotLoadOpenChecks", "Could not load open checks.");
     } else {
       const body = r.body || {};
       checks = Array.isArray(body.checks) ? body.checks : (Array.isArray(body.Checks) ? body.Checks : []);
     }
     if (tableDetailCache && Number(tableDetailCache.id) === Number(id))
-      $("tableDetailBody").innerHTML = buildTableDetailBody(t, checks, checksErr);
+      $("tableDetailBody").innerHTML = buildTableDetailBody(tbl, checks, checksErr);
   }
 
   function renderTableMenuList() {
@@ -907,31 +1141,32 @@
     if (tableMenuLoadError) {
       el.innerHTML =
         "<div class='danger' style='padding:12px;'>" + escapeHtml(tableMenuLoadError) +
-        " <span class='muted'>Try Refresh tables.</span></div>";
+        " <span class='muted'>" + escapeHtml(t("tryRefreshTables", "Try Refresh tables.")) + "</span></div>";
       return;
     }
     const rows = tables.slice().sort((a, b) => (Number(a.tableNumber) || 0) - (Number(b.tableNumber) || 0));
     if (!rows.length) {
       el.innerHTML =
-        "<div class='muted' style='padding:16px;'>No tables loaded. Use <strong>Refresh tables</strong> after tables are added in the back office.</div>";
+        "<div class='muted' style='padding:16px;'>" + escapeHtml(t("noTablesLoaded", "No tables loaded. Use Refresh tables after tables are added in the back office.")) + "</div>";
       return;
     }
-    el.innerHTML = rows.map(t => {
-      const id = t.id;
-      const num = escapeHtml(String(t.tableNumber ?? ""));
-      const name = escapeHtml(t.name || "Unnamed");
-      const avail = tableAvailFromStatus(t.status);
-      const srv = t.assignedServerName ? escapeHtml(t.assignedServerName) : "—";
+    el.innerHTML = rows.map(tblRow => {
+      const id = tblRow.id;
+      const num = escapeHtml(String(tblRow.tableNumber ?? ""));
+      const name = escapeHtml(tblRow.name || t("unnamed", "Unnamed"));
+      const avail = tableAvailFromStatus(tblRow.status);
+      const srv = tblRow.assignedServerName ? escapeHtml(tblRow.assignedServerName) : "—";
       const sid = String(id);
+      const ariaLabel = escapeHtml(t("tableDetailsAria", "Table {{num}} details", { num: tblRow.tableNumber ?? "" }));
       return (
         "<div class='tbl-card'>" +
-        "<button type='button' class='tbl-card__hit' data-tbl-open='" + sid + "' aria-label='Table " + num + " details'>" +
+        "<button type='button' class='tbl-card__hit' data-tbl-open='" + sid + "' aria-label='" + ariaLabel + "'>" +
         "<div class='tbl-card__rail" + avail.rail + "' aria-hidden='true'></div>" +
         "<div class='tbl-card__body'>" +
         "<div class='tbl-card__main'>" +
-        "<div class='tbl-card__num'>Table " + num + "</div>" +
+        "<div class='tbl-card__num'>" + escapeHtml(t("tableNumberPrefix", "Table {{num}}", { num: num })) + "</div>" +
         "<div class='tbl-card__name'>" + name + "</div>" +
-        "<div class='tbl-card__server'><strong>Server</strong> " + srv + "</div>" +
+        "<div class='tbl-card__server'><strong>" + escapeHtml(t("serverLabel", "Server")) + "</strong> " + srv + "</div>" +
         "</div>" +
         "<span class='tbl-avail-pill " + avail.cls + "'>" + escapeHtml(avail.label) + "</span>" +
         "</div></button></div>");
@@ -944,15 +1179,18 @@
   async function refreshTableMenuView() {
     const el = $("tableMenuList");
     if (!token) {
-      tableMenuLoadError = "Sign in to load tables.";
+      tableMenuLoadError = t("signInToLoadTables", "Sign in to load tables.");
       renderTableMenuList();
       return;
     }
-    if (el) el.innerHTML = "<div class='muted' style='padding:16px;'>Loading tables…</div>";
+    if (el) el.innerHTML = "<div class='muted' style='padding:16px;'>" + escapeHtml(t("loadingTables", "Loading tables…")) + "</div>";
     try {
       await loadTables();
     } catch (e) {
-      tableMenuLoadError = "Could not load tables. " + (e && e.message ? e.message : String(e));
+      tableMenuLoadError = t("couldNotLoadTables", "Could not load tables ({{status}}). {{detail}}", {
+        status: "",
+        detail: (e && e.message ? e.message : String(e))
+      });
       tables = [];
       console.warn("[Reception] refresh tables", e);
     }
@@ -996,12 +1234,12 @@
     }
     const names = ready.slice(0, 4).map(r => {
       const code = r.orderCode ?? r.OrderCode ?? "";
-      const guest = r.guestName ?? r.GuestName ?? "Guest";
+      const guest = r.guestName ?? r.GuestName ?? t("guestFallback", "Guest");
       return (code ? "#" + String(code).replace(/^#/, "") + " " : "") + guest;
     });
     el.textContent = ready.length === 1
-      ? "Ready for handoff: " + names[0]
-      : ready.length + " orders ready for handoff — " + names.join(" · ");
+      ? t("readyForHandoffOne", "Ready for handoff: {{name}}", { name: names[0] })
+      : t("readyForHandoffMany", "{{count}} orders ready for handoff — {{names}}", { count: ready.length, names: names.join(" · ") });
     el.classList.remove("hidden");
   }
 
@@ -1010,7 +1248,7 @@
     if (!el) return;
     if (!deliveryPickupRows.length) {
       el.innerHTML =
-        "<div class='muted' style='padding:16px;'>No active online delivery or pickup orders.</div>";
+        "<div class='muted' style='padding:16px;'>" + escapeHtml(t("noActiveDeliveryPickup", "No active online delivery or pickup orders.")) + "</div>";
       renderDeliveryReadyBanner();
       updateDeliveryNavBadge();
       return;
@@ -1018,10 +1256,10 @@
     el.innerHTML = deliveryPickupRows.map(r => {
       const isReady = !!(r.isReadyForHandoff || r.IsReadyForHandoff);
       const code = escapeHtml(String(r.orderCode ?? r.OrderCode ?? ""));
-      const guest = escapeHtml(String(r.guestName ?? r.GuestName ?? "Guest"));
+      const guest = escapeHtml(String(r.guestName ?? r.GuestName ?? t("guestFallback", "Guest")));
       const phone = escapeHtml(String(r.guestPhone ?? r.GuestPhone ?? ""));
-      const ft = escapeHtml(String(r.fulfillmentType ?? r.FulfillmentType ?? ""));
-      const st = escapeHtml(String(r.status ?? r.Status ?? ""));
+      const ft = escapeHtml(translateMetaValue("source", r.fulfillmentType ?? r.FulfillmentType ?? ""));
+      const st = escapeHtml(translateOrderStatus(r.status ?? r.Status ?? ""));
       const when = escapeHtml(String(r.createdAtDisplay ?? r.CreatedAtDisplay ?? ""));
       const items = escapeHtml(String(r.itemsSummary ?? r.ItemsSummary ?? ""));
       const pill = deliveryStatusPillClass(st);
@@ -1043,8 +1281,11 @@
     if (!r.ok) {
       const detail = (r.body && (r.body.message || r.body.title || r.body.detail)) || "";
       $("deliveryPickupList").innerHTML =
-        "<div class='danger' style='padding:12px;'>Could not load delivery / pickup orders (" +
-        escapeHtml(String(r.status)) + "). " + escapeHtml(String(detail)) + "</div>";
+        "<div class='danger' style='padding:12px;'>" +
+        escapeHtml(t("couldNotLoadDeliveryPickup", "Could not load delivery / pickup orders ({{status}}). {{detail}}", {
+          status: String(r.status),
+          detail: String(detail)
+        })) + "</div>";
       console.warn("[Reception] delivery-pickup-orders", r.status, r.body);
       return;
     }
@@ -1064,12 +1305,13 @@
   }
 
   function setHubPill(state) {
+    hubPillState = state;
     const el = $("hubPill");
     if (!el) return;
     el.classList.remove("ok", "warn", "off");
-    if (state === "live") { el.textContent = "Live: connected"; el.classList.add("ok"); }
-    else if (state === "degraded") { el.textContent = "Live: reconnecting"; el.classList.add("warn"); }
-    else { el.textContent = "Live: polling"; el.classList.add("off"); }
+    if (state === "live") { el.textContent = t("hubLive", "Live: connected"); el.classList.add("ok"); }
+    else if (state === "degraded") { el.textContent = t("hubReconnecting", "Live: reconnecting"); el.classList.add("warn"); }
+    else { el.textContent = t("hubPolling", "Live: polling"); el.classList.add("off"); }
   }
 
   async function startOrderHub() {
@@ -1082,26 +1324,29 @@
       .withUrl(location.origin + "/hubs/order", { accessTokenFactory: () => token || "" })
       .withAutomaticReconnect()
       .build();
-    conn.on("ReceptionDeliveryPickupChanged", payload => {
-      const p = payload && typeof payload === "object" ? payload : {};
-      const code = (p.orderCode ?? p.OrderCode ?? "").toString();
-      const reason = (p.reason ?? "").toString();
-      const isReady = !!(p.isReady ?? p.IsReady);
-      if (isReady || reason === "order-ready") {
-        scheduleDeliveryReadyFlash(
-          (code ? "#" + code.replace(/^#/, "") + " " : "") + "ready for front-desk handoff");
-      } else if (reason === "online-order-submitted") {
-        scheduleDeliveryReadyFlash(
-          (code ? "#" + code.replace(/^#/, "") + " " : "") + "new online order");
-      }
+    conn.on("ReceptionDeliveryPickupChanged", () => {
       void loadDeliveryPickupOrders();
     });
+    if (window.EliteOrderStageAlert) {
+      EliteOrderStageAlert.wireHubConnection(conn, {
+        audience: "Reception",
+        onFlash: scheduleDeliveryReadyFlash,
+        onNotify: () => { void loadDeliveryPickupOrders(); }
+      });
+    }
     conn.onreconnecting(() => setHubPill("degraded"));
     conn.onreconnected(() => {
       setHubPill("live");
       conn.invoke("JoinReception").catch(() => {});
     });
     conn.onclose(() => setHubPill("off"));
+    if (window.EliteSignalRBanner) {
+      EliteSignalRBanner.wire(conn, function () {
+        setHubPill("live");
+        conn.invoke("JoinReception").catch(function () {});
+        void loadDeliveryPickupOrders();
+      });
+    }
     try {
       await conn.start();
       await conn.invoke("JoinReception");
@@ -1146,7 +1391,7 @@
     msgEl.textContent = "";
     msgEl.classList.remove("ok");
     if (!name || !phone || !whenLocal) {
-      msgEl.textContent = "Name, phone, and date/time are required.";
+      msgEl.textContent = t("namePhoneDateRequired", "Name, phone, and date/time are required.");
       return;
     }
     const whenErr = validateResCreateWhenLocal(whenLocal);
@@ -1156,7 +1401,7 @@
     }
     const startIso = new Date(whenLocal).toISOString();
     if (!startIso) {
-      msgEl.textContent = "Invalid date and time.";
+      msgEl.textContent = t("invalidDateTime", "Invalid date and time.");
       return;
     }
     const durationMin = resScheduling?.defaultDurationMinutes ?? 105;
@@ -1171,10 +1416,10 @@
       if (pidAttr) placementUnitId = Number(pidAttr);
       else if (sug?.placementUnitId != null) placementUnitId = Number(sug.placementUnitId);
       else tableId = tid;
-      const t = tables.find(x => Number(x.id) === tid);
-      const cap = t ? Number(t.capacity) : NaN;
+      const tblMatch = tables.find(x => Number(x.id) === tid);
+      const cap = tblMatch ? Number(tblMatch.capacity) : NaN;
       if (Number.isFinite(cap) && cap < party) {
-        msgEl.textContent = "Party of " + party + " does not fit the selected table (seats " + cap + ").";
+        msgEl.textContent = t("partyDoesNotFitTable", "Party of {{party}} does not fit the selected table (seats {{seats}}).", { party: party, seats: cap });
         return;
       }
     }
@@ -1193,7 +1438,7 @@
     try {
       const r = await api("/api/cashier/reservations/engagements", "POST", body);
       if (!r.ok) {
-        msgEl.textContent = apiErrorMessage(r.body, "Could not create reservation (" + r.status + ").");
+        msgEl.textContent = apiErrorMessage(r.body, t("couldNotCreateReservation", "Could not create reservation ({{status}}).", { status: r.status }));
         if (placementUnitId && apiErrorMessage(r.body, "").toLowerCase().includes("conflict"))
           void loadResCreateAvailabilitySlots();
         return;
@@ -1205,9 +1450,11 @@
       if (newId != null && Number(newId) > 0)
         await openReservationDetail(Number(newId));
       else if (newCode)
-        alert("Reservation created. Guest confirmation code: " + newCode);
+        alert(t("reservationCreatedCode", "Reservation created. Guest confirmation code: {{code}}", { code: newCode }));
     } catch (e) {
-      msgEl.textContent = "Could not create reservation. " + (e && e.message ? e.message : String(e));
+      msgEl.textContent = t("couldNotCreateReservation", "Could not create reservation ({{status}}).", {
+        status: (e && e.message ? e.message : String(e))
+      });
     } finally {
       btn.disabled = false;
     }
@@ -1237,18 +1484,22 @@
     const staffId = ($("staffId").value || "").trim();
     const pin = $("pin").value || "";
     if (!staffId || !pin) {
-      $("loginErr").textContent = "Enter sign-in ID and PIN.";
+      $("loginErr").textContent = t("loginEnterIdPin", "Enter sign-in ID and PIN.");
       $("loginErr").classList.remove("hidden");
       return;
     }
     const res = await api("/api/auth/login", "POST", { staffId, pin, portal: "Reception" }, false);
     if (!res.ok || !res.body?.accessToken) {
-      $("loginErr").textContent = "Login failed (" + res.status + "). " + (res.body?.message || res.body?.title || "Check Front desk, cashier, admin, or manager role.");
+      $("loginErr").textContent = t("loginFailed", "Login failed ({{status}}). {{detail}}", {
+        status: res.status,
+        detail: res.body?.message || res.body?.title || t("loginFailedDetail", "Check Front desk, cashier, admin, or manager role.")
+      });
       $("loginErr").classList.remove("hidden");
       return;
     }
     token = res.body.accessToken;
     me = res.body;
+    if (window.EliteOrderStageAlert) window.EliteOrderStageAlert.unlockAudio();
     if (window.ElitePortalSession) window.ElitePortalSession.save(PORTAL_ID, token, me);
     $("sessionLabel").textContent = (me.name || "") + " (" + (me.signInId || me.employeeUniqueId || "") + ")";
     $("loginWrap").classList.add("hidden");
@@ -1287,7 +1538,7 @@
     me = saved.me;
     $("sessionLabel").textContent = me
       ? (me.name || "") + " (" + (me.signInId || me.employeeUniqueId || "") + ")"
-      : "Reception session";
+      : t("receptionSession", "Reception session");
     $("loginWrap").classList.add("hidden");
     $("app").classList.remove("hidden");
     const ok = await loadPortalData();
@@ -1334,18 +1585,26 @@
   $("resSchedApply").onclick = async () => {
     const id = Number($("reschedulePanel").dataset.engagementId);
     const local = $("resSchedLocal").value;
-    if (!local || !id) { alert("Pick a new time."); return; }
+    if (!local || !id) { alert(t("pickNewTime", "Pick a new time.")); return; }
     const startIso = new Date(local).toISOString();
     const r = await api("/api/cashier/reservations/engagements/" + id + "/reschedule", "POST", { plannedStartUtc: startIso });
-    if (!r.ok) { alert(r.body?.message || "Reschedule failed"); return; }
+    if (!r.ok) { alert(r.body?.message || t("rescheduleFailed", "Reschedule failed")); return; }
     closeResDetail();
     await loadReservations();
   };
 
   if (window.location.protocol === "file:") {
-    $("loginErr").textContent = "Open this page from the API site (e.g. http://localhost:8080/reception/) so login works.";
+    $("loginErr").textContent = t("fileProtocolHint", "Open this page from the API site (e.g. http://localhost:8080/reception/) so login works.");
     $("loginErr").classList.remove("hidden");
   } else {
     void tryRestoreReceptionSession();
   }
+
+  void (async function initReceptionI18n() {
+    if (!window.EliteI18n) return;
+    await EliteI18n.init();
+    applyReceptionStaticI18n();
+    EliteI18n.mountSwitcher("#receptionLangLogin");
+    EliteI18n.mountSwitcher("#receptionLangSidebar");
+  })();
 })();

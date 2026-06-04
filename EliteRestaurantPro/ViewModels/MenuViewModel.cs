@@ -10,6 +10,7 @@ using EliteRestaurant.Core.Menu;
 using EliteRestaurant.Core.Sync;
 using EliteRestaurant.Core.Utils;
 using EliteRestaurantPro.ApiClients;
+using EliteRestaurantPro.Localization;
 using EliteRestaurantPro.Services;
 using EliteRestaurantPro.Utils;
 using Microsoft.Win32;
@@ -61,6 +62,9 @@ public class MenuViewModel : AdminBaseViewModel
     private string _productComposition = string.Empty;
     private string _selectedViewCategory = "All";
     private string _selectedViewSubCategory = "All";
+    private LocalizedSelectOption? _selectedViewCategoryOption;
+    private LocalizedSelectOption? _selectedViewSubCategoryOption;
+    private Product? _detailsProduct;
     private string _searchText = string.Empty;
     private bool _isDetailsDialogMode;
     private string _detailsProductName = string.Empty;
@@ -78,6 +82,45 @@ public class MenuViewModel : AdminBaseViewModel
 
     public override string ActivePage => "Menu";
 
+    public string PageTitle => Loc.Admin("menuTitle", "Menu Products");
+    public string PageSubtitle => Loc.Admin("menuSubtitle", "Curate the premium product catalog for service and POS.");
+    public string AddProductLabel => Loc.Admin("menuAddProduct", "Add Product");
+    public string MenuTypeLabel => Loc.Admin("menuMenuTypeLabel", "MENU TYPE");
+    public string SubmenuTypeLabel => Loc.Admin("menuSubmenuTypeLabel", "SUBMENU TYPE");
+    public string SearchTooltip => Loc.Admin("menuSearchTooltip", "Search menu items by name, category, ID, or price");
+    public string DetailsLabel => Loc.Admin("menuDetails", "Details");
+    public string EditLabel => Loc.Admin("menuEdit", "Edit");
+    public string DeleteLabel => Loc.Admin("menuDelete", "Delete");
+    public string MenuFieldProductNameLabel => Loc.Admin("menuFieldProductName", "PRODUCT NAME");
+    public string MenuFieldSectionLabel => Loc.Admin("menuFieldSection", "SECTION");
+    public string MenuFieldTypeLabel => Loc.Admin("menuFieldType", "TYPE");
+    public string MenuFieldPriceLabel => Loc.Admin("menuFieldPrice", "PRICE");
+    public string MenuFieldCookingTimeLabel => Loc.Admin("menuFieldCookingTime", "COOKING TIME (MINUTES)");
+    public string MenuFieldCookingTimeHelp => Loc.Admin("menuFieldCookingTimeHelp",
+        "Used for kitchen estimates on guest menu, POS, and server tablets. Required for each menu item.");
+    public string MenuFieldDescriptionLabel => Loc.Admin("menuFieldDescription", "DESCRIPTION (CUSTOMER MENU)");
+    public string MenuFieldCompositionLabel => Loc.Admin("menuFieldComposition", "COMPOSITION (CUSTOMER, COMMA-SEPARATED)");
+    public string MenuDetailsDescriptionLabel => Loc.Admin("menuDetailsDescriptionLabel", "DESCRIPTION");
+    public string MenuDetailsCompositionLabel => Loc.Admin("menuDetailsCompositionLabel", "COMPOSITION");
+    public string MenuFieldProductImageLabel => Loc.Admin("menuFieldProductImage", "PRODUCT IMAGE");
+    public string BrowseLabel => Loc.Admin("menuBrowse", "Browse");
+    public string ClearLabel => Loc.Admin("menuClear", "Clear");
+    public string MenuNoImageSelectedLabel => Loc.Admin("menuNoImageSelected", "No image selected");
+    public string MenuInventoryIngredientsLabel => Loc.Admin("menuInventoryIngredients", "Ingredients from inventory");
+    public string MenuStockPrefix => Loc.Admin("menuStockPrefix", "Stock:");
+    public string MenuSaveProductLabel => Loc.Admin("menuSaveProduct", "Save Product");
+    public string CancelLabel => Loc.Common("cancel", "Cancel");
+    public string CloseLabel => Loc.Common("close", "Close");
+    public string MenuNoImageAvailableLabel => Loc.Admin("menuNoImageAvailable", "No image available");
+    public string MenuFieldProductIdLabel => Loc.Admin("menuFieldProductId", "PRODUCT ID");
+    public string MenuFieldCookingTimeShortLabel => Loc.Admin("menuFieldCookingTimeShort", "COOKING TIME");
+    public string MenuIngredientsLabel => Loc.Admin("menuIngredientsLabel", "Ingredients");
+    public string DescriptionCharCountRemainingText => Loc.Admin("menuCharactersRemaining", "Characters remaining: {{count}}",
+        new Dictionary<string, string>
+        {
+            ["count"] = DescriptionCharCountRemaining.ToString(CultureInfo.InvariantCulture)
+        });
+
     public string SearchText
     {
         get => _searchText;
@@ -94,8 +137,8 @@ public class MenuViewModel : AdminBaseViewModel
     public ObservableCollection<InventorySelectionItemViewModel> InventorySelections { get; } = new();
     public ObservableCollection<string> ProductIngredientsSummary { get; } = new();
     public ObservableCollection<string> SubCategories { get; } = new();
-    public ObservableCollection<string> ViewCategories { get; } = new();
-    public ObservableCollection<string> ViewSubCategories { get; } = new();
+    public ObservableCollection<LocalizedSelectOption> ViewCategoryOptions { get; } = new();
+    public ObservableCollection<LocalizedSelectOption> ViewSubCategoryOptions { get; } = new();
     public ObservableCollection<string> Categories { get; } = new();
 
     public bool IsDialogOpen
@@ -158,6 +201,7 @@ public class MenuViewModel : AdminBaseViewModel
             if (!SetField(ref _productDescription, value))
                 return;
             OnPropertyChanged(nameof(DescriptionCharCountRemaining));
+            OnPropertyChanged(nameof(DescriptionCharCountRemainingText));
         }
     }
 
@@ -177,6 +221,7 @@ public class MenuViewModel : AdminBaseViewModel
         {
             if (!SetField(ref _selectedViewCategory, value))
                 return;
+            SyncViewCategoryOption();
             UpdateViewSubCategories();
             RefreshGroupedProducts();
         }
@@ -189,7 +234,30 @@ public class MenuViewModel : AdminBaseViewModel
         {
             if (!SetField(ref _selectedViewSubCategory, value))
                 return;
+            SyncViewSubCategoryOption();
             RefreshGroupedProducts();
+        }
+    }
+
+    public LocalizedSelectOption? SelectedViewCategoryOption
+    {
+        get => _selectedViewCategoryOption;
+        set
+        {
+            if (!SetField(ref _selectedViewCategoryOption, value) || value is null)
+                return;
+            SelectedViewCategory = value.Value;
+        }
+    }
+
+    public LocalizedSelectOption? SelectedViewSubCategoryOption
+    {
+        get => _selectedViewSubCategoryOption;
+        set
+        {
+            if (!SetField(ref _selectedViewSubCategoryOption, value) || value is null)
+                return;
+            SelectedViewSubCategory = value.Value;
         }
     }
 
@@ -529,13 +597,29 @@ public class MenuViewModel : AdminBaseViewModel
                 ordered.Add(c);
         }
 
-        ViewCategories.Clear();
-        ViewCategories.Add("All");
+        var current = _selectedViewCategory;
+        ViewCategoryOptions.Clear();
+        ViewCategoryOptions.Add(new LocalizedSelectOption
+        {
+            Value = "All",
+            Label = Loc.Admin("menuAllTypes", "All types")
+        });
         foreach (var category in ordered)
-            ViewCategories.Add(category);
+        {
+            ViewCategoryOptions.Add(new LocalizedSelectOption
+            {
+                Value = category,
+                Label = category
+            });
+        }
 
-        if (!ViewCategories.Contains(SelectedViewCategory))
-            SelectedViewCategory = "All";
+        if (!ViewCategoryOptions.Any(o => o.Value.Equals(current, StringComparison.OrdinalIgnoreCase)))
+            current = "All";
+
+        _selectedViewCategory = current;
+        OnPropertyChanged(nameof(SelectedViewCategory));
+        SyncViewCategoryOption();
+        UpdateViewSubCategories();
     }
 
     private void UpdateViewSubCategories()
@@ -547,13 +631,48 @@ public class MenuViewModel : AdminBaseViewModel
             .OrderBy(c => c)
             .ToList();
 
-        ViewSubCategories.Clear();
-        ViewSubCategories.Add("All");
+        var current = _selectedViewSubCategory;
+        ViewSubCategoryOptions.Clear();
+        ViewSubCategoryOptions.Add(new LocalizedSelectOption
+        {
+            Value = "All",
+            Label = Loc.Admin("menuAllSubtypes", "All subtypes")
+        });
         foreach (var subCategory in subCategories)
-            ViewSubCategories.Add(subCategory);
+        {
+            ViewSubCategoryOptions.Add(new LocalizedSelectOption
+            {
+                Value = subCategory,
+                Label = subCategory
+            });
+        }
 
-        if (!ViewSubCategories.Contains(SelectedViewSubCategory))
-            SelectedViewSubCategory = "All";
+        if (!ViewSubCategoryOptions.Any(o => o.Value.Equals(current, StringComparison.OrdinalIgnoreCase)))
+            current = "All";
+
+        _selectedViewSubCategory = current;
+        OnPropertyChanged(nameof(SelectedViewSubCategory));
+        SyncViewSubCategoryOption();
+    }
+
+    private void SyncViewCategoryOption()
+    {
+        var match = ViewCategoryOptions.FirstOrDefault(o => o.Value.Equals(_selectedViewCategory, StringComparison.OrdinalIgnoreCase))
+                    ?? ViewCategoryOptions.FirstOrDefault();
+        if (ReferenceEquals(_selectedViewCategoryOption, match))
+            return;
+        _selectedViewCategoryOption = match;
+        OnPropertyChanged(nameof(SelectedViewCategoryOption));
+    }
+
+    private void SyncViewSubCategoryOption()
+    {
+        var match = ViewSubCategoryOptions.FirstOrDefault(o => o.Value.Equals(_selectedViewSubCategory, StringComparison.OrdinalIgnoreCase))
+                    ?? ViewSubCategoryOptions.FirstOrDefault();
+        if (ReferenceEquals(_selectedViewSubCategoryOption, match))
+            return;
+        _selectedViewSubCategoryOption = match;
+        OnPropertyChanged(nameof(SelectedViewSubCategoryOption));
     }
 
     private void OpenAddDialog()
@@ -562,7 +681,7 @@ public class MenuViewModel : AdminBaseViewModel
 
         IsDetailsDialogMode = false;
         _editingProductId = null;
-        DialogTitle = "Add Product";
+        DialogTitle = Loc.Admin("menuAddDialog", "Add Product");
         ProductName = string.Empty;
         SelectedCategory = Categories.First();
         SelectedSubCategory = SubCategories.FirstOrDefault() ?? string.Empty;
@@ -604,7 +723,7 @@ public class MenuViewModel : AdminBaseViewModel
 
         IsDetailsDialogMode = false;
         _editingProductId = product.Id;
-        DialogTitle = "Edit Product";
+        DialogTitle = Loc.Admin("menuEditDialog", "Edit Product");
         ProductName = product.Name;
         SelectedCategory = product.Category;
         SelectedSubCategory = string.IsNullOrWhiteSpace(product.SubCategory)
@@ -620,6 +739,7 @@ public class MenuViewModel : AdminBaseViewModel
         _removeProductImage = false;
         DetailsImagePreview = null;
         OnPropertyChanged(nameof(DescriptionCharCountRemaining));
+        OnPropertyChanged(nameof(DescriptionCharCountRemainingText));
         RefreshEditorImagePreview();
 
         foreach (var ingredient in InventorySelections)
@@ -659,21 +779,39 @@ public class MenuViewModel : AdminBaseViewModel
 
         IsDetailsDialogMode = true;
         _editingProductId = null;
-        DialogTitle = "Product Details";
+        _detailsProduct = product;
+        DialogTitle = Loc.Admin("menuDetailsTitle", "Product Details");
+        ApplyDetailsDisplayFields(product);
+        IsDialogOpen = true;
+    }
 
-        DetailsProductName = string.IsNullOrWhiteSpace(product.Name) ? "Unnamed product" : product.Name;
-        DetailsUniqueId = string.IsNullOrWhiteSpace(product.UniqueId) ? "N/A" : product.UniqueId;
-        DetailsCategory = string.IsNullOrWhiteSpace(product.Category) ? "Uncategorized" : product.Category;
-        DetailsSubCategory = string.IsNullOrWhiteSpace(product.SubCategory) ? "General" : product.SubCategory;
+    private void ApplyDetailsDisplayFields(Product product)
+    {
+        DetailsProductName = string.IsNullOrWhiteSpace(product.Name)
+            ? Loc.Admin("menuUnnamedProduct", "Unnamed product")
+            : product.Name;
+        DetailsUniqueId = string.IsNullOrWhiteSpace(product.UniqueId)
+            ? Loc.Admin("menuNotApplicable", "N/A")
+            : product.UniqueId;
+        DetailsCategory = string.IsNullOrWhiteSpace(product.Category)
+            ? Loc.Admin("menuUncategorized", "Uncategorized")
+            : product.Category;
+        DetailsSubCategory = string.IsNullOrWhiteSpace(product.SubCategory)
+            ? Loc.Admin("menuGeneral", "General")
+            : product.SubCategory;
         DetailsPrice = product.Price.ToString("N2", CultureInfo.InvariantCulture);
         DetailsPrepMinutes = product.PrepMinutes > 0
-            ? $"{product.PrepMinutes} min"
-            : "Not set (category estimate used on orders)";
+            ? Loc.Admin("menuPrepMinutesFmt", "{{minutes}} min",
+                new Dictionary<string, string>
+                {
+                    ["minutes"] = product.PrepMinutes.ToString(CultureInfo.InvariantCulture)
+                })
+            : Loc.Admin("menuPrepNotSet", "Not set (category estimate used on orders)");
         DetailsDescription = string.IsNullOrWhiteSpace(product.Description)
-            ? "No description provided."
+            ? Loc.Admin("menuNoDescription", "No description provided.")
             : product.Description.Trim();
         DetailsComposition = string.IsNullOrWhiteSpace(product.Composition)
-            ? "No composition provided."
+            ? Loc.Admin("menuNoComposition", "No composition provided.")
             : product.Composition.Trim();
         DetailsImagePreview = MenuImagePreview.TryLoadFromPathOrUrl(MenuImagePreview.GetProductPhotoAssetUrl(product.Id));
 
@@ -693,7 +831,13 @@ public class MenuViewModel : AdminBaseViewModel
             }
 
             if (string.IsNullOrWhiteSpace(ingredientName))
-                ingredientName = $"Inventory #{ingredient.InventoryItemId}";
+            {
+                ingredientName = Loc.Admin("menuInventoryItemFallback", "Inventory #{{id}}",
+                    new Dictionary<string, string>
+                    {
+                        ["id"] = ingredient.InventoryItemId.ToString(CultureInfo.InvariantCulture)
+                    });
+            }
 
             var unit = ingredient.InventoryItem?.Unit;
             var unitSuffix = string.IsNullOrWhiteSpace(unit) ? string.Empty : $" {unit}";
@@ -701,9 +845,7 @@ public class MenuViewModel : AdminBaseViewModel
         }
 
         if (ProductIngredientsSummary.Count == 0)
-            ProductIngredientsSummary.Add("No inventory ingredients linked.");
-
-        IsDialogOpen = true;
+            ProductIngredientsSummary.Add(Loc.Admin("menuNoInventoryIngredients", "No inventory ingredients linked."));
     }
 
     private async Task SaveProductAsync()
@@ -904,13 +1046,14 @@ public class MenuViewModel : AdminBaseViewModel
         if (names.Count > 0)
             return string.Join(", ", names);
 
-        return "No ingredients linked";
+        return Loc.Admin("menuNoIngredientsLinked", "No ingredients linked");
     }
 
     private void CloseDialog()
     {
         IsDialogOpen = false;
         _editingProductId = null;
+        _detailsProduct = null;
         ProductImagePath = string.Empty;
         _removeProductImage = false;
         EditorImagePreview = null;
@@ -1006,5 +1149,60 @@ public class MenuViewModel : AdminBaseViewModel
 
         if (!SubCategories.Contains(SelectedSubCategory))
             SelectedSubCategory = SubCategories.First();
+    }
+
+    protected override void RefreshLocalizedStrings()
+    {
+        base.RefreshLocalizedStrings();
+        InitializeViewCategories();
+        Notify(
+            nameof(PageTitle),
+            nameof(PageSubtitle),
+            nameof(AddProductLabel),
+            nameof(MenuTypeLabel),
+            nameof(SubmenuTypeLabel),
+            nameof(SearchTooltip),
+            nameof(DetailsLabel),
+            nameof(EditLabel),
+            nameof(DeleteLabel),
+            nameof(MenuFieldProductNameLabel),
+            nameof(MenuFieldSectionLabel),
+            nameof(MenuFieldTypeLabel),
+            nameof(MenuFieldPriceLabel),
+            nameof(MenuFieldCookingTimeLabel),
+            nameof(MenuFieldCookingTimeHelp),
+            nameof(MenuFieldDescriptionLabel),
+            nameof(MenuFieldCompositionLabel),
+            nameof(MenuDetailsDescriptionLabel),
+            nameof(MenuDetailsCompositionLabel),
+            nameof(MenuFieldProductImageLabel),
+            nameof(BrowseLabel),
+            nameof(ClearLabel),
+            nameof(MenuNoImageSelectedLabel),
+            nameof(MenuInventoryIngredientsLabel),
+            nameof(MenuStockPrefix),
+            nameof(MenuSaveProductLabel),
+            nameof(CancelLabel),
+            nameof(CloseLabel),
+            nameof(MenuNoImageAvailableLabel),
+            nameof(MenuFieldProductIdLabel),
+            nameof(MenuFieldCookingTimeShortLabel),
+            nameof(MenuIngredientsLabel),
+            nameof(DescriptionCharCountRemainingText));
+
+        if (IsDialogOpen && IsDetailsDialogMode)
+        {
+            DialogTitle = Loc.Admin("menuDetailsTitle", "Product Details");
+            if (_detailsProduct is not null)
+                ApplyDetailsDisplayFields(_detailsProduct);
+        }
+        else if (IsDialogOpen && !IsDetailsDialogMode)
+        {
+            DialogTitle = _editingProductId.HasValue
+                ? Loc.Admin("menuEditDialog", "Edit Product")
+                : Loc.Admin("menuAddDialog", "Add Product");
+        }
+
+        RefreshGroupedProducts();
     }
 }

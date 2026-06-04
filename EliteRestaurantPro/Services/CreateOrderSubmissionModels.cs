@@ -40,4 +40,5 @@ public sealed record CreateOrderSubmitSnapshot(
     string ReservationCode,
     string ReservationGuestName,
     /// <summary>Optional: Immediate or Deferred.</summary>
-    string? PaymentTiming);
+    string? PaymentTiming,
+    int? RestaurantClientId);

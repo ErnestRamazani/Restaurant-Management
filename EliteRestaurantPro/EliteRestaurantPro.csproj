@@ -28,6 +28,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="..\EliteRestaurant.Api\wwwroot\locales\en.json" Link="Locales\en.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\EliteRestaurant.Api\wwwroot\locales\fr.json" Link="Locales\fr.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Resource Include="..\assets\images\eliterestaurant\elite-restaurant-app.ico" Link="elite-restaurant-app.ico" />
   </ItemGroup>
 

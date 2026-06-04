@@ -8,6 +8,7 @@ using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Sync;
 using EliteRestaurant.Core.Utils;
 using EliteRestaurantPro.ApiClients;
+using EliteRestaurantPro.Localization;
 using EliteRestaurantPro.Services;
 
 namespace EliteRestaurantPro.ViewModels;
@@ -106,12 +107,19 @@ public sealed class AttendanceRowViewModel : BaseViewModel
 
     /// <summary>Read-only absence note after validate.</summary>
     public bool ShowAbsenceJustificationReadOnly { get; init; }
+
+    public string DisplayShiftLine { get; set; } = string.Empty;
+    public string DisplayClockLine { get; set; } = string.Empty;
+    public string DisplayStatusLine { get; set; } = string.Empty;
+    public string DisplayPendingSalaryText { get; set; } = string.Empty;
+    public string DisplayLateJustificationText { get; set; } = string.Empty;
 }
 
 public sealed class AttendanceDayGroupViewModel
 {
     public DateTime WorkDate { get; init; }
-    public string DayText { get; init; } = string.Empty;
+    public string DayText { get; set; } = string.Empty;
+    public string EmployeesCountText { get; set; } = string.Empty;
     public bool IsExpanded { get; set; }
     public bool IsDayValidated { get; init; }
     public bool CanValidateAttendance => !IsDayValidated;
@@ -153,6 +161,27 @@ public class AttendanceViewModel : AdminBaseViewModel
 
     public override string ActivePage => "Attendance";
 
+    public string PageTitle => Loc.Admin("attTitle", "Attendance");
+    public string PageTitleAccent => Loc.Admin("attTitleAccent", "Control");
+    public string ShowLabel => Loc.Admin("attShowLabel", "Show:");
+    public string FilterAllLabel => Loc.Admin("attFilterAll", "All");
+    public string FilterMorningLabel => Loc.Admin("attFilterMorning", "Morning shift");
+    public string FilterNightLabel => Loc.Admin("attFilterNight", "Night shift");
+    public string FilterFullDayLabel => Loc.Admin("attFilterFullDay", "Full day");
+    public string SearchTooltip => Loc.Admin("attSearchTooltip", "Search by employee name, ID, shift, or status");
+    public string ValidateLabel => Loc.Admin("attValidate", "Validate attendance");
+    public string ClockInLabel => Loc.Admin("attClockInBtn", "Clock In");
+    public string ClockOutLabel => Loc.Admin("attClockOutBtn", "Clock Out");
+    public string AbsenceLabel => Loc.Admin("attAbsence", "Absence");
+    public string AbsenceEditorLabel => Loc.Admin("attAbsenceEditorLabel", "ABSENCE JUSTIFICATION (required before Validate)");
+    public string AbsenceReadOnlyLabel => Loc.Admin("attAbsenceReadOnlyLabel", "ABSENCE JUSTIFICATION (validated — read only)");
+    public string MarkAbsenceBody => Loc.Admin("attMarkAbsenceBody", "Record that this employee did not work this day. Justification is required.");
+    public string LateDialogBody => Loc.Admin("attLateDialogBody", "Employee clocked in after 08:30 AM. Please provide a justification.");
+    public string JustificationRequiredLabel => Loc.Admin("attJustificationRequired", "JUSTIFICATION (required)");
+    public string SaveAbsenceLabel => Loc.Admin("attSaveAbsence", "Save absence");
+    public string SaveLateClockInLabel => Loc.Admin("attSaveLateClockIn", "Save Late Clock-In");
+    public string CancelLabel => Loc.Admin("attCancel", "Cancel");
+
     public ObservableCollection<AttendanceDayGroupViewModel> AttendanceDayGroups { get; } = [];
 
     private readonly List<AttendanceDayGroupViewModel> _attendanceSourceGroups = [];
@@ -188,7 +217,7 @@ public class AttendanceViewModel : AdminBaseViewModel
         set => SetField(ref _lateJustification, value);
     }
 
-    private string _dialogTitle = "Late Clock In";
+    private string _dialogTitle = string.Empty;
     public string DialogTitle
     {
         get => _dialogTitle;
@@ -196,6 +225,8 @@ public class AttendanceViewModel : AdminBaseViewModel
     }
 
     private int _pendingLateEmployeeId;
+    private string _lateDialogEmployeeName = string.Empty;
+    private string _lateDialogShiftName = string.Empty;
 
     private bool _isMarkAbsenceDialogOpen;
     public bool IsMarkAbsenceDialogOpen
@@ -204,13 +235,14 @@ public class AttendanceViewModel : AdminBaseViewModel
         set => SetField(ref _isMarkAbsenceDialogOpen, value);
     }
 
-    private string _markAbsenceDialogTitle = "Mark absence";
+    private string _markAbsenceDialogTitle = string.Empty;
     public string MarkAbsenceDialogTitle
     {
         get => _markAbsenceDialogTitle;
         set => SetField(ref _markAbsenceDialogTitle, value);
     }
 
+    private string _markAbsenceEmployeeName = string.Empty;
     private string _markAbsenceJustification = string.Empty;
     public string MarkAbsenceJustification
     {
@@ -331,18 +363,18 @@ public class AttendanceViewModel : AdminBaseViewModel
             var todayGroup = new AttendanceDayGroupViewModel
             {
                 WorkDate = today,
-                DayText = todayValidated
-                    ? $"Today - {today:dddd, MMM dd yyyy} · Validated"
-                    : $"Today - {today:dddd, MMM dd yyyy}",
                 IsExpanded = true,
                 IsDayValidated = todayValidated
             };
+            todayGroup.DayText = AdminTextLocalizer.FormatTodayCalendarDay(today, todayValidated);
 
             foreach (var employee in employees)
             {
                 todayAttendanceByEmployee.TryGetValue(employee.Id, out var attendance);
                 todayPendingSalariesByEmployeeId.TryGetValue(employee.Id, out var pendingSalaryToday);
-                todayGroup.Rows.Add(BuildAttendanceRow(employee, attendance, today, isCurrentDay: true, pendingSalaryToday, todayValidated));
+                var row = BuildAttendanceRow(employee, attendance, today, isCurrentDay: true, pendingSalaryToday, todayValidated);
+                AttendanceUiLocalizer.ApplyRow(row);
+                todayGroup.Rows.Add(row);
             }
 
             AttendanceDayGroups.Add(todayGroup);
@@ -358,31 +390,32 @@ public class AttendanceViewModel : AdminBaseViewModel
                 var vm = new AttendanceDayGroupViewModel
                 {
                     WorkDate = dayGroup.Key,
-                    DayText = dayValidated
-                        ? $"{dayGroup.Key:dddd, MMM dd yyyy} · Validated"
-                        : dayGroup.Key.ToString("dddd, MMM dd yyyy"),
                     IsExpanded = false,
                     IsDayValidated = dayValidated
                 };
+                vm.DayText = AdminTextLocalizer.FormatCalendarDay(dayGroup.Key, dayValidated);
 
                 foreach (var attendance in dayGroup.OrderBy(a => a.Employee?.Name))
                 {
                     if (attendance.Employee is null)
                         continue;
-                    vm.Rows.Add(BuildAttendanceRow(attendance.Employee, attendance, dayGroup.Key, isCurrentDay: false, pendingSalary: 0m, dayValidated));
+                    var row = BuildAttendanceRow(attendance.Employee, attendance, dayGroup.Key, isCurrentDay: false, pendingSalary: 0m, dayValidated);
+                    AttendanceUiLocalizer.ApplyRow(row);
+                    vm.Rows.Add(row);
                 }
 
                 AttendanceDayGroups.Add(vm);
             }
 
             SnapshotAttendanceSource();
+            LocalizeAttendanceGroups(today);
             ApplyListFilter();
         }
         catch (Exception ex)
         {
             MessageBox.Show(
                 ex.GetBaseException().Message,
-                "Attendance load failed",
+                Loc.Admin("attLoadFailedTitle", "Attendance load failed"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
@@ -420,8 +453,23 @@ public class AttendanceViewModel : AdminBaseViewModel
         var morning = s.FormatMorningRange().Replace("-", " - ");
         var night = s.FormatNightRange().Replace("-", " - ");
         var fullDay = s.FormatFullDayRange().Replace("-", " - ");
-        AttendanceShiftSummaryText =
-            $"Morning: {morning} | Night: {night} | Full day: {fullDay} (morning start → night end) | Late grace: {grace} min";
+        AttendanceShiftSummaryText = Loc.Admin("attShiftSummary",
+            "Morning: {{morning}} | Night: {{night}} | Full day: {{fullDay}} (morning start → night end) | Late grace: {{grace}} min",
+            new Dictionary<string, string>
+            {
+                ["morning"] = morning,
+                ["night"] = night,
+                ["fullDay"] = fullDay,
+                ["grace"] = grace.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            });
+    }
+
+    private void LocalizeAttendanceGroups(DateTime today)
+    {
+        foreach (var group in _attendanceSourceGroups)
+            AttendanceUiLocalizer.ApplyDayGroup(group, today);
+        foreach (var group in AttendanceDayGroups)
+            AttendanceUiLocalizer.ApplyDayGroup(group, today);
     }
 
     private void SetShiftListFilter(ShiftListFilter filter)
@@ -472,6 +520,7 @@ public class AttendanceViewModel : AdminBaseViewModel
             };
             foreach (var r in list)
                 vm.Rows.Add(r);
+            AttendanceUiLocalizer.ApplyDayGroup(vm, DateTime.Today);
             AttendanceDayGroups.Add(vm);
         }
     }
@@ -498,7 +547,11 @@ public class AttendanceViewModel : AdminBaseViewModel
 
         if (group.IsDayValidated)
         {
-            MessageBox.Show("This day has already been validated.", "Validate attendance", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(
+                Loc.Admin("attDayAlreadyValidated", "This day has already been validated."),
+                Loc.Admin("attValidateTitle", "Validate attendance"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 
@@ -508,8 +561,8 @@ public class AttendanceViewModel : AdminBaseViewModel
         if (absentWithout.Count > 0)
         {
             MessageBox.Show(
-                "Fill absence justification for every absent staff member before validating this day.",
-                "Validate attendance",
+                Loc.Admin("attValidateAbsenceRequired", "Fill absence justification for every absent staff member before validating this day."),
+                Loc.Admin("attValidateTitle", "Validate attendance"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
             return;
@@ -544,14 +597,19 @@ public class AttendanceViewModel : AdminBaseViewModel
 
             if (ops.Count == 0)
             {
-                MessageBox.Show("Nothing to validate for this day.", "Validate attendance", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(
+                    Loc.Admin("attNothingToValidate", "Nothing to validate for this day."),
+                    Loc.Admin("attValidateTitle", "Validate attendance"),
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
                 return;
             }
 
             DesktopCloudPersistence.PushBatchBlocking(ops);
             MessageBox.Show(
-                $"Attendance for {group.DayText} validated and justifications saved.",
-                "Validate attendance",
+                Loc.Admin("attValidateSuccess", "Attendance for {{day}} validated and justifications saved.",
+                    new Dictionary<string, string> { ["day"] = group.DayText }),
+                Loc.Admin("attValidateTitle", "Validate attendance"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
             await LoadAttendanceAsync().ConfigureAwait(true);
@@ -560,7 +618,7 @@ public class AttendanceViewModel : AdminBaseViewModel
         {
             MessageBox.Show(
                 ex.GetBaseException().Message,
-                "Validate attendance failed",
+                Loc.Admin("attValidateFailed", "Validate attendance failed"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
@@ -573,19 +631,28 @@ public class AttendanceViewModel : AdminBaseViewModel
 
         if (row.IsDayLocked)
         {
-            MessageBox.Show("This day is validated; absences cannot be changed.", "Attendance", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(
+                Loc.Admin("attDayLockedAbsence", "This day is validated; absences cannot be changed."),
+                Loc.Admin("attTitle", "Attendance"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 
         if (!row.CanMarkAbsence)
         {
-            MessageBox.Show("Mark absence is only available when the employee has not clocked in and is scheduled to work.", "Attendance", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(
+                Loc.Admin("attMarkAbsenceUnavailable", "Mark absence is only available when the employee has not clocked in and is scheduled to work."),
+                Loc.Admin("attTitle", "Attendance"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 
         _markAbsenceEmployeeId = row.EmployeeId;
         _markAbsenceWorkDate = row.WorkDate.Date;
-        MarkAbsenceDialogTitle = $"Mark absence — {row.EmployeeName} ({row.WorkDate:MMM dd, yyyy})";
+        _markAbsenceEmployeeName = row.EmployeeName;
+        ApplyMarkAbsenceDialogTitle();
         MarkAbsenceJustification = row.AbsenceJustification;
         IsMarkAbsenceDialogOpen = true;
     }
@@ -594,7 +661,11 @@ public class AttendanceViewModel : AdminBaseViewModel
     {
         if (string.IsNullOrWhiteSpace(MarkAbsenceJustification))
         {
-            MessageBox.Show("Enter an absence justification.", "Mark absence", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(
+                Loc.Admin("attEnterAbsenceJustification", "Enter an absence justification."),
+                Loc.Admin("attMarkAbsenceTitle", "Mark absence"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
             return;
         }
 
@@ -627,14 +698,18 @@ public class AttendanceViewModel : AdminBaseViewModel
 
             DesktopCloudPersistence.PushUpsertBlocking(att);
             CloseMarkAbsenceDialog();
-            MessageBox.Show("Absence saved.", "Attendance", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(
+                Loc.Admin("attAbsenceSaved", "Absence saved."),
+                Loc.Admin("attTitle", "Attendance"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             await LoadAttendanceAsync().ConfigureAwait(true);
         }
         catch (Exception ex)
         {
             MessageBox.Show(
                 ex.GetBaseException().Message,
-                "Save absence failed",
+                Loc.Admin("attSaveAbsenceFailed", "Save absence failed"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
@@ -645,6 +720,7 @@ public class AttendanceViewModel : AdminBaseViewModel
         IsMarkAbsenceDialogOpen = false;
         MarkAbsenceJustification = string.Empty;
         _markAbsenceEmployeeId = 0;
+        _markAbsenceEmployeeName = string.Empty;
     }
 
     private void ClockIn(object? parameter)
@@ -654,13 +730,21 @@ public class AttendanceViewModel : AdminBaseViewModel
 
         if (row.WorkDate.Date != DateTime.Today)
         {
-            MessageBox.Show("Clock in can only be recorded for today.", "Attendance", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(
+                Loc.Admin("attClockInTodayOnly", "Clock in can only be recorded for today."),
+                Loc.Admin("attTitle", "Attendance"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 
         if (row.IsScheduledOff)
         {
-            MessageBox.Show("This employee is off shift today. Clock-in is disabled for off days.", "Attendance", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(
+                Loc.Admin("attClockInOffShift", "This employee is off shift today. Clock-in is disabled for off days."),
+                Loc.Admin("attTitle", "Attendance"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 
@@ -669,8 +753,10 @@ public class AttendanceViewModel : AdminBaseViewModel
         if (now.TimeOfDay > lateCutoff)
         {
             _pendingLateEmployeeId = row.EmployeeId;
+            _lateDialogEmployeeName = row.EmployeeName;
+            _lateDialogShiftName = row.ShiftName;
             LateJustification = string.Empty;
-            DialogTitle = $"Late Clock In - {row.EmployeeName} ({row.ShiftName})";
+            ApplyLateDialogTitle();
             IsJustificationDialogOpen = true;
             return;
         }
@@ -686,7 +772,11 @@ public class AttendanceViewModel : AdminBaseViewModel
 
         if (string.IsNullOrWhiteSpace(LateJustification))
         {
-            MessageBox.Show("Please provide a justification for late clock-in.", "Attendance", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(
+                Loc.Admin("attLateJustificationRequired", "Please provide a justification for late clock-in."),
+                Loc.Admin("attTitle", "Attendance"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
             return;
         }
 
@@ -725,14 +815,19 @@ public class AttendanceViewModel : AdminBaseViewModel
 
             DesktopCloudPersistence.PushUpsertBlocking(attendance);
 
-            MessageBox.Show($"{status} clock-in saved.", "Attendance", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(
+                Loc.Admin("attClockInSaved", "{{status}} clock-in saved.",
+                    new Dictionary<string, string> { ["status"] = AdminTextLocalizer.TranslateAttendanceClockStatus(status) }),
+                Loc.Admin("attTitle", "Attendance"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             await LoadAttendanceAsync().ConfigureAwait(true);
         }
         catch (Exception ex)
         {
             MessageBox.Show(
                 ex.GetBaseException().Message,
-                "Clock-in failed",
+                Loc.Admin("attClockInFailed", "Clock-in failed"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
@@ -745,13 +840,21 @@ public class AttendanceViewModel : AdminBaseViewModel
 
         if (row.WorkDate.Date != DateTime.Today)
         {
-            MessageBox.Show("Clock out can only be recorded for today.", "Attendance", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(
+                Loc.Admin("attClockOutTodayOnly", "Clock out can only be recorded for today."),
+                Loc.Admin("attTitle", "Attendance"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 
         if (row.IsScheduledOff)
         {
-            MessageBox.Show("This employee is off shift today. Clock-out is not expected.", "Attendance", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(
+                Loc.Admin("attClockOutOffShift", "This employee is off shift today. Clock-out is not expected."),
+                Loc.Admin("attTitle", "Attendance"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 
@@ -764,21 +867,30 @@ public class AttendanceViewModel : AdminBaseViewModel
                 a.EmployeeId == row.EmployeeId && a.WorkDate >= todayStartUtc && a.WorkDate < todayEndExclusiveUtc);
             if (attendance is null || attendance.ClockInTime is null)
             {
-                MessageBox.Show("Employee must clock in before clocking out.", "Attendance", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(
+                    Loc.Admin("attClockOutMustClockIn", "Employee must clock in before clocking out."),
+                    Loc.Admin("attTitle", "Attendance"),
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
                 return;
             }
 
             if (attendance.ClockOutTime is not null)
             {
-                MessageBox.Show("Employee is already clocked out for today.", "Attendance", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(
+                    Loc.Admin("attClockOutAlready", "Employee is already clocked out for today."),
+                    Loc.Admin("attTitle", "Attendance"),
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
                 return;
             }
 
             if (DateTime.Now.TimeOfDay < row.ShiftStartTime)
             {
                 MessageBox.Show(
-                    $"Clock-out is not allowed before the shift starts ({row.ShiftStartTime:hh\\:mm}).",
-                    "Attendance",
+                    Loc.Admin("attClockOutBeforeShift", "Clock-out is not allowed before the shift starts ({{time}}).",
+                        new Dictionary<string, string> { ["time"] = FormatShiftTime(row.ShiftStartTime) }),
+                    Loc.Admin("attTitle", "Attendance"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
                 return;
@@ -787,8 +899,9 @@ public class AttendanceViewModel : AdminBaseViewModel
             if (DateTime.Now.TimeOfDay < row.ShiftEndTime)
             {
                 var earlyClockOut = MessageBox.Show(
-                    $"Current time is before scheduled shift end ({row.ShiftEndTime:hh\\:mm}). Record an early clock-out anyway?",
-                    "Early Clock-Out",
+                    Loc.Admin("attClockOutEarlyPrompt", "Current time is before scheduled shift end ({{time}}). Record an early clock-out anyway?",
+                        new Dictionary<string, string> { ["time"] = FormatShiftTime(row.ShiftEndTime) }),
+                    Loc.Admin("attEarlyClockOutTitle", "Early Clock-Out"),
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Question);
 
@@ -861,14 +974,18 @@ public class AttendanceViewModel : AdminBaseViewModel
 
             DesktopCloudPersistence.PushBatchBlocking(ops);
 
-            MessageBox.Show("Clock-out saved. Pending salary was updated in Money.", "Attendance", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(
+                Loc.Admin("attClockOutSaved", "Clock-out saved. Pending salary was updated in Money."),
+                Loc.Admin("attTitle", "Attendance"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             await LoadAttendanceAsync().ConfigureAwait(true);
         }
         catch (Exception ex)
         {
             MessageBox.Show(
                 ex.GetBaseException().Message,
-                "Clock-out failed",
+                Loc.Admin("attClockOutFailed", "Clock-out failed"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
@@ -877,6 +994,8 @@ public class AttendanceViewModel : AdminBaseViewModel
     private void CloseLateDialog()
     {
         _pendingLateEmployeeId = 0;
+        _lateDialogEmployeeName = string.Empty;
+        _lateDialogShiftName = string.Empty;
         IsJustificationDialogOpen = false;
         LateJustification = string.Empty;
     }
@@ -959,4 +1078,56 @@ public class AttendanceViewModel : AdminBaseViewModel
 
     private static string BuildPendingSalaryReference(Employee employee, DateTime workDate)
         => $"{PendingSalaryReferencePrefix} EMP-ID:{employee.Id} ({employee.UniqueId} - {employee.Name}) @ {workDate:yyyy-MM-dd}";
+
+    private void ApplyLateDialogTitle()
+    {
+        DialogTitle =
+            $"{Loc.Admin("attLateDialogTitle", "Late Clock In")} - {_lateDialogEmployeeName} ({AdminTextLocalizer.TranslateShift(_lateDialogShiftName)})";
+    }
+
+    private void ApplyMarkAbsenceDialogTitle()
+    {
+        var dateText = _markAbsenceWorkDate.ToString("MMMM dd, yyyy", AdminTextLocalizer.UiCulture);
+        MarkAbsenceDialogTitle =
+            $"{Loc.Admin("attMarkAbsenceTitle", "Mark absence")} — {_markAbsenceEmployeeName} ({dateText})";
+    }
+
+    private static string FormatShiftTime(TimeSpan time) =>
+        DateTime.Today.Add(time).ToString("t", AdminTextLocalizer.UiCulture);
+
+    protected override void RefreshLocalizedStrings()
+    {
+        base.RefreshLocalizedStrings();
+        RefreshShiftSettingsFromDisk();
+        Notify(
+            nameof(PageTitle),
+            nameof(PageTitleAccent),
+            nameof(ShowLabel),
+            nameof(FilterAllLabel),
+            nameof(FilterMorningLabel),
+            nameof(FilterNightLabel),
+            nameof(FilterFullDayLabel),
+            nameof(SearchTooltip),
+            nameof(ValidateLabel),
+            nameof(ClockInLabel),
+            nameof(ClockOutLabel),
+            nameof(AbsenceLabel),
+            nameof(AbsenceEditorLabel),
+            nameof(AbsenceReadOnlyLabel),
+            nameof(MarkAbsenceBody),
+            nameof(LateDialogBody),
+            nameof(JustificationRequiredLabel),
+            nameof(SaveAbsenceLabel),
+            nameof(SaveLateClockInLabel),
+            nameof(CancelLabel));
+
+        LocalizeAttendanceGroups(DateTime.Today);
+
+        if (IsMarkAbsenceDialogOpen)
+            ApplyMarkAbsenceDialogTitle();
+        if (IsJustificationDialogOpen)
+            ApplyLateDialogTitle();
+
+        ApplyListFilter();
+    }
 }

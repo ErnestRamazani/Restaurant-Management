@@ -1,8 +1,9 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronDown, Loader2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { fetchTables, submitDraft } from '../../utils/api'
-import { getMenuKind } from '../../utils/menuKind'
+import { inferOrderKindFromLines } from '../../utils/menuKind'
 import { formatUsd } from '../../utils/format'
 import { tableServerName } from '../../utils/tables'
 import { BottomSheet } from '../ui/BottomSheet'
@@ -21,6 +22,7 @@ export function CartScreen({
   onBack,
   onSuccess,
 }) {
+  const { t } = useTranslation()
   const [name, setName] = useState('')
   const [notes, setNotes] = useState('')
   const [allergyNotes, setAllergyNotes] = useState('')
@@ -62,8 +64,7 @@ export function CartScreen({
     if (!canSend) return
     setSubmitting(true)
     try {
-      const first = cart.lines[0]?.product
-      const orderKind = first && getMenuKind(first) === 'drink' ? 'drink' : 'food'
+      const orderKind = inferOrderKindFromLines(cart.lines)
       const payload = {
         tableId: effectiveTable,
         customerName: name.trim(),
@@ -81,7 +82,7 @@ export function CartScreen({
       cart.clearCart()
       onSuccess(res)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not send order')
+      setError(e instanceof Error ? e.message : t('guest.cart.sendFailed'))
     } finally {
       setSubmitting(false)
     }
@@ -124,12 +125,12 @@ export function CartScreen({
           type="button"
           onClick={onBack}
           className="flex h-11 min-w-[44px] items-center justify-center text-champagne"
-          aria-label="Back"
+          aria-label={t('guest.general.back')}
         >
           ←
         </button>
         <h2 className="flex-1 text-center font-display text-lg font-semibold text-champagne">
-          {guestOrderMode === 'online' ? 'Your online order' : 'Your order'}
+          {guestOrderMode === 'online' ? t('guest.cart.yourOnlineOrder') : t('guest.cart.yourOrder')}
         </h2>
         <div className="w-11" aria-hidden />
       </header>
@@ -137,46 +138,50 @@ export function CartScreen({
       {guestOrderMode === 'online' ? (
         <div className="mx-4 mt-3 rounded-xl border border-amber-400/35 bg-amber-500/10 px-3 py-2.5">
           <p className="font-body text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-amber-100/90">
-            Pickup or delivery
+            {t('guest.cart.pickupDeliveryTitle')}
           </p>
           <p className="mt-1 font-body text-[0.72rem] leading-snug text-amber-50/90">
-            Select the table or takeout code your cashier gave you, then send the order. Staff will confirm payment and
-            packaging.
+            {t('guest.cart.pickupDeliveryHint')}
           </p>
         </div>
       ) : null}
 
       <div className="border border-gold/25 bg-[var(--gold-dim)] mx-4 mt-3 flex flex-col gap-2 rounded-[10px] px-3 py-2.5">
         <p className="font-body text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-gold/90">
-          Your table
+          {t('guest.cart.yourTable')}
         </p>
         {hadInvalidTableParam ? (
           <p className="font-body text-[0.78rem] leading-snug text-amber-200/90">
-            The link’s <span className="font-mono">?table=…</span> value must be a number (the table id
-            in your POS). A letter or a blank id won’t work — choose a table below or rescan the code.
+            {t('guest.cart.invalidTableParam')}
           </p>
         ) : null}
         <div className="min-w-0">
           {tableIdFromUrl ? (
             loadingTables && !tableLabel ? (
-              <span className="text-sm text-[var(--text-muted)]">Resolving table…</span>
+              <span className="text-sm text-[var(--text-muted)]">{t('guest.cart.resolvingTable')}</span>
             ) : (
               <div className="min-w-0">
                 <span className="block font-body text-[0.88rem] font-semibold leading-snug text-champagne">
-                  Table {tableLabel?.tableCode ?? String(tableIdFromUrl)}
-                  {tableLabel?.name ? ` — ${tableLabel.name}` : ''}
+                  {tableLabel?.name
+                    ? t('guest.general.tableCodeName', {
+                        code: tableLabel?.tableCode ?? String(tableIdFromUrl),
+                        name: tableLabel.name,
+                      })
+                    : t('guest.general.tableCode', {
+                        code: tableLabel?.tableCode ?? String(tableIdFromUrl),
+                      })}
                 </span>
                 {tableServerName(tableLabel) ? (
                   <span className="mt-0.5 block font-body text-[0.8rem] text-champagne/75">
-                    Server: {tableServerName(tableLabel)}
+                    {t('guest.general.serverLine', { name: tableServerName(tableLabel) })}
                   </span>
                 ) : null}
               </div>
             )
           ) : loadingTables ? (
-            <span className="text-sm text-[var(--text-muted)]">Loading tables…</span>
+            <span className="text-sm text-[var(--text-muted)]">{t('guest.cart.loadingTables')}</span>
           ) : tables.length === 0 ? (
-            <span className="text-sm text-red-300/80">No tables are available. Ask staff to enable tables in the back office.</span>
+            <span className="text-sm text-red-300/80">{t('guest.cart.noTables')}</span>
           ) : (
             <button
               type="button"
@@ -187,16 +192,19 @@ export function CartScreen({
                 {manualTableId && manualTableLabel ? (
                   <span className="block w-full min-w-0">
                     <span className="block">
-                      Table {manualTableLabel.tableCode} — {manualTableLabel.name}
+                      {t('guest.general.tableCodeName', {
+                        code: manualTableLabel.tableCode,
+                        name: manualTableLabel.name,
+                      })}
                     </span>
                     {tableServerName(manualTableLabel) ? (
                       <span className="mt-0.5 block text-[0.8rem] text-champagne/75">
-                        Server: {tableServerName(manualTableLabel)}
+                        {t('guest.general.serverLine', { name: tableServerName(manualTableLabel) })}
                       </span>
                     ) : null}
                   </span>
                 ) : (
-                  'Choose your table'
+                  t('guest.cart.chooseTable')
                 )}
               </span>
               <ChevronDown className="h-5 w-5 shrink-0 text-gold/70" strokeWidth={2.5} aria-hidden />
@@ -207,12 +215,12 @@ export function CartScreen({
 
       <div className="mt-2 px-4">
         <label className="mb-1.5 block font-body text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-gold">
-          Your name
+          {t('guest.cart.yourName')}
         </label>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="So your server can find you"
+          placeholder={t('guest.cart.namePlaceholder')}
           maxLength={60}
           className="h-[46px] w-full rounded-[10px] border border-champagne/15 bg-champagne/[0.06] px-3.5 font-body text-[0.95rem] text-champagne placeholder:text-champagne/35 focus:border-gold/50 focus:outline-none"
         />
@@ -220,7 +228,7 @@ export function CartScreen({
 
       <div className="mt-4 flex-1 overflow-y-auto px-4">
         <p className="mb-2.5 font-body text-[0.78rem] text-[var(--text-muted)]">
-          {cart.totalItems} item{cart.totalItems === 1 ? '' : 's'} in your order
+          {t('guest.cart.itemsInOrder', { count: cart.totalItems })}
         </p>
         <AnimatePresence initial={false}>
           {cart.lines.map((l) => (
@@ -241,7 +249,7 @@ export function CartScreen({
                 </span>
               </div>
               <p className="mt-1 font-body text-[0.78rem] text-[var(--text-muted)]">
-                {formatUsd(l.product.price)} each
+                {formatUsd(l.product.price)} {t('guest.general.each')}
               </p>
               <div className="mt-2.5 flex items-center justify-between">
                 <QuantityControl
@@ -255,7 +263,7 @@ export function CartScreen({
                   whileTap={{ scale: 0.9 }}
                   onClick={() => cart.removeItem(l.product.id)}
                   className="flex h-7 w-7 items-center justify-center rounded-full border border-red-500/20 bg-red-500/10 text-red-500"
-                  aria-label="Remove"
+                  aria-label={t('guest.general.remove')}
                 >
                   ×
                 </motion.button>
@@ -271,14 +279,14 @@ export function CartScreen({
           onClick={() => setOpenNotes(!openNotes)}
           className="flex w-full items-center justify-between py-2 font-body text-sm text-champagne/70"
         >
-          <span>{openNotes ? '▾ Note to your order' : '▸ Add a note to your order'}</span>
+          <span>{openNotes ? t('guest.cart.noteOpen') : t('guest.cart.noteClosed')}</span>
         </button>
         {openNotes ? (
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={3}
-            placeholder="Any special requests? (e.g. no onions, extra sauce)"
+            placeholder={t('guest.cart.notePlaceholder')}
             className="w-full rounded-[10px] border border-champagne/15 bg-champagne/[0.06] p-3 font-body text-champagne"
           />
         ) : null}
@@ -287,7 +295,7 @@ export function CartScreen({
           onClick={() => setOpenAllergy(!openAllergy)}
           className="flex w-full items-center justify-between py-2 font-body text-sm text-champagne/70"
         >
-          <span>{openAllergy ? '▾ Allergy information' : '▸ Allergy information'}</span>
+          <span>{openAllergy ? t('guest.cart.allergyOpen') : t('guest.cart.allergyClosed')}</span>
         </button>
         {openAllergy ? (
           <>
@@ -295,10 +303,10 @@ export function CartScreen({
               value={allergyNotes}
               onChange={(e) => setAllergyNotes(e.target.value)}
               rows={2}
-              placeholder="Please list any food allergies or dietary restrictions"
+              placeholder={t('guest.cart.allergyPlaceholder')}
               className="w-full rounded-[10px] border border-champagne/15 bg-champagne/[0.06] p-3 font-body text-champagne"
             />
-            <p className="text-[0.72rem] text-red-400/70">⚠ Our team will be informed. Always verify with your server.</p>
+            <p className="text-[0.72rem] text-red-400/70">{t('guest.cart.allergyWarning')}</p>
           </>
         ) : null}
       </div>
@@ -306,14 +314,13 @@ export function CartScreen({
       {cart.totalItems > 0 && cart.estimatedPrepMinutes > 0 ? (
         <div className="mx-4 mt-4 rounded-[10px] border border-gold/30 bg-gold/10 px-3.5 py-3">
           <p className="font-body text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-gold/90">
-            Estimated kitchen time
+            {t('guest.cart.estPrepTitle')}
           </p>
           <p className="mt-1 font-body text-[0.95rem] font-semibold text-champagne">
-            About {cart.estimatedPrepMinutes} minutes
+            {t('guest.cart.estPrepMinutes', { minutes: cart.estimatedPrepMinutes })}
           </p>
           <p className="mt-1 font-body text-[0.7rem] leading-snug text-[var(--text-muted)]">
-            Same model as the restaurant system: busy service or item mix can change real timing; your server can
-            confirm.
+            {t('guest.cart.estPrepDisclaimer')}
           </p>
         </div>
       ) : null}
@@ -345,7 +352,7 @@ export function CartScreen({
             transition={{ duration: 0.4 }}
             className="min-h-[48px] w-full rounded-xl border-2 border-red-500/60 bg-red-500/[0.12] px-4 font-body text-[0.9rem] font-bold uppercase tracking-[0.1em] text-red-300 shadow-[0_0_20px_rgba(239,68,68,0.12)] transition-colors active:bg-red-500/20"
           >
-            Clear order
+            {t('guest.cart.clearOrder')}
           </motion.button>
           <button
             type="button"
@@ -356,10 +363,10 @@ export function CartScreen({
             {submitting ? (
               <>
                 <Loader2 className="h-5 w-5 animate-spin" />
-                Sending…
+                {t('guest.cart.sending')}
               </>
             ) : (
-              'Send Order to Server'
+              t('guest.cart.sendToServer')
             )}
           </button>
         </div>
@@ -367,9 +374,9 @@ export function CartScreen({
 
       <ConfirmDialog
         open={clearDialogOpen}
-        title="Clear order?"
-        confirmLabel="Clear all"
-        cancelLabel="Keep order"
+        title={t('guest.cart.clearTitle')}
+        confirmLabel={t('guest.cart.clearConfirm')}
+        cancelLabel={t('guest.cart.clearCancel')}
         danger
         onConfirm={() => {
           cart.clearCart()
@@ -377,19 +384,19 @@ export function CartScreen({
         }}
         onCancel={() => setClearDialogOpen(false)}
       >
-        Clear your entire order? This cannot be undone.
+        {t('guest.cart.clearBody')}
       </ConfirmDialog>
 
       <BottomSheet open={tablePickerOpen} onClose={() => setTablePickerOpen(false)}>
         <div className="px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-0">
-          <h2 className="font-display text-2xl italic text-champagne">Select your table</h2>
+          <h2 className="font-display text-2xl italic text-champagne">{t('guest.cart.selectTableTitle')}</h2>
           <GoldDivider className="my-3" />
           <p className="mb-3 font-body text-[0.8rem] text-[var(--text-muted)]">
-            Tap a table so your server can match this order to your seat.
+            {t('guest.cart.selectTableHint')}
           </p>
           <ul className="space-y-1 pb-2" role="listbox">
-            {tables.map((t) => {
-              const id = Number(t.id)
+            {tables.map((table) => {
+              const id = Number(table.id)
               const selected = manualTableId === id
               return (
                 <li key={id}>
@@ -408,11 +415,13 @@ export function CartScreen({
                     }`}
                   >
                     <span>
-                      <span className="font-mono text-[0.85rem] font-semibold text-gold/90">T{t.tableCode}</span>
-                      <span className="text-champagne/90"> — {t.name}</span>
+                      <span className="font-mono text-[0.85rem] font-semibold text-gold/90">T{table.tableCode}</span>
+                      <span className="text-champagne/90"> — {table.name}</span>
                     </span>
-                    {tableServerName(t) ? (
-                      <span className="text-[0.78rem] text-champagne/60">Server: {tableServerName(t)}</span>
+                    {tableServerName(table) ? (
+                      <span className="text-[0.78rem] text-champagne/60">
+                        {t('guest.general.serverLine', { name: tableServerName(table) })}
+                      </span>
                     ) : null}
                   </button>
                 </li>
@@ -424,7 +433,7 @@ export function CartScreen({
             onClick={() => setTablePickerOpen(false)}
             className="mt-4 w-full min-h-[48px] rounded-xl border border-champagne/20 font-body text-sm font-semibold text-champagne/80"
           >
-            Close
+            {t('common.close')}
           </button>
         </div>
       </BottomSheet>

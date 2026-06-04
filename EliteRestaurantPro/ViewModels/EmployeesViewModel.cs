@@ -9,15 +9,29 @@ using System.Windows.Input;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Utils;
 using EliteRestaurantPro.ApiClients;
+using EliteRestaurantPro.Localization;
 using EliteRestaurantPro.Services;
 using Microsoft.Win32;
 
 namespace EliteRestaurantPro.ViewModels;
 
+public sealed class LocalizedSelectOption
+{
+    public string Value { get; init; } = string.Empty;
+    public string Label { get; set; } = string.Empty;
+
+    /// <summary>EliteComboBox closed state uses <see cref="object.ToString"/> instead of DisplayMemberPath.</summary>
+    public override string ToString() => Label;
+}
+
 public class EmployeesViewModel : AdminBaseViewModel
 {
     private readonly AdminDataApiClient _data = new();
     private const string PendingSalaryReferencePrefix = "Pending salary accrual:";
+    private static readonly string[] RoleCanonical =
+        ["Admin", "Manager", "Cashier", "Server", "Chef", "Barman", "Sous Chef", "Front desk"];
+    private static readonly string[] EmploymentCanonical = ["Active", "On Leave", "Inactive"];
+    private static readonly string[] ShiftCanonical = ["Off", "Morning Shift", "Night Shift", "Full Day"];
     private int? _editingEmployeeId;
     private bool _isDialogOpen;
     private string _dialogTitle = "Add New Employee";
@@ -27,6 +41,7 @@ public class EmployeesViewModel : AdminBaseViewModel
     private string _signInId = string.Empty;
     private string _phoneNumber = string.Empty;
     private string _monthlySalaryUsdText = string.Empty;
+    private string _staffMealDiscountPercentText = "0";
     private string _joinDateText = string.Empty;
     private string _selectedEmploymentStatus = "Active";
     private string _profileImagePath = string.Empty;
@@ -48,6 +63,50 @@ public class EmployeesViewModel : AdminBaseViewModel
 
     public override string ActivePage => "Employees";
 
+    public string PageTitle => Loc.Admin("empTitle", "Employee Management");
+    public string PageSubtitle => Loc.Admin("empSubtitle", "Manage staff access, roles, and tablet PINs (stored hashed; never shown here).");
+    public string AddNewEmployeeLabel => Loc.Admin("empAddNew", "Add New Employee");
+    public string SearchTooltip => Loc.Admin("empSearchTooltip", "Search by name, role, sign-in ID, system ID, phone, or status");
+    public string PinMaskedLabel => Loc.Admin("empPinMasked", "PIN ●●●●");
+    public string NotesLabel => Loc.Admin("empNotes", "Notes");
+    public string ProfileTitle => Loc.Admin("empProfileTitle", "Employee Profile");
+    public string PerformanceTitle => Loc.Admin("empPerformance", "Performance");
+    public string AttendanceTodayTitle => Loc.Admin("empAttendanceToday", "Attendance (today)");
+    public string WorkScheduleTitle => Loc.Admin("empWorkSchedule", "Work schedule");
+    public string AttendanceStatusLabel => Loc.Admin("empStatus", "Status");
+    public string EditProfileLabel => Loc.Admin("empEditProfile", "Edit Profile");
+    public string ShiftHistoryLabel => Loc.Admin("empShiftHistory", "Shift History");
+    public string DeleteLabel => Loc.Admin("empDelete", "Delete");
+    public string CancelLabel => Loc.Common("cancel", "Cancel");
+    public string BrowseLabel => Loc.Admin("empBrowse", "Browse");
+
+    public string EmpEmployeeNameLabel => Loc.Admin("empFieldEmployeeName", "EMPLOYEE NAME");
+    public string EmpRoleLabel => Loc.Admin("empFieldRole", "ROLE");
+    public string EmpSignInIdLabel => Loc.Admin("empSignInIdLabel", "Sign-in ID");
+    public string EmpSignInIdHint => Loc.Admin("empFieldSignInIdHint", "(required for floor + kitchen tablets)");
+    public string EmpSignInIdTooltip => Loc.Admin("empFieldSignInIdTooltip", "Short ID for tablet login with PIN (letters, numbers, - or _). Not the long system Unique ID.");
+    public string EmpPinCodeLabel => Loc.Admin("empFieldPinCode", "PIN CODE");
+    public string EmpPhoneNumberLabel => Loc.Admin("empFieldPhoneNumber", "PHONE NUMBER");
+    public string EmpMonthlySalaryLabel => Loc.Admin("empFieldMonthlySalary", "MONTHLY SALARY (USD) — PAYROLL");
+    public string EmpMonthlySalaryTooltip => Loc.Admin("empFieldMonthlySalaryTooltip", "Required for payroll. Gross monthly amount in USD (calendar-prorated after join date).");
+    public string EmpStaffMealDiscountLabel => Loc.Admin("empFieldStaffMealDiscount", "STAFF MEAL DISCOUNT (%)");
+    public string EmpStaffMealDiscountTooltip => Loc.Admin("empFieldStaffMealDiscountTooltip", "Auto-applied when this employee is linked as a client on an order (0–100).");
+    public string EmpJoinDateLabel => Loc.Admin("empFieldJoinDate", "JOIN DATE (YYYY-MM-DD)");
+    public string EmpEmploymentStatusLabel => Loc.Admin("empFieldEmploymentStatus", "EMPLOYMENT STATUS");
+    public string EmpProfileImageLabel => Loc.Admin("empFieldProfileImage", "PROFILE IMAGE (OPTIONAL)");
+    public string EmpDialogNotesLabel => Loc.Admin("empFieldNotes", "NOTES");
+    public string EmpWeeklyScheduleLabel => Loc.Admin("empFieldWeeklySchedule", "WEEKLY WORK SCHEDULE");
+    public string EmpSaveEmployeeLabel => Loc.Admin("empSaveEmployee", "Save Employee");
+    public string EmpMondayLabel => Loc.Admin("empDay.monday", "Monday");
+    public string EmpTuesdayLabel => Loc.Admin("empDay.tuesday", "Tuesday");
+    public string EmpWednesdayLabel => Loc.Admin("empDay.wednesday", "Wednesday");
+    public string EmpThursdayLabel => Loc.Admin("empDay.thursday", "Thursday");
+    public string EmpFridayLabel => Loc.Admin("empDay.friday", "Friday");
+    public string EmpSaturdayLabel => Loc.Admin("empDay.saturday", "Saturday");
+    public string EmpSundayLabel => Loc.Admin("empDay.sunday", "Sunday");
+
+    public string SystemIdLabel => Loc.Admin("empSystemId", "System ID");
+
     public string SearchText
     {
         get => _searchText;
@@ -60,12 +119,19 @@ public class EmployeesViewModel : AdminBaseViewModel
     }
 
     public ObservableCollection<Employee> Employees { get; } = new();
-    public ObservableCollection<string> Roles { get; } =
-        new(["Admin", "Manager", "Cashier", "Server", "Chef", "Barman", "Sous Chef", "Front desk"]);
-    public ObservableCollection<string> EmploymentStatuses { get; } =
-        new(["Active", "On Leave", "Inactive"]);
-    public ObservableCollection<string> ShiftOptions { get; } =
-        new(["Off", "Morning Shift", "Night Shift", "Full Day"]);
+    public ObservableCollection<LocalizedSelectOption> RoleOptions { get; } = new();
+    public ObservableCollection<LocalizedSelectOption> EmploymentStatusOptions { get; } = new();
+    public ObservableCollection<LocalizedSelectOption> ShiftOptions { get; } = new();
+
+    private LocalizedSelectOption? _selectedRoleOption;
+    private LocalizedSelectOption? _selectedEmploymentStatusOption;
+    private LocalizedSelectOption? _selectedMondayShiftOption;
+    private LocalizedSelectOption? _selectedTuesdayShiftOption;
+    private LocalizedSelectOption? _selectedWednesdayShiftOption;
+    private LocalizedSelectOption? _selectedThursdayShiftOption;
+    private LocalizedSelectOption? _selectedFridayShiftOption;
+    private LocalizedSelectOption? _selectedSaturdayShiftOption;
+    private LocalizedSelectOption? _selectedSundayShiftOption;
 
     public bool IsDialogOpen
     {
@@ -85,10 +151,27 @@ public class EmployeesViewModel : AdminBaseViewModel
         set => SetField(ref _employeeName, value);
     }
 
+    public LocalizedSelectOption? SelectedRoleOption
+    {
+        get => _selectedRoleOption;
+        set
+        {
+            if (!SetField(ref _selectedRoleOption, value) || value is null)
+                return;
+            _selectedRole = value.Value;
+            OnPropertyChanged(nameof(SelectedRole));
+        }
+    }
+
     public string SelectedRole
     {
         get => _selectedRole;
-        set => SetField(ref _selectedRole, value);
+        set
+        {
+            if (!SetField(ref _selectedRole, value))
+                return;
+            SyncSelectOption(ref _selectedRoleOption, RoleOptions, value, nameof(SelectedRoleOption));
+        }
     }
 
     public string PinCode
@@ -112,10 +195,10 @@ public class EmployeesViewModel : AdminBaseViewModel
     /// <summary>Context-sensitive help next to the PIN field (add vs edit, PIN present or not).</summary>
     public string PinFieldHelpText =>
         !_editingEmployeeId.HasValue
-            ? "Tablet login PIN — required for roles that sign in on tablets."
+            ? Loc.Admin("empPinHelpAdd", "Tablet login PIN — required for roles that sign in on tablets.")
             : PinStoredOnAccount
-                ? "PIN is set on this account (stored securely). The field is intentionally blank — type a new PIN only to change it."
-                : "No PIN on file yet. Enter one if this role requires tablet login.";
+                ? Loc.Admin("empPinHelpEditSet", "PIN is set on this account (stored securely). The field is intentionally blank — type a new PIN only to change it.")
+                : Loc.Admin("empPinHelpEditUnset", "No PIN on file yet. Enter one if this role requires tablet login.");
 
     /// <summary>Short ID for server/cashier tablet login (required for those roles).</summary>
     public string SignInId
@@ -136,16 +219,39 @@ public class EmployeesViewModel : AdminBaseViewModel
         set => SetField(ref _monthlySalaryUsdText, value);
     }
 
+    public string StaffMealDiscountPercentText
+    {
+        get => _staffMealDiscountPercentText;
+        set => SetField(ref _staffMealDiscountPercentText, value);
+    }
+
     public string JoinDateText
     {
         get => _joinDateText;
         set => SetField(ref _joinDateText, value);
     }
 
+    public LocalizedSelectOption? SelectedEmploymentStatusOption
+    {
+        get => _selectedEmploymentStatusOption;
+        set
+        {
+            if (!SetField(ref _selectedEmploymentStatusOption, value) || value is null)
+                return;
+            _selectedEmploymentStatus = value.Value;
+            OnPropertyChanged(nameof(SelectedEmploymentStatus));
+        }
+    }
+
     public string SelectedEmploymentStatus
     {
         get => _selectedEmploymentStatus;
-        set => SetField(ref _selectedEmploymentStatus, value);
+        set
+        {
+            if (!SetField(ref _selectedEmploymentStatus, value))
+                return;
+            SyncSelectOption(ref _selectedEmploymentStatusOption, EmploymentStatusOptions, value, nameof(SelectedEmploymentStatusOption));
+        }
     }
 
     public string ProfileImagePath
@@ -165,50 +271,94 @@ public class EmployeesViewModel : AdminBaseViewModel
         set => SetField(ref _employeeNotes, value);
     }
 
+    public LocalizedSelectOption? SelectedMondayShiftOption
+    {
+        get => _selectedMondayShiftOption;
+        set => SetShiftOption(ref _selectedMondayShiftOption, value, ref _mondayShift, nameof(MondayShift), nameof(SelectedMondayShiftOption));
+    }
+
     public string MondayShift
     {
         get => _mondayShift;
-        set => SetField(ref _mondayShift, value);
+        set => SetShiftCanonical(ref _mondayShift, value, ref _selectedMondayShiftOption, nameof(SelectedMondayShiftOption));
+    }
+
+    public LocalizedSelectOption? SelectedTuesdayShiftOption
+    {
+        get => _selectedTuesdayShiftOption;
+        set => SetShiftOption(ref _selectedTuesdayShiftOption, value, ref _tuesdayShift, nameof(TuesdayShift), nameof(SelectedTuesdayShiftOption));
     }
 
     public string TuesdayShift
     {
         get => _tuesdayShift;
-        set => SetField(ref _tuesdayShift, value);
+        set => SetShiftCanonical(ref _tuesdayShift, value, ref _selectedTuesdayShiftOption, nameof(SelectedTuesdayShiftOption));
+    }
+
+    public LocalizedSelectOption? SelectedWednesdayShiftOption
+    {
+        get => _selectedWednesdayShiftOption;
+        set => SetShiftOption(ref _selectedWednesdayShiftOption, value, ref _wednesdayShift, nameof(WednesdayShift), nameof(SelectedWednesdayShiftOption));
     }
 
     public string WednesdayShift
     {
         get => _wednesdayShift;
-        set => SetField(ref _wednesdayShift, value);
+        set => SetShiftCanonical(ref _wednesdayShift, value, ref _selectedWednesdayShiftOption, nameof(SelectedWednesdayShiftOption));
+    }
+
+    public LocalizedSelectOption? SelectedThursdayShiftOption
+    {
+        get => _selectedThursdayShiftOption;
+        set => SetShiftOption(ref _selectedThursdayShiftOption, value, ref _thursdayShift, nameof(ThursdayShift), nameof(SelectedThursdayShiftOption));
     }
 
     public string ThursdayShift
     {
         get => _thursdayShift;
-        set => SetField(ref _thursdayShift, value);
+        set => SetShiftCanonical(ref _thursdayShift, value, ref _selectedThursdayShiftOption, nameof(SelectedThursdayShiftOption));
+    }
+
+    public LocalizedSelectOption? SelectedFridayShiftOption
+    {
+        get => _selectedFridayShiftOption;
+        set => SetShiftOption(ref _selectedFridayShiftOption, value, ref _fridayShift, nameof(FridayShift), nameof(SelectedFridayShiftOption));
     }
 
     public string FridayShift
     {
         get => _fridayShift;
-        set => SetField(ref _fridayShift, value);
+        set => SetShiftCanonical(ref _fridayShift, value, ref _selectedFridayShiftOption, nameof(SelectedFridayShiftOption));
+    }
+
+    public LocalizedSelectOption? SelectedSaturdayShiftOption
+    {
+        get => _selectedSaturdayShiftOption;
+        set => SetShiftOption(ref _selectedSaturdayShiftOption, value, ref _saturdayShift, nameof(SaturdayShift), nameof(SelectedSaturdayShiftOption));
     }
 
     public string SaturdayShift
     {
         get => _saturdayShift;
-        set => SetField(ref _saturdayShift, value);
+        set => SetShiftCanonical(ref _saturdayShift, value, ref _selectedSaturdayShiftOption, nameof(SelectedSaturdayShiftOption));
+    }
+
+    public LocalizedSelectOption? SelectedSundayShiftOption
+    {
+        get => _selectedSundayShiftOption;
+        set => SetShiftOption(ref _selectedSundayShiftOption, value, ref _sundayShift, nameof(SundayShift), nameof(SelectedSundayShiftOption));
     }
 
     public string SundayShift
     {
         get => _sundayShift;
-        set => SetField(ref _sundayShift, value);
+        set => SetShiftCanonical(ref _sundayShift, value, ref _selectedSundayShiftOption, nameof(SelectedSundayShiftOption));
     }
 
     public string SelectedImageFileName =>
-        string.IsNullOrWhiteSpace(ProfileImagePath) ? "No image selected" : Path.GetFileName(ProfileImagePath);
+        string.IsNullOrWhiteSpace(ProfileImagePath)
+            ? Loc.Admin("empNoImageSelected", "No image selected")
+            : Path.GetFileName(ProfileImagePath);
 
     public bool IsShiftHistoryOpen
     {
@@ -263,7 +413,77 @@ public class EmployeesViewModel : AdminBaseViewModel
         ShowShiftHistoryCommand = new RelayCommand(employee => _ = ShowShiftHistoryAsync(employee as Employee));
         CloseShiftHistoryCommand = new RelayCommand(_ => CloseShiftHistory());
 
+        RebuildLocalizedSelectLists();
         _ = LoadEmployeesAsync();
+    }
+
+    private void SetShiftOption(
+        ref LocalizedSelectOption? field,
+        LocalizedSelectOption? value,
+        ref string canonical,
+        string canonicalPropertyName,
+        string optionPropertyName)
+    {
+        if (ReferenceEquals(field, value))
+            return;
+        field = value;
+        OnPropertyChanged(optionPropertyName);
+        if (value is null)
+            return;
+        canonical = value.Value;
+        OnPropertyChanged(canonicalPropertyName);
+    }
+
+    private void SetShiftCanonical(
+        ref string canonical,
+        string value,
+        ref LocalizedSelectOption? field,
+        string optionPropertyName)
+    {
+        if (!SetField(ref canonical, value))
+            return;
+        SyncSelectOption(ref field, ShiftOptions, value, optionPropertyName);
+    }
+
+    private void RebuildLocalizedSelectLists()
+    {
+        RebuildOptionList(RoleOptions, RoleCanonical, AdminTextLocalizer.TranslateRole);
+        RebuildOptionList(EmploymentStatusOptions, EmploymentCanonical, AdminTextLocalizer.TranslateEmploymentStatus);
+        RebuildOptionList(ShiftOptions, ShiftCanonical, AdminTextLocalizer.TranslateShift);
+
+        SyncSelectOption(ref _selectedRoleOption, RoleOptions, SelectedRole, nameof(SelectedRoleOption));
+        SyncSelectOption(ref _selectedEmploymentStatusOption, EmploymentStatusOptions, SelectedEmploymentStatus, nameof(SelectedEmploymentStatusOption));
+        SyncSelectOption(ref _selectedMondayShiftOption, ShiftOptions, MondayShift, nameof(SelectedMondayShiftOption));
+        SyncSelectOption(ref _selectedTuesdayShiftOption, ShiftOptions, TuesdayShift, nameof(SelectedTuesdayShiftOption));
+        SyncSelectOption(ref _selectedWednesdayShiftOption, ShiftOptions, WednesdayShift, nameof(SelectedWednesdayShiftOption));
+        SyncSelectOption(ref _selectedThursdayShiftOption, ShiftOptions, ThursdayShift, nameof(SelectedThursdayShiftOption));
+        SyncSelectOption(ref _selectedFridayShiftOption, ShiftOptions, FridayShift, nameof(SelectedFridayShiftOption));
+        SyncSelectOption(ref _selectedSaturdayShiftOption, ShiftOptions, SaturdayShift, nameof(SelectedSaturdayShiftOption));
+        SyncSelectOption(ref _selectedSundayShiftOption, ShiftOptions, SundayShift, nameof(SelectedSundayShiftOption));
+    }
+
+    private static void RebuildOptionList(
+        ObservableCollection<LocalizedSelectOption> target,
+        IReadOnlyList<string> canonicalValues,
+        Func<string?, string> translate)
+    {
+        target.Clear();
+        foreach (var value in canonicalValues)
+            target.Add(new LocalizedSelectOption { Value = value, Label = translate(value) });
+    }
+
+    private void SyncSelectOption(
+        ref LocalizedSelectOption? field,
+        IEnumerable<LocalizedSelectOption> options,
+        string canonical,
+        string propertyName)
+    {
+        var match = options.FirstOrDefault(o => o.Value.Equals(canonical, StringComparison.OrdinalIgnoreCase))
+                    ?? options.FirstOrDefault();
+        if (ReferenceEquals(field, match))
+            return;
+        field = match;
+        OnPropertyChanged(propertyName);
     }
 
     private async Task LoadEmployeesAsync()
@@ -345,6 +565,7 @@ public class EmployeesViewModel : AdminBaseViewModel
                     employee.PendingSalaryToday = 0m;
 
                 employee.RebuildScheduleDays();
+                EmployeeUiLocalizer.Apply(employee);
                 _allEmployees.Add(employee);
             }
         }
@@ -352,7 +573,7 @@ public class EmployeesViewModel : AdminBaseViewModel
         {
             MessageBox.Show(
                 ex.GetBaseException().Message,
-                "Could not load employees",
+                Loc.Admin("empLoadFailed", "Could not load employees"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
@@ -387,15 +608,15 @@ public class EmployeesViewModel : AdminBaseViewModel
     private void OpenAddDialog()
     {
         _editingEmployeeId = null;
-        DialogTitle = "Add New Employee";
+        DialogTitle = Loc.Admin("empAddDialog", "Add New Employee");
         EmployeeName = string.Empty;
-        SelectedRole = Roles.First();
+        SelectedRole = RoleCanonical[0];
         PinCode = string.Empty;
         SignInId = string.Empty;
         PhoneNumber = string.Empty;
         MonthlySalaryUsdText = string.Empty;
         JoinDateText = DateTime.Today.ToString("yyyy-MM-dd");
-        SelectedEmploymentStatus = EmploymentStatuses.First();
+        SelectedEmploymentStatus = EmploymentCanonical[0];
         ProfileImagePath = string.Empty;
         EmployeeNotes = string.Empty;
         MondayShift = "Off";
@@ -414,13 +635,14 @@ public class EmployeesViewModel : AdminBaseViewModel
         if (employee is null) return;
 
         _editingEmployeeId = employee.Id;
-        DialogTitle = "Edit Employee";
+        DialogTitle = Loc.Admin("empEditDialog", "Edit Employee");
         EmployeeName = employee.Name;
         SelectedRole = employee.Role;
         PinCode = string.Empty;
         SignInId = employee.SignInId;
         PhoneNumber = employee.PhoneNumber;
         MonthlySalaryUsdText = employee.MonthlySalaryUSD.ToString("0.##", CultureInfo.InvariantCulture);
+        StaffMealDiscountPercentText = employee.StaffMealDiscountPercent.ToString("0.##", CultureInfo.InvariantCulture);
         JoinDateText = employee.JoinDate.ToString("yyyy-MM-dd");
         SelectedEmploymentStatus = string.IsNullOrWhiteSpace(employee.EmploymentStatus) ? "Active" : employee.EmploymentStatus;
         ProfileImagePath = employee.ProfileImagePath;
@@ -474,6 +696,10 @@ public class EmployeesViewModel : AdminBaseViewModel
         if (!decimal.TryParse(MonthlySalaryUsdText.Trim(), NumberStyles.Number, CultureInfo.InvariantCulture, out var monthlySalaryUsd))
             monthlySalaryUsd = 0m;
         monthlySalaryUsd = Math.Round(Math.Max(0m, monthlySalaryUsd), 2);
+
+        if (!decimal.TryParse(StaffMealDiscountPercentText.Trim(), NumberStyles.Number, CultureInfo.InvariantCulture, out var staffDiscountPct))
+            staffDiscountPct = 0m;
+        staffDiscountPct = Math.Clamp(Math.Round(staffDiscountPct, 2), 0m, 100m);
 
         if (monthlySalaryUsd <= 0m)
         {
@@ -603,7 +829,8 @@ public class EmployeesViewModel : AdminBaseViewModel
                     ThursdayShift = thursdayShift,
                     FridayShift = fridayShift,
                     SaturdayShift = saturdayShift,
-                    SundayShift = sundayShift
+                    SundayShift = sundayShift,
+                    StaffMealDiscountPercent = staffDiscountPct
                 };
 
                 DesktopCloudPersistence.PushUpsertBlocking(toSave);
@@ -639,7 +866,8 @@ public class EmployeesViewModel : AdminBaseViewModel
                     ThursdayShift = thursdayShift,
                     FridayShift = fridayShift,
                     SaturdayShift = saturdayShift,
-                    SundayShift = sundayShift
+                    SundayShift = sundayShift,
+                    StaffMealDiscountPercent = staffDiscountPct
                 };
 
                 DesktopCloudPersistence.PushUpsertBlocking(newEmployee);
@@ -720,8 +948,8 @@ public class EmployeesViewModel : AdminBaseViewModel
         if (employee is null)
             return;
 
-        ShiftHistoryTitle = $"Shift history — {employee.Name}";
-        ShiftHistoryBanner = "Loading…";
+        ShiftHistoryTitle = AdminTextLocalizer.FormatShiftHistoryTitle(employee.Name);
+        ShiftHistoryBanner = AdminTextLocalizer.ShiftHistoryLoadingText;
         ShiftHistorySubtitle = string.Empty;
         ShiftHistoryRows.Clear();
         IsShiftHistoryOpen = true;
@@ -755,18 +983,18 @@ public class EmployeesViewModel : AdminBaseViewModel
                 ShiftHistoryRows.Add(new ShiftHistoryRowViewModel
                 {
                     WorkDateDisplay = a.WorkDate.ToString("ddd yyyy-MM-dd", CultureInfo.CurrentCulture),
-                    ShiftType = shiftDefinition.Name,
+                    ShiftType = AdminTextLocalizer.TranslateShift(shiftDefinition.Name),
                     ClockIn = a.ClockInTime?.ToString("HH:mm", CultureInfo.CurrentCulture) ?? "—",
                     ClockOut = a.ClockOutTime?.ToString("HH:mm", CultureInfo.CurrentCulture) ?? "—",
-                    Status = status,
+                    Status = AdminTextLocalizer.TranslateShiftHistoryStatus(status),
                     Justification = string.IsNullOrEmpty(lateJust) ? "—" : lateJust,
                     Notes = string.IsNullOrEmpty(absenceNote) ? "—" : absenceNote
                 });
             }
 
-            ShiftHistorySubtitle = history.Count == 1 ? "1 row" : $"{history.Count} rows";
+            ShiftHistorySubtitle = AdminTextLocalizer.FormatShiftHistoryRowCount(history.Count);
             ShiftHistoryBanner = history.Count == 0
-                ? "No attendance rows stored for this employee yet."
+                ? AdminTextLocalizer.ShiftHistoryEmptyText
                 : string.Empty;
         }
         catch (Exception ex)
@@ -791,6 +1019,66 @@ public class EmployeesViewModel : AdminBaseViewModel
         return int.TryParse(token, NumberStyles.Integer, CultureInfo.InvariantCulture, out var employeeId)
             ? employeeId
             : null;
+    }
+
+    protected override void RefreshLocalizedStrings()
+    {
+        base.RefreshLocalizedStrings();
+        RebuildLocalizedSelectLists();
+        Notify(
+            nameof(PageTitle),
+            nameof(PageSubtitle),
+            nameof(AddNewEmployeeLabel),
+            nameof(SearchTooltip),
+            nameof(PinMaskedLabel),
+            nameof(NotesLabel),
+            nameof(ProfileTitle),
+            nameof(PerformanceTitle),
+            nameof(AttendanceTodayTitle),
+            nameof(WorkScheduleTitle),
+            nameof(AttendanceStatusLabel),
+            nameof(EditProfileLabel),
+            nameof(ShiftHistoryLabel),
+            nameof(DeleteLabel),
+            nameof(CancelLabel),
+            nameof(BrowseLabel),
+            nameof(SystemIdLabel),
+            nameof(EmpEmployeeNameLabel),
+            nameof(EmpRoleLabel),
+            nameof(EmpSignInIdLabel),
+            nameof(EmpSignInIdHint),
+            nameof(EmpSignInIdTooltip),
+            nameof(EmpPinCodeLabel),
+            nameof(EmpPhoneNumberLabel),
+            nameof(EmpMonthlySalaryLabel),
+            nameof(EmpMonthlySalaryTooltip),
+            nameof(EmpStaffMealDiscountLabel),
+            nameof(EmpStaffMealDiscountTooltip),
+            nameof(EmpJoinDateLabel),
+            nameof(EmpEmploymentStatusLabel),
+            nameof(EmpProfileImageLabel),
+            nameof(EmpDialogNotesLabel),
+            nameof(EmpWeeklyScheduleLabel),
+            nameof(EmpSaveEmployeeLabel),
+            nameof(EmpMondayLabel),
+            nameof(EmpTuesdayLabel),
+            nameof(EmpWednesdayLabel),
+            nameof(EmpThursdayLabel),
+            nameof(EmpFridayLabel),
+            nameof(EmpSaturdayLabel),
+            nameof(EmpSundayLabel),
+            nameof(SelectedImageFileName),
+            nameof(PinFieldHelpText));
+
+        foreach (var employee in _allEmployees)
+            EmployeeUiLocalizer.Apply(employee);
+
+        if (IsDialogOpen)
+            DialogTitle = _editingEmployeeId.HasValue
+                ? Loc.Admin("empEditDialog", "Edit Employee")
+                : Loc.Admin("empAddDialog", "Add New Employee");
+
+        ApplyEmployeeFilter();
     }
 
 }

@@ -19,3 +19,19 @@ export function getMenuKind(product) {
 export function isDrinkProduct(product) {
   return getMenuKind(product) === 'drink'
 }
+
+/**
+ * @param {{ product: Record<string, unknown> }[]} lines
+ * @returns {'food' | 'drink' | 'mixed'}
+ */
+export function inferOrderKindFromLines(lines) {
+  let sawFood = false
+  let sawDrink = false
+  for (const line of lines) {
+    if (getMenuKind(line.product) === 'drink') sawDrink = true
+    else sawFood = true
+    if (sawFood && sawDrink) return 'mixed'
+  }
+  if (sawDrink) return 'drink'
+  return 'food'
+}

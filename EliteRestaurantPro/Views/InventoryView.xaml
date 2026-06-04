@@ -28,11 +28,11 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Row="0" Grid.Column="0">
-                    <TextBlock Style="{StaticResource HeadingLarge}" FontSize="26">
-                        <Run Text="Inventory" Foreground="{StaticResource TextPrimaryBrush}"/>
-                        <Run Text=" Items" Foreground="{StaticResource GoldAccentBrush}"/>
-                    </TextBlock>
-                    <TextBlock Text="Single food/ingredient records with unique IDs."
+                    <TextBlock Text="{Binding InvTitle}"
+                               Style="{StaticResource HeadingLarge}"
+                               FontSize="26"
+                               Foreground="{StaticResource TextPrimaryBrush}"/>
+                    <TextBlock Text="{Binding InvSubtitle}"
                                Style="{StaticResource BodyText}"
                                FontSize="13"
                                Margin="0,5,0,0"/>
@@ -42,16 +42,15 @@
                     <Button Width="168"
                             Margin="0,0,10,0"
                             Command="{Binding ToggleExpirationViewCommand}"
-                            ToolTip="Sort by expiry date (most urgent first) and show red / orange / blue on each card. Click again to return to alphabetical list.">
+                            Content="{Binding InvSortExpLabel}"
+                            ToolTip="{Binding InvSortExpTooltip}">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
                                 <Setter Property="Padding" Value="16,10"/>
-                                <Setter Property="Content" Value="By expiration"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding ExpirationViewActive}" Value="True">
                                         <Setter Property="BorderBrush" Value="{StaticResource GoldAccentBrush}"/>
                                         <Setter Property="BorderThickness" Value="1"/>
-                                        <Setter Property="Content" Value="By expiration ✓"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -60,23 +59,22 @@
                     <Button Width="150"
                             Margin="0,0,10,0"
                             Command="{Binding ToggleQuantityViewCommand}"
-                            ToolTip="Sort by stock quantity (lowest first) and show stock urgency colors. Click again to return to alphabetical list.">
+                            Content="{Binding InvSortQtyLabel}"
+                            ToolTip="{Binding InvSortQtyTooltip}">
                         <Button.Style>
                             <Style TargetType="Button" BasedOn="{StaticResource GhostButton}">
                                 <Setter Property="Padding" Value="16,10"/>
-                                <Setter Property="Content" Value="By quantity"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding QuantityViewActive}" Value="True">
                                         <Setter Property="BorderBrush" Value="{StaticResource GoldAccentBrush}"/>
                                         <Setter Property="BorderThickness" Value="1"/>
-                                        <Setter Property="Content" Value="By quantity ✓"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </Button.Style>
                     </Button>
                     <Button Width="150"
-                            Content="Add Inventory"
+                            Content="{Binding InvAddItemLabel}"
                             Command="{Binding OpenAddDialogCommand}"
                             Style="{StaticResource GoldPrimaryButton}"
                             Visibility="{Binding ShowInventoryManagementChrome, Converter={StaticResource BoolToVisibilityConverter}}"/>
@@ -89,32 +87,32 @@
                          MinHeight="42"
                          FontSize="13"
                          Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                         ToolTip="Search by name, ID, unit, stock, notes, or expiry"/>
+                         ToolTip="{Binding InvSearchTooltip}"/>
 
                 <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Margin="0,10,0,0"
                             Visibility="{Binding ExpirationViewActive, Converter={StaticResource BoolToVisibilityConverter}}">
                     <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="12" TextWrapping="Wrap">
-                        <Run Text="Color key: " FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}"/>
-                        <Run Text="Red" Foreground="{StaticResource StatRedBrush}" FontWeight="SemiBold"/>
-                        <Run Text=" — expired or ≤7 days  ·  " Foreground="{StaticResource TextMutedBrush}"/>
-                        <Run Text="Orange" Foreground="{StaticResource StatOrangeBrush}" FontWeight="SemiBold"/>
-                        <Run Text=" — 8–14 days  ·  " Foreground="{StaticResource TextMutedBrush}"/>
-                        <Run Text="Blue" Foreground="{StaticResource StatBlueBrush}" FontWeight="SemiBold"/>
-                        <Run Text=" — 15+ days  ·  " Foreground="{StaticResource TextMutedBrush}"/>
-                        <Run Text="Neutral" Foreground="#8899AABB" FontWeight="SemiBold"/>
-                        <Run Text=" — no expiry date set" Foreground="{StaticResource TextMutedBrush}"/>
+                        <Run Text="{Binding InvColorKeyLabel, Mode=OneWay}" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        <Run Text="{Binding InvColorRed, Mode=OneWay}" Foreground="{StaticResource StatRedBrush}" FontWeight="SemiBold"/>
+                        <Run Text="{Binding InvExpColorRedDesc, Mode=OneWay}" Foreground="{StaticResource TextMutedBrush}"/>
+                        <Run Text="{Binding InvColorOrange, Mode=OneWay}" Foreground="{StaticResource StatOrangeBrush}" FontWeight="SemiBold"/>
+                        <Run Text="{Binding InvExpColorOrangeDesc, Mode=OneWay}" Foreground="{StaticResource TextMutedBrush}"/>
+                        <Run Text="{Binding InvColorBlue, Mode=OneWay}" Foreground="{StaticResource StatBlueBrush}" FontWeight="SemiBold"/>
+                        <Run Text="{Binding InvExpColorBlueDesc, Mode=OneWay}" Foreground="{StaticResource TextMutedBrush}"/>
+                        <Run Text="{Binding InvColorNeutral, Mode=OneWay}" Foreground="#8899AABB" FontWeight="SemiBold"/>
+                        <Run Text="{Binding InvExpColorNeutralDesc, Mode=OneWay}" Foreground="{StaticResource TextMutedBrush}"/>
                     </TextBlock>
                 </StackPanel>
                 <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Margin="0,10,0,0"
                             Visibility="{Binding QuantityViewActive, Converter={StaticResource BoolToVisibilityConverter}}">
                     <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="12" TextWrapping="Wrap">
-                        <Run Text="Color key: " FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}"/>
-                        <Run Text="Red" Foreground="{StaticResource StatRedBrush}" FontWeight="SemiBold"/>
-                        <Run Text=" — out / critical stock (≤3)  ·  " Foreground="{StaticResource TextMutedBrush}"/>
-                        <Run Text="Orange" Foreground="{StaticResource StatOrangeBrush}" FontWeight="SemiBold"/>
-                        <Run Text=" — low stock (4–10)  ·  " Foreground="{StaticResource TextMutedBrush}"/>
-                        <Run Text="Blue" Foreground="{StaticResource StatBlueBrush}" FontWeight="SemiBold"/>
-                        <Run Text=" — healthy stock (11+)" Foreground="{StaticResource TextMutedBrush}"/>
+                        <Run Text="{Binding InvColorKeyLabel, Mode=OneWay}" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        <Run Text="{Binding InvColorRed, Mode=OneWay}" Foreground="{StaticResource StatRedBrush}" FontWeight="SemiBold"/>
+                        <Run Text="{Binding InvQtyColorRedDesc, Mode=OneWay}" Foreground="{StaticResource TextMutedBrush}"/>
+                        <Run Text="{Binding InvColorOrange, Mode=OneWay}" Foreground="{StaticResource StatOrangeBrush}" FontWeight="SemiBold"/>
+                        <Run Text="{Binding InvQtyColorOrangeDesc, Mode=OneWay}" Foreground="{StaticResource TextMutedBrush}"/>
+                        <Run Text="{Binding InvColorBlue, Mode=OneWay}" Foreground="{StaticResource StatBlueBrush}" FontWeight="SemiBold"/>
+                        <Run Text="{Binding InvQtyColorBlueDesc, Mode=OneWay}" Foreground="{StaticResource TextMutedBrush}"/>
                     </TextBlock>
                 </StackPanel>
             </Grid>
@@ -216,17 +214,18 @@
                                         <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="17"/>
                                         <TextBlock Text="{Binding UniqueId}" Foreground="{StaticResource TextMutedBrush}" FontFamily="Consolas" FontSize="11" Margin="0,2,0,0"/>
                                         <TextBlock Foreground="{StaticResource StatBlueBrush}" FontSize="12" Margin="0,6,0,0">
-                                            <Run Text="Stock: "/>
+                                            <Run Text="{Binding DataContext.InvStockPrefix, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}"/>
+                                            <Run Text=" "/>
                                             <Run Text="{Binding StockQuantity, StringFormat={}{0:0.##}}"/>
                                             <Run Text=" "/>
                                             <Run Text="{Binding Unit}"/>
                                         </TextBlock>
                                         <StackPanel Orientation="Horizontal" Margin="0,4,0,0"
                                                     Visibility="{Binding DataContext.QuantityViewActive, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}">
-                                            <TextBlock Text="Stock status: "
+                                            <TextBlock Text="{Binding DataContext.InvStockStatusPrefix, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}"
                                                        Foreground="{StaticResource TextMutedBrush}"
                                                        FontSize="11"/>
-                                            <TextBlock Text="{Binding QuantityStatus, Mode=OneWay}"
+                                            <TextBlock Text="{Binding DisplayQuantityStatus, Mode=OneWay}"
                                                        FontSize="11"
                                                        FontWeight="SemiBold">
                                                 <TextBlock.Style>
@@ -248,8 +247,9 @@
                                             </TextBlock>
                                         </StackPanel>
                                         <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,4,0,0">
-                                            <Run Text="Expires: "/>
-                                            <Run Text="{Binding ExpirationDate, StringFormat={}{0:yyyy-MM-dd}, TargetNullValue=N/A}"/>
+                                            <Run Text="{Binding DataContext.InvExpiresPrefix, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}"/>
+                                            <Run Text=" "/>
+                                            <Run Text="{Binding DisplayExpirationDateText, Mode=OneWay}"/>
                                         </TextBlock>
                                         <StackPanel Orientation="Horizontal" Margin="0,6,0,0" VerticalAlignment="Center">
                                             <TextBlock Text="⌛"
@@ -295,14 +295,12 @@
                                                         </Style.Triggers>
                                                     </Style>
                                                 </TextBlock.Style>
-                                                <Run Text="{Binding ExpirationStatus, Mode=OneWay}"/>
-                                                <Run Text=" · "/>
-                                                <Run Text="{Binding DaysUntilExpiration, Mode=OneWay, StringFormat={}{0} day(s), TargetNullValue=No timer}"/>
+                                                <Run Text="{Binding DisplayShelfStatusLine, Mode=OneWay}"/>
                                             </TextBlock>
                                         </StackPanel>
                                         <Border BorderBrush="#22FFFFFF" BorderThickness="1" CornerRadius="6" Margin="0,6,0,0" Padding="6">
                                             <ScrollViewer Height="48" VerticalScrollBarVisibility="Auto" Style="{StaticResource EliteScrollViewer}">
-                                                <TextBlock Text="{Binding Notes, TargetNullValue=No notes}"
+                                                <TextBlock Text="{Binding DisplayNotesForView, Mode=OneWay}"
                                                            Foreground="{StaticResource TextMutedBrush}"
                                                            FontSize="11"
                                                            TextWrapping="Wrap"/>
@@ -312,20 +310,20 @@
 
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="12,0,8,0">
                                         <Button Width="90" Margin="0,0,8,0"
-                                                Content="Edit"
+                                                Content="{Binding DataContext.InvEditLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 Command="{Binding DataContext.EditItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}"
                                                 Style="{StaticResource SapphireButton}"
                                                 Visibility="{Binding DataContext.ShowInventoryManagementChrome, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                         <Button Width="90"
-                                                Content="Add/Deduct"
+                                                Content="{Binding DataContext.InvAddDeductLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 Command="{Binding DataContext.OpenAdjustDialogCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}"
                                                 Style="{StaticResource GoldPrimaryButton}"
                                                 Visibility="{Binding DataContext.ShowInventoryAdjustmentChrome, RelativeSource={RelativeSource AncestorType=UserControl}, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                     </StackPanel>
                                     <Button Grid.Column="2" Width="90"
-                                            Content="Delete"
+                                            Content="{Binding DataContext.InvDeleteLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                             Command="{Binding DataContext.DeleteItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                             CommandParameter="{Binding}"
                                             Style="{StaticResource DangerButton}"
@@ -344,9 +342,9 @@
                 <Border Style="{StaticResource DialogCard}" HorizontalAlignment="Center" VerticalAlignment="Center" Width="440">
                     <StackPanel>
                         <TextBlock Text="{Binding DialogTitle}" Style="{StaticResource HeadingMedium}" FontSize="22"/>
-                        <TextBlock Text="ITEM NAME" Style="{StaticResource HeadingSmall}" Margin="0,22,0,8"/>
+                        <TextBlock Text="{Binding InvItemNameLabel}" Style="{StaticResource HeadingSmall}" Margin="0,22,0,8"/>
                         <TextBox Text="{Binding ItemName, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                        <TextBlock Text="UNIT" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                        <TextBlock Text="{Binding InvUnitLabel}" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
                         <TextBox Text="{Binding Unit, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
                         <StackPanel Margin="0,18,0,0">
                             <StackPanel.Style>
@@ -359,13 +357,14 @@
                                     </Style.Triggers>
                                 </Style>
                             </StackPanel.Style>
-                            <TextBlock Text="STOCK QUANTITY" Style="{StaticResource HeadingSmall}" Margin="0,0,0,8"/>
+                            <TextBlock Text="{Binding InvStockQtyLabel}" Style="{StaticResource HeadingSmall}" Margin="0,0,0,8"/>
                             <TextBox Text="{Binding StockText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
                         </StackPanel>
-                        <TextBlock Text="EXPIRATION DATE (YYYY-MM-DD)" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                        <TextBlock Text="{Binding InvExpirationDateLabel}" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
                         <TextBox Text="{Binding ExpirationDateText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                        <TextBlock Text="NOTES" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                        <TextBlock Text="{Binding InvNotesLabel}" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
                         <TextBox Text="{Binding Notes, UpdateSourceTrigger=PropertyChanged}"
+                                 IsReadOnly="{Binding IsEditingExistingItem}"
                                  Height="90"
                                  TextWrapping="Wrap"
                                  AcceptsReturn="True"
@@ -381,8 +380,8 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Button Grid.Column="0" Content="Cancel" Margin="0,0,8,0" Command="{Binding CancelDialogCommand}" Style="{StaticResource GhostButton}"/>
-                            <Button Grid.Column="1" Content="Save Item" Margin="8,0,0,0" Command="{Binding SaveItemCommand}" Style="{StaticResource GoldPrimaryButton}"/>
+                            <Button Grid.Column="0" Content="{Binding InvCancelLabel}" Margin="0,0,8,0" Command="{Binding CancelDialogCommand}" Style="{StaticResource GhostButton}"/>
+                            <Button Grid.Column="1" Content="{Binding InvSaveItemLabel}" Margin="8,0,0,0" Command="{Binding SaveItemCommand}" Style="{StaticResource GoldPrimaryButton}"/>
                         </Grid>
                     </StackPanel>
                 </Border>
@@ -393,19 +392,21 @@
                   Visibility="{Binding IsAdjustmentDialogOpen, Converter={StaticResource BoolToVisibilityConverter}}">
                 <Border Style="{StaticResource DialogCard}" HorizontalAlignment="Center" VerticalAlignment="Center" Width="460">
                     <StackPanel>
-                        <TextBlock Text="Manual Inventory Deduction" Style="{StaticResource HeadingMedium}" FontSize="22"/>
+                        <TextBlock Text="{Binding InvAdjustmentTitle}" Style="{StaticResource HeadingMedium}" FontSize="22"/>
                         <TextBlock Text="{Binding AdjustmentItemName}" Foreground="{StaticResource TextMutedBrush}" Margin="0,6,0,0"/>
 
-                        <TextBlock Text="DEDUCT QUANTITY" Style="{StaticResource HeadingSmall}" Margin="0,22,0,8"/>
-                        <ComboBox ItemsSource="{Binding AdjustmentTypes}"
-                                  SelectedItem="{Binding SelectedAdjustmentType}"
+                        <TextBlock Text="{Binding InvAdjustmentTypeLabel}" Style="{StaticResource HeadingSmall}" Margin="0,22,0,8"/>
+                        <ComboBox ItemsSource="{Binding AdjustmentTypeOptions}"
+                                  DisplayMemberPath="Label"
+                                  SelectedValuePath="Key"
+                                  SelectedValue="{Binding SelectedAdjustmentType}"
                                   Style="{StaticResource EliteComboBox}"
                                   ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
 
-                        <TextBlock Text="QUANTITY" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                        <TextBlock Text="{Binding InvQuantityLabel}" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
                         <TextBox Text="{Binding AdjustmentQuantityText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
 
-                        <TextBlock Text="COMMENT (required)" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                        <TextBlock Text="{Binding InvCommentRequiredLabel}" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
                         <TextBox Text="{Binding AdjustmentComment, UpdateSourceTrigger=PropertyChanged}"
                                  Height="90"
                                  TextWrapping="Wrap"
@@ -422,8 +423,8 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Button Grid.Column="0" Content="Cancel" Margin="0,0,8,0" Command="{Binding CancelAdjustmentDialogCommand}" Style="{StaticResource GhostButton}"/>
-                            <Button Grid.Column="1" Content="Apply Deduction" Margin="8,0,0,0" Command="{Binding ApplyAdjustmentCommand}" Style="{StaticResource GoldPrimaryButton}"/>
+                            <Button Grid.Column="0" Content="{Binding InvCancelLabel}" Margin="0,0,8,0" Command="{Binding CancelAdjustmentDialogCommand}" Style="{StaticResource GhostButton}"/>
+                            <Button Grid.Column="1" Content="{Binding InvApplyAdjustmentLabel}" Margin="8,0,0,0" Command="{Binding ApplyAdjustmentCommand}" Style="{StaticResource GoldPrimaryButton}"/>
                         </Grid>
                     </StackPanel>
                 </Border>

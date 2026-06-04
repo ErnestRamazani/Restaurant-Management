@@ -21,7 +21,7 @@ public static class KitchenQueueKindFilter
                || p.Equals(PortalKitchenBar, StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>Infer Food/Drink from order lines. Returns null when empty, mixed, or products missing.</summary>
+    /// <summary>Infer Food/Drink/Mixed from order lines. Returns null when empty or products missing.</summary>
     public static string? TryInferOrderCheckKind(OrderRecord order, MenuTaxonomySettings? taxonomy = null)
     {
         var products = GetProductsFromOrder(order).ToList();

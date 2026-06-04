@@ -1,8 +1,10 @@
 import { motion } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { formatUsd } from '../../utils/format'
 
 export function CartButton({ totalItems, grandTotal, onClick }) {
+  const { t } = useTranslation()
   const empty = totalItems <= 0
   const prevCount = useRef(0)
   const [bump, setBump] = useState(0)
@@ -33,12 +35,10 @@ export function CartButton({ totalItems, grandTotal, onClick }) {
           className="pointer-events-auto mx-auto flex min-h-[3.5rem] w-full max-w-full flex-col items-center justify-center gap-0.5 rounded-[14px] bg-gradient-to-br from-gold to-[#A87820] px-4 py-2.5 text-center shadow-[0_8px_28px_rgba(200,168,76,0.35)]"
         >
           <span className="font-body text-[0.9rem] font-extrabold tracking-[0.1em] text-black">
-            View order
+            {t('guest.cart.viewOrder')}
           </span>
           <div className="flex items-baseline justify-center gap-1.5 font-mono text-[0.88rem] font-bold tabular-nums text-black/95">
-            <span>
-              {totalItems} {totalItems === 1 ? 'item' : 'items'}
-            </span>
+            <span>{t('guest.cart.itemsInOrder', { count: totalItems })}</span>
             <span className="text-black/40" aria-hidden>
               ·
             </span>

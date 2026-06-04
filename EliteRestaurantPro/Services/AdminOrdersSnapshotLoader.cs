@@ -15,6 +15,7 @@ public static class AdminOrdersSnapshotLoader
         bool canViewTicket,
         CancellationToken cancellationToken = default)
     {
+        var restaurantTimeZoneId = SettingsManager.Load().BusinessProfile.RestaurantTimeZoneId;
         var data = new AdminDataApiClient();
         var ordersTask = data.GetOrdersAsync(cancellationToken);
         var tablesTask = data.GetTablesAsync(cancellationToken);
@@ -54,7 +55,7 @@ public static class AdminOrdersSnapshotLoader
             .Where(o => o.Status == "Waiting" || o.Status == "In Kitchen" || o.Status == "Ready" ||
                         o.Status == OrderWorkflow.Served)
             .OrderByDescending(o => o.CreatedAt)
-            .Select(o => AdminOrdersViewMapper.MapOrder(o, false, showAdminAdvance, canViewTicket))
+            .Select(o => AdminOrdersViewMapper.MapOrder(o, false, showAdminAdvance, canViewTicket, restaurantTimeZoneId))
             .ToList();
 
         var pastOrders = orders
@@ -62,7 +63,7 @@ public static class AdminOrdersSnapshotLoader
                         string.Equals(o.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(o => o.CreatedAt)
             .Take(MaxPastOrdersToDisplay)
-            .Select(o => AdminOrdersViewMapper.MapOrder(o, true, showAdminAdvance, canViewTicket))
+            .Select(o => AdminOrdersViewMapper.MapOrder(o, true, showAdminAdvance, canViewTicket, restaurantTimeZoneId))
             .ToList();
 
         var availableTables = tables
@@ -106,7 +107,7 @@ public static class AdminOrdersSnapshotLoader
                 TableLabel = $"{o.TableCode} · {o.TableName}".Trim(' ', '·'),
                 ServerName = o.ServerName,
                 CreatedAt = o.CreatedAt,
-                CreatedAtText = o.CreatedAt.ToString("MMM d, yyyy · HH:mm"),
+                CreatedAtText = RestaurantTimeZone.FormatOrderCreatedAt(o.CreatedAt, restaurantTimeZoneId),
                 GrandTotalUsd = totals.GrandTotal,
                 GrandTotalText = $"$ {totals.GrandTotal:N2}",
                 LinesSummary = string.IsNullOrWhiteSpace(lines) ? "No lines" : lines

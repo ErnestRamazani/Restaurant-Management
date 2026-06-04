@@ -39,22 +39,38 @@ public static class CurrencyHelper
             ? CongoleseFranc
             : Usd;
 
-    public static string FormatAmount(decimal amount, string currencyCode)
-        => NormalizeCurrencyCode(currencyCode) == CongoleseFranc
-            ? $"FC {amount:N0}"
-            : $"$ {amount:N2}";
+    private static readonly CultureInfo DefaultMoneyCulture = CultureInfo.GetCultureInfo("en-US");
+
+    public static string FormatAmount(decimal amount, string currencyCode, CultureInfo? culture = null)
+    {
+        culture ??= DefaultMoneyCulture;
+        if (NormalizeCurrencyCode(currencyCode) == CongoleseFranc)
+        {
+            var fcDigits = amount.ToString("N0", culture);
+            return $"FC {fcDigits}";
+        }
+
+        var usdDigits = amount.ToString("N2", culture);
+        return IsFrenchMoneyCulture(culture)
+            ? $"{usdDigits} $"
+            : $"$ {usdDigits}";
+    }
 
     /// <summary>USD amount with two decimals and no currency symbol (compact copy in dialogs).</summary>
     public static string FormatUsdAmountDigits(decimal amount)
         => amount.ToString("N2", CultureInfo.InvariantCulture);
 
-    public static string FormatDualCurrency(decimal usdAmount, decimal fcAmount)
+    public static string FormatDualCurrency(decimal usdAmount, decimal fcAmount, CultureInfo? culture = null)
     {
+        culture ??= DefaultMoneyCulture;
         var mode = SettingsManager.Load().CurrencyPricing.DefaultCurrencyDisplayMode;
         if (string.Equals(mode, Usd, StringComparison.OrdinalIgnoreCase))
-            return FormatAmount(usdAmount, Usd);
+            return FormatAmount(usdAmount, Usd, culture);
         if (string.Equals(mode, CongoleseFranc, StringComparison.OrdinalIgnoreCase))
-            return FormatAmount(fcAmount, CongoleseFranc);
-        return $"{FormatAmount(usdAmount, Usd)} | {FormatAmount(fcAmount, CongoleseFranc)}";
+            return FormatAmount(fcAmount, CongoleseFranc, culture);
+        return $"{FormatAmount(usdAmount, Usd, culture)} | {FormatAmount(fcAmount, CongoleseFranc, culture)}";
     }
+
+    private static bool IsFrenchMoneyCulture(CultureInfo culture) =>
+        culture.Name.StartsWith("fr", StringComparison.OrdinalIgnoreCase);
 }
