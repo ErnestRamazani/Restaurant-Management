@@ -98,7 +98,7 @@ jobs:
           ConnectionStrings__DefaultConnection: ${{ secrets.PROD_DB_CONNECTION }}
         run: |
           if [ -z "$ConnectionStrings__DefaultConnection" ]; then
-            echo "PROD_DB_CONNECTION not configured — skipping migrate-check (apply migrations manually; see docs/DEPLOY-CHECKLIST.md)"
+            echo "::warning::PROD_DB_CONNECTION not set — migrate-check skipped. Apply migrations manually before deploy (docs/DEPLOY-CHECKLIST.md)."
             exit 0
           fi
           dotnet tool install --global dotnet-ef

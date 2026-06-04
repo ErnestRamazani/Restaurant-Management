@@ -50,3 +50,7 @@ CSP `connect-src` is built from the same origin list for static portals.
 2. Server login → cancel order with passcode (no 403).
 3. Cashier release → append to in-kitchen check → release again (stock not double-deducted).
 4. Complete order with change → Money report sale matches merchandise grand.
+
+## 6. Free-tier ops (no cost — rubric)
+
+See [FREE-TIER-OPS.md](./FREE-TIER-OPS.md) for Sentry DSN, UptimeRobot monitor, DO backup verification, and log triage. These are console/signup steps, not application code.
