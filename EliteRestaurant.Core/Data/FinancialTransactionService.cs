@@ -140,6 +140,17 @@ public static class FinancialTransactionService
         if (order.MerchandiseGrandTotalUsd > 0m)
             return Math.Round(order.MerchandiseGrandTotalUsd, 2);
 
+        var changeUsd = Math.Round(order.ChangeGivenUsd, 2);
+        var changeFcAsUsd = order.ExchangeRateUsed > 0m
+            ? Math.Round(order.ChangeGivenFc / order.ExchangeRateUsed, 2)
+            : 0m;
+        if (changeUsd > 0m || changeFcAsUsd > 0m)
+        {
+            var fromNetAndChange = Math.Round(order.PaymentAmountUsd + changeUsd + changeFcAsUsd, 2);
+            if (fromNetAndChange > 0m)
+                return fromNetAndChange;
+        }
+
         if (order.PaymentAmountUsd > 0m)
             return Math.Round(order.PaymentAmountUsd, 2);
 

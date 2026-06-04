@@ -280,6 +280,48 @@ public class FinancialLedgerTests
     }
 
     [Fact]
+    public void RecordCompletedOrderRevenue_LegacyNetCashWithChange_UsesNetPlusChange()
+    {
+        using var db = BuildDb($"ledger-legacy-{Guid.NewGuid():N}");
+
+        var product = new Product
+        {
+            UniqueId = "P-LEG-1",
+            Name = "Soup",
+            Category = "Food",
+            SubCategory = "Main",
+            Price = 50m
+        };
+        db.Products.Add(product);
+        db.SaveChanges();
+
+        var order = new OrderRecord
+        {
+            UniqueId = "ORD-LEG-1",
+            Status = "Completed",
+            OrderOrigin = OrderOrigin.InStore,
+            PaymentCurrencyCode = CurrencyHelper.Usd,
+            MerchandiseGrandTotalUsd = 0m,
+            PaymentAmountUsd = 40m,
+            ChangeGivenUsd = 10m,
+            ExchangeRateUsed = CurrencyHelper.FcPerUsd,
+            PaymentConfirmedAt = DateTime.UtcNow,
+            CompletedAt = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow
+        };
+        order.Items.Add(new OrderItem { ProductId = product.Id, Quantity = 1 });
+        db.Orders.Add(order);
+        db.SaveChanges();
+
+        FinancialTransactionService.RecordCompletedOrderRevenue(db, order.Id);
+        db.SaveChanges();
+
+        var sale = db.Transactions.AsNoTracking()
+            .Single(t => t.Type == "Revenue" && t.Category == "Sale");
+        Assert.Equal(50m, sale.AmountUsd);
+    }
+
+    [Fact]
     public void MixedCurrencyRevenue_LedgerShowsDualAmount()
     {
         var txs = new List<MoneyTransaction>
