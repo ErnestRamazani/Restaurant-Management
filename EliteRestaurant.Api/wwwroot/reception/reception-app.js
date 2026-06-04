@@ -1488,7 +1488,7 @@
       $("loginErr").classList.remove("hidden");
       return;
     }
-    const res = await api("/api/auth/login", "POST", { staffId, pin, portal: "Reception" }, false);
+    const res = await api("/api/auth/login", "POST", { staffId, pin, portal: "Reception" }, false, { silent: true });
     if (!res.ok || !res.body?.accessToken) {
       $("loginErr").textContent = t("loginFailed", "Login failed ({{status}}). {{detail}}", {
         status: res.status,

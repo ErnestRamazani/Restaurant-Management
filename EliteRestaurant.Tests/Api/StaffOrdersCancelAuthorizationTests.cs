@@ -9,6 +9,7 @@ using EliteRestaurant.Core.Orders;
 using EliteRestaurant.Core.Utils;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
