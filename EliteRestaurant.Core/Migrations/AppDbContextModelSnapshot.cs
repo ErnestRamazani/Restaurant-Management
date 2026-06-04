@@ -526,6 +526,9 @@ namespace EliteRestaurant.Core.Migrations
                     b.Property<decimal>("PaymentAmountUsd")
                         .HasColumnType("numeric");
 
+                    b.Property<decimal>("MerchandiseGrandTotalUsd")
+                        .HasColumnType("numeric");
+
                     b.Property<DateTime?>("PaymentConfirmedAt")
                         .HasColumnType("timestamp with time zone");
 

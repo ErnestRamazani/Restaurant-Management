@@ -468,7 +468,7 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
         }
         catch (InvalidOperationException ex)
         {
-            return Ok(new AdminOrderOpMessageResponse(false, ex.Message));
+            return BadRequest(new AdminOrderOpMessageResponse(false, ex.Message));
         }
     }
 
