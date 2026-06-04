@@ -346,13 +346,17 @@ try
 
         if (!context.Request.Path.StartsWithSegments("/api"))
         {
+            var connectOrigins = string.Join(' ', configuredCorsOrigins
+                .Where(o => o.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                .Distinct());
             headers["Content-Security-Policy"] =
                 "default-src 'self'; " +
                 "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
                 "style-src 'self'; " +
+                "style-src-attr 'unsafe-inline'; " +
                 "img-src 'self' blob: data:; " +
                 "frame-src 'self' blob:; " +
-                $"connect-src 'self' {ProductionOrigin};";
+                $"connect-src 'self' {connectOrigins};";
         }
 
         await next();

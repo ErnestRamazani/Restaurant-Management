@@ -1,5 +1,6 @@
 using EliteRestaurant.Api.Branding;
 using EliteRestaurant.Api.Dtos;
+using EliteRestaurant.Api.Services;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Utils;
 using Microsoft.AspNetCore.Authorization;
@@ -13,17 +14,23 @@ namespace EliteRestaurant.Api.Controllers;
 [ApiController]
 [Route("api/kitchen")]
 [Authorize(Policy = "KitchenOnly")]
-public sealed class KitchenPortalController(AppDbContext db, IWebHostEnvironment environment) : ControllerBase
+public sealed class KitchenPortalController(
+    AppDbContext db,
+    IWebHostEnvironment environment,
+    PublicMenuSettingsCache menuSettings) : ControllerBase
 {
     [HttpGet("config")]
     public ActionResult<KitchenPortalConfigDto> GetConfig()
     {
         var allSettings = SettingsManager.Load();
         var business = allSettings.BusinessProfile;
-        var cloudSettings = db.PublicMenuSettings.AsNoTracking().FirstOrDefault(s => s.Key == "default");
+        var cloudSettings = menuSettings.GetDefault();
         var restaurantName = PublicMenuBrandingMerge.RestaurantDisplayName(cloudSettings, business);
         var logoUrl = "/api/kitchen/assets/restaurant-logo";
-        return Ok(new KitchenPortalConfigDto(restaurantName, logoUrl));
+        return Ok(new KitchenPortalConfigDto(
+            restaurantName,
+            logoUrl,
+            RestaurantTimeZone.ResolveId(cloudSettings, business)));
     }
 
     [HttpGet("assets/restaurant-logo")]

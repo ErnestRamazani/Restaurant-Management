@@ -4,6 +4,7 @@ using EliteRestaurant.Api.Branding;
 using EliteRestaurant.Api.Dtos;
 using EliteRestaurant.Api.Hubs;
 using EliteRestaurant.Api.Security;
+using EliteRestaurant.Core.Security;
 using EliteRestaurant.Api.Services;
 using EliteRestaurant.Contracts.PublicMenu;
 using Microsoft.AspNetCore.Authorization;
@@ -33,7 +34,8 @@ public sealed class PublicMenuController(
     IWebHostEnvironment environment,
     IHubContext<OrderHub> hubContext,
     JwtTokenService jwtTokenService,
-    ITenantContext tenant) : ControllerBase
+    ITenantContext tenant,
+    PublicMenuSettingsCache menuSettings) : ControllerBase
 {
     private static readonly JsonSerializerOptions JsonStoreOptions = new()
     {
@@ -51,9 +53,10 @@ public sealed class PublicMenuController(
         var all = SettingsManager.Load();
         var business = all.BusinessProfile;
         var pricing = all.CurrencyPricing;
-        var cloudSettings = db.PublicMenuSettings.AsNoTracking().FirstOrDefault(s => s.Key == "default");
-        var tax = PricingResolver.ResolveRestaurantTaxPercent(cloudSettings?.TaxPercent, pricing.TaxPercent);
-        var service = PricingResolver.ResolveRestaurantServicePercent(cloudSettings?.ServicePercent, pricing.ServicePercent);
+        var cloudSettings = menuSettings.GetDefault();
+        var effectivePricing = PricingResolver.ResolveEffectiveRestaurantPricing(cloudSettings);
+        var tax = effectivePricing.TaxPercent;
+        var service = effectivePricing.ServicePercent;
         var name = PublicMenuBrandingMerge.RestaurantDisplayName(cloudSettings, business);
         var mode = string.IsNullOrWhiteSpace(cloudSettings?.DefaultCurrencyDisplayMode)
             ? (string.IsNullOrWhiteSpace(pricing.DefaultCurrencyDisplayMode) ? "Dual" : pricing.DefaultCurrencyDisplayMode.Trim())
@@ -146,7 +149,8 @@ public sealed class PublicMenuController(
             promoSubtitle,
             promoCta,
             onlinePromoUrl,
-            menuTaxonomyJson));
+            menuTaxonomyJson,
+            RestaurantTimeZone.ResolveId(cloudSettings, business)));
     }
 
 
@@ -162,7 +166,7 @@ public sealed class PublicMenuController(
     [ProducesResponseType(typeof(StaffLoginCodeResponse), 200)]
     [ProducesResponseType(typeof(StaffLoginCodeResponse), 400)]
     public ActionResult<StaffLoginCodeResponse> ValidateStaffLoginCodeFromPath(string code)
-        => ValidateStaffLoginCodeValue(code);
+        => ValidateStaffLoginCodeValue(Uri.UnescapeDataString(code ?? string.Empty));
 
     [HttpGet("staff-login-code/{code}")]
     [EnableRateLimiting("PublicMenuRead")]
@@ -173,20 +177,15 @@ public sealed class PublicMenuController(
 
     private ActionResult<StaffLoginCodeResponse> ValidateStaffLoginCodeValue(string? code, string? signInId = null, string? pin = null)
     {
-        var configured = db.PublicMenuSettings.AsNoTracking()
-                             .Where(s => s.Key == "default")
-                             .Select(s => s.StaffLoginPasscode)
-                             .FirstOrDefault()
-                         ?? SettingsManager.Load().BusinessProfile.StaffLoginPasscode;
-        var expected = (configured ?? string.Empty).Trim();
+        var restaurantId = tenant.IsResolved ? tenant.RestaurantId : (int?)null;
+        var expected = StaffLoginPasscodeHelper.ResolveConfigured(db, restaurantId);
         if (string.IsNullOrEmpty(expected))
         {
             return BadRequest(new StaffLoginCodeResponse(false,
                 "Staff passcode is not configured. Set it in Elite Pro → Appearance → Business profile, then push to cloud."));
         }
 
-        var submitted = code?.Trim() ?? string.Empty;
-        if (!string.Equals(submitted, expected, StringComparison.Ordinal))
+        if (!StaffLoginPasscodeHelper.Matches(code, expected))
         {
             return BadRequest(new StaffLoginCodeResponse(false, "Incorrect staff passcode."));
         }
@@ -512,7 +511,7 @@ public sealed class PublicMenuController(
         var estimatedPrep = OrderPrepTimeEstimator.EstimateTicketPrepMinutes(prepLines);
 
         var totalUsd = body.Items.Sum(i => i.Quantity * i.UnitPrice);
-        await hubContext.Clients.Group("Server").SendAsync("CustomerDraftArrived", new
+        await OrderHubBroadcasts.NotifyCustomerDraftArrivedAsync(hubContext, new
         {
             draftId = entity.UniqueId,
             label = entity.DraftLabel,
@@ -719,7 +718,7 @@ public sealed class PublicMenuController(
             DiscountMode = "None",
             DiscountValue = 0m,
             PaymentCurrencyCode = CurrencyHelper.Usd,
-            CreatedAt = DateTime.Now,
+            CreatedAt = DateTime.UtcNow,
             OrderSource = "WalkIn",
             OrderOrigin = OrderOrigin.Online
         };
@@ -737,7 +736,9 @@ public sealed class PublicMenuController(
             });
         }
 
-        OrderSubmissionHelper.SyncPaymentFields(order, dbProducts);
+        var menuPricing = PricingResolver.ResolveEffectiveRestaurantPricing(
+            await menuSettings.GetDefaultAsync());
+        OrderSubmissionHelper.SyncPaymentFields(order, dbProducts, menuPricing);
         db.Orders.Add(order);
         orderTable.Status = "Occupied";
         DataReconciler.ReconcileTableStatusesWithOrders(db);
@@ -941,7 +942,7 @@ public sealed class PublicMenuController(
             DiscountMode = "None",
             DiscountValue = 0m,
             PaymentCurrencyCode = CurrencyHelper.Usd,
-            CreatedAt = DateTime.Now,
+            CreatedAt = DateTime.UtcNow,
             OrderSource = orderSource,
             OrderOrigin = OrderOrigin.Online,
             DeliveryFeeUsd = deliveryFee,
@@ -963,7 +964,9 @@ public sealed class PublicMenuController(
             });
         }
 
-        OrderSubmissionHelper.SyncPaymentFields(order, dbProducts);
+        var menuPricing = PricingResolver.ResolveEffectiveRestaurantPricing(
+            await menuSettings.GetDefaultAsync());
+        OrderSubmissionHelper.SyncPaymentFields(order, dbProducts, menuPricing);
         db.Orders.Add(order);
         orderTable.Status = "Occupied";
         DataReconciler.ReconcileTableStatusesWithOrders(db);
@@ -1005,8 +1008,7 @@ public sealed class PublicMenuController(
     /// </summary>
     private async Task<OnlineOrdersTableResolution> ResolveOnlineOrdersTableAsync()
     {
-        var settingsRow = await db.PublicMenuSettings.AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Key == "default");
+        var settingsRow = await menuSettings.GetDefaultAsync();
 
         if (settingsRow?.OnlineOrdersTableId is int configuredId and > 0)
         {
@@ -1069,6 +1071,7 @@ public sealed class PublicMenuController(
         {
             if (string.Equals(ok, "drink", StringComparison.OrdinalIgnoreCase)) return "🥤";
             if (string.Equals(ok, "food", StringComparison.OrdinalIgnoreCase)) return "🍽️";
+            if (string.Equals(ok, "mixed", StringComparison.OrdinalIgnoreCase)) return "🍽️🥤";
         }
         if (items.Count > 0 && dbProducts.TryGetValue(items[0].ProductId, out var p))
         {
