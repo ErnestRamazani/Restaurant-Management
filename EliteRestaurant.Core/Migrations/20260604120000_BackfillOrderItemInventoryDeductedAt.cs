@@ -11,6 +11,8 @@ namespace EliteRestaurant.Core.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // Only kitchen-pipeline statuses (post–cashier release). Excludes Pending*, Waiting, and Completed
+            // so we do not mark never-deducted lines as deducted (under-deduction) or rewrite history on closed checks.
             migrationBuilder.Sql(
                 """
                 UPDATE "OrderItems" oi
@@ -18,7 +20,7 @@ namespace EliteRestaurant.Core.Migrations
                 FROM "Orders" o
                 WHERE oi."OrderId" = o."Id"
                   AND oi."InventoryDeductedAt" IS NULL
-                  AND o."Status" IN ('Waiting', 'In Kitchen', 'Ready', 'Served', 'Completed')
+                  AND o."Status" IN ('In Kitchen', 'Ready', 'Served')
                 """);
         }
 

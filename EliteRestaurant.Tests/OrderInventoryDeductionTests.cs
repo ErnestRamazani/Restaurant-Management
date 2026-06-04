@@ -124,4 +124,73 @@ public class OrderInventoryDeductionTests
         Assert.NotNull(legacyLine.InventoryDeductedAt);
         Assert.Null(OrderInventoryDeduction.TryApplyForPlacedOrder(db, order));
     }
+
+    [Fact]
+    public void TryApplyForAdditionalItems_DeductsOnlyNewLines_NotPriorLines()
+    {
+        using var db = BuildDb($"inv-addon-{Guid.NewGuid():N}");
+        var inv = new InventoryItem
+        {
+            UniqueId = "INV-FLOUR",
+            Name = "Flour",
+            Unit = "kg",
+            StockQuantity = 100m
+        };
+        var product = new Product
+        {
+            UniqueId = "P4",
+            Name = "Bread",
+            Category = "Food",
+            SubCategory = "Bakery",
+            Price = 5m
+        };
+        db.InventoryItems.Add(inv);
+        db.Products.Add(product);
+        db.SaveChanges();
+        db.ProductIngredients.Add(new ProductIngredient
+        {
+            ProductId = product.Id,
+            InventoryItemId = inv.Id,
+            Quantity = 2m
+        });
+        db.Employees.Add(new Employee
+        {
+            UniqueId = "EMP-CHEF-1",
+            SignInId = "chef1",
+            Name = "Chef",
+            Role = "Chef",
+            PinCode = "x",
+            EmploymentStatus = "Active",
+            JoinDate = DateTime.Today
+        });
+        db.SaveChanges();
+
+        var order = new OrderRecord
+        {
+            UniqueId = "ORD-4",
+            Status = "Ready",
+            OrderOrigin = OrderOrigin.InStore,
+            CreatedAt = DateTime.UtcNow
+        };
+        var existingLine = new OrderItem
+        {
+            ProductId = product.Id,
+            Quantity = 1,
+            InventoryDeductedAt = DateTime.UtcNow
+        };
+        var newLine = new OrderItem { ProductId = product.Id, Quantity = 3 };
+        order.Items.Add(existingLine);
+        order.Items.Add(newLine);
+        db.Orders.Add(order);
+        db.SaveChanges();
+
+        var stockBefore = db.InventoryItems.AsNoTracking().Single(i => i.Id == inv.Id).StockQuantity;
+        var err = OrderInventoryDeduction.TryApplyForAdditionalItems(db, order, [newLine]);
+        Assert.Null(err);
+        db.SaveChanges();
+
+        var stockAfter = db.InventoryItems.AsNoTracking().Single(i => i.Id == inv.Id).StockQuantity;
+        Assert.Equal(stockBefore - 6m, stockAfter);
+        Assert.NotNull(newLine.InventoryDeductedAt);
+    }
 }
