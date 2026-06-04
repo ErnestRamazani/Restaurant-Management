@@ -3,10 +3,12 @@ using System.Threading.RateLimiting;
 using EliteRestaurant.Api;
 using EliteRestaurant.Api.Hubs;
 using EliteRestaurant.Api.Middleware;
+using EliteRestaurant.Api.Options;
 using EliteRestaurant.Api.Notifications;
 using EliteRestaurant.Api.Security;
 using EliteRestaurant.Api.Services;
 using EliteRestaurant.Api.Tenancy;
+using EliteRestaurant.Core.Clients;
 using EliteRestaurant.Core.Tenancy;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Reservations;
@@ -49,9 +51,23 @@ try
 
     builder.Host.UseSerilog();
 
-    if (!builder.Environment.IsEnvironment("Testing") && !EF.IsDesignTime)
+    if (builder.Environment.IsDevelopment()
+        && !builder.Environment.IsEnvironment("Testing")
+        && !EF.IsDesignTime)
         DatabaseInitializer.Initialize(builder.Configuration);
 
+    var sentryDsn = builder.Configuration["Sentry:Dsn"];
+    if (!string.IsNullOrWhiteSpace(sentryDsn))
+    {
+        builder.WebHost.UseSentry(options =>
+        {
+            options.Dsn = sentryDsn;
+            options.Environment = builder.Environment.EnvironmentName;
+            options.TracesSampleRate = builder.Environment.IsDevelopment() ? 0.1 : 0.02;
+        });
+    }
+
+    builder.Services.AddMemoryCache();
     builder.Services.Configure<CurrencyPricingOptions>(builder.Configuration.GetSection("CurrencyPricing"));
     builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
     builder.Services.Configure<AuthDevOptions>(builder.Configuration.GetSection("Auth"));
@@ -59,7 +75,12 @@ try
     builder.Services.Configure<EliteRestaurant.Api.Options.TenancyOptions>(
         builder.Configuration.GetSection(EliteRestaurant.Api.Options.TenancyOptions.SectionName));
     builder.Services.Configure<LocalizationOptions>(builder.Configuration.GetSection("Localization"));
+    builder.Services.Configure<EliteRestaurant.Api.Options.CorsOptions>(
+        builder.Configuration.GetSection(EliteRestaurant.Api.Options.CorsOptions.SectionName));
     builder.Services.AddSingleton<LocalizationService>();
+    builder.Services.AddSingleton<EliteRestaurant.Api.Services.CachedAppSettingsProvider>();
+    builder.Services.AddScoped<EliteRestaurant.Api.Services.PublicMenuSettingsCache>();
+    builder.Services.AddScoped<EliteRestaurant.Core.Utils.SharedOrderDraftService>();
     builder.Services.Configure<ForwardedHeadersOptions>(options =>
     {
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
@@ -152,6 +173,7 @@ try
         // Reception / front desk (reservations, delivery & pickup tracking).
         options.AddPolicy("ReceptionDesk", policy => policy.RequireRole("Admin", "Manager", "Cashier", "Front desk"));
         options.AddPolicy("CashierDesk", policy => policy.RequireRole("Admin", "Manager", "Cashier"));
+        options.AddPolicy("CancelOrder", policy => policy.RequireRole("Admin", "Manager", "Cashier", "Server"));
     });
     builder.Services.AddScoped<EliteRestaurant.Core.Reporting.AdminReportAggregationService>();
     builder.Services.Configure<ReservationSchedulingOptions>(builder.Configuration.GetSection("ReservationScheduling"));
@@ -159,6 +181,7 @@ try
     builder.Services.AddScoped<PlacementUnitClusterResolver>();
     builder.Services.AddScoped<ReservationSchedulingService>();
     builder.Services.AddScoped<FloorSnapshotBuilder>();
+    builder.Services.AddScoped<EliteRestaurant.Core.Clients.ClientAccountService>();
     builder.Services.AddSingleton<ReservationFloorRealtimePublisher>();
     builder.Services.AddSingleton<INotificationPublisher, LogNotificationPublisher>();
     if (!builder.Environment.IsEnvironment("Testing"))
@@ -173,16 +196,47 @@ try
     builder.Services.AddRateLimiter(options =>
     {
         options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-        options.AddPolicy("PublicMenuRead", context =>
-            RateLimitPartition.GetFixedWindowLimiter(
+        options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+            RateLimitPartition.GetSlidingWindowLimiter(
                 GetPartitionKey(context),
-                _ => new FixedWindowRateLimiterOptions
+                _ => new SlidingWindowRateLimiterOptions
+                {
+                    PermitLimit = 300,
+                    Window = TimeSpan.FromMinutes(1),
+                    SegmentsPerWindow = 6,
+                    QueueLimit = 0
+                }));
+        options.AddPolicy("PublicMenuRead", context =>
+            RateLimitPartition.GetSlidingWindowLimiter(
+                GetPartitionKey(context),
+                _ => new SlidingWindowRateLimiterOptions
                 {
                     PermitLimit = 60,
                     Window = TimeSpan.FromMinutes(1),
+                    SegmentsPerWindow = 6,
                     QueueLimit = 0
                 }));
         options.AddPolicy("PublicMenuDraft", context =>
+            RateLimitPartition.GetSlidingWindowLimiter(
+                GetPartitionKey(context),
+                _ => new SlidingWindowRateLimiterOptions
+                {
+                    PermitLimit = 10,
+                    Window = TimeSpan.FromMinutes(1),
+                    SegmentsPerWindow = 6,
+                    QueueLimit = 0
+                }));
+        options.AddPolicy("Setup", context =>
+            RateLimitPartition.GetSlidingWindowLimiter(
+                GetPartitionKey(context),
+                _ => new SlidingWindowRateLimiterOptions
+                {
+                    PermitLimit = 5,
+                    Window = TimeSpan.FromMinutes(1),
+                    SegmentsPerWindow = 6,
+                    QueueLimit = 0
+                }));
+        options.AddPolicy("AuthLogin", context =>
             RateLimitPartition.GetFixedWindowLimiter(
                 GetPartitionKey(context),
                 _ => new FixedWindowRateLimiterOptions
@@ -191,19 +245,21 @@ try
                     Window = TimeSpan.FromMinutes(1),
                     QueueLimit = 0
                 }));
-        options.AddPolicy("Setup", context =>
-            RateLimitPartition.GetFixedWindowLimiter(
-                GetPartitionKey(context),
-                _ => new FixedWindowRateLimiterOptions
-                {
-                    PermitLimit = 5,
-                    Window = TimeSpan.FromMinutes(1),
-                    QueueLimit = 0
-                }));
     });
 
-    static string GetPartitionKey(HttpContext context) =>
-        context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    static string GetPartitionKey(HttpContext context)
+    {
+        var forwarded = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(forwarded))
+        {
+            var first = forwarded.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+                .FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(first))
+                return first;
+        }
+
+        return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    }
 
     static int GetHttpPort()
     {
@@ -214,7 +270,7 @@ try
         return 8080;
     }
 
-    const string CorsPolicyAllowAll = "AllowAllOrigins";
+    const string CorsPolicyConfigured = "ConfiguredOrigins";
     const string ProductionOrigin = "https://starfish-app-owtoz.ondigitalocean.app";
 
     var httpPort = GetHttpPort();
@@ -224,19 +280,42 @@ try
         options.Listen(IPAddress.Any, httpPort);
     });
 
+    var configuredCorsOrigins = builder.Configuration
+        .GetSection(EliteRestaurant.Api.Options.CorsOptions.SectionName)
+        .Get<string[]>() ?? [];
+    if (configuredCorsOrigins.Length == 0)
+    {
+        configuredCorsOrigins =
+        [
+            ProductionOrigin,
+            "http://localhost:8080",
+            "http://127.0.0.1:8080",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173"
+        ];
+    }
+
     builder.Services.AddCors(options =>
     {
-        options.AddPolicy(CorsPolicyAllowAll, policy =>
+        options.AddPolicy(CorsPolicyConfigured, policy =>
         {
-            policy.AllowAnyOrigin()
+            policy.WithOrigins(configuredCorsOrigins)
                 .AllowAnyHeader()
-                .AllowAnyMethod();
+                .AllowAnyMethod()
+                .AllowCredentials();
         });
     });
 
+    builder.Services.AddHsts(options => options.MaxAge = TimeSpan.FromDays(365));
+
     var app = builder.Build();
 
+    app.UseMiddleware<GlobalExceptionHandler>();
+
     app.UseForwardedHeaders();
+
+    if (!app.Environment.IsDevelopment())
+        app.UseHsts();
 
     app.UseResponseCompression();
 
@@ -270,7 +349,7 @@ try
             headers["Content-Security-Policy"] =
                 "default-src 'self'; " +
                 "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
-                "style-src 'self' 'unsafe-inline'; " +
+                "style-src 'self'; " +
                 "img-src 'self' blob: data:; " +
                 "frame-src 'self' blob:; " +
                 $"connect-src 'self' {ProductionOrigin};";
@@ -289,7 +368,7 @@ try
         });
     }
 
-    app.UseCors(CorsPolicyAllowAll);
+    app.UseCors(CorsPolicyConfigured);
     app.UseRateLimiter();
     if (!app.Environment.IsEnvironment("Testing"))
         app.UseMiddleware<TenantResolutionMiddleware>();
@@ -449,6 +528,24 @@ try
     });
 
     IntegrationTestSeed.Ensure(app);
+
+    if (app.Environment.IsDevelopment())
+    {
+        try
+        {
+            using var scope = app.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var demoSeed = DemoClientHistorySeed.Ensure(db);
+            if (demoSeed == DemoClientHistorySeed.EnsureResult.Seeded)
+                Log.Information("Demo client history seeded (15 regular clients with order history).");
+            else if (demoSeed == DemoClientHistorySeed.EnsureResult.RepairedTenantScope)
+                Log.Information("Demo client rows repaired for tenant scope.");
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Demo client seed skipped.");
+        }
+    }
 
     app.Run();
 }
