@@ -1,6 +1,7 @@
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Menu;
 using EliteRestaurant.Core.Models;
+using ClientSettlement = EliteRestaurant.Core.Models.ClientSettlement;
 using EliteRestaurant.Core.Reporting;
 using EliteRestaurant.Core.Utils;
 using Microsoft.EntityFrameworkCore;
@@ -77,21 +78,35 @@ public sealed class AdminOrderOperationsService(AppDbContext db)
         });
     }
 
-    public string? TryCancelPendingCashier(int orderId)
+    public string? TryCancelPendingCashier(int orderId, string? passcode) =>
+        TryCancelOrder(orderId, passcode);
+
+    public string? TryCancelOrder(int orderId, string? passcode)
     {
+        var passErr = OrderCancelPasscodeHelper.Validate(_db, passcode);
+        if (passErr is not null)
+            return passErr;
+
         var order = _db.Orders.FirstOrDefault(o => o.Id == orderId);
         if (order is null)
-            return "Order not found or already processed.";
+            return "Order not found.";
 
-        var cancelAllowed =
-            (OrderWorkflow.IsPendingCashier(order.Status) && OrderOrigin.IsInStore(order.OrderOrigin))
-            || (OrderWorkflow.IsPendingApproval(order.Status) && OrderOrigin.IsOnline(order.OrderOrigin));
+        if (string.Equals(order.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+            return "Cannot cancel a completed order.";
 
-        if (!cancelAllowed)
-            return "Order not found or already processed.";
+        if (string.Equals(order.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+            return "Order is already cancelled.";
 
         return DatabaseResilientTransaction.Execute(_db, () =>
         {
+            if (IsInMemoryDatabase(_db))
+            {
+                order.Status = "Cancelled";
+                DataReconciler.ReconcileTableStatusesWithOrders(_db);
+                _db.SaveChanges();
+                return (string?)null;
+            }
+
             using var tx = _db.Database.BeginTransaction();
             try
             {
@@ -138,7 +153,7 @@ public sealed class AdminOrderOperationsService(AppDbContext db)
             PaymentAmountUsd = Math.Round(grandTotalUsd, 2),
             PaymentAmountFc = CurrencyHelper.ConvertUsdToFc(grandTotalUsd),
             ExchangeRateUsed = CurrencyHelper.FcPerUsd,
-            CreatedAt = DateTime.Now
+            CreatedAt = DateTime.UtcNow
         };
 
         var activeStaff = _db.Employees
@@ -507,6 +522,9 @@ public sealed class AdminOrderOperationsService(AppDbContext db)
         var previousStatus = order.Status;
         if (status == "Completed")
         {
+            if (!OrderWorkflow.CanCashierComplete(order.Status, order.OrderOrigin))
+                throw new InvalidOperationException(
+                    "Order cannot be completed until it is served (in-store) or ready (online).");
             var lineSubtotal = order.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
             var totals = OrderTotalsHelper.ComputeTotalsWithDeliveryFee(
                 lineSubtotal,
@@ -527,6 +545,7 @@ public sealed class AdminOrderOperationsService(AppDbContext db)
             var netPaymentUsd = Math.Round(Math.Max(0m, paidUsdRounded - changeUsdRounded), 2);
             var netPaymentFc = Math.Round(Math.Max(0m, paidFcRounded - changeFcRounded), 2);
 
+            order.MerchandiseGrandTotalUsd = Math.Round(grandTotalUsd, 2);
             order.PaymentCurrencyCode = paymentCurrency;
             order.ExchangeRateUsed = CurrencyHelper.FcPerUsd;
             // Revenue split for the ledger uses PaymentAmountUsd/Fc as net cash retained per currency (tender − change).
@@ -556,7 +575,8 @@ public sealed class AdminOrderOperationsService(AppDbContext db)
         order.Status = status;
         _db.SaveChanges();
 
-        if (status == "Completed" && previousStatus != "Completed")
+        if (status == "Completed" && previousStatus != "Completed"
+            && !ClientSettlement.IsOnAccount(order.ClientSettlement))
         {
             FinancialTransactionService.RecordCompletedOrderRevenue(_db, order.Id);
             RecordChangeExpense(_db, order);

@@ -29,6 +29,8 @@ public class OrderRecord : IRestaurantScoped
     public decimal PaymentAmount { get; set; }
     public decimal PaymentAmountUsd { get; set; }
     public decimal PaymentAmountFc { get; set; }
+    /// <summary>Merchandise + tax + service grand (USD), preserved when net cash overwrites <see cref="PaymentAmountUsd"/> on complete.</summary>
+    public decimal MerchandiseGrandTotalUsd { get; set; }
     public decimal CustomerPaidUsd { get; set; }
     public decimal CustomerPaidFc { get; set; }
     public decimal ChangeGivenUsd { get; set; }
@@ -50,8 +52,16 @@ public class OrderRecord : IRestaurantScoped
     public int? ReservationBookingId { get; set; }
     public string ReservationCode { get; set; } = string.Empty;
     public string ReservationGuestName { get; set; } = string.Empty;
-    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     /// <summary>When the order was marked Completed (payment recorded). Used for money ledger date.</summary>
     public DateTime? CompletedAt { get; set; }
+    public int? RestaurantClientId { get; set; }
+    public RestaurantClient? RestaurantClient { get; set; }
+    /// <summary><see cref="Models.ClientSettlement"/> code.</summary>
+    public string ClientSettlement { get; set; } = Models.ClientSettlement.None;
+    /// <summary>USD grand total placed on client account when <see cref="ClientSettlement.OnAccount"/>.</summary>
+    public decimal AmountOnAccountUsd { get; set; }
+    /// <summary>USD portion of <see cref="AmountOnAccountUsd"/> already recognized as revenue via debt settlement.</summary>
+    public decimal ClientDebtSettledUsd { get; set; }
     public ICollection<OrderItem> Items { get; set; } = new List<OrderItem>();
 }
