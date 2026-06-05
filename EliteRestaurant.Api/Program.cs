@@ -51,10 +51,13 @@ try
 
     builder.Host.UseSerilog();
 
-    if (builder.Environment.IsDevelopment()
-        && !builder.Environment.IsEnvironment("Testing")
-        && !EF.IsDesignTime)
-        DatabaseInitializer.Initialize(builder.Configuration);
+    if (!builder.Environment.IsEnvironment("Testing") && !EF.IsDesignTime)
+    {
+        if (builder.Environment.IsDevelopment())
+            DatabaseInitializer.Initialize(builder.Configuration);
+        else
+            DatabaseMigrationRunner.ApplyPendingMigrations(builder.Configuration.GetConnectionString("DefaultConnection"));
+    }
 
     var sentryDsn = builder.Configuration["Sentry:Dsn"];
     if (!string.IsNullOrWhiteSpace(sentryDsn))
