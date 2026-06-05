@@ -7,6 +7,8 @@ RUN npm ci
 COPY elite-menu ./
 # Repo-root assets (Vite alias @repo-assets -> ../assets from elite-menu)
 COPY assets /src/assets
+# merge-guest-locales.mjs reads staff portal strings from API wwwroot before vite build
+COPY EliteRestaurant.Api/wwwroot/locales /src/EliteRestaurant.Api/wwwroot/locales
 RUN npm run build
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS dotnet-build
