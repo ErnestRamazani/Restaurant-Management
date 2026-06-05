@@ -19,21 +19,21 @@
 
             <StackPanel Grid.Row="0" Margin="32,24,32,18">
                 <TextBlock Style="{StaticResource HeadingLarge}" FontSize="26">
-                    <Run Text="Settings"/>
-                    <Run Text=" Panel" Foreground="{StaticResource GoldAccentBrush}"/>
+                    <Run Text="{Binding SetPanelTitle, Mode=OneWay}"/>
+                    <Run Text="{Binding SetPanelTitleAccent, Mode=OneWay}" Foreground="{StaticResource GoldAccentBrush}"/>
                 </TextBlock>
-                <TextBlock Text="Business profile, currency &amp; pricing, and appearance controls."
+                <TextBlock Text="{Binding SetPanelSubtitle, Mode=OneWay}"
                            Style="{StaticResource BodyText}"
                            Margin="0,6,0,0"/>
                 <TextBlock TextWrapping="Wrap" Margin="0,10,0,0" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}">
-                    <Run FontWeight="SemiBold" Foreground="{StaticResource GoldAccentBrush}">Cloud website:</Run>
-                    <Run Text=" Pushing code to GitHub deploys the API and menu app only — not your restaurant data. Each Save here must push to the Public menu base URL below (hosted API). Sign in as Admin/Manager in Elite Pro first. Menu items and photos sync when you save them on the Menu tab."/>
+                    <Run FontWeight="SemiBold" Foreground="{StaticResource GoldAccentBrush}" Text="{Binding SetCloudWebsiteLabel, Mode=OneWay}"/>
+                    <Run Text="{Binding SetCloudWebsiteHint, Mode=OneWay}"/>
                 </TextBlock>
                 <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-                    <TextBlock Text="Section:" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBlock Text="{Binding SetSectionFilterLabel, Mode=OneWay}" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0"/>
                     <ComboBox Width="220"
-                              ItemsSource="{Binding SettingsSections}"
-                              SelectedItem="{Binding SelectedSettingsSection, Mode=TwoWay}"
+                              ItemsSource="{Binding SettingsSectionOptions}"
+                              SelectedItem="{Binding SelectedSettingsSectionOption, Mode=TwoWay}"
                               Style="{StaticResource EliteComboBox}"/>
                 </StackPanel>
             </StackPanel>
@@ -43,11 +43,11 @@
                     <Border Style="{StaticResource GlassCard}" Padding="18"
                             Visibility="{Binding ShowBusinessSection, Converter={StaticResource BoolToVisibilityConverter}}">
                         <StackPanel>
-                            <TextBlock Text="Business Profile"
+                            <TextBlock Text="{Binding SetBusinessProfileTitle, Mode=OneWay}"
                                        Foreground="{StaticResource GoldAccentBrush}"
                                        FontSize="20"
                                        FontWeight="SemiBold"/>
-                            <TextBlock Text="Restaurant identity, public menu URL, online promo, and staff access."
+                            <TextBlock Text="{Binding SetBusinessProfileLead, Mode=OneWay}"
                                        Style="{StaticResource BodyText}"
                                        Margin="0,4,0,12"/>
 
@@ -66,43 +66,43 @@
                                 </Grid.RowDefinitions>
 
                                 <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,10,10">
-                                    <TextBlock Text="Restaurant name" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBlock Text="{Binding SetRestaurantNameLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                                     <TextBox Text="{Binding RestaurantName, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
                                 </StackPanel>
                                 <StackPanel Grid.Row="0" Grid.Column="1" Margin="10,0,0,10">
-                                    <TextBlock Text="Phone" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBlock Text="{Binding SetPhoneLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                                     <TextBox Text="{Binding RestaurantPhone, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
                                 </StackPanel>
 
                                 <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,0,0,10">
-                                    <TextBlock Text="Address" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBlock Text="{Binding SetAddressLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                                     <TextBox Text="{Binding RestaurantAddress, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
                                 </StackPanel>
 
                                 <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Margin="0,0,0,10">
-                                    <TextBlock Text="Website domain" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBlock Text="{Binding SetWebsiteDomainLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                                     <TextBox Text="{Binding RestaurantWebsiteDomain, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
                                 </StackPanel>
 
                                 <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Margin="0,0,0,10">
-                                    <TextBlock Text="Other social (optional)" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBlock Text="{Binding SetOtherSocialLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                                     <TextBox Text="{Binding RestaurantSocialMedia, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
                                 </StackPanel>
 
                                 <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Margin="0,0,0,10">
-                                    <TextBlock Text="Logo path" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBlock Text="{Binding SetLogoPathLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="120"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBox Grid.Column="0" Text="{Binding RestaurantLogoPath, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                                        <Button Grid.Column="1" Margin="8,0,0,0" Content="Browse" Command="{Binding BrowseLogoCommand}" Style="{StaticResource GhostButton}"/>
+                                        <Button Grid.Column="1" Margin="8,0,0,0" Content="{Binding SetBrowseLabel, Mode=OneWay}" Command="{Binding BrowseLogoCommand}" Style="{StaticResource GhostButton}"/>
                                     </Grid>
                                 </StackPanel>
 
                                 <StackPanel Grid.Row="5" Grid.ColumnSpan="2">
-                                    <TextBlock Text="Homepage background image" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBlock Text="{Binding SetHomepageBackgroundLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
@@ -113,7 +113,7 @@
                                                  Style="{StaticResource EliteTextBox}"/>
                                         <Button Grid.Column="1"
                                                 Margin="8,0,0,0"
-                                                Content="Browse"
+                                                Content="{Binding SetBrowseLabel, Mode=OneWay}"
                                                 Command="{Binding BrowseHomepageBackgroundCommand}"
                                                 Style="{StaticResource GhostButton}"/>
                                     </Grid>
@@ -121,8 +121,8 @@
                             </Grid>
 
                             <StackPanel Margin="0,10,0,0">
-                                <TextBlock Text="Public menu base URL (QR codes for customers’ phones)" Style="{StaticResource HeadingSmall}"/>
-                                <TextBlock Text="Set this to your live API host (e.g. https://starfish-app-owtoz.ondigitalocean.app or https://etoilegourmandekin.com if that domain serves the API). Saves push settings to that server’s database. For Wi-Fi testing only, use this PC’s LAN IP — not localhost. No trailing slash."
+                                <TextBlock Text="{Binding SetPublicMenuBaseUrlLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
+                                <TextBlock Text="{Binding SetPublicMenuBaseUrlHint, Mode=OneWay}"
                                            Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,0,0,6"/>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -131,21 +131,21 @@
                                     </Grid.ColumnDefinitions>
                                     <TextBox Grid.Column="0" Text="{Binding PublicMenuBaseUrl, UpdateSourceTrigger=PropertyChanged}"
                                              Style="{StaticResource EliteTextBox}"
-                                             ToolTip="Example: https://starfish-app-owtoz.ondigitalocean.app — no trailing slash"/>
-                                    <Button Grid.Column="1" Content="Use phone-friendly URL" Margin="10,0,0,0" VerticalAlignment="Top"
+                                             ToolTip="{Binding SetPublicMenuBaseUrlTooltip, Mode=OneWay}"/>
+                                    <Button Grid.Column="1" Content="{Binding SetUsePhoneFriendlyUrlLabel, Mode=OneWay}" Margin="10,0,0,0" VerticalAlignment="Top"
                                             Command="{Binding ApplyPhoneFriendlyMenuUrlCommand}" Style="{StaticResource GhostButton}"/>
                                 </Grid>
                             </StackPanel>
                             <StackPanel Margin="0,10,0,0">
-                                <TextBlock Text="Customer menu tagline (optional)" Style="{StaticResource HeadingSmall}"/>
-                                <TextBlock Text="Shown under the logo on the public homepage (e.g. Cuisine moderne · Kinshasa)."
+                                <TextBlock Text="{Binding SetCustomerMenuTaglineLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
+                                <TextBlock Text="{Binding SetCustomerMenuTaglineHint, Mode=OneWay}"
                                            Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,0,0,6"/>
                                 <TextBox Text="{Binding CustomerMenuTagline, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
                             </StackPanel>
 
                             <StackPanel Margin="0,14,0,0">
-                                <TextBlock Text="Public menu — About (footer sheet)" Style="{StaticResource HeadingSmall}"/>
-                                <TextBlock Text="Plain text for the About link on the customer menu homepage. Saved with Business Profile and pushed to the cloud."
+                                <TextBlock Text="{Binding SetPublicMenuAboutLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
+                                <TextBlock Text="{Binding SetPublicMenuAboutHint, Mode=OneWay}"
                                            Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,0,0,6"/>
                                 <TextBox Text="{Binding CustomerMenuAboutText, UpdateSourceTrigger=PropertyChanged}"
                                          Style="{StaticResource EliteTextBox}"
@@ -153,8 +153,8 @@
                             </StackPanel>
 
                             <StackPanel Margin="0,14,0,0">
-                                <TextBlock Text="Public menu — Contact intro (optional)" Style="{StaticResource HeadingSmall}"/>
-                                <TextBlock Text="Short line above address and phone on the Contact sheet. Address and phone still come from fields above."
+                                <TextBlock Text="{Binding SetPublicMenuContactLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
+                                <TextBlock Text="{Binding SetPublicMenuContactHint, Mode=OneWay}"
                                            Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,0,0,6"/>
                                 <TextBox Text="{Binding CustomerMenuContactIntro, UpdateSourceTrigger=PropertyChanged}"
                                          Style="{StaticResource EliteTextBox}"
@@ -162,8 +162,8 @@
                             </StackPanel>
 
                             <StackPanel Margin="0,14,0,0">
-                                <TextBlock Text="Public menu — Notes (footer sheet)" Style="{StaticResource HeadingSmall}"/>
-                                <TextBlock Text="Allergies, ordering policy, and legal notes for the Notes link. Tax / legal line can still use Tax ID field in Tickets section."
+                                <TextBlock Text="{Binding SetPublicMenuNotesLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
+                                <TextBlock Text="{Binding SetPublicMenuNotesHint, Mode=OneWay}"
                                            Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,0,0,6"/>
                                 <TextBox Text="{Binding CustomerMenuNotesText, UpdateSourceTrigger=PropertyChanged}"
                                          Style="{StaticResource EliteTextBox}"
@@ -171,21 +171,21 @@
                             </StackPanel>
 
                             <StackPanel Margin="0,18,0,0">
-                                <TextBlock Text="Online order — weekly promo (PWA)"
+                                <TextBlock Text="{Binding SetOnlinePromoTitle, Mode=OneWay}"
                                            Foreground="{StaticResource GoldAccentBrush}"
                                            FontSize="16"
                                            FontWeight="SemiBold"/>
-                                <TextBlock Text="Hero card on the dedicated Order online flow. Saved with Business Profile and pushed to the cloud menu."
+                                <TextBlock Text="{Binding SetOnlinePromoLead, Mode=OneWay}"
                                            Style="{StaticResource BodyText}"
                                            TextWrapping="Wrap"
                                            Margin="0,4,0,10"/>
-                                <TextBlock Text="Promo title" Style="{StaticResource HeadingSmall}"/>
+                                <TextBlock Text="{Binding SetPromoTitleLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                                 <TextBox Text="{Binding OnlinePromoTitle, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                                <TextBlock Text="Promo subtitle" Style="{StaticResource HeadingSmall}" Margin="0,8,0,0"/>
+                                <TextBlock Text="{Binding SetPromoSubtitleLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,8,0,0"/>
                                 <TextBox Text="{Binding OnlinePromoSubtitle, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                                <TextBlock Text="Button label (CTA)" Style="{StaticResource HeadingSmall}" Margin="0,8,0,0"/>
+                                <TextBlock Text="{Binding SetPromoCtaLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,8,0,0"/>
                                 <TextBox Text="{Binding OnlinePromoCtaLabel, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                                <TextBlock Text="Hero image (optional)" Style="{StaticResource HeadingSmall}" Margin="0,8,0,0"/>
+                                <TextBlock Text="{Binding SetPromoHeroImageLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,8,0,0"/>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
@@ -193,36 +193,44 @@
                                         <ColumnDefinition Width="100"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBox Grid.Column="0" Text="{Binding OnlinePromoImagePath, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                                    <Button Grid.Column="1" Margin="8,0,0,0" Content="Browse" Command="{Binding BrowseOnlinePromoImageCommand}" Style="{StaticResource GhostButton}"/>
-                                    <Button Grid.Column="2" Margin="8,0,0,0" Content="Clear" Command="{Binding ClearOnlinePromoImageCommand}" Style="{StaticResource GhostButton}"/>
+                                    <Button Grid.Column="1" Margin="8,0,0,0" Content="{Binding SetBrowseLabel, Mode=OneWay}" Command="{Binding BrowseOnlinePromoImageCommand}" Style="{StaticResource GhostButton}"/>
+                                    <Button Grid.Column="2" Margin="8,0,0,0" Content="{Binding SetClearLabel, Mode=OneWay}" Command="{Binding ClearOnlinePromoImageCommand}" Style="{StaticResource GhostButton}"/>
                                 </Grid>
-                                <TextBlock Text="Online orders table id (optional)" Style="{StaticResource HeadingSmall}" Margin="0,8,0,0"/>
-                                <TextBlock Text="POS table id to attach guest online orders (must have an assigned server). Leave blank to use the first available staffed table."
+                                <TextBlock Text="{Binding SetOnlineOrdersTableIdLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,8,0,0"/>
+                                <TextBlock Text="{Binding SetOnlineOrdersTableIdHint, Mode=OneWay}"
                                            Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,0,0,6"/>
                                 <TextBox Text="{Binding OnlineOrdersTableId, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
                             </StackPanel>
 
                             <StackPanel Margin="0,10,0,0">
-                                <TextBlock Text="Staff login passcode" Style="{StaticResource HeadingSmall}"/>
-                                <TextBlock Text="Customers see the menu first. Staff must enter this code before the workplace chooser opens."
+                                <TextBlock Text="{Binding SetStaffLoginPasscodeLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
+                                <TextBlock Text="{Binding SetStaffLoginPasscodeHint, Mode=OneWay}"
                                            Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,0,0,6"/>
                                 <TextBox Text="{Binding StaffLoginPasscode, UpdateSourceTrigger=PropertyChanged}"
                                          Style="{StaticResource EliteTextBox}"/>
                             </StackPanel>
 
                             <StackPanel Margin="0,10,0,0">
-                                <TextBlock Text="Admin web portal" Style="{StaticResource HeadingSmall}"/>
-                                <TextBlock Text="Read-only owner dashboard at /admin/ on your API host. Sign-in ID and PIN are pushed to the cloud and synced to the AdminWeb employee."
+                                <TextBlock Text="{Binding SetOrderCancelPasscodeLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
+                                <TextBlock Text="{Binding SetOrderCancelPasscodeHint, Mode=OneWay}"
                                            Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,0,0,6"/>
-                                <TextBlock Text="Sign-in ID" Style="{StaticResource BodyText}" Margin="0,0,0,4"/>
+                                <TextBox Text="{Binding OrderCancelPasscode, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource EliteTextBox}"/>
+                            </StackPanel>
+
+                            <StackPanel Margin="0,10,0,0">
+                                <TextBlock Text="{Binding SetAdminWebPortalLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
+                                <TextBlock Text="{Binding SetAdminWebPortalHint, Mode=OneWay}"
+                                           Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                <TextBlock Text="{Binding SetSignInIdLabel, Mode=OneWay}" Style="{StaticResource BodyText}" Margin="0,0,0,4"/>
                                 <TextBox Text="{Binding AdminWebSignInId, UpdateSourceTrigger=PropertyChanged}"
                                          Style="{StaticResource EliteTextBox}"/>
-                                <TextBlock Text="PIN" Style="{StaticResource BodyText}" Margin="0,8,0,4"/>
+                                <TextBlock Text="{Binding SetPinLabel, Mode=OneWay}" Style="{StaticResource BodyText}" Margin="0,8,0,4"/>
                                 <TextBox Text="{Binding AdminWebPin, UpdateSourceTrigger=PropertyChanged}"
                                          Style="{StaticResource EliteTextBox}"/>
                             </StackPanel>
 
-                            <Button Content="Save Business Profile"
+                            <Button Content="{Binding SetSaveBusinessProfileLabel, Mode=OneWay}"
                                     Margin="0,14,0,0"
                                     Command="{Binding SaveBusinessProfileCommand}"
                                     Style="{StaticResource GoldPrimaryButton}"/>
@@ -232,17 +240,17 @@
                     <Border Style="{StaticResource GlassCard}" Margin="0,16,0,0" Padding="18"
                             Visibility="{Binding ShowTicketsReceiptSection, Converter={StaticResource BoolToVisibilityConverter}}">
                         <StackPanel>
-                            <TextBlock Text="Tickets &amp; receipts"
+                            <TextBlock Text="{Binding SetTicketsTitle, Mode=OneWay}"
                                        Foreground="{StaticResource GoldAccentBrush}"
                                        FontSize="20"
                                        FontWeight="SemiBold"/>
-                            <TextBlock Text="Printed and PDF tickets: optional header image above the restaurant name, footer and tax lines, and custom social rows (your label, text, and icon file per line). Phone is taken from Business Profile."
+                            <TextBlock Text="{Binding SetTicketsLead, Mode=OneWay}"
                                        Style="{StaticResource BodyText}"
                                        TextWrapping="Wrap"
                                        Margin="0,4,0,12"/>
 
-                            <TextBlock Text="Receipt printer (Windows)" Style="{StaticResource HeadingSmall}"/>
-                            <TextBlock Text="Choose the POS printer queue (e.g. EliteRestaurant_Printer). A Windows default printer is not required."
+                            <TextBlock Text="{Binding SetReceiptPrinterLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
+                            <TextBlock Text="{Binding SetReceiptPrinterHint, Mode=OneWay}"
                                        Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,0,0,6"/>
                             <Grid Margin="0,0,0,12">
                                 <Grid.ColumnDefinitions>
@@ -255,13 +263,13 @@
                                           IsEditable="True"
                                           IsTextSearchEnabled="True"
                                           StaysOpenOnEdit="True"/>
-                                <Button Grid.Column="1" Margin="8,0,0,0" Content="Refresh"
+                                <Button Grid.Column="1" Margin="8,0,0,0" Content="{Binding SetRefreshLabel, Mode=OneWay}"
                                         Command="{Binding RefreshInstalledPrintersCommand}"
                                         Style="{StaticResource GhostButton}"/>
                             </Grid>
 
-                            <TextBlock Text="Ticket header logo path (not the main restaurant logo)" Style="{StaticResource HeadingSmall}"/>
-                            <TextBlock Text="Shown centered above the restaurant name on tickets only. Leave blank to skip."
+                            <TextBlock Text="{Binding SetTicketHeaderLogoLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
+                            <TextBlock Text="{Binding SetTicketHeaderLogoHint, Mode=OneWay}"
                                        Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,0,0,6"/>
                             <Grid Margin="0,0,0,12">
                                 <Grid.ColumnDefinitions>
@@ -269,19 +277,19 @@
                                     <ColumnDefinition Width="120"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBox Grid.Column="0" Text="{Binding TicketHeaderLogoPath, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                                <Button Grid.Column="1" Margin="8,0,0,0" Content="Browse" Command="{Binding BrowseTicketHeaderLogoCommand}" Style="{StaticResource GhostButton}"/>
+                                <Button Grid.Column="1" Margin="8,0,0,0" Content="{Binding SetBrowseLabel, Mode=OneWay}" Command="{Binding BrowseTicketHeaderLogoCommand}" Style="{StaticResource GhostButton}"/>
                             </Grid>
 
-                            <TextBlock Text="Footer text for tickets" Style="{StaticResource HeadingSmall}"/>
+                            <TextBlock Text="{Binding SetTicketFooterLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                             <TextBox Text="{Binding TicketFooterText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"
                                      Margin="0,0,0,10"/>
 
-                            <TextBlock Text="Tax ID / legal info for receipts" Style="{StaticResource HeadingSmall}"/>
+                            <TextBlock Text="{Binding SetTaxIdLegalLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                             <TextBox Text="{Binding TaxIdLegalInfo, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"
                                      Margin="0,0,0,12"/>
 
-                            <TextBlock Text="Social lines on tickets" Style="{StaticResource HeadingSmall}"/>
-                            <TextBlock Text="Add a row for each item: type the platform name, the username or URL to show, and pick a small icon image from disk."
+                            <TextBlock Text="{Binding SetTicketSocialLinesLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
+                            <TextBlock Text="{Binding SetTicketSocialLinesHint, Mode=OneWay}"
                                        Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,0,0,8"/>
 
                             <ItemsControl ItemsSource="{Binding TicketSocialMediaRows}" Margin="0,0,0,8">
@@ -296,26 +304,26 @@
                                                         <ColumnDefinition Width="*"/>
                                                     </Grid.ColumnDefinitions>
                                                     <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                                                        <TextBlock Text="Name (e.g. Instagram)" Style="{StaticResource HeadingSmall}"/>
+                                                        <TextBlock Text="{Binding DataContext.SetSocialNameExampleLabel, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                                                         <TextBox Text="{Binding PlatformName, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
                                                     </StackPanel>
                                                     <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                                                        <TextBlock Text="Username / URL / text" Style="{StaticResource HeadingSmall}"/>
+                                                        <TextBlock Text="{Binding DataContext.SetSocialUsernameUrlLabel, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                                                         <TextBox Text="{Binding UserText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
                                                     </StackPanel>
                                                 </Grid>
-                                                <TextBlock Text="Icon image path" Style="{StaticResource HeadingSmall}"/>
+                                                <TextBlock Text="{Binding DataContext.SetSocialIconPathLabel, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                                                 <Grid Margin="0,0,0,8">
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="*"/>
                                                         <ColumnDefinition Width="120"/>
                                                     </Grid.ColumnDefinitions>
                                                     <TextBox Grid.Column="0" Text="{Binding IconPath, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                                                    <Button Grid.Column="1" Margin="8,0,0,0" Content="Browse"
+                                                    <Button Grid.Column="1" Margin="8,0,0,0" Content="{Binding DataContext.SetBrowseLabel, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}"
                                                             Command="{Binding DataContext.BrowseTicketSocialIconCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                             CommandParameter="{Binding}" Style="{StaticResource GhostButton}"/>
                                                 </Grid>
-                                                <Button HorizontalAlignment="Right" Content="Remove row"
+                                                <Button HorizontalAlignment="Right" Content="{Binding DataContext.SetRemoveRowLabel, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}"
                                                         Command="{Binding DataContext.RemoveTicketSocialRowCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         CommandParameter="{Binding}" Style="{StaticResource GhostButton}"/>
                                             </StackPanel>
@@ -324,9 +332,9 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
 
-                            <Button Content="Add social row" Command="{Binding AddTicketSocialRowCommand}" HorizontalAlignment="Left" Style="{StaticResource GhostButton}" Margin="0,0,0,12"/>
+                            <Button Content="{Binding SetAddSocialRowLabel, Mode=OneWay}" Command="{Binding AddTicketSocialRowCommand}" HorizontalAlignment="Left" Style="{StaticResource GhostButton}" Margin="0,0,0,12"/>
 
-                            <Button Content="Save tickets &amp; receipts"
+                            <Button Content="{Binding SetSaveTicketsLabel, Mode=OneWay}"
                                     Command="{Binding SaveTicketReceiptLayoutCommand}"
                                     Style="{StaticResource GoldPrimaryButton}"/>
                         </StackPanel>
@@ -335,23 +343,38 @@
                     <Border Style="{StaticResource GlassCard}" Margin="0,16,0,0" Padding="18"
                             Visibility="{Binding ShowReservationsSection, Converter={StaticResource BoolToVisibilityConverter}}">
                         <StackPanel>
-                            <TextBlock Text="Reservations (public menu)"
+                            <TextBlock Text="{Binding SetTimezoneTitle, Mode=OneWay}"
                                        Foreground="{StaticResource GoldAccentBrush}"
                                        FontSize="20"
                                        FontWeight="SemiBold"/>
-                            <TextBlock Text="Controls how far ahead guests can book online and how much notice is required. Saved here and pushed to the cloud API so the reservation page and server rules stay in sync."
+                            <TextBlock Text="{Binding SetTimezoneLead, Mode=OneWay}"
                                        Style="{StaticResource BodyText}"
                                        TextWrapping="Wrap"
                                        Margin="0,4,0,12"/>
-                            <TextBlock Text="Lead days (X days in advance)" Style="{StaticResource HeadingSmall}"/>
-                            <TextBlock Text="Guests may choose a date starting today + this many calendar days. Use 0 to allow any future day (still not in the past)."
+                            <TextBlock Text="{Binding SetIanaTimezoneLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
+                            <ComboBox ItemsSource="{Binding RestaurantTimeZoneOptions}"
+                                      SelectedItem="{Binding RestaurantTimeZoneId, Mode=TwoWay}"
+                                      Style="{StaticResource EliteComboBox}"
+                                      ItemContainerStyle="{StaticResource ComboBoxItemStyle}"
+                                      Margin="0,0,0,16"/>
+
+                            <TextBlock Text="{Binding SetReservationsTitle, Mode=OneWay}"
+                                       Foreground="{StaticResource GoldAccentBrush}"
+                                       FontSize="20"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding SetReservationsLead, Mode=OneWay}"
+                                       Style="{StaticResource BodyText}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,4,0,12"/>
+                            <TextBlock Text="{Binding SetReservationLeadDaysLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
+                            <TextBlock Text="{Binding SetReservationLeadDaysHint, Mode=OneWay}"
                                        Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,0,0,6"/>
                             <TextBox Text="{Binding ReservationLeadDays, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                            <TextBlock Text="Maximum months ahead" Style="{StaticResource HeadingSmall}" Margin="0,12,0,0"/>
-                            <TextBlock Text="Guests cannot book beyond this many months from today."
+                            <TextBlock Text="{Binding SetReservationMaxMonthsLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,12,0,0"/>
+                            <TextBlock Text="{Binding SetReservationMaxMonthsHint, Mode=OneWay}"
                                        Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,0,0,6"/>
                             <TextBox Text="{Binding ReservationMaxMonthsAhead, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                            <Button Content="Save reservation settings"
+                            <Button Content="{Binding SetSaveReservationSettingsLabel, Mode=OneWay}"
                                     Margin="0,16,0,0"
                                     Command="{Binding SaveReservationSettingsCommand}"
                                     Style="{StaticResource GoldPrimaryButton}"/>
@@ -361,22 +384,22 @@
                     <Border Style="{StaticResource GlassCard}" Margin="0,16,0,0" Padding="18"
                             Visibility="{Binding ShowMenuTaxonomySection, Converter={StaticResource BoolToVisibilityConverter}}">
                         <StackPanel>
-                            <TextBlock Text="Menu categories"
+                            <TextBlock Text="{Binding SetMenuCategoriesTitle, Mode=OneWay}"
                                        Foreground="{StaticResource GoldAccentBrush}"
                                        FontSize="20"
                                        FontWeight="SemiBold"/>
-                            <TextBlock Text="Defines menu types (e.g. Food / Drink), product categories (saved on each item), and allowed subcategories. This drives the admin menu, customer PWA, and staff web menus after you save and push."
+                            <TextBlock Text="{Binding SetMenuCategoriesLead, Mode=OneWay}"
                                        Style="{StaticResource BodyText}"
                                        TextWrapping="Wrap"
                                        Margin="0,4,0,12"/>
-                            <TextBlock Text="Check “Drink type” for the bucket that holds beverages. Legacy rows with Category “Drink” still match drink sections by subcategory."
+                            <TextBlock Text="{Binding SetMenuCategoriesDrinkHint, Mode=OneWay}"
                                        Style="{StaticResource BodyText}"
                                        TextWrapping="Wrap"
                                        Margin="0,0,0,12"/>
                             <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                                <Button Content="Add menu type" Command="{Binding AddMenuTaxonomyTypeCommand}" Style="{StaticResource GhostButton}" Margin="0,0,10,0"/>
-                                <Button Content="Restore Elite defaults" Command="{Binding ResetMenuTaxonomyCommand}" Style="{StaticResource GhostButton}" Margin="0,0,10,0"/>
-                                <Button Content="Save menu categories" Command="{Binding SaveMenuTaxonomyCommand}" Style="{StaticResource GoldPrimaryButton}"/>
+                                <Button Content="{Binding SetAddMenuTypeLabel, Mode=OneWay}" Command="{Binding AddMenuTaxonomyTypeCommand}" Style="{StaticResource GhostButton}" Margin="0,0,10,0"/>
+                                <Button Content="{Binding SetRestoreEliteDefaultsLabel, Mode=OneWay}" Command="{Binding ResetMenuTaxonomyCommand}" Style="{StaticResource GhostButton}" Margin="0,0,10,0"/>
+                                <Button Content="{Binding SetSaveMenuCategoriesLabel, Mode=OneWay}" Command="{Binding SaveMenuTaxonomyCommand}" Style="{StaticResource GoldPrimaryButton}"/>
                             </StackPanel>
                             <ItemsControl ItemsSource="{Binding MenuTaxonomyTypes}">
                                 <ItemsControl.ItemTemplate>
@@ -388,13 +411,13 @@
                                                         <ColumnDefinition Width="*"/>
                                                         <ColumnDefinition Width="Auto"/>
                                                     </Grid.ColumnDefinitions>
-                                                    <TextBlock Grid.Column="0" Text="Menu type name" Style="{StaticResource HeadingSmall}"/>
-                                                    <Button Grid.Column="1" Content="Remove type" Command="{Binding RemoveTypeCommand}" Style="{StaticResource GhostButton}"/>
+                                                    <TextBlock Grid.Column="0" Text="{Binding DataContext.SetMenuTypeNameLabel, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
+                                                    <Button Grid.Column="1" Content="{Binding DataContext.SetRemoveTypeLabel, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}" Command="{Binding RemoveTypeCommand}" Style="{StaticResource GhostButton}"/>
                                                 </Grid>
                                                 <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                                                <CheckBox Margin="0,10,0,8" Content="Drink type (beverages)" IsChecked="{Binding IsDrink, Mode=TwoWay}" Foreground="{StaticResource TextSecondaryBrush}"/>
-                                                <TextBlock Text="Sections (product category = section name). Subcategories: comma-separated list." Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,0,0,6"/>
-                                                <Button HorizontalAlignment="Left" Content="Add section" Command="{Binding AddSectionCommand}" Style="{StaticResource GhostButton}" Margin="0,0,0,8"/>
+                                                <CheckBox Margin="0,10,0,8" Content="{Binding DataContext.SetDrinkTypeCheckboxLabel, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}" IsChecked="{Binding IsDrink, Mode=TwoWay}" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                                <TextBlock Text="{Binding DataContext.SetSectionsHint, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}" Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                                <Button HorizontalAlignment="Left" Content="{Binding DataContext.SetAddSectionLabel, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}" Command="{Binding AddSectionCommand}" Style="{StaticResource GhostButton}" Margin="0,0,0,8"/>
                                                 <ItemsControl ItemsSource="{Binding Sections}">
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate DataType="{x:Type vm:MenuTaxonomySectionEditVm}">
@@ -405,11 +428,11 @@
                                                                             <ColumnDefinition Width="*"/>
                                                                             <ColumnDefinition Width="Auto"/>
                                                                         </Grid.ColumnDefinitions>
-                                                                        <TextBlock Grid.Column="0" Text="Category (section name)" Style="{StaticResource HeadingSmall}"/>
-                                                                        <Button Grid.Column="1" Content="Remove" Command="{Binding RemoveCommand}" Style="{StaticResource GhostButton}"/>
+                                                                        <TextBlock Grid.Column="0" Text="{Binding DataContext.SetCategorySectionNameLabel, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
+                                                                        <Button Grid.Column="1" Content="{Binding DataContext.SetRemoveLabel, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}" Command="{Binding RemoveCommand}" Style="{StaticResource GhostButton}"/>
                                                                     </Grid>
                                                                     <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                                                                    <TextBlock Text="Subcategories (comma-separated)" Style="{StaticResource HeadingSmall}" Margin="0,8,0,0"/>
+                                                                    <TextBlock Text="{Binding DataContext.SetSubcategoriesCommaLabel, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,8,0,0"/>
                                                                     <TextBox Text="{Binding ItemsText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
                                                                 </StackPanel>
                                                             </Border>
@@ -427,15 +450,15 @@
                     <Border Style="{StaticResource GlassCard}" Margin="0,16,0,0" Padding="18"
                             Visibility="{Binding ShowMenuQrSection, Converter={StaticResource BoolToVisibilityConverter}}">
                         <StackPanel>
-                            <TextBlock Text="Menu QR codes"
+                            <TextBlock Text="{Binding SetMenuQrTitle, Mode=OneWay}"
                                        Foreground="{StaticResource GoldAccentBrush}"
                                        FontSize="20"
                                        FontWeight="SemiBold"/>
-                            <TextBlock Text="Each code opens the customer menu with the table preset. URL: {base URL}/menu/?table={table id}. Save Business Profile if you change the base URL."
+                            <TextBlock Text="{Binding SetMenuQrLead, Mode=OneWay}"
                                        Style="{StaticResource BodyText}"
                                        Margin="0,4,0,12"
                                        TextWrapping="Wrap"/>
-                            <Button Content="Print all QR codes (PDF)"
+                            <Button Content="{Binding SetPrintAllQrPdfLabel, Mode=OneWay}"
                                     Command="{Binding PrintAllMenuQrCommand}"
                                     Style="{StaticResource GoldPrimaryButton}"
                                     HorizontalAlignment="Left"
@@ -464,11 +487,11 @@
                     <Border Style="{StaticResource GlassCard}" Margin="0,16,0,0" Padding="18"
                             Visibility="{Binding ShowCurrencySection, Converter={StaticResource BoolToVisibilityConverter}}">
                         <StackPanel>
-                            <TextBlock Text="Currency &amp; Pricing"
+                            <TextBlock Text="{Binding SetCurrencyTitle, Mode=OneWay}"
                                        Foreground="{StaticResource GoldAccentBrush}"
                                        FontSize="20"
                                        FontWeight="SemiBold"/>
-                            <TextBlock Text="Default display, exchange rate, rounding, tax and service."
+                            <TextBlock Text="{Binding SetCurrencyLead, Mode=OneWay}"
                                        Style="{StaticResource BodyText}"
                                        Margin="0,4,0,12"/>
 
@@ -485,63 +508,58 @@
                                 </Grid.RowDefinitions>
 
                                 <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,10,10">
-                                    <TextBlock Text="Default currency display mode" Style="{StaticResource HeadingSmall}"/>
-                                    <ComboBox SelectedValuePath="Content"
+                                    <TextBlock Text="{Binding SetDefaultCurrencyDisplayLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
+                                    <ComboBox ItemsSource="{Binding CurrencyDisplayOptions}"
+                                              SelectedValuePath="Value"
+                                              DisplayMemberPath="Label"
                                               SelectedValue="{Binding DefaultCurrencyDisplayMode, Mode=TwoWay}"
-                                              Style="{StaticResource EliteComboBox}">
-                                        <ComboBoxItem Content="USD"/>
-                                        <ComboBoxItem Content="FC"/>
-                                        <ComboBoxItem Content="Dual"/>
-                                    </ComboBox>
+                                              Style="{StaticResource EliteComboBox}"/>
                                 </StackPanel>
 
                                 <StackPanel Grid.Row="0" Grid.Column="1" Margin="10,0,0,10">
-                                    <TextBlock Text="USD ↔ FC exchange rate" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBlock Text="{Binding SetExchangeRateLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                                     <TextBox Text="{Binding ExchangeRateUsdToFc, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
                                 </StackPanel>
 
                                 <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,0,0,10">
-                                    <TextBlock Text="Exchange rate last updated" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBlock Text="{Binding SetExchangeRateUpdatedLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                                     <TextBox Text="{Binding ExchangeRateLastUpdated, Mode=OneWay}" Style="{StaticResource EliteTextBox}" IsReadOnly="True"/>
                                 </StackPanel>
 
                                 <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,0,10,10">
-                                    <TextBlock Text="Rounding: line / subtotal" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBlock Text="{Binding SetRoundingLineSubtotalLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="8"/>
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
-                                        <ComboBox Grid.Column="0" SelectedValuePath="Content" SelectedValue="{Binding RoundingLine, Mode=TwoWay}" Style="{StaticResource EliteComboBox}">
-                                            <ComboBoxItem Content="Nearest"/>
-                                            <ComboBoxItem Content="Up"/>
-                                            <ComboBoxItem Content="Down"/>
-                                            <ComboBoxItem Content="None"/>
-                                        </ComboBox>
-                                        <ComboBox Grid.Column="2" SelectedValuePath="Content" SelectedValue="{Binding RoundingSubtotal, Mode=TwoWay}" Style="{StaticResource EliteComboBox}">
-                                            <ComboBoxItem Content="Nearest"/>
-                                            <ComboBoxItem Content="Up"/>
-                                            <ComboBoxItem Content="Down"/>
-                                            <ComboBoxItem Content="None"/>
-                                        </ComboBox>
+                                        <ComboBox Grid.Column="0"
+                                                  ItemsSource="{Binding RoundingOptions}"
+                                                  SelectedValuePath="Value"
+                                                  DisplayMemberPath="Label"
+                                                  SelectedValue="{Binding RoundingLine, Mode=TwoWay}"
+                                                  Style="{StaticResource EliteComboBox}"/>
+                                        <ComboBox Grid.Column="2"
+                                                  ItemsSource="{Binding RoundingOptions}"
+                                                  SelectedValuePath="Value"
+                                                  DisplayMemberPath="Label"
+                                                  SelectedValue="{Binding RoundingSubtotal, Mode=TwoWay}"
+                                                  Style="{StaticResource EliteComboBox}"/>
                                     </Grid>
                                 </StackPanel>
 
                                 <StackPanel Grid.Row="2" Grid.Column="1" Margin="10,0,0,10">
-                                    <TextBlock Text="Rounding: grand total" Style="{StaticResource HeadingSmall}"/>
-                                    <ComboBox SelectedValuePath="Content"
+                                    <TextBlock Text="{Binding SetRoundingGrandTotalLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
+                                    <ComboBox ItemsSource="{Binding RoundingOptions}"
+                                              SelectedValuePath="Value"
+                                              DisplayMemberPath="Label"
                                               SelectedValue="{Binding RoundingGrandTotal, Mode=TwoWay}"
-                                              Style="{StaticResource EliteComboBox}">
-                                        <ComboBoxItem Content="Nearest"/>
-                                        <ComboBoxItem Content="Up"/>
-                                        <ComboBoxItem Content="Down"/>
-                                        <ComboBoxItem Content="None"/>
-                                    </ComboBox>
+                                              Style="{StaticResource EliteComboBox}"/>
                                 </StackPanel>
 
                                 <StackPanel Grid.Row="3" Grid.ColumnSpan="2">
-                                    <TextBlock Text="Tax % / Service % (admin only)" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBlock Text="{Binding SetTaxServicePercentLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
@@ -560,7 +578,7 @@
                                 </StackPanel>
                             </Grid>
 
-                            <Button Content="Save Currency &amp; Pricing"
+                            <Button Content="{Binding SetSaveCurrencyPricingLabel, Mode=OneWay}"
                                     Margin="0,14,0,0"
                                     Command="{Binding SaveCurrencyPricingCommand}"
                                     Style="{StaticResource GoldPrimaryButton}"/>
@@ -570,25 +588,25 @@
                     <Border Style="{StaticResource GlassCard}" Margin="0,16,0,0" Padding="18"
                             Visibility="{Binding ShowAttendanceSection, Converter={StaticResource BoolToVisibilityConverter}}">
                         <StackPanel>
-                            <TextBlock Text="Attendance &amp; shifts"
+                            <TextBlock Text="{Binding SetAttendanceTitle, Mode=OneWay}"
                                        Foreground="{StaticResource GoldAccentBrush}"
                                        FontSize="20"
                                        FontWeight="SemiBold"/>
-                            <TextBlock Text="Define shift windows (local time). Morning and night set partial shifts; Full Day on an employee schedule uses morning start through night end. Used for attendance, late grace, payroll hours, and auto-absence on this PC."
+                            <TextBlock Text="{Binding SetAttendanceLead, Mode=OneWay}"
                                        Style="{StaticResource BodyText}"
                                        TextWrapping="Wrap"
                                        Margin="0,4,0,12"/>
-                            <TextBlock Text="Morning shift — start (HH:mm)" Style="{StaticResource HeadingSmall}"/>
+                            <TextBlock Text="{Binding SetMorningStartLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                             <TextBox Text="{Binding AttendanceMorningStartText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                            <TextBlock Text="Morning shift — end (HH:mm)" Style="{StaticResource HeadingSmall}" Margin="0,10,0,0"/>
+                            <TextBlock Text="{Binding SetMorningEndLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,10,0,0"/>
                             <TextBox Text="{Binding AttendanceMorningEndText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                            <TextBlock Text="Night shift — start (HH:mm)" Style="{StaticResource HeadingSmall}" Margin="0,10,0,0"/>
+                            <TextBlock Text="{Binding SetNightStartLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,10,0,0"/>
                             <TextBox Text="{Binding AttendanceNightStartText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                            <TextBlock Text="Night shift — end (HH:mm)" Style="{StaticResource HeadingSmall}" Margin="0,10,0,0"/>
+                            <TextBlock Text="{Binding SetNightEndLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,10,0,0"/>
                             <TextBox Text="{Binding AttendanceNightEndText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                            <TextBlock Text="Late clock-in grace (minutes after shift start)" Style="{StaticResource HeadingSmall}" Margin="0,10,0,0"/>
+                            <TextBlock Text="{Binding SetLateGraceLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,10,0,0"/>
                             <TextBox Text="{Binding AttendanceLateGraceMinutesText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                            <Button Content="Save attendance shift settings"
+                            <Button Content="{Binding SetSaveAttendanceLabel, Mode=OneWay}"
                                     Margin="0,14,0,0"
                                     Command="{Binding SaveAttendanceShiftsCommand}"
                                     Style="{StaticResource GoldPrimaryButton}"/>
@@ -598,25 +616,25 @@
                     <Border Style="{StaticResource GlassCard}" Margin="0,16,0,0" Padding="18"
                             Visibility="{Binding ShowSalarySection, Converter={StaticResource BoolToVisibilityConverter}}">
                         <StackPanel>
-                            <TextBlock Text="Salary"
+                            <TextBlock Text="{Binding SetSalaryTitle, Mode=OneWay}"
                                        Foreground="{StaticResource GoldAccentBrush}"
                                        FontSize="20"
                                        FontWeight="SemiBold"/>
-                            <TextBlock Text="Payroll uses scheduled workdays, attendance absences/lates, merchandise sales bonus, and advance caps. These values sync to the cloud profile so API-side payroll matches this PC."
+                            <TextBlock Text="{Binding SetSalaryLead, Mode=OneWay}"
                                        Style="{StaticResource BodyText}"
                                        TextWrapping="Wrap"
                                        Margin="0,4,0,12"/>
-                            <TextBlock Text="Late days per attendance deduction unit (e.g. 4 means four late days = one unit)" Style="{StaticResource HeadingSmall}"/>
+                            <TextBlock Text="{Binding SetLateDaysPerUnitLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                             <TextBox Text="{Binding SalaryLateDaysPerAttendanceUnitText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
                             <CheckBox Margin="0,12,0,0"
-                                      Content="Each absence day counts as one deduction unit"
+                                      Content="{Binding SetAbsenceCountsAsUnitLabel, Mode=OneWay}"
                                       IsChecked="{Binding SalaryAbsenceCountsAsAttendanceUnit, Mode=TwoWay}"
                                       Foreground="{StaticResource TextSecondaryBrush}"/>
-                            <TextBlock Text="Sales bonus (% of server merchandise for the month)" Style="{StaticResource HeadingSmall}" Margin="0,12,0,0"/>
+                            <TextBlock Text="{Binding SetSalesBonusPercentLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,12,0,0"/>
                             <TextBox Text="{Binding SalarySalesBonusPercentText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                            <TextBlock Text="Max salary advance (% of scheduled gross for that payroll month)" Style="{StaticResource HeadingSmall}" Margin="0,10,0,0"/>
+                            <TextBlock Text="{Binding SetMaxAdvancePercentLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}" Margin="0,10,0,0"/>
                             <TextBox Text="{Binding SalaryMaxAdvancePercentOfGrossText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}"/>
-                            <Button Content="Save Salary settings"
+                            <Button Content="{Binding SetSaveSalaryLabel, Mode=OneWay}"
                                     Margin="0,14,0,0"
                                     Command="{Binding SaveSalarySettingsCommand}"
                                     Style="{StaticResource GoldPrimaryButton}"/>
@@ -626,23 +644,23 @@
                     <Border Style="{StaticResource GlassCard}" Margin="0,16,0,0" Padding="18"
                             Visibility="{Binding ShowMenuBackgroundSection, Converter={StaticResource BoolToVisibilityConverter}}">
                         <StackPanel>
-                            <TextBlock Text="Menu Backgrounds"
+                            <TextBlock Text="{Binding SetMenuBackgroundsTitle, Mode=OneWay}"
                                        Foreground="{StaticResource GoldAccentBrush}"
                                        FontSize="20"
                                        FontWeight="SemiBold"/>
-                            <TextBlock Text="Set a custom image for each navigation page. Dim and contrast apply app-wide."
+                            <TextBlock Text="{Binding SetMenuBackgroundsLead, Mode=OneWay}"
                                        Style="{StaticResource BodyText}"
                                        Margin="0,4,0,12"/>
 
                             <StackPanel>
-                                <TextBlock Text="Page" Style="{StaticResource HeadingSmall}"/>
-                                <ComboBox ItemsSource="{Binding BackgroundMenuKeys}"
-                                          SelectedItem="{Binding SelectedBackgroundMenu, Mode=TwoWay}"
+                                <TextBlock Text="{Binding SetPageLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
+                                <ComboBox ItemsSource="{Binding BackgroundPageOptions}"
+                                          SelectedItem="{Binding SelectedBackgroundPageOption, Mode=TwoWay}"
                                           Style="{StaticResource EliteComboBox}"/>
                             </StackPanel>
 
                             <StackPanel Margin="0,10,0,0">
-                                <TextBlock Text="Background image path" Style="{StaticResource HeadingSmall}"/>
+                                <TextBlock Text="{Binding SetBackgroundImagePathLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
@@ -654,28 +672,28 @@
                                              Style="{StaticResource EliteTextBox}"/>
                                     <Button Grid.Column="1"
                                             Margin="8,0,0,0"
-                                            Content="Browse"
+                                            Content="{Binding SetBrowseLabel, Mode=OneWay}"
                                             Command="{Binding BrowseMenuBackgroundCommand}"
                                             Style="{StaticResource GhostButton}"/>
                                     <Button Grid.Column="2"
                                             Margin="8,0,0,0"
-                                            Content="Clear"
+                                            Content="{Binding SetClearLabel, Mode=OneWay}"
                                             Command="{Binding ClearMenuBackgroundCommand}"
                                             Style="{StaticResource GhostButton}"/>
                                 </Grid>
                             </StackPanel>
 
                             <TextBlock Margin="0,10,0,0" Foreground="{StaticResource TextSecondaryBrush}">
-                                <Run Text="Dim light: "/><Run Text="{Binding BackgroundDimStrength, StringFormat={}{0:0.00}}"/>
+                                <Run Text="{Binding SetDimLightLabel, Mode=OneWay}"/><Run Text="{Binding BackgroundDimStrength, StringFormat={}{0:0.00}}"/>
                             </TextBlock>
                             <Slider Minimum="0" Maximum="0.5" Value="{Binding BackgroundDimStrength, Mode=TwoWay}"/>
 
                             <TextBlock Margin="0,6,0,0" Foreground="{StaticResource TextSecondaryBrush}">
-                                <Run Text="Contrast: "/><Run Text="{Binding BackgroundContrastIntensity, StringFormat={}{0:0.00}}"/>
+                                <Run Text="{Binding SetContrastLabel, Mode=OneWay}"/><Run Text="{Binding BackgroundContrastIntensity, StringFormat={}{0:0.00}}"/>
                             </TextBlock>
                             <Slider Minimum="0" Maximum="0.5" Value="{Binding BackgroundContrastIntensity, Mode=TwoWay}"/>
 
-                            <Button Content="Save Menu Background Settings"
+                            <Button Content="{Binding SetSaveMenuBackgroundsLabel, Mode=OneWay}"
                                     Margin="0,14,0,0"
                                     Command="{Binding SaveMenuBackgroundCommand}"
                                     Style="{StaticResource GoldPrimaryButton}"/>
@@ -685,17 +703,17 @@
                     <Border Style="{StaticResource GlassCard}" Margin="0,16,0,0" Padding="18"
                             Visibility="{Binding ShowDatabaseSection, Converter={StaticResource BoolToVisibilityConverter}}">
                         <StackPanel>
-                            <TextBlock Text="Database"
+                            <TextBlock Text="{Binding SetDatabaseTitle, Mode=OneWay}"
                                        Foreground="{StaticResource GoldAccentBrush}"
                                        FontSize="20"
                                        FontWeight="SemiBold"/>
-                            <TextBlock Text="PostgreSQL-only runtime. Password is stored with Windows DPAPI (CurrentUser). Prefer ELITE_POSTGRES_CONNECTION for services or automation."
+                            <TextBlock Text="{Binding SetDatabaseLead, Mode=OneWay}"
                                        Style="{StaticResource BodyText}"
                                        TextWrapping="Wrap"
                                        Margin="0,4,0,12"/>
 
                             <StackPanel>
-                                <TextBlock Text="Provider" Style="{StaticResource HeadingSmall}"/>
+                                <TextBlock Text="{Binding SetProviderLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                                 <ComboBox ItemsSource="{Binding DatabaseProviders}"
                                           SelectedItem="{Binding DatabaseProvider, Mode=TwoWay}"
                                           Style="{StaticResource EliteComboBox}"/>
@@ -711,32 +729,32 @@
                                     <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
                                 <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,8,8">
-                                    <TextBlock Text="Host" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBlock Text="{Binding SetHostLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                                     <TextBox Text="{Binding DatabaseHost, UpdateSourceTrigger=PropertyChanged}"
                                              Style="{StaticResource EliteTextBox}"/>
                                 </StackPanel>
                                 <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,0,8">
-                                    <TextBlock Text="Port" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBlock Text="{Binding SetPortLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                                     <TextBox Text="{Binding DatabasePort, UpdateSourceTrigger=PropertyChanged}"
                                              Style="{StaticResource EliteTextBox}"/>
                                 </StackPanel>
                                 <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2">
-                                    <TextBlock Text="Database name" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBlock Text="{Binding SetDatabaseNameLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                                     <TextBox Text="{Binding DatabaseName, UpdateSourceTrigger=PropertyChanged}"
                                              Style="{StaticResource EliteTextBox}"/>
                                 </StackPanel>
                             </Grid>
 
                             <StackPanel Margin="0,6,0,0">
-                                <TextBlock Text="Username" Style="{StaticResource HeadingSmall}"/>
+                                <TextBlock Text="{Binding SetUsernameLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                                 <TextBox Text="{Binding DatabaseUsername, UpdateSourceTrigger=PropertyChanged}"
                                          Style="{StaticResource EliteTextBox}"/>
                             </StackPanel>
 
                             <StackPanel Margin="0,10,0,0">
                                 <TextBlock Style="{StaticResource HeadingSmall}">
-                                    <Run Text="Password"/>
-                                    <Run Text=" (not shown after save)" Foreground="{StaticResource TextMutedBrush}" FontSize="11"/>
+                                    <Run Text="{Binding SetPasswordLabel, Mode=OneWay}"/>
+                                    <Run Text="{Binding SetPasswordNotShownLabel, Mode=OneWay}" Foreground="{StaticResource TextMutedBrush}" FontSize="11"/>
                                 </TextBlock>
                                 <PasswordBox x:Name="DatabasePasswordBox"
                                              Style="{StaticResource ElitePasswordBox}"
@@ -745,7 +763,7 @@
                                            Foreground="{StaticResource TextMutedBrush}"
                                            FontSize="11"
                                            Visibility="{Binding HasSavedDatabasePassword, Converter={StaticResource BoolToVisibilityConverter}}"
-                                           Text="A password is already saved on this PC. Enter a new password only to change it."/>
+                                           Text="{Binding SetPasswordAlreadySavedLabel, Mode=OneWay}"/>
                             </StackPanel>
 
                             <Grid Margin="0,14,0,0">
@@ -754,12 +772,12 @@
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <Button Grid.Column="0"
-                                        Content="Test Connection"
+                                        Content="{Binding SetTestConnectionLabel, Mode=OneWay}"
                                         Margin="0,0,6,0"
                                         Command="{Binding TestDatabaseConnectionCommand}"
                                         Style="{StaticResource GhostButton}"/>
                                 <Button Grid.Column="1"
-                                        Content="Save Database Settings"
+                                        Content="{Binding SetSaveDatabaseLabel, Mode=OneWay}"
                                         Margin="6,0,0,0"
                                         Command="{Binding SaveDatabaseSettingsCommand}"
                                         Style="{StaticResource GoldPrimaryButton}"/>
@@ -768,13 +786,33 @@
                     </Border>
 
                     <Border Style="{StaticResource GlassCard}" Margin="0,16,0,0" Padding="18"
-                            Visibility="{Binding ShowAppearanceSection, Converter={StaticResource BoolToVisibilityConverter}}">
+                            Visibility="{Binding ShowLanguageSection, Converter={StaticResource BoolToVisibilityConverter}}">
                         <StackPanel>
-                            <TextBlock Text="Appearance"
+                            <TextBlock Text="{Binding SettingsLanguageTitle}"
                                        Foreground="{StaticResource GoldAccentBrush}"
                                        FontSize="20"
                                        FontWeight="SemiBold"/>
-                            <TextBlock Text="Use HSL picker, then apply the token. No live preview panel."
+                            <TextBlock Text="{Binding SettingsLanguageLead}"
+                                       Style="{StaticResource BodyText}"
+                                       Margin="0,4,0,12"/>
+                            <TextBlock Text="{Binding SettingsLanguageLabel}" Style="{StaticResource HeadingSmall}"/>
+                            <ComboBox Width="260"
+                                      Margin="0,8,0,0"
+                                      ItemsSource="{Binding UiLanguageOptions}"
+                                      DisplayMemberPath="DisplayName"
+                                      SelectedItem="{Binding SelectedUiLanguage, Mode=TwoWay}"
+                                      Style="{StaticResource EliteComboBox}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource GlassCard}" Margin="0,16,0,0" Padding="18"
+                            Visibility="{Binding ShowAppearanceSection, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <StackPanel>
+                            <TextBlock Text="{Binding SetAppearanceTitle, Mode=OneWay}"
+                                       Foreground="{StaticResource GoldAccentBrush}"
+                                       FontSize="20"
+                                       FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding SetAppearanceLead, Mode=OneWay}"
                                        Style="{StaticResource BodyText}"
                                        Margin="0,4,0,10"/>
 
@@ -791,39 +829,28 @@
                                         Background="{Binding PickerPreviewBrush}"/>
 
                                 <StackPanel Grid.Column="1" Margin="14,0,0,0">
-                                    <ComboBox SelectedValuePath="Content"
-                                              SelectedValue="{Binding SelectedToken, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                              Style="{StaticResource EliteComboBox}">
-                                        <ComboBoxItem Content="Background Dark"/>
-                                        <ComboBoxItem Content="Background Medium"/>
-                                        <ComboBoxItem Content="Sidebar"/>
-                                        <ComboBoxItem Content="Card Base"/>
-                                        <ComboBoxItem Content="Gold Accent"/>
-                                        <ComboBoxItem Content="Text Secondary"/>
-                                        <ComboBoxItem Content="Border Subtle"/>
-                                        <ComboBoxItem Content="Stat Blue"/>
-                                        <ComboBoxItem Content="Stat Green"/>
-                                        <ComboBoxItem Content="Stat Red"/>
-                                    </ComboBox>
+                                    <ComboBox ItemsSource="{Binding ThemeTokenOptions}"
+                                              SelectedItem="{Binding SelectedTokenOption, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                              Style="{StaticResource EliteComboBox}"/>
 
                                     <TextBlock Margin="0,8,0,0" Foreground="{StaticResource TextSecondaryBrush}">
-                                        <Run Text="Hue: "/><Run Text="{Binding PickerHue, StringFormat={}{0:0}}"/>
+                                        <Run Text="{Binding SetHueLabel, Mode=OneWay}"/><Run Text="{Binding PickerHue, StringFormat={}{0:0}}"/>
                                     </TextBlock>
                                     <Slider Minimum="0" Maximum="360" Value="{Binding PickerHue, Mode=TwoWay}"/>
 
                                     <TextBlock Margin="0,6,0,0" Foreground="{StaticResource TextSecondaryBrush}">
-                                        <Run Text="Saturation: "/><Run Text="{Binding PickerSaturation, StringFormat={}{0:0}}"/><Run Text="%"/>
+                                        <Run Text="{Binding SetSaturationLabel, Mode=OneWay}"/><Run Text="{Binding PickerSaturation, StringFormat={}{0:0}}"/><Run Text="%"/>
                                     </TextBlock>
                                     <Slider Minimum="0" Maximum="100" Value="{Binding PickerSaturation, Mode=TwoWay}"/>
 
                                     <TextBlock Margin="0,6,0,0" Foreground="{StaticResource TextSecondaryBrush}">
-                                        <Run Text="Lightness: "/><Run Text="{Binding PickerLightness, StringFormat={}{0:0}}"/><Run Text="%"/>
+                                        <Run Text="{Binding SetLightnessLabel, Mode=OneWay}"/><Run Text="{Binding PickerLightness, StringFormat={}{0:0}}"/><Run Text="%"/>
                                     </TextBlock>
                                     <Slider Minimum="0" Maximum="100" Value="{Binding PickerLightness, Mode=TwoWay}"/>
 
                                     <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                         <TextBlock Text="{Binding PickerHex}" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
-                                        <Button Content="Apply to selected token"
+                                        <Button Content="{Binding SetApplyToTokenLabel, Mode=OneWay}"
                                                 Width="190"
                                                 Height="38"
                                                 Margin="12,0,0,0"
@@ -833,14 +860,14 @@
                                 </StackPanel>
                             </Grid>
 
-                            <Button Content="Apply Theme" Margin="0,12,0,0" Command="{Binding ApplyThemeCommand}" Style="{StaticResource GoldPrimaryButton}"/>
+                            <Button Content="{Binding SetApplyThemeLabel, Mode=OneWay}" Margin="0,12,0,0" Command="{Binding ApplyThemeCommand}" Style="{StaticResource GoldPrimaryButton}"/>
                             <Grid Margin="0,8,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <Button Grid.Column="0" Content="Save Theme" Margin="0,0,6,0" Command="{Binding SaveThemeCommand}" Style="{StaticResource GoldPrimaryButton}"/>
-                                <Button Grid.Column="1" Content="Reset Default Theme" Margin="6,0,0,0" Command="{Binding ResetThemeCommand}" Style="{StaticResource GhostButton}"/>
+                                <Button Grid.Column="0" Content="{Binding SetSaveThemeLabel, Mode=OneWay}" Margin="0,0,6,0" Command="{Binding SaveThemeCommand}" Style="{StaticResource GoldPrimaryButton}"/>
+                                <Button Grid.Column="1" Content="{Binding SetResetDefaultThemeLabel, Mode=OneWay}" Margin="6,0,0,0" Command="{Binding ResetThemeCommand}" Style="{StaticResource GhostButton}"/>
                             </Grid>
                         </StackPanel>
                     </Border>

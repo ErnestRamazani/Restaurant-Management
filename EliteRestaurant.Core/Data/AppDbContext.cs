@@ -45,6 +45,8 @@ public class AppDbContext : DbContext
     public DbSet<PayrollPaymentRecord> PayrollPaymentRecords => Set<PayrollPaymentRecord>();
     public DbSet<MoneyTransaction> Transactions => Set<MoneyTransaction>();
     public DbSet<CustomerProfile> CustomerProfiles => Set<CustomerProfile>();
+    public DbSet<RestaurantClient> RestaurantClients => Set<RestaurantClient>();
+    public DbSet<ClientDebtLedgerEntry> ClientDebtLedgerEntries => Set<ClientDebtLedgerEntry>();
     public DbSet<ReservationBooking> Reservations => Set<ReservationBooking>();
     public DbSet<PlacementUnit> PlacementUnits => Set<PlacementUnit>();
     public DbSet<ReservationEngagement> ReservationEngagements => Set<ReservationEngagement>();
@@ -154,6 +156,8 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<PayrollPaymentRecord>().ToTable("PayrollPaymentRecords");
         modelBuilder.Entity<MoneyTransaction>().ToTable("Transactions");
         modelBuilder.Entity<CustomerProfile>().ToTable("CustomerProfiles");
+        modelBuilder.Entity<RestaurantClient>().ToTable("RestaurantClients");
+        modelBuilder.Entity<ClientDebtLedgerEntry>().ToTable("ClientDebtLedgerEntries");
         modelBuilder.Entity<ReservationBooking>().ToTable("Reservations");
         modelBuilder.Entity<PlacementUnit>().ToTable("PlacementUnits");
         modelBuilder.Entity<ReservationEngagement>().ToTable("ReservationEngagements");
@@ -197,6 +201,38 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<InventoryItem>().HasIndex(i => new { i.RestaurantId, i.UniqueId }).IsUnique();
         modelBuilder.Entity<CustomerProfile>().HasIndex(c => new { c.RestaurantId, c.UniqueId }).IsUnique();
         modelBuilder.Entity<CustomerProfile>().HasIndex(c => c.PrimaryPhone);
+
+        modelBuilder.Entity<RestaurantClient>().HasIndex(c => new { c.RestaurantId, c.UniqueId }).IsUnique();
+        modelBuilder.Entity<RestaurantClient>()
+            .HasIndex(c => new { c.RestaurantId, c.PrimaryPhone })
+            .IsUnique()
+            .HasFilter("\"PrimaryPhone\" IS NOT NULL AND \"PrimaryPhone\" <> '' AND NOT \"IsStaffClient\"");
+        modelBuilder.Entity<RestaurantClient>()
+            .HasIndex(c => c.EmployeeId)
+            .IsUnique()
+            .HasFilter("\"EmployeeId\" IS NOT NULL");
+        modelBuilder.Entity<RestaurantClient>()
+            .HasOne(c => c.Employee)
+            .WithMany()
+            .HasForeignKey(c => c.EmployeeId)
+            .OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<OrderRecord>()
+            .HasOne(o => o.RestaurantClient)
+            .WithMany(c => c.Orders)
+            .HasForeignKey(o => o.RestaurantClientId)
+            .OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<ClientDebtLedgerEntry>()
+            .HasOne(e => e.RestaurantClient)
+            .WithMany(c => c.LedgerEntries)
+            .HasForeignKey(e => e.RestaurantClientId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ClientDebtLedgerEntry>()
+            .HasOne(e => e.Order)
+            .WithMany()
+            .HasForeignKey(e => e.OrderId)
+            .OnDelete(DeleteBehavior.SetNull);
+        modelBuilder.Entity<ClientDebtLedgerEntry>().HasIndex(e => e.RestaurantClientId);
+        modelBuilder.Entity<ClientDebtLedgerEntry>().HasIndex(e => e.OrderId);
         modelBuilder.Entity<ReservationBooking>().HasIndex(r => new { r.RestaurantId, r.UniqueId }).IsUnique();
         modelBuilder.Entity<ReservationBooking>().HasIndex(r => r.ReservedFor);
         modelBuilder.Entity<ReservationBooking>().HasIndex(r => r.Status);

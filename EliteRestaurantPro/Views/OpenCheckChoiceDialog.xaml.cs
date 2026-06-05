@@ -1,6 +1,6 @@
 using System.Windows;
 using System.Windows.Input;
-using EliteRestaurant.Core.Utils;
+using EliteRestaurantPro.Localization;
 
 namespace EliteRestaurantPro.Views;
 
@@ -9,6 +9,39 @@ public enum OpenCheckChoice
     Cancel,
     AppendToSameTicket,
     NewSeparateTicket,
+}
+
+public sealed class OpenCheckChoiceDialogViewModel
+{
+    public string DialogTitle { get; }
+    public string DialogHeading { get; }
+    public string SummaryText { get; }
+    public string PromptText { get; }
+    public string SubtotalText { get; }
+    public string ChooseHowLabel { get; }
+    public string AppendButtonLabel { get; }
+    public string NewTicketButtonLabel { get; }
+    public string BackButtonLabel { get; }
+
+    public OpenCheckChoiceDialogViewModel(
+        int tableNumber,
+        string tableName,
+        string checkCode,
+        string? rawStatus,
+        int newLineCount,
+        decimal newLinesSubtotalUsd)
+    {
+        var name = string.IsNullOrWhiteSpace(tableName) ? $"{CreateOrderUiLocalizer.TableComboPrefix}{tableNumber}" : tableName;
+        DialogTitle = CreateOrderUiLocalizer.OpenCheckDialogTitle;
+        DialogHeading = CreateOrderUiLocalizer.OpenCheckDialogHeading;
+        SummaryText = CreateOrderUiLocalizer.OpenCheckDialogSummary(name, checkCode, rawStatus);
+        PromptText = CreateOrderUiLocalizer.OpenCheckNewLinesPrompt(newLineCount);
+        SubtotalText = CreateOrderUiLocalizer.OpenCheckNewLinesSubtotal(newLinesSubtotalUsd);
+        ChooseHowLabel = Loc.Admin("createOrderDlgChooseHow", "Choose how to send these items");
+        AppendButtonLabel = Loc.Admin("createOrderDlgAppendTicket", "Add to this ticket");
+        NewTicketButtonLabel = Loc.Admin("createOrderDlgNewSeparateTicket", "New separate ticket");
+        BackButtonLabel = Loc.Admin("createOrderDlgBack", "Back");
+    }
 }
 
 public partial class OpenCheckChoiceDialog : Window
@@ -23,18 +56,9 @@ public partial class OpenCheckChoiceDialog : Window
         int newLineCount,
         decimal newLinesSubtotalUsd)
     {
+        DataContext = new OpenCheckChoiceDialogViewModel(
+            tableNumber, tableName, checkCode, status, newLineCount, newLinesSubtotalUsd);
         InitializeComponent();
-
-        var name = string.IsNullOrWhiteSpace(tableName) ? $"Table {tableNumber}" : tableName;
-        SummaryText.Text =
-            $"{name} already has an open ticket {checkCode}.\nStatus: {status}";
-
-        PromptText.Text = newLineCount == 1
-            ? "You are sending 1 new line on this order."
-            : $"You are sending {newLineCount} new lines on this order.";
-
-        SubtotalText.Text =
-            $"Subtotal for new lines: {CurrencyHelper.FormatUsdAmountDigits(newLinesSubtotalUsd)}";
     }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

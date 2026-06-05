@@ -1,5 +1,6 @@
 using System.Globalization;
 using EliteRestaurant.Core.Models;
+using ClientSettlement = EliteRestaurant.Core.Models.ClientSettlement;
 using EliteRestaurant.Core.Reporting;
 using EliteRestaurant.Core.Utils;
 using Microsoft.EntityFrameworkCore;
@@ -69,25 +70,12 @@ public static class FinancialTransactionService
         if (order is null || order.Status != "Completed" || order.PaymentConfirmedAt is null)
             return;
 
-        var items = db.OrderItems
-            .AsNoTracking()
-            .Where(i => i.OrderRecordId == order.Id)
-            .ToList();
-        if (items.Count == 0)
+        if (ClientSettlement.IsOnAccount(order.ClientSettlement)
+            && order.ClientDebtSettledUsd < order.AmountOnAccountUsd - 0.01m)
             return;
 
-        var productIds = items.Select(i => i.ProductId).Distinct().ToList();
-        var pricesByProductId = db.Products
-            .AsNoTracking()
-            .Where(p => productIds.Contains(p.Id))
-            .ToDictionary(p => p.Id, p => p.Price);
-
-        var merchSubtotal = items.Sum(item =>
-            (pricesByProductId.TryGetValue(item.ProductId, out var price) ? price : 0m) * item.Quantity);
-
-        var totals = OrderTotalsHelper.ComputeTotals(merchSubtotal, order.DiscountMode, order.DiscountValue);
         var deliveryFee = Math.Round(Math.Max(0m, order.DeliveryFeeUsd), 2);
-        var merchGrandUsd = totals.GrandTotal;
+        var merchGrandUsd = ResolveMerchandiseGrandUsd(db, order);
         if (merchGrandUsd <= 0m && deliveryFee <= 0m)
             return;
 
@@ -106,7 +94,7 @@ public static class FinancialTransactionService
 
         if (merchGrandUsd > 0m && !HasPostedMerchandiseSale(db, order.Id, reference))
         {
-            var (amt, usd, fc) = ResolvePostedAmounts(order, merchGrandUsd, totalPartsUsd, paymentCurrency, exchangeRate);
+            var (amt, usd, fc) = MerchandiseRevenueAmounts(order, merchGrandUsd, paymentCurrency, exchangeRate);
             db.Transactions.Add(new MoneyTransaction
             {
                 RelatedOrderId = order.Id,
@@ -146,6 +134,73 @@ public static class FinancialTransactionService
     }
 
     private static string DeliveryMarker(int orderId) => $"|ORDER:{orderId}:DELIVERY|";
+
+    private static decimal ResolveMerchandiseGrandUsd(AppDbContext db, OrderRecord order)
+    {
+        if (order.MerchandiseGrandTotalUsd > 0m)
+            return Math.Round(order.MerchandiseGrandTotalUsd, 2);
+
+        var changeUsd = Math.Round(order.ChangeGivenUsd, 2);
+        var changeFcAsUsd = order.ExchangeRateUsed > 0m
+            ? Math.Round(order.ChangeGivenFc / order.ExchangeRateUsed, 2)
+            : 0m;
+        if (changeUsd > 0m || changeFcAsUsd > 0m)
+        {
+            var fromNetAndChange = Math.Round(order.PaymentAmountUsd + changeUsd + changeFcAsUsd, 2);
+            if (fromNetAndChange > 0m)
+                return fromNetAndChange;
+        }
+
+        if (order.PaymentAmountUsd > 0m)
+            return Math.Round(order.PaymentAmountUsd, 2);
+
+        var items = db.OrderItems.AsNoTracking().Where(i => i.OrderRecordId == order.Id).ToList();
+        if (items.Count == 0)
+            return 0m;
+
+        var productIds = items.Select(i => i.ProductId).Distinct().ToList();
+        var prices = db.Products.AsNoTracking()
+            .Where(p => productIds.Contains(p.Id))
+            .ToDictionary(p => p.Id, p => p.Price);
+        var lineSub = items.Sum(i => (prices.TryGetValue(i.ProductId, out var price) ? price : 0m) * i.Quantity);
+        return OrderTotalsHelper.ComputeTotalsWithDeliveryFee(
+            lineSub,
+            order.DiscountMode,
+            order.DiscountValue,
+            order.DeliveryFeeUsd).GrandTotal;
+    }
+
+    private static (decimal Amount, decimal AmountUsd, decimal AmountFc) MerchandiseRevenueAmounts(
+        OrderRecord order,
+        decimal merchGrandUsd,
+        string paymentCurrency,
+        decimal exchangeRate)
+    {
+        merchGrandUsd = Math.Round(merchGrandUsd, 2);
+        if (merchGrandUsd <= 0m)
+            return (0m, 0m, 0m);
+
+        if (string.Equals(paymentCurrency, CurrencyHelper.CongoleseFranc, StringComparison.OrdinalIgnoreCase)
+            && order.PaymentAmountFc > 0m
+            && order.PaymentAmountUsd <= 0m)
+        {
+            var fc = CurrencyHelper.ConvertUsdToFc(merchGrandUsd);
+            return (fc, 0m, fc);
+        }
+
+        if (MoneyReportingHelpers.IsMixedCurrency(paymentCurrency)
+            && (order.PaymentAmountUsd > 0m || order.PaymentAmountFc > 0m))
+        {
+            var usd = merchGrandUsd;
+            var fc = CurrencyHelper.ConvertUsdToFc(merchGrandUsd);
+            return (usd, usd, fc);
+        }
+
+        var amount = string.Equals(paymentCurrency, CurrencyHelper.CongoleseFranc, StringComparison.OrdinalIgnoreCase)
+            ? CurrencyHelper.ConvertUsdToFc(merchGrandUsd)
+            : merchGrandUsd;
+        return (amount, merchGrandUsd, CurrencyHelper.ConvertUsdToFc(merchGrandUsd));
+    }
 
     private static bool HasPostedMerchandiseSale(AppDbContext db, int orderId, string legacyJustification)
     {

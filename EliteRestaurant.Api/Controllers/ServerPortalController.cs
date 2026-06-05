@@ -10,6 +10,7 @@ using EliteRestaurant.Api.Branding;
 using EliteRestaurant.Api.Dtos;
 using EliteRestaurant.Api.Security;
 using EliteRestaurant.Api.Services;
+using EliteRestaurant.Core.Clients;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Menu;
 using EliteRestaurant.Core.Models;
@@ -32,13 +33,15 @@ namespace EliteRestaurant.Api.Controllers;
 [ApiController]
 [Route("api/server")]
 [Authorize(Policy = "StaffAny")]
-public sealed class     ServerPortalController(
+public sealed class ServerPortalController(
     TabletAuthService authService,
     ITenantContext tenant,
     IWebHostEnvironment environment,
     IOptions<CurrencyPricingOptions> currencyPricingOptions,
     AppDbContext db,
-    IHubContext<OrderHub> orderHub) : ControllerBase
+    SharedOrderDraftService draftStore,
+    IHubContext<OrderHub> orderHub,
+    PublicMenuSettingsCache menuSettings) : ControllerBase
 {
     [HttpGet("config")]
     public ActionResult<ServerPortalConfigDto> GetConfig()
@@ -50,7 +53,7 @@ public sealed class     ServerPortalController(
         var allSettings = SettingsManager.Load();
         var settings = allSettings.CurrencyPricing;
         var business = allSettings.BusinessProfile;
-        var cloudSettings = db.PublicMenuSettings.AsNoTracking().FirstOrDefault(s => s.Key == "default");
+        var cloudSettings = menuSettings.GetDefault();
         var restaurantName = PublicMenuBrandingMerge.RestaurantDisplayName(cloudSettings, business);
         var logoUrl = "/api/server/assets/restaurant-logo";
         var employeePhotoUrl = "/api/server/assets/me-photo";
@@ -78,7 +81,8 @@ public sealed class     ServerPortalController(
             usdToFc,
             taxPercent,
             servicePercent,
-            menuTaxonomyJson));
+            menuTaxonomyJson,
+            RestaurantTimeZone.ResolveId(cloudSettings, business)));
     }
 
     [HttpGet("assets/restaurant-logo")]
@@ -241,7 +245,7 @@ public sealed class     ServerPortalController(
         var restrict = session.Role.Equals("Server", StringComparison.OrdinalIgnoreCase);
         try
         {
-            var rows = SharedOrderDraftStore.ListServerDrafts(session.EmployeeId, tableId, restrict)
+            var rows = draftStore.ListServerDrafts(session.EmployeeId, tableId, restrict)
                 .Select(d => new ServerDraftDto(
                     d.Id,
                     d.Label,
@@ -268,7 +272,7 @@ public sealed class     ServerPortalController(
         var restrict = session.Role.Equals("Server", StringComparison.OrdinalIgnoreCase);
         try
         {
-            var row = SharedOrderDraftStore.GetServerDraft(session.EmployeeId, draftId, restrict);
+            var row = draftStore.GetServerDraft(session.EmployeeId, draftId, restrict);
             if (row is null)
                 return NotFound(new { message = "Draft not found for this server." });
 
@@ -308,8 +312,8 @@ public sealed class     ServerPortalController(
 
         try
         {
-            var tableId = SharedOrderDraftStore.ParseTableIdFromSnapshotJson(snapshot);
-            var saved = SharedOrderDraftStore.SaveServerDraft(
+            var tableId = SharedOrderDraftService.ParseTableIdFromSnapshotJson(snapshot);
+            var saved = draftStore.SaveServerDraft(
                 session.EmployeeId,
                 session.Name,
                 request.Label ?? string.Empty,
@@ -340,7 +344,7 @@ public sealed class     ServerPortalController(
         var restrict = session.Role.Equals("Server", StringComparison.OrdinalIgnoreCase);
         try
         {
-            var deleted = SharedOrderDraftStore.DeleteServerDraft(session.EmployeeId, draftId, tableId, restrict);
+            var deleted = draftStore.DeleteServerDraft(session.EmployeeId, draftId, tableId, restrict);
             if (!deleted)
                 return NotFound(new { message = "Draft not found for this server." });
 
@@ -459,9 +463,8 @@ public sealed class     ServerPortalController(
                 .Where(p => p is not null)
                 .Cast<Product>()
                 .ToList();
-            var checkKind = OpenCheckKindHelper.TryInferCheckKindFromProducts(existingProducts, menuTaxonomy);
-            if (checkKind is null)
-                return BadRequest(new { message = "This open check mixes food and drinks. Start a new food or drink ticket instead." });
+            var checkKind = OpenCheckKindHelper.TryInferCheckKindFromProducts(existingProducts, menuTaxonomy)
+                ?? OpenCheckKindHelper.Mixed;
 
             var kindErr = OpenCheckKindHelper.TryValidateLinesForCheckKind(
                 checkKind,
@@ -479,7 +482,7 @@ public sealed class     ServerPortalController(
                     normalizedLines.Select(l => (l.ProductId, l.Quantity)),
                     menuTaxonomy);
             if (newKind is null)
-                return BadRequest(new { message = "Choose Food or Drink for a new ticket, or send only food or only drink items." });
+                return BadRequest(new { message = "Choose Food, Drink, or Mixed for a new ticket, or send items to infer the check type." });
 
             var newKindErr = OpenCheckKindHelper.TryValidateLinesForCheckKind(
                 newKind,
@@ -517,6 +520,9 @@ public sealed class     ServerPortalController(
 
         if (request.AppendToOpenCheck && openOrder is not null)
         {
+            var requiresImmediateDeduction = !OrderWorkflow.IsPendingCashier(openOrder.Status)
+                && !OrderWorkflow.IsPendingApproval(openOrder.Status);
+
             foreach (var item in newItems)
                 openOrder.Items.Add(item);
 
@@ -562,7 +568,44 @@ public sealed class     ServerPortalController(
             OrderSubmissionHelper.SyncPaymentFields(openOrder, products);
             table.Status = "Occupied";
             DataReconciler.ReconcileTableStatusesWithOrders(db);
+
+            if (requiresImmediateDeduction)
+            {
+                string? invErr;
+                if (db.Database.IsInMemory())
+                {
+                    OrderInventoryDeduction.MarkExistingLinesAsDeducted(openOrder, newItems);
+                    invErr = OrderInventoryDeduction.TryApplyForAdditionalItems(db, openOrder, newItems);
+                    if (invErr is not null)
+                        return BadRequest(new { message = invErr });
+                }
+                else
+                {
+                    using var tx = db.Database.BeginTransaction();
+                    try
+                    {
+                        OrderInventoryDeduction.MarkExistingLinesAsDeducted(openOrder, newItems);
+                        invErr = OrderInventoryDeduction.TryApplyForAdditionalItems(db, openOrder, newItems);
+                        if (invErr is not null)
+                        {
+                            tx.Rollback();
+                            return BadRequest(new { message = invErr });
+                        }
+
+                        db.SaveChanges();
+                        tx.Commit();
+                    }
+                    catch
+                    {
+                        tx.Rollback();
+                        throw;
+                    }
+                }
+            }
+
             db.SaveChanges();
+            if (request.RestaurantClientId is int appendClientId && appendClientId > 0)
+                new ClientAccountService(db).TryLinkNewOrder(openOrder.Id, appendClientId);
 
             if (OrderWorkflow.IsPendingCashier(openOrder.Status) || OrderWorkflow.IsPendingApproval(openOrder.Status))
             {
@@ -593,7 +636,7 @@ public sealed class     ServerPortalController(
             DiscountMode = discountMode,
             DiscountValue = discountValue,
             PaymentCurrencyCode = CurrencyHelper.NormalizeCurrencyCode(request.PaymentCurrencyCode),
-            CreatedAt = DateTime.Now,
+            CreatedAt = DateTime.UtcNow,
             OrderSource = isDelivery ? "Delivery" : "WalkIn",
             OrderOrigin = isDelivery ? OrderOrigin.Online : OrderOrigin.InStore,
             ReservationGuestName = isDelivery ? request.SourceReference.Trim() : string.Empty
@@ -611,6 +654,7 @@ public sealed class     ServerPortalController(
         table.Status = "Occupied";
         DataReconciler.ReconcileTableStatusesWithOrders(db);
         db.SaveChanges();
+        new ClientAccountService(db).TryLinkNewOrder(order.Id, request.RestaurantClientId);
 
         await OrderHubBroadcasts.NotifyCashierOrderBoardChangedAsync(
             orderHub, db, order.Id, "server-order-submitted");
@@ -748,42 +792,28 @@ public sealed class     ServerPortalController(
         if (session is null)
             return Unauthorized(new { message = "Missing/invalid token or non-server role." });
 
+        var menuTaxonomy = LoadMenuTaxonomy();
         var orders = db.Orders
             .AsNoTracking()
             .Include(o => o.Items)
             .ThenInclude(i => i.Product)
-            .Where(o => o.Status == "Ready" && o.ServerId == session.EmployeeId)
+            .Where(o => o.ServerId == session.EmployeeId
+                        && (o.Status == "Ready" || o.Status == "In Kitchen"))
             .OrderBy(o => o.CreatedAt)
             .ToList();
 
-        var rows = MapOngoingOrders(orders)
-            .Select(o => new ServerReadyOrderDto(
-                o.Id,
-                o.OrderId,
-                o.TableId,
-                o.TableLabel,
-                o.ServerName,
-                o.Status,
-                o.ItemsSummary,
-                o.ItemCount,
-                o.TotalUsd,
-                o.TotalFc,
-                o.CreatedAt,
-                o.TimeText,
-                o.CustomerNotes,
-                o.AllergyNotes,
-                o.GuestCustomerName,
-                o.OrderOrigin,
-                o.OrderSource,
-                o.IsOnlineMenuOrder,
-                o.Lines))
+        var pickup = orders
+            .Where(o => ServerOrderStationStatus.Compute(o, menuTaxonomy).ShowOnServerPickup)
+            .Select(o => MapPickupOrder(o, menuTaxonomy))
             .ToList();
 
-        return Ok(rows);
+        return Ok(pickup);
     }
 
-    [HttpPost("orders/{orderId:int}/serve")]
-    public ActionResult<ServerMarkServedResponse> MarkServed(int orderId)
+    [HttpPost("orders/{orderId:int}/serve-station")]
+    public async Task<ActionResult<ServerMarkServedResponse>> ServeStation(
+        int orderId,
+        [FromBody] ServerServeStationRequest? body)
     {
         var session = RequireServerSession();
         if (session is null)
@@ -791,15 +821,98 @@ public sealed class     ServerPortalController(
         if (orderId <= 0)
             return BadRequest(new { message = "orderId is required." });
 
-        var order = db.Orders.SingleOrDefault(o => o.Id == orderId && o.ServerId == session.EmployeeId);
+        var portal = NormalizeServeStationPortal(body?.Station);
+        if (portal is null)
+            return BadRequest(new { message = "Station must be Kitchen (food) or Bar (drinks)." });
+
+        var order = db.Orders
+            .Include(o => o.Items)
+            .ThenInclude(i => i.Product)
+            .SingleOrDefault(o => o.Id == orderId && o.ServerId == session.EmployeeId);
         if (order is null)
             return NotFound(new { message = "Order not found for this server." });
-        if (!string.Equals(order.Status, "Ready", StringComparison.OrdinalIgnoreCase))
-            return BadRequest(new { message = "Only Ready orders can be marked Served." });
+        if (!string.Equals(order.Status, "In Kitchen", StringComparison.OrdinalIgnoreCase)
+            && !OrderWorkflow.IsReady(order.Status))
+            return BadRequest(new { message = "This order is not out for service." });
 
+        var taxonomy = LoadMenuTaxonomy();
+        var state = ServerOrderStationStatus.Compute(order, taxonomy);
+        try
+        {
+            if (portal.Equals(KitchenQueueKindFilter.PortalKitchen, StringComparison.OrdinalIgnoreCase)
+                && !state.CanServeFoodStation)
+                return BadRequest(new { message = "Food is not ready to serve yet." });
+            if (portal.Equals(KitchenQueueKindFilter.PortalBar, StringComparison.OrdinalIgnoreCase)
+                && !state.CanServeBarStation)
+                return BadRequest(new { message = "Drinks are not ready to serve yet." });
+
+            ServerOrderStationStatus.MarkStationServed(order.Items, portal, taxonomy);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+
+        DataReconciler.ReconcileTableStatusesWithOrders(db);
+        db.SaveChanges();
+
+        await OrderHubBroadcasts.BroadcastOrderStageAsync(
+            orderHub, db, orderId, "station-served", order.Status);
+
+        var orderCode = string.IsNullOrWhiteSpace(order.UniqueId) ? $"#{order.Id:000}" : order.UniqueId;
+        var label = portal.Equals(KitchenQueueKindFilter.PortalBar, StringComparison.OrdinalIgnoreCase) ? "Drinks" : "Food";
+        return Ok(new ServerMarkServedResponse(
+            true,
+            $"{label} marked served for {orderCode}.",
+            orderCode,
+            order.Status,
+            DateTime.UtcNow));
+    }
+
+    [HttpPost("orders/{orderId:int}/serve")]
+    public async Task<ActionResult<ServerMarkServedResponse>> MarkServed(int orderId)
+    {
+        var session = RequireServerSession();
+        if (session is null)
+            return Unauthorized(new { message = "Missing/invalid token or non-server role." });
+        if (orderId <= 0)
+            return BadRequest(new { message = "orderId is required." });
+
+        var order = db.Orders
+            .Include(o => o.Items)
+            .ThenInclude(i => i.Product)
+            .SingleOrDefault(o => o.Id == orderId && o.ServerId == session.EmployeeId);
+        if (order is null)
+            return NotFound(new { message = "Order not found for this server." });
+
+        var taxonomy = LoadMenuTaxonomy();
+        var state = ServerOrderStationStatus.Compute(order, taxonomy);
+        if (!state.IsFullyPrepReady)
+        {
+            return BadRequest(new
+            {
+                message = $"Not everything is ready yet. {ServerOrderStationStatus.BuildPrepSummary(state)}"
+            });
+        }
+
+        if (!OrderWorkflow.IsReady(order.Status) && !string.Equals(order.Status, "In Kitchen", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { message = "This order cannot be marked served in its current status." });
+
+        var now = DateTime.UtcNow;
+        foreach (var line in order.Items)
+        {
+            if (!KitchenLineVisibility.IsLinePrepared(line))
+                return BadRequest(new { message = "Some items are still being prepared." });
+            line.ServerServedAt ??= now;
+        }
+
+        var previousStatus = order.Status;
         order.Status = OrderWorkflow.Served;
         DataReconciler.ReconcileTableStatusesWithOrders(db);
         db.SaveChanges();
+
+        await OrderHubBroadcasts.BroadcastOrderStageAsync(
+            orderHub, db, orderId, "status-served", previousStatus);
 
         var orderCode = string.IsNullOrWhiteSpace(order.UniqueId) ? $"#{order.Id:000}" : order.UniqueId;
         return Ok(new ServerMarkServedResponse(
@@ -952,65 +1065,148 @@ public sealed class     ServerPortalController(
         if (orders.Count == 0)
             return [];
 
+        var menuTaxonomy = LoadMenuTaxonomy();
+        var photoKeyPresent = LoadProductPhotoKeys(orders);
+
+        return orders.Select(o => MapOngoingOrder(o, menuTaxonomy, photoKeyPresent)).ToList();
+    }
+
+    private ServerReadyOrderDto MapPickupOrder(OrderRecord o, MenuTaxonomySettings menuTaxonomy)
+    {
+        var photoKeyPresent = LoadProductPhotoKeys([o]);
+        var ongoing = MapOngoingOrder(o, menuTaxonomy, photoKeyPresent);
+        return new ServerReadyOrderDto(
+            ongoing.Id,
+            ongoing.OrderId,
+            ongoing.TableId,
+            ongoing.TableLabel,
+            ongoing.ServerName,
+            ongoing.Status,
+            ongoing.ItemsSummary,
+            ongoing.ItemCount,
+            ongoing.TotalUsd,
+            ongoing.TotalFc,
+            ongoing.CreatedAt,
+            ongoing.TimeText,
+            ongoing.CustomerNotes,
+            ongoing.AllergyNotes,
+            ongoing.GuestCustomerName,
+            ongoing.OrderOrigin,
+            ongoing.OrderSource,
+            ongoing.IsOnlineMenuOrder,
+            ongoing.IsFullyReady,
+            ongoing.FoodStationReady,
+            ongoing.BarStationReady,
+            ongoing.FoodStationServed,
+            ongoing.BarStationServed,
+            ongoing.CanServeFoodStation,
+            ongoing.CanServeBarStation,
+            ongoing.CanMarkServed,
+            ongoing.PrepSummary,
+            ongoing.Lines);
+    }
+
+    private ServerOngoingOrderDto MapOngoingOrder(
+        OrderRecord o,
+        MenuTaxonomySettings menuTaxonomy,
+        HashSet<string> photoKeyPresent)
+    {
+        var subtotal = o.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
+        var totals = OrderTotalsHelper.ComputeTotals(subtotal, o.DiscountMode, o.DiscountValue);
+        var guestName = ResolveGuestCustomerName(o);
+        var lines = MapOrderLines(o.Items, photoKeyPresent, menuTaxonomy);
+        var status = o.Status ?? string.Empty;
+        var kitchenKey = OrderWorkflow.KitchenStatusKey(status);
+        var station = ServerOrderStationStatus.Compute(o, menuTaxonomy);
+        var prepSummary = ServerOrderStationStatus.BuildPrepSummary(station);
+        var canMarkServed = station.IsFullyPrepReady
+            && !OrderWorkflow.IsServed(status)
+            && !string.Equals(status, "Completed", StringComparison.OrdinalIgnoreCase);
+
+        return new ServerOngoingOrderDto(
+            o.Id,
+            string.IsNullOrWhiteSpace(o.UniqueId) ? $"#{o.Id:000}" : o.UniqueId,
+            o.TableId ?? 0,
+            OrderRecordUiLabels.TableCaption(o),
+            string.IsNullOrWhiteSpace(o.ServerName) ? "-" : o.ServerName,
+            status,
+            kitchenKey,
+            AdminOrdersViewMapper.GetStatusColor(status),
+            ServerOngoingDisplayStatus(status, kitchenKey, prepSummary),
+            string.Join(", ", o.Items.Select(i => $"{i.Product?.Name ?? "Unknown"} x{i.Quantity}")),
+            o.Items.Sum(i => i.Quantity),
+            totals.GrandTotal,
+            CurrencyHelper.ConvertUsdToFc(totals.GrandTotal),
+            o.CreatedAt,
+            o.CreatedAt.ToString("HH:mm"),
+            (o.CustomerNotes ?? string.Empty).Trim(),
+            (o.AllergyNotes ?? string.Empty).Trim(),
+            guestName,
+            o.OrderOrigin ?? OrderOrigin.InStore,
+            o.OrderSource ?? "WalkIn",
+            OrderOrigin.IsOnline(o.OrderOrigin),
+            canMarkServed,
+            OrderWorkflow.IsReady(status),
+            station.FoodPrepReady,
+            station.BarPrepReady,
+            station.FoodServed,
+            station.BarServed,
+            station.CanServeFoodStation,
+            station.CanServeBarStation,
+            prepSummary,
+            lines);
+    }
+
+    private static List<ServerReadyOrderLineDto> MapOrderLines(
+        IEnumerable<OrderItem> items,
+        HashSet<string> photoKeyPresent,
+        MenuTaxonomySettings menuTaxonomy) =>
+        items
+            .OrderBy(i => i.Product?.Name ?? string.Empty)
+            .Select(i =>
+            {
+                var photoUrl = photoKeyPresent.Contains(ProductPhotoAssetKey(i.ProductId))
+                    ? $"/api/public/menu/assets/product/{i.ProductId}"
+                    : null;
+                var isDrink = i.Product is not null && MenuTaxonomyHelper.IsDrinkProduct(i.Product, menuTaxonomy);
+                return new ServerReadyOrderLineDto(
+                    i.ProductId,
+                    string.IsNullOrWhiteSpace(i.Product?.Name) ? "Unknown" : i.Product.Name.Trim(),
+                    i.Quantity,
+                    photoUrl,
+                    KitchenLineVisibility.IsLinePrepared(i),
+                    ServerOrderStationStatus.IsLineServed(i),
+                    isDrink);
+            })
+            .ToList();
+
+    private HashSet<string> LoadProductPhotoKeys(IReadOnlyList<OrderRecord> orders)
+    {
         var productIds = orders
             .SelectMany(o => o.Items)
             .Select(i => i.ProductId)
             .Distinct()
             .ToList();
         var photoKeys = productIds.Select(ProductPhotoAssetKey).ToList();
-        var photoKeyPresent = photoKeys.Count == 0
+        return photoKeys.Count == 0
             ? new HashSet<string>()
             : db.PublicMenuAssets.AsNoTracking()
                 .Where(a => photoKeys.Contains(a.Key) && a.Content.Length > 0)
                 .Select(a => a.Key)
                 .ToHashSet();
+    }
 
-        return orders.Select(o =>
-        {
-            var subtotal = o.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
-            var totals = OrderTotalsHelper.ComputeTotals(subtotal, o.DiscountMode, o.DiscountValue);
-            var guestName = ResolveGuestCustomerName(o);
-            var lines = o.Items
-                .OrderBy(i => i.Product?.Name ?? string.Empty)
-                .Select(i =>
-                {
-                    var photoUrl = photoKeyPresent.Contains(ProductPhotoAssetKey(i.ProductId))
-                        ? $"/api/public/menu/assets/product/{i.ProductId}"
-                        : null;
-                    return new ServerReadyOrderLineDto(
-                        i.ProductId,
-                        string.IsNullOrWhiteSpace(i.Product?.Name) ? "Unknown" : i.Product.Name.Trim(),
-                        i.Quantity,
-                        photoUrl);
-                })
-                .ToList();
-            var status = o.Status ?? string.Empty;
-            var kitchenKey = OrderWorkflow.KitchenStatusKey(status);
-            return new ServerOngoingOrderDto(
-                o.Id,
-                string.IsNullOrWhiteSpace(o.UniqueId) ? $"#{o.Id:000}" : o.UniqueId,
-                o.TableId ?? 0,
-                OrderRecordUiLabels.TableCaption(o),
-                string.IsNullOrWhiteSpace(o.ServerName) ? "-" : o.ServerName,
-                status,
-                kitchenKey,
-                AdminOrdersViewMapper.GetStatusColor(status),
-                ServerOngoingDisplayStatus(status, kitchenKey),
-                string.Join(", ", o.Items.Select(i => $"{i.Product?.Name ?? "Unknown"} x{i.Quantity}")),
-                o.Items.Sum(i => i.Quantity),
-                totals.GrandTotal,
-                CurrencyHelper.ConvertUsdToFc(totals.GrandTotal),
-                o.CreatedAt,
-                o.CreatedAt.ToString("HH:mm"),
-                (o.CustomerNotes ?? string.Empty).Trim(),
-                (o.AllergyNotes ?? string.Empty).Trim(),
-                guestName,
-                o.OrderOrigin ?? OrderOrigin.InStore,
-                o.OrderSource ?? "WalkIn",
-                OrderOrigin.IsOnline(o.OrderOrigin),
-                OrderWorkflow.IsReady(status),
-                lines);
-        }).ToList();
+    private static string? NormalizeServeStationPortal(string? raw)
+    {
+        var s = (raw ?? string.Empty).Trim();
+        if (s.Equals(KitchenQueueKindFilter.PortalKitchen, StringComparison.OrdinalIgnoreCase)
+            || s.Equals("Food", StringComparison.OrdinalIgnoreCase))
+            return KitchenQueueKindFilter.PortalKitchen;
+        if (s.Equals(KitchenQueueKindFilter.PortalBar, StringComparison.OrdinalIgnoreCase)
+            || s.Equals("Drink", StringComparison.OrdinalIgnoreCase)
+            || s.Equals("Drinks", StringComparison.OrdinalIgnoreCase))
+            return KitchenQueueKindFilter.PortalBar;
+        return null;
     }
 
     private Dictionary<int, List<ServerTableCallOrderDto>> MapTableCallOrdersByTable(
@@ -1064,8 +1260,13 @@ public sealed class     ServerPortalController(
         return result;
     }
 
-    private static string ServerOngoingDisplayStatus(string status, string kitchenKey) =>
-        kitchenKey switch
+    private static string ServerOngoingDisplayStatus(string status, string kitchenKey, string prepSummary)
+    {
+        if (!string.IsNullOrWhiteSpace(prepSummary)
+            && string.Equals(kitchenKey, "inKitchen", StringComparison.OrdinalIgnoreCase))
+            return prepSummary;
+
+        return kitchenKey switch
         {
             "waiting" => "Waiting",
             "inKitchen" => "Cooking",
@@ -1076,6 +1277,7 @@ public sealed class     ServerPortalController(
             _ when string.Equals(status, "Completed", StringComparison.OrdinalIgnoreCase) => "Completed",
             _ => string.IsNullOrWhiteSpace(status) ? "Unknown" : status.Trim()
         };
+    }
 
     private static List<OrderItem> BuildOrderItems(
         IReadOnlyList<ServerOrderLineRequest> lines,
@@ -1101,7 +1303,7 @@ public sealed class     ServerPortalController(
 
     private MenuTaxonomySettings LoadMenuTaxonomy()
     {
-        var cloud = db.PublicMenuSettings.AsNoTracking().FirstOrDefault(s => s.Key == "default");
+        var cloud = menuSettings.GetDefault();
         return MenuTaxonomyHelper.ResolveEffective(cloud?.MenuTaxonomyJson, SettingsManager.Load().MenuTaxonomy);
     }
 

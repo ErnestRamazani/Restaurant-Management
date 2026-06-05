@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="fr">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -82,6 +82,8 @@
     }
     .elite-lang-switch:hover { border-color: var(--amber); }
     .admin-login { position: relative; }
+    .admin-lang-wrap { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+    #adminLangSidebar.admin-lang-wrap { margin-top: 4px; margin-bottom: 8px; justify-content: flex-start; }
     .lead { color: var(--dash-muted); font-size: 14px; margin: 0 0 16px; }
     label { display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.12em; color: #64748b; margin-bottom: 6px; }
     input, select {
@@ -608,6 +610,7 @@
     .od-status-pill--kitchen { color: #fcd34d; background: rgba(251, 191, 36, 0.1); border-color: rgba(251, 191, 36, 0.28); }
     .od-status-pill--ready { color: #6ee7b7; background: rgba(45, 212, 191, 0.12); border-color: rgba(45, 212, 191, 0.32); }
     .od-status-pill--served { color: #c4b5fd; background: rgba(167, 139, 250, 0.12); border-color: rgba(167, 139, 250, 0.3); }
+    .od-status-pill--debt { color: #fde68a; background: rgba(245, 158, 11, 0.16); border-color: rgba(245, 158, 11, 0.42); }
     .od-modal-body {
       flex: 1;
       min-height: 0;
@@ -1115,6 +1118,7 @@
 <body>
   <div id="adminLoginScreen" class="admin-login-screen">
     <div class="admin-login card">
+      <div id="adminLangLogin" class="admin-lang-wrap"></div>
       <h1 class="admin-login__title" data-i18n="staff.adminWeb">Admin web</h1>
       <div id="adminLoginError" class="admin-login__error danger hidden" role="alert"></div>
       <form id="adminLoginForm" class="admin-login__form" autocomplete="off" novalidate>
@@ -1130,27 +1134,32 @@
   <div id="app" class="layout hidden">
     <aside class="sidebar">
       <div class="brand-wrap">
-        <img id="brandLogo" class="brand-logo hidden" alt="Restaurant logo">
+        <img id="brandLogo" class="brand-logo hidden" alt="" data-i18n="portals.admin.brandDefault" data-i18n-attr="alt">
         <div id="brandName" class="brand">Admin</div>
-        <div class="brand-sub">Read-only mirrors: dashboard, operations snapshot, reports.</div>
+        <div class="brand-sub" data-i18n="portals.admin.brandSub">Read-only mirrors: dashboard, operations snapshot, reports.</div>
       </div>
-      <button type="button" class="nav-btn active" data-view="dashboard">Dashboard</button>
-      <button type="button" class="nav-btn" data-view="orders">Orders</button>
-      <button type="button" class="nav-btn" data-view="inventory">Inventory</button>
-      <button type="button" class="nav-btn" data-view="menu">Menu</button>
-      <button type="button" class="nav-btn" data-view="tables">Tables</button>
-      <button type="button" class="nav-btn" data-view="employees">Employees</button>
-      <button type="button" class="nav-btn" data-view="money">Money</button>
-      <button type="button" class="nav-btn" data-view="reports">Reports</button>
+      <div id="adminLangSidebar" class="admin-lang-wrap"></div>
+      <button type="button" class="nav-btn active" data-view="dashboard" data-i18n="portals.admin.navDashboard">Dashboard</button>
+      <button type="button" class="nav-btn" data-view="orders" data-i18n="portals.admin.navOrders">Orders</button>
+      <button type="button" class="nav-btn" data-view="inventory" data-i18n="portals.admin.navInventory">Inventory</button>
+      <button type="button" class="nav-btn" data-view="menu" data-i18n="portals.admin.navMenu">Menu</button>
+      <button type="button" class="nav-btn" data-view="tables" data-i18n="portals.admin.navTables">Tables</button>
+      <button type="button" class="nav-btn" data-view="employees" data-i18n="portals.admin.navEmployees">Employees</button>
+      <button type="button" class="nav-btn" data-view="money" data-i18n="portals.admin.navMoney">Money</button>
+      <button type="button" class="nav-btn" data-view="reports" data-i18n="portals.admin.navReports">Reports</button>
       <div class="who">
         <div id="sessionLabel"></div>
-        <button type="button" class="btn btn-ghost btn-block" id="btnLogout" style="margin-top:10px;">Sign out</button>
+        <button type="button" class="btn btn-ghost btn-block" id="btnLogout" style="margin-top:10px;" data-i18n="portals.admin.signOut">Sign out</button>
       </div>
     </aside>
     <main class="main-area" id="main"></main>
   </div>
 
+  <script src="/shared/api-error-banner.js"></script>
   <script src="/js/elite-portal-session.js"></script>
+  <script src="/shared/restaurant-datetime.js"></script>
+  <script>window.EliteI18nDisableAutoInit = true;</script>
+  <script src="/js/elite-i18n.js?v=6"></script>
   <script>
     const TOKEN_KEY = "eliteAdminWebJwt";
     const PORTAL_ID = "AdminWeb";
@@ -1164,6 +1173,851 @@
     }
     let dashClockTimer = null;
     let portalConfig = { restaurantName: "", restaurantLogoUrl: "" };
+    let currentView = "dashboard";
+
+    function t(key, fallback, vars) {
+      const full = key.indexOf("portals.") === 0 || key.indexOf("auth.") === 0 || key.indexOf("common.") === 0 || key.indexOf("orders.") === 0
+        ? key
+        : "portals.admin." + key;
+      return (window.EliteI18n && EliteI18n.t) ? EliteI18n.t(full, fallback, vars) : (fallback != null ? String(fallback) : full);
+    }
+
+    function metaSlug(value) {
+      return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+    }
+
+    function normalizeStatusKey(status) {
+      const raw = String(status ?? "").trim();
+      if (!raw) return "";
+      const spaced = raw.replace(/([a-z])([A-Z])/g, "$1 $2");
+      const n = spaced.replace(/\s+/g, " ").trim().toLowerCase();
+      const aliases = {
+        waiting: "waiting", "pending approval": "pending_approval", "pending cashier": "pending_cashier",
+        "in kitchen": "in_kitchen", ready: "ready", served: "served", completed: "completed",
+        cancelled: "cancelled", canceled: "cancelled", pending: "pending", "on account": "on_account", debt: "on_account"
+      };
+      return aliases[n] || metaSlug(n);
+    }
+
+    const STATUS_FALLBACK_EN = {
+      pending_approval: "Pending approval", pending_cashier: "Pending cashier", waiting: "Waiting",
+      in_kitchen: "In kitchen", ready: "Ready", served: "Served", completed: "Completed",
+      cancelled: "Cancelled", pending: "Pending", on_account: "On account"
+    };
+    const STATUS_FALLBACK_FR = {
+      pending_approval: "En attente d'approbation", pending_cashier: "En attente caisse", waiting: "En attente",
+      in_kitchen: "En cuisine", ready: "Prête", served: "Servie", completed: "Terminée",
+      cancelled: "Annulée", pending: "En attente", on_account: "En compte"
+    };
+    const STATUS_ORDERS_KEY = {
+      pending_approval: "orders.pendingApproval", pending_cashier: "orders.pendingCashier", waiting: "orders.waiting",
+      in_kitchen: "orders.inKitchen", ready: "orders.ready", served: "orders.served",
+      completed: "orders.completed", cancelled: "orders.cancelled", pending: "orders.pending"
+    };
+
+    function currentLangCode() {
+      if (window.EliteI18n && EliteI18n.lang) return EliteI18n.lang;
+      try {
+        const raw = localStorage.getItem("elite_lang");
+        if (raw != null && String(raw).trim() !== "") return raw.indexOf("fr") === 0 ? "fr" : "en";
+      } catch (e) {}
+      return "fr";
+    }
+
+    let lastDashboardPayload = null;
+
+    function translateOrderStatus(status) {
+      const raw = String(status ?? "").trim();
+      if (!raw) return raw;
+      const key = normalizeStatusKey(raw);
+      if (!key) return raw;
+      const lang = currentLangCode();
+      const fb = (lang === "fr" ? STATUS_FALLBACK_FR : STATUS_FALLBACK_EN)[key] || raw;
+      let translated = t("status." + key, fb);
+      if (translated && translated.indexOf("portals.admin.") !== 0) return translated;
+      const ordersKey = STATUS_ORDERS_KEY[key];
+      if (ordersKey) {
+        translated = t(ordersKey, fb);
+        if (translated && translated.indexOf("orders.") !== 0) return translated;
+      }
+      return fb;
+    }
+
+    function normalizeMetaKey(kind, value) {
+      const raw = String(value ?? "").trim();
+      if (!raw) return "";
+      const spaced = raw.replace(/([a-z])([A-Z])/g, "$1 $2");
+      const n = spaced.replace(/\s+/g, " ").trim().toLowerCase();
+      const aliases = {
+        payment: { deferred: "deferred", immediate: "immediate", "pay now": "pay_now", "on account": "on_account" },
+        origin: { online: "online", "dine in": "dine_in", "dine-in": "dine_in", "walk in": "walk_in", "walk-in": "walk_in" },
+        source: { delivery: "delivery", pickup: "pickup", "dine in": "dine_in", "dine-in": "dine_in", table: "table" }
+      };
+      return (aliases[kind] && aliases[kind][n]) || metaSlug(n);
+    }
+
+    const META_FALLBACK_FR = {
+      payment: { deferred: "Différé", immediate: "Immédiat", pay_now: "Payer maintenant", on_account: "En compte" },
+      origin: { online: "En ligne", dine_in: "Sur place", walk_in: "Sans réservation" },
+      source: { delivery: "Livraison", pickup: "À emporter", dine_in: "Sur place", table: "Table" }
+    };
+    const META_FALLBACK_EN = {
+      payment: { deferred: "Deferred", immediate: "Immediate", pay_now: "Pay now", on_account: "On account" },
+      origin: { online: "Online", dine_in: "Dine-in", walk_in: "Walk-in" },
+      source: { delivery: "Delivery", pickup: "Pickup", dine_in: "Dine-in", table: "Table" }
+    };
+
+    function translateMetaValue(kind, value) {
+      const raw = String(value ?? "").trim();
+      if (!raw) return raw;
+      if (raw.includes("·")) {
+        return raw.split("·").map(part => translateMetaValue(kind, part.trim())).join(" · ");
+      }
+      const slug = normalizeMetaKey(kind, raw);
+      if (!slug) return raw;
+      const lang = currentLangCode();
+      const fbMap = lang === "fr" ? META_FALLBACK_FR : META_FALLBACK_EN;
+      const fb = (fbMap[kind] && fbMap[kind][slug]) || raw;
+      const translated = t("meta." + kind + "." + slug, fb);
+      if (translated && translated.indexOf("portals.admin.") !== 0) return translated;
+      return fb;
+    }
+
+    function translateDashboardSubtitle(key, apiSubtitle) {
+      const sub = String(apiSubtitle ?? "").trim();
+      if (!sub) return sub;
+
+      let m = sub.match(/(-?\d+(?:\.\d+)?)\s*%\s*vs\s+yesterday\s*·\s*Money\s*\(USD\)/i);
+      if (m) return t("kpiDeltaUsd", "{{delta}}% vs yesterday · Money (USD).", { delta: m[1] });
+      m = sub.match(/(-?\d+(?:\.\d+)?)\s*%\s*vs\s+yesterday\s*·\s*Money\s*\(FC\)/i);
+      if (m) return t("kpiDeltaFc", "{{delta}}% vs yesterday · Money (FC).", { delta: m[1] });
+      m = sub.match(/(-?\d+(?:\.\d+)?)\s*%\s*vs\s+yesterday\s*·\s*all\s+in\s+USD/i);
+      if (m) return t("kpiDeltaExp", "{{delta}}% vs yesterday · all in USD.", { delta: m[1] });
+      if (key === "completedToday") {
+        m = sub.match(/(-?\d+(?:\.\d+)?)\s*%\s*vs\s+yesterday/i);
+        if (m) return t("kpiDeltaCompleted", "{{delta}}% vs yesterday.", { delta: m[1] });
+      }
+      if (sub === "No USD revenue yesterday to compare. Money — entries in USD only.")
+        return t("kpiNoCompareUsd", sub);
+      if (sub === "No FC revenue yesterday to compare. Money — entries in FC only (not converted from USD).")
+        return t("kpiNoCompareFc", sub);
+      if (sub === "No expenses yesterday to compare. All expenses in USD (FC rows use stored USD equivalent).")
+        return t("kpiNoCompareExp", sub);
+      if (sub === "No completions yesterday. From orders (not Money ledger).")
+        return t("kpiNoCompareCompleted", sub);
+      if (/vs\s+yesterday/i.test(sub)) {
+        return sub
+          .replace(/vs\s+yesterday/gi, t("kpiVsYesterday", "vs yesterday"))
+          .replace(/Money\s*\(USD\)/gi, t("kpiMoneyUsdShort", "Money (USD)"))
+          .replace(/Money\s*\(FC\)/gi, t("kpiMoneyFcShort", "Money (FC)"))
+          .replace(/all\s+in\s+USD/gi, t("kpiAllInUsd", "all in USD"));
+      }
+      return sub;
+    }
+
+    function translateEmployeeRole(role) {
+      const raw = String(role ?? "").trim();
+      if (!raw) return raw;
+      const slug = metaSlug(raw);
+      if (!slug) return raw;
+      const translated = t("role." + slug, raw);
+      return translated.indexOf("portals.admin.role.") === 0 ? raw : translated;
+    }
+
+    function localizeDashboardKpi(k, s) {
+      const key = String(k.key || k.Key || "").trim();
+      const apiPrimary = k.primaryText || k.PrimaryText || "";
+      const apiSub = k.subtitle || k.Subtitle || "";
+      const occ = Number(pick(s, "occupiedTables", "OccupiedTables")) || 0;
+      const tot = Number(pick(s, "totalTables", "TotalTables")) || 0;
+      const avail = Number(pick(s, "availableTables", "AvailableTables")) || 0;
+      const tTot = tot > 0 ? tot : occ + avail || 0;
+      const ao = pick(s, "activeOrders", "ActiveOrders") || 0;
+      const inKitchen = pick(s, "inKitchenNow", "InKitchenNow") ?? 0;
+      switch (key) {
+        case "todayUsd":
+          return { label: t("kpiTodayUsd", "Today's revenue (USD)"), primary: apiPrimary, subtitle: translateDashboardSubtitle(key, apiSub) };
+        case "todayFc":
+          return { label: t("kpiTodayFc", "Today's revenue (FC)"), primary: apiPrimary, subtitle: translateDashboardSubtitle(key, apiSub) };
+        case "todayExp":
+          return { label: t("kpiTodayExp", "Today's expenses"), primary: apiPrimary, subtitle: translateDashboardSubtitle(key, apiSub) };
+        case "tables":
+          return {
+            label: t("kpiTables", "Tables occupied"),
+            primary: t("kpiTablesPrimary", "{{occupied}}/{{total}} occupied", { occupied: occ, total: tTot }),
+            subtitle: t("kpiTablesSub", "{{count}} active orders", { count: ao })
+          };
+        case "activeOrders":
+          return {
+            label: t("kpiActiveOrders", "Active orders"),
+            primary: apiPrimary,
+            subtitle: t("kpiActiveOrdersSub", "{{count}} in kitchen now", { count: inKitchen })
+          };
+        case "completedToday":
+          return {
+            label: t("kpiCompletedToday", "Orders completed today"),
+            primary: apiPrimary,
+            subtitle: translateDashboardSubtitle(key, apiSub)
+          };
+        default:
+          return { label: k.label || k.Label || key, primary: apiPrimary, subtitle: translateDashboardSubtitle(key, apiSub) };
+      }
+    }
+
+    function translateApiStatus(text) {
+      const raw = String(text ?? "").trim();
+      if (!raw) return raw;
+      if (raw === "Cloud API — Connected") return t("dashApiConnected", raw);
+      return raw;
+    }
+
+    function translateInventoryDetail(detail) {
+      let d = String(detail ?? "");
+      d = d.replace(/\bstatus:\s*Low\b/gi, t("invStatusLow", "status: Low"));
+      d = d.replace(/\bstatus:\s*Healthy\b/gi, t("invStatusHealthy", "status: Healthy"));
+      d = d.replace(/\bstatus:\s*Reorder\b/gi, t("invStatusReorder", "status: Reorder"));
+      d = d.replace(/\bstatus:\s*Out\b/gi, t("invStatusOut", "status: Out"));
+      d = d.replace(/\bstatus:\s*Critical\b/gi, t("invStatusCritical", "status: Critical"));
+      return d;
+    }
+
+    function translateInventoryActorName(name) {
+      const n = String(name ?? "").trim();
+      if (/^Unassigned Chef$/i.test(n)) return t("invActorUnassignedChef", "Unassigned Chef");
+      if (/^Unassigned Barman$/i.test(n)) return t("invActorUnassignedBarman", "Unassigned Barman");
+      return n;
+    }
+
+    function translateInventoryActorSegment(segment) {
+      const s = String(segment ?? "").trim();
+      if (!s) return s;
+      if (s === "Unassigned") return t("invActorUnassigned", "Unassigned");
+      const m = s.match(/^(Chef|Barman|Unknown)\s+(.+):\s*([\d.]+)$/i);
+      if (!m) return s;
+      const roleTr = translateEmployeeRole(m[1]);
+      const nameTr = translateInventoryActorName(m[2]);
+      return t("invActorSegment", "{{role}} {{name}}: {{qty}}", { role: roleTr, name: nameTr, qty: m[3] });
+    }
+
+    function translateInventoryActorText(actorText) {
+      const raw = String(actorText ?? "").trim();
+      if (!raw) return raw;
+      if (raw === "Unassigned") return t("invActorUnassigned", "Unassigned");
+      return raw.split(/,\s*/).map(translateInventoryActorSegment).join(", ");
+    }
+
+    function translateInventoryNoteLine(line) {
+      const raw = String(line ?? "").trim();
+      if (!raw) return raw;
+
+      let m = raw.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2})Z - ([\d.]+) (.+?) deducted \(add-on\) from order (ORD-[A-F0-9]+)\. Used by (.+)\.$/i);
+      if (m) {
+        return t("invNoteDeductionAddon", "{{ts}}Z - {{qty}} {{item}} deducted (add-on) from order {{orderId}}. Used by {{actors}}.", {
+          ts: m[1], qty: m[2], item: m[3], orderId: m[4], actors: translateInventoryActorText(m[5])
+        });
+      }
+
+      m = raw.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2})Z - ([\d.]+) (.+?) deducted from order (ORD-[A-F0-9]+)\. Used by (.+)\.$/i);
+      if (m) {
+        return t("invNoteDeduction", "{{ts}}Z - {{qty}} {{item}} deducted from order {{orderId}}. Used by {{actors}}.", {
+          ts: m[1], qty: m[2], item: m[3], orderId: m[4], actors: translateInventoryActorText(m[5])
+        });
+      }
+
+      m = raw.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}) - Stock added ([\d.]+) (.+?): (.+)$/i);
+      if (m) {
+        return t("invNoteStockAdded", "{{ts}} - Stock added {{qty}} {{unit}}: {{comment}}", {
+          ts: m[1], qty: m[2], unit: m[3], comment: m[4]
+        });
+      }
+
+      m = raw.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}) - Manual deduction ([\d.]+) (.+?): (.+)$/i);
+      if (m) {
+        return t("invNoteManualDeduction", "{{ts}} - Manual deduction {{qty}} {{unit}}: {{comment}}", {
+          ts: m[1], qty: m[2], unit: m[3], comment: m[4]
+        });
+      }
+
+      return raw;
+    }
+
+    function translateInventoryNotes(notes) {
+      const raw = String(notes ?? "");
+      if (!raw.trim()) return raw;
+      return raw.split(/\r?\n/).map(translateInventoryNoteLine).join("\n");
+    }
+
+    function translateTableStatus(status) {
+      const raw = String(status ?? "").trim();
+      if (!raw) return raw;
+      const lower = raw.toLowerCase();
+      if (lower === "available") return t("tblStatusAvailable", "Available");
+      if (lower === "occupied") return t("tblStatusOccupied", "Occupied");
+      if (lower === "closed") return t("tblStatusClosed", "Closed");
+      return raw;
+    }
+
+    function translateStaffStatusLabel(st) {
+      const raw = String(st ?? "").trim();
+      const lower = raw.toLowerCase();
+      if (lower === "active") return t("staffStatusActive", "Active");
+      if (lower === "off duty") return t("staffStatusOffDuty", "Off duty");
+      return raw;
+    }
+
+    function translateEmployeeEmploymentStatus(st) {
+      const raw = String(st ?? "").trim();
+      if (!raw) return raw;
+      const lower = raw.toLowerCase();
+      if (lower === "active") return t("staffStatusActive", "Active");
+      if (lower === "off duty") return t("staffStatusOffDuty", "Off duty");
+      if (lower === "on leave") return t("empEmploymentOnLeave", "On Leave");
+      if (lower === "inactive") return t("empEmploymentInactive", "Inactive");
+      return raw;
+    }
+
+    function translateAttendanceClockStatus(status) {
+      const raw = String(status ?? "").trim();
+      if (!raw) return raw;
+      const lower = raw.toLowerCase();
+      if (lower === "late") return t("empAttLate", "Late");
+      if (lower === "on time") return t("empAttOnTime", "On Time");
+      if (lower === "absent") return t("empAttAbsent", "Absent");
+      if (lower === "pending") return t("empAttPending", "Pending");
+      if (lower === "recorded") return t("empAttRecorded", "Recorded");
+      return raw;
+    }
+
+    function translateEmployeeClockText(text) {
+      const raw = String(text ?? "").trim();
+      if (!raw) return raw;
+      if (raw === "Not clocked in") return t("empNotClockedIn", "Not clocked in");
+      if (raw === "Not clocked out") return t("empNotClockedOut", "Not clocked out");
+      const m = raw.match(/^(\d{1,2}:\d{2})\s+\((.+)\)$/);
+      if (m) return m[1] + " (" + translateAttendanceClockStatus(m[2]) + ")";
+      return raw;
+    }
+
+    function translateEmployeeAttendanceStatus(status) {
+      const raw = String(status ?? "").trim();
+      if (!raw) return raw;
+      const lower = raw.toLowerCase();
+      if (lower === "not active") return t("empNotActive", "Not active");
+      if (lower === "on shift") return t("empOnShift", "On shift");
+      if (lower === "shift ended") return t("empShiftEnded", "Shift ended");
+      return raw;
+    }
+
+    function translateWorkShiftName(shift) {
+      const raw = String(shift ?? "").trim();
+      if (!raw) return raw;
+      const lower = raw.toLowerCase();
+      if (lower === "off") return t("empShiftOff", "Off");
+      if (lower === "morning shift" || lower === "morning") return t("empShiftMorning", "Morning Shift");
+      if (lower === "night shift" || lower === "night") return t("empShiftNight", "Night Shift");
+      if (lower === "full day") return t("empShiftFullDay", "Full Day");
+      if (lower === "evening") return t("empShiftEvening", "Evening");
+      return raw;
+    }
+
+    function translateWorkDayName(day) {
+      const key = metaSlug(String(day ?? "").trim());
+      const fb = String(day ?? "").trim();
+      if (!key) return fb;
+      const translated = t("empDay." + key, fb);
+      return translated.indexOf("portals.admin.empDay.") === 0 ? fb : translated;
+    }
+
+    function translateWorkSchedulePart(part) {
+      const raw = String(part ?? "").trim();
+      if (!raw) return raw;
+      const m = raw.match(/^(\w+)\s+\((.+)\)$/);
+      if (!m) return raw;
+      return t("empScheduleDayShift", "{{day}} ({{shift}})", {
+        day: translateWorkDayName(m[1]),
+        shift: translateWorkShiftName(m[2])
+      });
+    }
+
+    function translateWorkScheduleSummary(summary) {
+      const raw = String(summary ?? "").trim();
+      if (!raw) return raw;
+      if (raw === "No schedule assigned.") return t("empNoSchedule", "No schedule assigned.");
+      return raw.split(/,\s*/).map(translateWorkSchedulePart).join(", ");
+    }
+
+    const MONEY_EN_MONTHS = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+
+    function translateMoneyMonthYear(label) {
+      const raw = String(label ?? "").trim();
+      const m = raw.match(/^(\w+)\s+(\d{4})$/);
+      if (!m) return raw;
+      const idx = MONEY_EN_MONTHS.indexOf(m[1]);
+      if (idx < 0) return raw;
+      const d = new Date(Number(m[2]), idx, 1);
+      const lang = currentLangCode() === "fr" ? "fr-FR" : "en-US";
+      return d.toLocaleDateString(lang, { month: "long", year: "numeric" });
+    }
+
+    function translateMoneyPeriodLabel(label) {
+      const raw = String(label ?? "").trim();
+      if (!raw) return raw;
+      const map = {
+        "this day": "moneyPeriodThisDay",
+        "this week": "moneyPeriodThisWeek",
+        "this month": "moneyPeriodThisMonth",
+        "this year": "moneyPeriodThisYear",
+        "all time": "moneyPeriodAllTime"
+      };
+      const key = map[raw.toLowerCase()];
+      if (key) return t(key, raw);
+      return raw;
+    }
+
+    function translateMoneyOriginLabel(label) {
+      const raw = String(label ?? "").trim();
+      if (!raw) return raw;
+      if (raw === "Online orders") return t("moneyOriginOnlineOrders", raw);
+      if (raw === "In-store orders") return t("moneyOriginInStoreOrders", raw);
+      return raw;
+    }
+
+    function translateMoneyType(type) {
+      const raw = String(type ?? "").trim();
+      if (!raw) return raw;
+      const lower = raw.toLowerCase();
+      if (lower === "revenue") return t("moneyTypeRevenue", "Revenue");
+      if (lower === "expense") return t("moneyTypeExpense", "Expense");
+      return raw;
+    }
+
+    function translateMoneyCategory(category) {
+      const raw = String(category ?? "").trim();
+      if (!raw) return raw;
+      const slug = metaSlug(raw);
+      const keys = {
+        sale: "moneyCatSale",
+        sale_change: "moneyCatSaleChange",
+        delivery_fee: "moneyCatDeliveryFee",
+        salary: "moneyCatSalary",
+        tip: "moneyCatTip"
+      };
+      const tKey = keys[slug];
+      if (tKey) return t(tKey, raw);
+      return raw;
+    }
+
+    function translateMoneyJustification(jus) {
+      let raw = String(jus ?? "").trim();
+      if (!raw) return raw;
+
+      let m = raw.match(/^Auto revenue from (ORD-[A-F0-9]+|Order #\d+) \(Reservation: (.+)\)$/i);
+      if (m) {
+        return t("moneyJustAutoRevenueRes", "Auto revenue from {{orderId}} (Reservation: {{reservation}})", {
+          orderId: m[1], reservation: m[2]
+        });
+      }
+
+      m = raw.match(/^Auto revenue from (ORD-[A-F0-9]+|Order #\d+)$/i);
+      if (m) {
+        return t("moneyJustAutoRevenue", "Auto revenue from {{orderId}}", { orderId: m[1] });
+      }
+
+      m = raw.match(/^Cash change returned for order (ORD-[A-F0-9]+) \((USD|FC)\)\. (\| CHANGE_ORDER:\d+:(USD|FC)\|)$/i);
+      if (m) {
+        return t("moneyJustCashChange", "Cash change returned for order {{orderId}} ({{currency}}). {{marker}}", {
+          orderId: m[1], currency: m[2], marker: m[3]
+        });
+      }
+
+      m = raw.match(/^Delivery fee \(20%\) — (.+?) (\|ORDER:\d+:DELIVERY\|)$/i);
+      if (m) {
+        return t("moneyJustDeliveryFee", "Delivery fee (20%) — {{reference}} {{marker}}", {
+          reference: translateMoneyJustification(m[1]), marker: m[2]
+        });
+      }
+
+      m = raw.match(/^(Partial|Final) monthly salary payment to (.+?) for (\w+ \d{4}) \(units:(\d+) sales USD:([\d.]+) bonus:([\d.]+) advances deducted:([\d.]+)\) (\| EMP:\d+\| NET:[\d.]+ THIS:[\d.]+ CUMULATIVE:[\d.]+\|)$/i);
+      if (m) {
+        const partKey = m[1].toLowerCase() === "final" ? "moneySalaryFinal" : "moneySalaryPartial";
+        return t("moneyJustSalaryPayment", "{{part}} monthly salary payment to {{name}} for {{month}} (units:{{units}} sales USD:{{sales}} bonus:{{bonus}} advances deducted:{{advances}}) {{marker}}", {
+          part: t(partKey, m[1]),
+          name: m[2],
+          month: translateMoneyMonthYear(m[3]),
+          units: m[4],
+          sales: m[5],
+          bonus: m[6],
+          advances: m[7],
+          marker: m[8]
+        });
+      }
+
+      m = raw.match(/^Salary advance to (.+?) (\| EMP:\d+\| ADVANCE:\d+\| USD:[\d.]+\|?)$/i);
+      if (m) {
+        return t("moneyJustSalaryAdvance", "Salary advance to {{name}} {{marker}}", { name: m[1], marker: m[2] });
+      }
+
+      return raw;
+    }
+
+    function fmtMoneyLedgerWhenLocalized(iso) {
+      const lang = currentLangCode() === "fr" ? "fr-FR" : "en-US";
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return "—";
+      const opts = { month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: lang !== "fr-FR" };
+      const tz = window.EliteRestaurantDateTime ? EliteRestaurantDateTime.getRestaurantTimeZone() : undefined;
+      if (tz) return new Intl.DateTimeFormat(lang, { timeZone: tz, ...opts }).format(d);
+      return d.toLocaleString(lang, opts);
+    }
+
+    function translateActivityKind(kind) {
+      const k = String(kind ?? "").trim().toUpperCase();
+      if (k === "ORDER") return t("actKindOrder", "ORDER");
+      if (k === "TEAM") return t("actKindTeam", "TEAM");
+      if (k === "STOCK") return t("actKindStock", "STOCK");
+      return kind;
+    }
+
+    function translateActivityTimestamp(line) {
+      const raw = String(line ?? "").trim();
+      const m = raw.match(/^([A-Za-z]{3}) (\d{2}), (\d{4}) · (\d{2}):(\d{2})$/);
+      if (!m) return raw;
+      const monthIdx = REP_SHORT_MONTHS[m[1].slice(0, 3).toLowerCase()];
+      if (monthIdx === undefined) return raw;
+      const d = new Date(Number(m[3]), monthIdx, Number(m[2]), Number(m[4]), Number(m[5]));
+      if (Number.isNaN(d.getTime())) return raw;
+      const lang = currentLangCode() === "fr" ? "fr-FR" : "en-US";
+      const datePart = d.toLocaleDateString(lang, { month: "short", day: "2-digit", year: "numeric" });
+      const timePart = d.toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit", hour12: lang !== "fr-FR" });
+      return datePart + " · " + timePart;
+    }
+
+    function translateActivityDetailLine(line) {
+      const raw = String(line ?? "").trim();
+      if (!raw) return raw;
+
+      const inv = translateInventoryNoteLine(raw);
+      if (inv !== raw) return inv;
+
+      if (/^[A-Za-z]{3} \d{2}, \d{4} · \d{2}:\d{2}$/.test(raw)) return translateActivityTimestamp(raw);
+
+      const st = raw.match(/^Status:\s*(.+)$/i);
+      if (st) {
+        return t("actStatusLine", "Status: {{status}}", { status: translateOrderStatus(st[1].trim()) });
+      }
+
+      return raw;
+    }
+
+    function translateActivityDetail(block) {
+      let s = String(block ?? "");
+      if (!s) return s;
+
+      s = s.replace(/^Clocked in \((.+)\)\nShift date:\s*(.+)$/m, (_, st, dt) =>
+        t("actClockedInShift", "Clocked in ({{status}})\nShift date: {{date}}", {
+          status: translateAttendanceClockStatus(String(st).trim()),
+          date: String(dt).trim()
+        }));
+
+      return s.split(/\r?\n/).map(translateActivityDetailLine).join("\n");
+    }
+
+    function formatDashboardClock(now) {
+      const lang = currentLangCode() === "fr" ? "fr-FR" : "en-US";
+      if (window.EliteRestaurantDateTime) {
+        return EliteRestaurantDateTime.formatRestaurantDateTime(now, {
+          weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit"
+        });
+      }
+      return now.toLocaleString(lang, { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    }
+
+    function applyAdminStaticI18n(root) {
+      if (window.EliteI18n) EliteI18n.applyToDocument(root || document);
+      document.title = t("pageTitle", "Elite Admin — Read-only");
+    }
+
+    async function refreshAdminDynamicLabels() {
+      applyAdminStaticI18n();
+      if (!token || !currentView) return;
+      if (currentView === "dashboard" && lastDashboardPayload) {
+        const el = $("main");
+        if (el && views.dashboard) await renderAdminDashboard(el, lastDashboardPayload);
+        return;
+      }
+      await navTo(currentView);
+    }
+
+    document.addEventListener("elite-language-changed", function () {
+      void refreshAdminDynamicLabels();
+    });
+
+    function translateReportEventType(rawType) {
+      const raw = String(rawType ?? "").trim();
+      if (!raw) return raw;
+      const n = raw.toLowerCase();
+      const map = {
+        "clock in": "clockIn",
+        "clock out": "clockOut",
+        "absence": "absence",
+        "scheduled shift": "repEvScheduledShift",
+        "menu activity": "repEvMenuActivity",
+        "inventory activity": "repEvInventoryActivity",
+        "inventory note": "repEvInventoryNote",
+        "online order": "repEvOnlineOrder",
+        "table service": "repEvTableService",
+        "served order": "repEvServedOrder",
+        "table order": "repEvTableOrder",
+        "reservation": "repEvReservation",
+        "salary advance (money)": "repEvSalaryAdvanceMoney",
+        "salary payment (money)": "repEvSalaryPaymentMoney",
+        "salary advance (record)": "repEvSalaryAdvanceRecord",
+        "payroll month (record)": "repEvPayrollMonthRecord"
+      };
+      if (map[n]) return t(map[n], raw);
+      const orderSt = translateOrderStatus(raw);
+      if (orderSt !== raw) return orderSt;
+      return raw;
+    }
+
+    const REP_SHORT_MONTHS = {
+      jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+      jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
+    };
+
+    function translateReportDayText(dayText) {
+      const raw = String(dayText ?? "").trim();
+      if (!raw) return raw;
+      const m = raw.match(/^(\w+),\s+(\w+)\s+(\d{1,2})\s+(\d{4})$/i);
+      if (!m) return raw;
+      const monthIdx = REP_SHORT_MONTHS[m[2].slice(0, 3).toLowerCase()];
+      if (monthIdx === undefined) return raw;
+      const d = new Date(Number(m[4]), monthIdx, Number(m[3]));
+      if (Number.isNaN(d.getTime())) return raw;
+      const lang = currentLangCode() === "fr" ? "fr-FR" : "en-US";
+      return d.toLocaleDateString(lang, { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    }
+
+    function translateReportTotalsText(totals) {
+      const raw = String(totals ?? "").trim();
+      if (!raw) return raw;
+      let m = raw.match(/^(\d+) events \| (\d+) orders \| (\d+) items \| ([\d.]+) units$/);
+      if (m) {
+        return t("repTotalsFull", "{{events}} events | {{orders}} orders | {{items}} items | {{units}} units", {
+          events: m[1], orders: m[2], items: m[3], units: m[4]
+        });
+      }
+      m = raw.match(/^(\d+) order\(s\) \| (\d+) items$/);
+      if (m) {
+        return t("repTotalsOrders", "{{orders}} order(s) | {{items}} items", { orders: m[1], items: m[2] });
+      }
+      if (raw === "0 events | 0 orders | 0 items | 0 units") return t("repTotalsEmpty", raw);
+      return raw;
+    }
+
+    function translateReportTableCaption(caption) {
+      const raw = String(caption ?? "").trim();
+      if (!raw) return raw;
+      if (raw === "Online · Delivery") return t("repOnlineDelivery", "Online · Delivery");
+      if (raw === "Online · Pickup") return t("repOnlinePickup", "Online · Pickup");
+      let m = raw.match(/^Table (\d+)$/i);
+      if (m) return t("repTableNumber", "Table {{num}}", { num: m[1] });
+      m = raw.match(/^Table: (.+)$/i);
+      if (m) return t("repTablePrefix", "Table: {{label}}", { label: translateReportTableCaption(m[1]) });
+      return raw;
+    }
+
+    function translateReportSummary(text) {
+      let raw = String(text ?? "").trim();
+      if (!raw) return raw;
+
+      let m = raw.match(/^(.+?) marked absent$/i);
+      if (m) return t("repAttMarkedAbsent", "{{name}} marked absent", { name: m[1] });
+
+      m = raw.match(/^(.+?) signed in at (\d{1,2}:\d{2}) \((.+)\)$/i);
+      if (m) {
+        return t("repAttSignedIn", "{{name}} signed in at {{time}} ({{status}})", {
+          name: m[1], time: m[2], status: translateAttendanceClockStatus(m[3])
+        });
+      }
+
+      m = raw.match(/^(.+?) scheduled \(not clocked in yet\)$/i);
+      if (m) return t("repAttScheduledNotIn", "{{name}} scheduled (not clocked in yet)", { name: m[1] });
+
+      m = raw.match(/^(.+?) clocked out at (\d{1,2}:\d{2})$/i);
+      if (m) return t("repAttClockedOut", "{{name}} clocked out at {{time}}", { name: m[1], time: m[2] });
+
+      m = raw.match(/^Absent \((.+)\)$/i);
+      if (m) return t("repAttAbsentStatus", "Absent ({{status}})", { status: translateAttendanceClockStatus(m[1]) });
+
+      m = raw.match(/^Sign in: (.+?) \((.+)\) \| Clock out: (.+)$/i);
+      if (m) {
+        return t("repAttSignInOut", "Sign in: {{in}} ({{status}}) | Clock out: {{out}}", {
+          in: m[1], status: translateAttendanceClockStatus(m[2]), out: m[3] === "Not clocked out" ? t("empNotClockedOut", "Not clocked out") : m[3]
+        });
+      }
+
+      if (raw.startsWith("Scheduled | Clock out:")) {
+        const out = raw.slice("Scheduled | Clock out:".length).trim();
+        return t("repAttScheduledClockOut", "Scheduled | Clock out: {{out}}", {
+          out: out === "Not clocked out" ? t("empNotClockedOut", "Not clocked out") : out
+        });
+      }
+
+      m = raw.match(/^Order (ORD-[A-F0-9]+|#[0-9]+) · (\d+) item\(s\)$/i);
+      if (m) {
+        return t("repOrderItems", "Order {{orderId}} · {{count}} item(s)", { orderId: m[1], count: m[2] });
+      }
+
+      m = raw.match(/^Order (ORD-[A-F0-9]+) \((.+)\)$/i);
+      if (m) {
+        return t("repOrderStatus", "Order {{orderId}} ({{status}})", {
+          orderId: m[1], status: translateOrderStatus(m[2])
+        });
+      }
+
+      m = raw.match(/^Reservation (ORD-[A-Z0-9-]+|RES-[A-Z0-9-]+|\S+) · (.+?) · (.+)$/i);
+      if (m) {
+        return t("repReservationLine", "Reservation {{id}} · {{name}} · {{status}}", {
+          id: m[1], name: m[2], status: translateOrderStatus(m[3])
+        });
+      }
+
+      m = raw.match(/^Reservation (RES-[A-F0-9]+|\S+) \((.+)\)$/i);
+      if (m) {
+        return t("repReservationStatus", "Reservation {{id}} ({{status}})", {
+          id: m[1], status: translateOrderStatus(m[2])
+        });
+      }
+
+      m = raw.match(/^(.+?) x(\d+)$/i);
+      if (m) return t("repMenuQty", "{{name}} x{{qty}}", { name: m[1], qty: m[2] });
+
+      m = raw.match(/^(.+?) ×(\d+)$/);
+      if (m) return t("repMenuQty", "{{name}} x{{qty}}", { name: m[1], qty: m[2] });
+
+      if (raw === "Text-based inventory history entry") return t("repInvTextEntry", raw);
+
+      const moneyJ = translateMoneyJustification(raw);
+      if (moneyJ !== raw) return moneyJ;
+
+      const invJ = translateInventoryNoteLine(raw);
+      if (invJ !== raw) return invJ;
+
+      return raw;
+    }
+
+    function translateReportRelated(text) {
+      let raw = String(text ?? "").trim();
+      if (!raw) return raw;
+
+      let m = raw.match(/^Justification: (.+)$/i);
+      if (m) {
+        return t("repJustification", "Justification: {{value}}", { value: m[1] === "-" ? "—" : m[1] });
+      }
+
+      m = raw.match(/^Employee: (.+)$/i);
+      if (m) return t("repEmployee", "Employee: {{name}}", { name: m[1] });
+
+      m = raw.match(/^Order (ORD-[A-F0-9]+) \| (.+)$/i);
+      if (m) {
+        return t("repOrderTable", "Order {{orderId}} | {{table}}", {
+          orderId: m[1], table: translateReportTableCaption(m[2])
+        });
+      }
+
+      m = raw.match(/^Work day (\d{4}-\d{2}-\d{2}) \| Justification: (.+)$/i);
+      if (m) {
+        return t("repWorkDayJustification", "Work day {{date}} | Justification: {{value}}", {
+          date: m[1], value: m[2] === "-" ? "—" : m[2]
+        });
+      }
+
+      m = raw.match(/^Work day (\d{4}-\d{2}-\d{2}) \| Status: (.+)$/i);
+      if (m) {
+        return t("repWorkDayStatus", "Work day {{date}} | Status: {{status}}", {
+          date: m[1], status: translateAttendanceClockStatus(m[2])
+        });
+      }
+
+      m = raw.match(/^Shift (\d{1,2}:\d{2}) → (\d{1,2}:\d{2})$/);
+      if (m) return t("repShiftRange", "Shift {{start}} → {{end}}", { start: m[1], end: m[2] });
+
+      m = raw.match(/^Server: (.+?) \| (.+)$/i);
+      if (m) {
+        const items = m[2] === "No order items." ? t("repNoOrderItems", "No order items.") : m[2];
+        return t("repServerItems", "Server: {{server}} | {{items}}", { server: m[1] === "Unassigned" ? t("invActorUnassigned", "Unassigned") : m[1], items: items });
+      }
+
+      m = raw.match(/^(.+?) \| Server: (.+?) \| Items: (\d+)$/i);
+      if (m) {
+        return t("repTableServerItems", "{{table}} | Server: {{server}} | Items: {{count}}", {
+          table: translateReportTableCaption(m[1]),
+          server: m[2] === "Unassigned" ? t("invActorUnassigned", "Unassigned") : m[2],
+          count: m[3]
+        });
+      }
+
+      m = raw.match(/^(.+?) \| Server: (.+?) \| Status: (.+)$/i);
+      if (m) {
+        return t("repTableServerStatus", "{{table}} | Server: {{server}} | Status: {{status}}", {
+          table: translateReportTableCaption(m[1]),
+          server: m[2] === "Unassigned" ? t("invActorUnassigned", "Unassigned") : m[2],
+          status: translateOrderStatus(m[3])
+        });
+      }
+
+      m = raw.match(/^Reservation (RES-[A-F0-9]+|\S+) \| Guest: (.+?) \| Party: (\d+)$/i);
+      if (m) {
+        return t("repReservationGuest", "Reservation {{id}} | Guest: {{guest}} | Party: {{party}}", {
+          id: m[1], guest: m[2], party: m[3]
+        });
+      }
+
+      m = raw.match(/^Reserved for (\d{4}-\d{2}-\d{2} \d{2}:\d{2}) \| Party: (\d+) \| Table: (.+)$/i);
+      if (m) {
+        return t("repReservedFor", "Reserved for {{when}} | Party: {{party}} | Table: {{table}}", {
+          when: m[1], party: m[2], table: m[3] === "-" ? "—" : translateReportTableCaption(m[3])
+        });
+      }
+
+      m = raw.match(/^Item: (.+?) \((INV-[A-F0-9]+)\)$/i);
+      if (m) return t("repInvItem", "Item: {{name}} ({{id}})", { name: m[1], id: m[2] });
+
+      if (raw.includes(" | ")) {
+        return raw.split(" | ").map(part => translateReportRelated(part.trim())).join(" | ");
+      }
+
+      const invJ = translateInventoryNoteLine(raw);
+      if (invJ !== raw) return invJ;
+
+      return translateReportSummary(raw);
+    }
+
+    function translateReportContext(text) {
+      const raw = String(text ?? "").trim();
+      if (!raw) return raw;
+      let m = raw.match(/^Menu: (.+)$/i);
+      if (m) return t("repMenuCtx", "Menu: {{name}}", { name: m[1] });
+      m = raw.match(/^Employee: (.+)$/i);
+      if (m) return t("repEmployee", "Employee: {{name}}", { name: m[1] });
+      m = raw.match(/^Inventory: (.+)$/i);
+      if (m) return t("repInventoryCtx", "Inventory: {{name}}", { name: m[1] });
+      m = raw.match(/^Table (\d+)$/i);
+      if (m) return t("repTableNumber", "Table {{num}}", { num: m[1] });
+      if (raw === "Reservations") return t("repReservations", "Reservations");
+      if (raw === "Unassigned") return t("invActorUnassigned", "Unassigned");
+      return raw;
+    }
+
+    function formatReportTime(d) {
+      if (!d || Number.isNaN(d.getTime())) return "—";
+      const lang = currentLangCode() === "fr" ? "fr-FR" : "en-US";
+      return d.toLocaleTimeString(lang, { hour: "2-digit", minute: "2-digit", hour12: lang !== "fr-FR" });
+    }
 
     function $(id) { return document.getElementById(id); }
 
@@ -1209,12 +2063,16 @@
       const body = cfg.body || {};
       portalConfig = {
         restaurantName: body.restaurantName ?? body.RestaurantName ?? "",
-        restaurantLogoUrl: body.restaurantLogoUrl ?? body.RestaurantLogoUrl ?? ""
+        restaurantLogoUrl: body.restaurantLogoUrl ?? body.RestaurantLogoUrl ?? "",
+        restaurantTimeZoneId: body.restaurantTimeZoneId ?? body.RestaurantTimeZoneId ?? ""
       };
+      if (window.EliteRestaurantDateTime) {
+        EliteRestaurantDateTime.setRestaurantTimeZone(portalConfig.restaurantTimeZoneId);
+      }
       const brandNameEl = $("brandName");
       const brandLogoEl = $("brandLogo");
       if (brandNameEl) {
-        brandNameEl.textContent = (portalConfig.restaurantName || "Admin").toUpperCase();
+        brandNameEl.textContent = (portalConfig.restaurantName || t("brandDefault", "Admin")).toUpperCase();
       }
       if (brandLogoEl) {
         if (portalConfig.restaurantLogoUrl) {
@@ -1230,7 +2088,7 @@
     function resetPortalBranding() {
       const brandNameEl = $("brandName");
       const brandLogoEl = $("brandLogo");
-      if (brandNameEl) brandNameEl.textContent = "Admin";
+      if (brandNameEl) brandNameEl.textContent = t("brandDefault", "Admin");
       if (brandLogoEl) {
         revokeImgBlob(brandLogoEl);
         brandLogoEl.classList.add("hidden");
@@ -1321,7 +2179,9 @@
       const txt = await res.text();
       let json;
       try { json = JSON.parse(txt); } catch (_) { json = { raw: txt }; }
-      return { ok: res.ok, status: res.status, body: json };
+      var result = { ok: res.ok, status: res.status, body: json };
+      if (window.EliteApiError) window.EliteApiError.wrap(result);
+      return result;
     }
 
     function fmtMoney(n) {
@@ -1338,6 +2198,10 @@
 
     function esc(s) {
       return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]));
+    }
+
+    function escAttr(s) {
+      return esc(s);
     }
 
     function formatApiError(r) {
@@ -1395,6 +2259,7 @@
 
     function orderDetailStatusPillClass(stRaw) {
       const s = String(stRaw || "").toLowerCase();
+      if (s.includes("debt")) return "od-status-pill--debt";
       if (s.includes("pending")) return "od-status-pill--pending";
       if (s.includes("waiting")) return "od-status-pill--wait";
       if (s.includes("kitchen")) return "od-status-pill--kitchen";
@@ -1404,9 +2269,9 @@
     }
 
     function orderDetailNoteInnerHtml(bodyRaw) {
-      const t = String(bodyRaw ?? "").trim();
-      if (!t || t === "-") return "<span class=\"od-note-empty\">None noted</span>";
-      return esc(t);
+      const noteText = String(bodyRaw ?? "").trim();
+      if (!noteText || noteText === "-") return "<span class=\"od-note-empty\">" + esc(t("detailNoneNoted", "None noted")) + "</span>";
+      return esc(noteText);
     }
 
     function renderAdminOrderDetailBody(d) {
@@ -1419,9 +2284,9 @@
       const gfc = d.grandTotalFc ?? d.GrandTotalFc ?? 0;
       const cn = d.customerNotes ?? d.CustomerNotes ?? "-";
       const an = d.allergyNotes ?? d.AllergyNotes ?? "-";
-      const origin = d.orderOrigin ?? d.OrderOrigin ?? "";
-      const src = d.orderSource ?? d.OrderSource ?? "";
-      const pt = d.paymentTiming ?? d.PaymentTiming ?? "";
+      const origin = translateMetaValue("origin", d.orderOrigin ?? d.OrderOrigin ?? "");
+      const src = translateMetaValue("source", d.orderSource ?? d.OrderSource ?? "");
+      const pt = translateMetaValue("payment", d.paymentTiming ?? d.PaymentTiming ?? "");
       const dFee = Number(d.deliveryFeeUsd ?? d.DeliveryFeeUsd ?? 0);
       const merch = Number(d.merchandiseGrandUsd ?? d.MerchandiseGrandUsd ?? 0);
       const taxable = Number(d.taxableSubtotalUsd ?? d.TaxableSubtotalUsd ?? 0);
@@ -1444,44 +2309,44 @@
       const itemsBlock = linesRaw.length
         ? (
             "<div class=\"od-items-table\" role=\"table\">" +
-            "<div class=\"od-items-head\" role=\"row\"><span>Qty</span><span>Item</span><span class=\"od-num\">Unit</span><span class=\"od-num\">Line</span></div>" +
+            "<div class=\"od-items-head\" role=\"row\"><span>" + esc(t("detailQty", "Qty")) + "</span><span>" + esc(t("detailItem", "Item")) + "</span><span class=\"od-num\">" + esc(t("detailUnit", "Unit")) + "</span><span class=\"od-num\">" + esc(t("detailLine", "Line")) + "</span></div>" +
             lineRows +
             "</div>"
           )
-        : "<div class=\"muted\" style=\"padding:12px 14px;font-size:13px;\">No line items.</div>";
+        : "<div class=\"muted\" style=\"padding:12px 14px;font-size:13px;\">" + esc(t("detailNoLineItems", "No line items.")) + "</div>";
       const deliveryRow = dFee > 0
-        ? "<div class=\"od-total-row\"><span>Delivery fee (20%)</span><span>" + esc(usdFmt(dFee)) + "</span></div>"
+        ? "<div class=\"od-total-row\"><span>" + esc(t("detailDeliveryFee", "Delivery fee (20%)")) + "</span><span>" + esc(usdFmt(dFee)) + "</span></div>"
         : "";
       const grandLine = esc(usdFmt(gusd) + " (" + fcFmt(gfc) + ")");
       return (
-        "<section class=\"od-section\" aria-label=\"Order details\">" +
-        "<h4 class=\"od-section-title\">Details</h4>" +
+        "<section class=\"od-section\" aria-label=\"" + esc(t("detailSectionDetails", "Details")) + "\">" +
+        "<h4 class=\"od-section-title\">" + esc(t("detailSectionDetails", "Details")) + "</h4>" +
         "<div class=\"od-meta-grid\">" +
-        "<div class=\"od-meta-cell\"><span class=\"od-meta-k\">Table</span><span class=\"od-meta-v\">" + esc(String(tableLabel)) + "</span></div>" +
-        "<div class=\"od-meta-cell\"><span class=\"od-meta-k\">Server</span><span class=\"od-meta-v\">" + esc(String(serverName)) + "</span></div>" +
-        "<div class=\"od-meta-cell\"><span class=\"od-meta-k\">Origin</span><span class=\"od-meta-v\">" + esc(String(origin)) + "</span></div>" +
-        "<div class=\"od-meta-cell\"><span class=\"od-meta-k\">Source</span><span class=\"od-meta-v\">" + esc(String(src)) + "</span></div>" +
-        "<div class=\"od-meta-cell\" style=\"grid-column:1/-1;\"><span class=\"od-meta-k\">Payment timing</span><span class=\"od-meta-v\">" + esc(String(pt)) + "</span></div>" +
+        "<div class=\"od-meta-cell\"><span class=\"od-meta-k\">" + esc(t("detailTable", "Table")) + "</span><span class=\"od-meta-v\">" + esc(String(tableLabel)) + "</span></div>" +
+        "<div class=\"od-meta-cell\"><span class=\"od-meta-k\">" + esc(t("detailServer", "Server")) + "</span><span class=\"od-meta-v\">" + esc(String(serverName)) + "</span></div>" +
+        "<div class=\"od-meta-cell\"><span class=\"od-meta-k\">" + esc(t("detailOrigin", "Origin")) + "</span><span class=\"od-meta-v\">" + esc(String(origin)) + "</span></div>" +
+        "<div class=\"od-meta-cell\"><span class=\"od-meta-k\">" + esc(t("detailSource", "Source")) + "</span><span class=\"od-meta-v\">" + esc(String(src)) + "</span></div>" +
+        "<div class=\"od-meta-cell\" style=\"grid-column:1/-1;\"><span class=\"od-meta-k\">" + esc(t("detailPaymentTiming", "Payment timing")) + "</span><span class=\"od-meta-v\">" + esc(String(pt)) + "</span></div>" +
         "</div></section>" +
-        "<section class=\"od-section\" aria-label=\"Line items\">" +
-        "<h4 class=\"od-section-title\">Line items</h4>" + itemsBlock + "</section>" +
-        "<section class=\"od-section\" aria-label=\"Totals\">" +
-        "<h4 class=\"od-section-title\">Totals</h4>" +
+        "<section class=\"od-section\" aria-label=\"" + esc(t("detailSectionLineItems", "Line items")) + "\">" +
+        "<h4 class=\"od-section-title\">" + esc(t("detailSectionLineItems", "Line items")) + "</h4>" + itemsBlock + "</section>" +
+        "<section class=\"od-section\" aria-label=\"" + esc(t("detailSectionTotals", "Totals")) + "\">" +
+        "<h4 class=\"od-section-title\">" + esc(t("detailSectionTotals", "Totals")) + "</h4>" +
         "<div class=\"od-totals\">" +
-        "<div class=\"od-total-row\"><span>Line subtotal</span><span>" + esc(usdFmt(sub)) + "</span></div>" +
-        "<div class=\"od-total-row\"><span>Taxable (after discount)</span><span>" + esc(usdFmt(taxable)) + "</span></div>" +
-        "<div class=\"od-total-row\"><span>Discount</span><span>" + esc(usdFmt(disc)) + "</span></div>" +
-        "<div class=\"od-total-row\"><span>Tax</span><span>" + esc(usdFmt(tax)) + "</span></div>" +
-        "<div class=\"od-total-row\"><span>Service</span><span>" + esc(usdFmt(svc)) + "</span></div>" +
-        "<div class=\"od-total-row\"><span>Merchandise total</span><span>" + esc(usdFmt(merch)) + "</span></div>" +
+        "<div class=\"od-total-row\"><span>" + esc(t("detailLineSubtotal", "Line subtotal")) + "</span><span>" + esc(usdFmt(sub)) + "</span></div>" +
+        "<div class=\"od-total-row\"><span>" + esc(t("detailTaxable", "Taxable (after discount)")) + "</span><span>" + esc(usdFmt(taxable)) + "</span></div>" +
+        "<div class=\"od-total-row\"><span>" + esc(t("detailDiscount", "Discount")) + "</span><span>" + esc(usdFmt(disc)) + "</span></div>" +
+        "<div class=\"od-total-row\"><span>" + esc(t("detailTax", "Tax")) + "</span><span>" + esc(usdFmt(tax)) + "</span></div>" +
+        "<div class=\"od-total-row\"><span>" + esc(t("detailService", "Service")) + "</span><span>" + esc(usdFmt(svc)) + "</span></div>" +
+        "<div class=\"od-total-row\"><span>" + esc(t("detailMerchandise", "Merchandise total")) + "</span><span>" + esc(usdFmt(merch)) + "</span></div>" +
         deliveryRow +
-        "<div class=\"od-total-row od-total-row--grand\"><span>Grand total</span><span>" + grandLine + "</span></div>" +
+        "<div class=\"od-total-row od-total-row--grand\"><span>" + esc(t("detailGrandTotal", "Grand total")) + "</span><span>" + grandLine + "</span></div>" +
         "</div></section>" +
-        "<section class=\"od-section\" aria-label=\"Notes and allergies\">" +
-        "<h4 class=\"od-section-title\">Notes &amp; allergies</h4>" +
+        "<section class=\"od-section\" aria-label=\"" + esc(t("detailSectionNotes", "Notes & allergies")) + "\">" +
+        "<h4 class=\"od-section-title\">" + esc(t("detailSectionNotes", "Notes & allergies")) + "</h4>" +
         "<div class=\"od-notes-grid\">" +
-        "<div class=\"od-note\"><div class=\"od-note-title\">Customer notes</div><div class=\"od-note-body\">" + orderDetailNoteInnerHtml(cn) + "</div></div>" +
-        "<div class=\"od-note od-note--allergy\"><div class=\"od-note-title\">Allergy</div><div class=\"od-note-body\">" + orderDetailNoteInnerHtml(an) + "</div></div>" +
+        "<div class=\"od-note\"><div class=\"od-note-title\">" + esc(t("detailCustomerNotes", "Customer notes")) + "</div><div class=\"od-note-body\">" + orderDetailNoteInnerHtml(cn) + "</div></div>" +
+        "<div class=\"od-note od-note--allergy\"><div class=\"od-note-title\">" + esc(t("detailAllergy", "Allergy")) + "</div><div class=\"od-note-body\">" + orderDetailNoteInnerHtml(an) + "</div></div>" +
         "</div></section>"
       );
     }
@@ -1661,7 +2526,7 @@
       const staffId = ($("adminLoginId")?.value || "").trim();
       const pin = ($("adminLoginPin")?.value || "").trim();
       if (!staffId || !pin) {
-        errEl.textContent = window.EliteI18n ? EliteI18n.t("auth.enterIdAndPin", "Enter your sign-in ID and PIN.") : "Enter your sign-in ID and PIN.";
+        errEl.textContent = t("auth.enterIdAndPin", "Enter your sign-in ID and PIN.");
         errEl.classList.remove("hidden");
         return;
       }
@@ -1671,7 +2536,7 @@
       const r = await api("/api/auth/login", "POST", { staffId, pin, portal: "AdminWeb", preferredLanguage: lang }, false);
       if (submitBtn) submitBtn.disabled = false;
       if (!r.ok || !r.body || !r.body.accessToken) {
-        errEl.textContent = (r.body && r.body.message) || (window.EliteI18n ? EliteI18n.t("auth.signInFailed", "Sign-in failed.") : "Sign-in failed.");
+        errEl.textContent = (r.body && r.body.message) || t("auth.signInFailed", "Sign-in failed.");
         errEl.classList.remove("hidden");
         return;
       }
@@ -1679,31 +2544,18 @@
       sessionStorage.setItem(TOKEN_KEY, token);
       $("sessionLabel").innerHTML = "<strong>" + esc(r.body.name) + "</strong><br><span class=\"muted\">" + esc(r.body.role) + "</span>";
       showApp();
+      applyAdminStaticI18n();
       await loadPortalBranding();
       navTo("dashboard");
     }
 
-    const views = {
-      dashboard: async (el) => {
-        const r = await api("/api/admin/dashboard", "GET", null, true);
-        if (!r.ok) {
-          const hint = formatApiError(r.status, r.body);
-          el.innerHTML =
-            "<div class='danger'>HTTP " +
-            r.status +
-            (hint
-              ? "<pre class=\"api-err-detail\">" + esc(hint) + "</pre>"
-              : "") +
-            "</div>";
-          return;
-        }
-        const d = r.body;
+    async function renderAdminDashboard(el, d) {
         const s = d.summary || d.Summary || {};
         const roster = d.staffRoster || d.StaffRoster || [];
         const clk = pick(s, "clockedInEmployees", "ClockedInEmployees");
         const tact = pick(s, "totalActiveEmployees", "TotalActiveEmployees");
         const clocked = clk != null && tact != null ? clk + "/" + tact : "—";
-        const notYet = (tact != null && clk != null) ? Math.max(0, tact - clk) + " not yet in" : "";
+        const notYet = (tact != null && clk != null) ? t("dashNotYetIn", "{{count}} not yet in", { count: Math.max(0, tact - clk) }) : "";
 
         let kpiList = d.kpiCards || d.KpiCards;
         if (!kpiList || !kpiList.length) {
@@ -1718,12 +2570,12 @@
           const inKitchen = pick(s, "inKitchenNow", "InKitchenNow");
           const tTot = tt != null ? Number(tt) : (Number(oc || 0) + Number(av || 0));
           kpiList = [
-            { key: "todayUsd", label: "Today's revenue (USD)", primaryText: fmtMoney(Number(tr) || 0), subtitle: "Money — entries in USD only", accentClass: "accent-blue", navView: "money", navFilter: null, sparklineUsdRevenue7d: null },
-            { key: "todayFc", label: "Today's revenue (FC)", primaryText: fmtFc(Number(trFc) || 0), subtitle: "Money — entries in FC only (not converted from USD)", accentClass: "accent-gold", navView: "money", navFilter: null, sparklineUsdRevenue7d: null },
-            { key: "todayExp", label: "Today's expenses", primaryText: fmtMoney(Number(tExp) || 0), subtitle: "All expenses in USD (FC rows use stored USD equivalent)", accentClass: "accent-red", navView: "money", navFilter: null, sparklineUsdRevenue7d: null },
-            { key: "tables", label: "Tables occupied", primaryText: (oc || 0) + "/" + (tTot || 0) + " occupied", subtitle: (ao || 0) + " active orders", accentClass: "accent-cyan", navView: "tables", navFilter: null, sparklineUsdRevenue7d: null },
-            { key: "activeOrders", label: "Active orders", primaryText: String(ao ?? "0"), subtitle: (inKitchen ?? 0) + " in kitchen now", accentClass: "accent-green", navView: "orders", navFilter: null, sparklineUsdRevenue7d: null },
-            { key: "completedToday", label: "Orders completed today", primaryText: String(completed ?? "0"), subtitle: "From orders (not Money ledger)", accentClass: "accent-purple", navView: "orders", navFilter: null, sparklineUsdRevenue7d: null }
+            { key: "todayUsd", label: t("kpiTodayUsd", "Today's revenue (USD)"), primaryText: fmtMoney(Number(tr) || 0), subtitle: t("kpiTodayUsdSub", "Money — entries in USD only"), accentClass: "accent-blue", navView: "money", navFilter: null, sparklineUsdRevenue7d: null },
+            { key: "todayFc", label: t("kpiTodayFc", "Today's revenue (FC)"), primaryText: fmtFc(Number(trFc) || 0), subtitle: t("kpiTodayFcSub", "Money — entries in FC only (not converted from USD)"), accentClass: "accent-gold", navView: "money", navFilter: null, sparklineUsdRevenue7d: null },
+            { key: "todayExp", label: t("kpiTodayExp", "Today's expenses"), primaryText: fmtMoney(Number(tExp) || 0), subtitle: t("kpiTodayExpSub", "All expenses in USD (FC rows use stored USD equivalent)"), accentClass: "accent-red", navView: "money", navFilter: null, sparklineUsdRevenue7d: null },
+            { key: "tables", label: t("kpiTables", "Tables occupied"), primaryText: t("kpiTablesPrimary", "{{occupied}}/{{total}} occupied", { occupied: oc || 0, total: tTot || 0 }), subtitle: t("kpiTablesSub", "{{count}} active orders", { count: ao || 0 }), accentClass: "accent-cyan", navView: "tables", navFilter: null, sparklineUsdRevenue7d: null },
+            { key: "activeOrders", label: t("kpiActiveOrders", "Active orders"), primaryText: String(ao ?? "0"), subtitle: t("kpiActiveOrdersSub", "{{count}} in kitchen now", { count: inKitchen ?? 0 }), accentClass: "accent-green", navView: "orders", navFilter: null, sparklineUsdRevenue7d: null },
+            { key: "completedToday", label: t("kpiCompletedToday", "Orders completed today"), primaryText: String(completed ?? "0"), subtitle: t("kpiCompletedTodaySub", "From orders (not Money ledger)"), accentClass: "accent-purple", navView: "orders", navFilter: null, sparklineUsdRevenue7d: null }
           ];
         }
 
@@ -1732,11 +2584,14 @@
           const accent = k.accentClass || k.AccentClass || "";
           const navView = k.navView || k.NavView || "dashboard";
           const navFilter = k.navFilter || k.NavFilter || "";
-          const label = k.label || k.Label || key;
-          const primary = k.primaryText || k.PrimaryText || "";
-          const subtitle = k.subtitle || k.Subtitle || "";
+          const loc = localizeDashboardKpi(k, s);
+          const label = loc.label;
+          const primary = loc.primary;
+          const subtitle = loc.subtitle;
           const sparkRaw = k.sparklineUsdRevenue7d || k.SparklineUsdRevenue7d;
-          const spark = sparkRaw && sparkRaw.length ? "<div class=\"kpi-spark-wrap\">" + sparklineSvg(sparkRaw) + (key === "todayUsd" ? "<div class=\"kpi-spark-cap\">Sparkline: 7-day USD revenue (Money)</div>" : "") + "</div>" : "";
+          const spark = sparkRaw && sparkRaw.length
+            ? "<div class=\"kpi-spark-wrap\">" + sparklineSvg(sparkRaw) + (key === "todayUsd" ? "<div class=\"kpi-spark-cap\">" + esc(t("dashSparklineCap", "Sparkline: 7-day USD revenue (Money)")) + "</div>" : "") + "</div>"
+            : "";
           let extra = "";
           if (key === "tables") {
             const occ = Number(pick(s, "occupiedTables", "OccupiedTables")) || 0;
@@ -1760,25 +2615,25 @@
           const detail = a.detail || a.Detail || "";
           const tier = (a.alertLevel || a.AlertLevel || "critical").toLowerCase();
           const cls = tier === "reorder" ? "inv-alert reorder js-nav" : tier === "info" ? "inv-alert info js-nav" : "inv-alert js-nav";
-          return "<button type=\"button\" class=\"" + cls + "\" data-nav=\"inventory\" data-filter=\"" + esc(name) + "\"><span class=\"t\">" + esc(name) + "</span><span class=\"d\">" + esc(detail) + "</span></button>";
-        }).join("") || "<p class=\"muted\">No inventory on file.</p>";
+          return "<button type=\"button\" class=\"" + cls + "\" data-nav=\"inventory\" data-filter=\"" + esc(name) + "\"><span class=\"t\">" + esc(name) + "</span><span class=\"d\">" + esc(translateInventoryDetail(detail)) + "</span></button>";
+        }).join("") || "<p class=\"muted\">" + esc(t("dashNoInventory", "No inventory on file.")) + "</p>";
 
         const dishes = d.topDishesToday || d.TopDishesToday || [];
-        const topDishes = dishes.map(t => {
-          const name = t.name || t.Name || "";
-          const qty = t.quantity != null ? t.quantity : t.Quantity;
-          const pct = Number(t.barPercent != null ? t.barPercent : t.BarPercent) || 0;
-          const photoRaw = (t.photoUrl ?? t.PhotoUrl ?? "").trim();
+        const topDishes = dishes.map(dish => {
+          const name = dish.name || dish.Name || "";
+          const qty = dish.quantity != null ? dish.quantity : dish.Quantity;
+          const pct = Number(dish.barPercent != null ? dish.barPercent : dish.BarPercent) || 0;
+          const photoRaw = (dish.photoUrl ?? dish.PhotoUrl ?? "").trim();
           const photo = photoRaw ? absPublicUrl(photoRaw) : "";
           const img = photo
             ? "<div class=\"top-dish-photo-wrap\"><img class=\"top-dish-photo\" src=\"" + esc(photo) + "\" alt=\"\" loading=\"lazy\"/></div>"
-            : "<div class=\"top-dish-photo-wrap top-dish-photo-ph\" aria-hidden=\"true\">No photo</div>";
+            : "<div class=\"top-dish-photo-wrap top-dish-photo-ph\" aria-hidden=\"true\">" + esc(t("dashNoPhoto", "No photo")) + "</div>";
           return "<div class=\"top-dish js-nav\" style=\"cursor:pointer\" data-nav=\"menu\" data-filter=\"" + esc(name) + "\">" +
             img +
             "<div class=\"top-dish-text\">" +
             "<div class=\"row\"><span>" + esc(name) + "</span><span>" + esc(String(qty ?? "")) + "</span></div>" +
             "<div class=\"bar\"><i style=\"width:" + pct + "%\"></i></div></div></div>";
-        }).join("") || "<p class=\"muted\">No dishes yet today.</p>";
+        }).join("") || "<p class=\"muted\">" + esc(t("dashNoDishes", "No dishes yet today.")) + "</p>";
 
         const hourlyChart = renderHourlyChartBlock(d);
 
@@ -1787,51 +2642,49 @@
           const stl = st.statusLabel || st.StatusLabel || "";
           return "<button type=\"button\" class=\"staff-card js-nav\" data-nav=\"employees\" data-filter=\"" + esc(st.name || st.Name || "") + "\">" +
             "<span class=\"staff-av " + (on ? "dot-on" : "dot-off") + "\"></span>" +
-            "<div><div class=\"staff-name\">" + esc(st.name || st.Name || "") + "</div><div class=\"staff-role\">" + esc(st.role || st.Role || "") + "</div><div class=\"staff-st\">" + esc(stl) + "</div></div></button>";
+            "<div><div class=\"staff-name\">" + esc(st.name || st.Name || "") + "</div><div class=\"staff-role\">" + esc(translateEmployeeRole(st.role || st.Role || "")) + "</div><div class=\"staff-st\">" + esc(translateStaffStatusLabel(stl)) + "</div></div></button>";
         }).join("");
 
         const actList = d.recentActivity || d.RecentActivity || [];
         const acts = actList.map(a =>
           "<button type=\"button\" class=\"act-card js-nav\" data-nav=\"" + esc(a.navView || a.NavView || "") + "\" data-filter=\"" + esc(a.navFilter || a.NavFilter || "") + "\">" +
-          "<div class=\"act-kind\">" + esc(a.kindLabel || a.KindLabel || "") + "</div>" +
+          "<div class=\"act-kind\">" + esc(translateActivityKind(a.kindLabel || a.KindLabel || "")) + "</div>" +
           "<div class=\"act-title\">" + esc(a.title || a.Title || "") + "</div>" +
-          "<div class=\"act-detail\">" + esc(a.detailBlock || a.DetailBlock || "") + "</div></button>"
+          "<div class=\"act-detail\">" + esc(translateActivityDetail(a.detailBlock || a.DetailBlock || "")) + "</div></button>"
         ).join("");
 
-        const welcomeName = d.welcomeName || d.WelcomeName || "Owner";
-        const headerSub = d.headerSubtitle || d.HeaderSubtitle || "";
-        const apiStatus = d.apiStatusText || d.ApiStatusText || "";
+        const welcomeName = d.welcomeName || d.WelcomeName || t("dashOwnerFallback", "Owner");
+        const apiStatus = translateApiStatus(d.apiStatusText || d.ApiStatusText || "");
 
         el.innerHTML =
           "<div class=\"dash-wrap\">" +
           "<header class=\"dash-header\">" +
-          "<div><h1>Welcome, " + esc(welcomeName) + "</h1></div>" +
+          "<div><h1>" + esc(t("dashWelcome", "Welcome, {{name}}", { name: welcomeName })) + "</h1></div>" +
           "<div class=\"dash-meta\"><div><span class=\"status-dot\"></span>" + esc(apiStatus) + "</div>" +
           "<div class=\"clock\" id=\"dashClock\"></div></div></header>" +
           "<div class=\"kpi-grid\" id=\"dash-kpis\">" + kpis + "</div>" +
           "<div class=\"dash-mid\">" +
           "<div class=\"panel\">" +
-          "<div class=\"panel-title-row\"><h2>Inventory alerts</h2><button type=\"button\" class=\"pill-btn js-nav\" data-nav=\"inventory\">Inventory</button></div>" +
-          "<p class=\"muted\" style=\"margin:0 0 10px;\">Ten lowest on-hand quantities (by stock). Status reflects quantity rules only.</p>" + inv + "</div>" +
+          "<div class=\"panel-title-row\"><h2>" + esc(t("dashInventoryAlerts", "Inventory alerts")) + "</h2><button type=\"button\" class=\"pill-btn js-nav\" data-nav=\"inventory\">" + esc(t("dashInventoryBtn", "Inventory")) + "</button></div>" +
+          "<p class=\"muted\" style=\"margin:0 0 10px;\">" + esc(t("dashInventoryHint", "Ten lowest on-hand quantities (by stock). Status reflects quantity rules only.")) + "</p>" + inv + "</div>" +
           "<div class=\"panel\">" +
-          "<div class=\"panel-title-row\"><h2>Today's sales rhythm</h2></div>" +
-          "<p class=\"chart-caption\">Revenue by hour (completed &amp; open orders created today).</p>" +
+          "<div class=\"panel-title-row\"><h2>" + esc(t("dashSalesRhythm", "Today's sales rhythm")) + "</h2></div>" +
+          "<p class=\"chart-caption\">" + esc(t("dashSalesCaption", "Revenue by hour (completed & open orders created today).")) + "</p>" +
           hourlyChart +
-          "<p class=\"chart-caption\">Tap the chart to open orders · Scale max ≈ " + fmtMoney(Number(pick(d, "hourlyRevenueChartMax", "HourlyRevenueChartMax")) || 0) + "</p>" +
-          "<h3 style=\"margin:14px 0 8px;font-size:1rem;\">Top dishes today</h3>" + topDishes +
+          "<p class=\"chart-caption\">" + esc(t("dashChartTap", "Tap the chart to open orders · Scale max ≈ {{max}}", { max: fmtMoney(Number(pick(d, "hourlyRevenueChartMax", "HourlyRevenueChartMax")) || 0) })) + "</p>" +
+          "<h3 style=\"margin:14px 0 8px;font-size:1rem;\">" + esc(t("dashTopDishes", "Top dishes today")) + "</h3>" + topDishes +
           "</div></div>" +
           "<section class=\"roster-section\">" +
-          "<div class=\"roster-head\"><h2>Team on roster</h2><span class=\"roster-badge\">" + esc(clocked) + " Attendance</span></div>" +
+          "<div class=\"roster-head\"><h2>" + esc(t("dashTeamRoster", "Team on roster")) + "</h2><span class=\"roster-badge\">" + esc(clocked) + " " + esc(t("dashAttendance", "Attendance")) + "</span></div>" +
           "<p class=\"roster-sub\">" + esc(notYet) + "</p><div class=\"roster-grid\">" + staffCards + "</div></section>" +
           "<div class=\"dash-bottom\" style=\"grid-template-columns:1fr;\">" +
-          "<div class=\"panel\"><h2>Recent activity</h2>" +
-          "<p class=\"muted\" style=\"margin-top:0;\">Last " + actList.length + " events · tap a card to open orders, team, or inventory.</p>" +
+          "<div class=\"panel\"><h2>" + esc(t("dashRecentActivity", "Recent activity")) + "</h2>" +
+          "<p class=\"muted\" style=\"margin-top:0;\">" + esc(t("dashRecentHint", "Last {{count}} events · tap a card to open orders, team, or inventory.", { count: actList.length })) + "</p>" +
           "<div class=\"act-list\">" + acts + "</div></div></div></div>";
 
         const clockEl = $("dashClock");
         function tick() {
-          const now = new Date();
-          clockEl.textContent = now.toLocaleString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" });
+          clockEl.textContent = formatDashboardClock(new Date());
         }
         tick();
         clearDashClock();
@@ -1842,6 +2695,24 @@
         el.querySelectorAll(".top-dish.js-nav").forEach(row => {
           row.addEventListener("click", () => navTo("menu", { filter: row.getAttribute("data-filter") }));
         });
+    }
+
+    const views = {
+      dashboard: async (el) => {
+        const r = await api("/api/admin/dashboard", "GET", null, true);
+        if (!r.ok) {
+          const hint = formatApiError(r.status, r.body);
+          el.innerHTML =
+            "<div class='danger'>HTTP " +
+            r.status +
+            (hint
+              ? "<pre class=\"api-err-detail\">" + esc(hint) + "</pre>"
+              : "") +
+            "</div>";
+          return;
+        }
+        lastDashboardPayload = r.body;
+        await renderAdminDashboard(el, r.body);
       },
 
       orders: async (el) => {
@@ -1887,29 +2758,29 @@
 
         el.innerHTML =
           "<div class=\"orders-view-root\">" +
-          "<div class=\"orders-toolbar\"><h1>Orders</h1><span class=\"orders-updated\" id=\"admOrdUpdated\">Updated " + esc(updatedAt) + "</span></div>" +
-          (hint ? "<p class=\"orders-hint\">Filtered from dashboard: \"" + esc(hint) + "\" · " + items.length + " row(s).</p>" : "") +
+          "<div class=\"orders-toolbar\"><h1>" + esc(t("ordersHeading", "Orders")) + "</h1><span class=\"orders-updated\" id=\"admOrdUpdated\">" + esc(t("updatedPrefix", "Updated")) + " " + esc(updatedAt) + "</span></div>" +
+          (hint ? "<p class=\"orders-hint\">" + esc(t("filteredFromDashboard", "Filtered from dashboard: \"{{hint}}\" · {{count}} row(s).", { hint: hint, count: items.length })) + "</p>" : "") +
           "<div class=\"orders-columns\">" +
           "<div class=\"orders-col\">" +
-          "<h2>Active</h2>" +
-          "<input type=\"search\" class=\"orders-search\" id=\"admSearchActive\" placeholder=\"Search active…\" autocomplete=\"off\">" +
+          "<h2>" + esc(t("active", "Active")) + "</h2>" +
+          "<input type=\"search\" class=\"orders-search\" id=\"admSearchActive\" placeholder=\"" + escAttr(t("searchActive", "Search active…")) + "\" autocomplete=\"off\">" +
           "<div class=\"orders-col-list\" id=\"admListActive\"></div></div>" +
           "<div class=\"orders-col\">" +
-          "<h2>Past</h2>" +
-          "<label class=\"orders-day-label\" for=\"admPastDay\">Day</label>" +
+          "<h2>" + esc(t("past", "Past")) + "</h2>" +
+          "<label class=\"orders-day-label\" for=\"admPastDay\">" + esc(t("day", "Day")) + "</label>" +
           "<select class=\"orders-day-select\" id=\"admPastDay\"></select>" +
-          "<input type=\"search\" class=\"orders-search\" id=\"admSearchPast\" placeholder=\"Search past…\" autocomplete=\"off\">" +
+          "<input type=\"search\" class=\"orders-search\" id=\"admSearchPast\" placeholder=\"" + escAttr(t("searchPast", "Search past…")) + "\" autocomplete=\"off\">" +
           "<div class=\"orders-col-list\" id=\"admListPast\"></div></div></div></div>" +
           "<div id=\"admOrdModal\" class=\"modal-backdrop hidden\" role=\"presentation\">" +
           "<div class=\"modal-card-admin order-detail-modal\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"detailOrderCode\">" +
           "<header class=\"od-modal-header\">" +
           "<div class=\"od-modal-header-row\">" +
-          "<div><div class=\"od-modal-label\">Order</div><div id=\"detailOrderCode\" class=\"od-modal-code\">—</div></div>" +
+          "<div><div class=\"od-modal-label\">" + esc(t("orderLabel", "Order")) + "</div><div id=\"detailOrderCode\" class=\"od-modal-code\">—</div></div>" +
           "<span id=\"detailStatusPill\" class=\"od-status-pill\" aria-live=\"polite\">—</span>" +
           "</div></header>" +
           "<div id=\"detailBodyScroll\" class=\"od-modal-body\"></div>" +
           "<footer class=\"od-modal-footer\">" +
-          "<button type=\"button\" class=\"btn btn-ghost\" id=\"admOrdClose\">Close</button>" +
+          "<button type=\"button\" class=\"btn btn-ghost\" id=\"admOrdClose\">" + esc(t("close", "Close")) + "</button>" +
           "</footer></div></div>";
 
         function filterByNeedle(rows, needle) {
@@ -1921,21 +2792,21 @@
         async function openModal(row) {
           $("detailOrderCode").textContent = row.orderId || "—";
           const pill = $("detailStatusPill");
-          pill.textContent = row.status || "—";
+          pill.textContent = translateOrderStatus(row.status) || row.status || "—";
           pill.className = "od-status-pill " + orderDetailStatusPillClass(row.status);
-          $("detailBodyScroll").innerHTML = "<p class=\"muted\" style=\"padding:12px 4px;margin:0;\">Loading order…</p>";
+          $("detailBodyScroll").innerHTML = "<p class=\"muted\" style=\"padding:12px 4px;margin:0;\">" + esc(t("loadingOrder", "Loading order…")) + "</p>";
           $("detailBodyScroll").scrollTop = 0;
           $("admOrdModal").classList.remove("hidden");
           const r = await api("/api/admin/data/order-summaries/" + row.id + "/invoice", "GET", null, true);
           if (!r.ok) {
-            $("detailBodyScroll").innerHTML = "<div class=\"danger\" style=\"margin:0;\">" + esc(formatApiError(r.status, r.body) || "Could not load order details.") + "</div>";
+            $("detailBodyScroll").innerHTML = "<div class=\"danger\" style=\"margin:0;\">" + esc(formatApiError(r.status, r.body) || t("couldNotLoadOrder", "Could not load order details.")) + "</div>";
             return;
           }
           const d = r.body;
           const code = d.orderCode ?? d.OrderCode ?? row.orderId ?? "";
           const st = d.status ?? d.Status ?? row.status ?? "";
           $("detailOrderCode").textContent = code || "—";
-          pill.textContent = st || "—";
+          pill.textContent = translateOrderStatus(st) || st || "—";
           pill.className = "od-status-pill " + orderDetailStatusPillClass(st);
           $("detailBodyScroll").innerHTML = renderAdminOrderDetailBody(d);
           $("detailBodyScroll").scrollTop = 0;
@@ -1959,7 +2830,7 @@
             selPast.innerHTML = "";
             pastForDay = [];
           } else if (!pastDayKeys.length) {
-            selPast.innerHTML = "<option value=\"\">All past orders</option>";
+            selPast.innerHTML = "<option value=\"\">" + esc(t("pastAllOrders", "All past orders")) + "</option>";
             selPast.disabled = true;
             pastForDay = pastRows;
           } else {
@@ -1982,27 +2853,27 @@
           al.innerHTML = af.length
             ? af.map(row =>
               "<button type=\"button\" class=\"admin-order-active\" data-adm-oid=\"" + esc(String(row.id)) + "\">" +
-              "<div class=\"row-top\"><span class=\"oid\">" + esc(row.orderId) + "</span><span class=\"st\">" + esc(row.status) + "</span></div>" +
+              "<div class=\"row-top\"><span class=\"oid\">" + esc(row.orderId) + "</span><span class=\"st\">" + esc(translateOrderStatus(row.status) || row.status) + "</span></div>" +
               "<div class=\"line\">" + esc(row.tableLabel) + "</div>" +
-              "<div class=\"line\">Server: " + esc(row.serverName) + "</div>" +
+              "<div class=\"line\">" + esc(t("serverLabel", "Server")) + ": " + esc(row.serverName) + "</div>" +
               "<div class=\"items\">" + esc(row.itemsPreview) + "</div>" +
               "<div class=\"tot\">" + esc(usdSp(row.grandTotal)) + "</div>" +
               "</button>").join("")
-            : "<p class=\"muted\" style=\"padding:12px 4px;margin:0;\">No active orders.</p>";
+            : "<p class=\"muted\" style=\"padding:12px 4px;margin:0;\">" + esc(t("noActiveOrders", "No active orders.")) + "</p>";
 
           pl.innerHTML = pf.length
             ? pf.map(row => {
               const ts = row.createdAt ? new Date(row.createdAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) : "";
               return (
                 "<button type=\"button\" class=\"admin-order-past\" data-adm-oid=\"" + esc(String(row.id)) + "\">" +
-                "<div class=\"hint\">Tap for details</div>" +
-                "<div class=\"line1\"><strong>" + esc(row.orderId) + "</strong> <span class=\"muted\">" + esc(row.status) + "</span> · " + esc(ts) + "</div>" +
+                "<div class=\"hint\">" + esc(t("tapForDetails", "Tap for details")) + "</div>" +
+                "<div class=\"line1\"><strong>" + esc(row.orderId) + "</strong> <span class=\"muted\">" + esc(translateOrderStatus(row.status) || row.status) + "</span> · " + esc(ts) + "</div>" +
                 "<div class=\"line2\">" + esc(row.tableLabel) + " · " + esc(usdSp(row.grandTotal)) + "</div>" +
                 "</button>");
             }).join("")
             : (pastRows.length
-              ? "<p class=\"muted\" style=\"padding:12px 4px;margin:0;\">No past orders for this selection" + (pNeed.trim() ? " matching search" : "") + ".</p>"
-              : "<p class=\"muted\" style=\"padding:12px 4px;margin:0;\">No past orders.</p>");
+              ? "<p class=\"muted\" style=\"padding:12px 4px;margin:0;\">" + esc(t("noPastOrdersDay", "No past orders for this selection{{search}}.", { search: pNeed.trim() ? t("noPastOrdersSearchSuffix", " matching search") : "" })) + "</p>"
+              : "<p class=\"muted\" style=\"padding:12px 4px;margin:0;\">" + esc(t("noPastOrders", "No past orders.")) + "</p>");
 
           const byId = new Map(items.map(x => [String(x.id), x]));
           al.querySelectorAll("[data-adm-oid]").forEach(b => {
@@ -2056,7 +2927,7 @@
         let sortInv = "exp";
 
         function expMeta(iso) {
-          if (iso == null || iso === "") return { sortKey: 999999, label: "No expiry", pct: 15, ok: true };
+          if (iso == null || iso === "") return { sortKey: 999999, label: t("invExpNoExpiry", "No expiry"), pct: 15, ok: true };
           const d = new Date(iso);
           if (Number.isNaN(d.getTime())) return { sortKey: 999998, label: "—", pct: 20, ok: true };
           const today = new Date();
@@ -2065,37 +2936,37 @@
           exp.setHours(0, 0, 0, 0);
           const days = Math.round((exp - today) / 864e5);
           let label, ok, pct;
-          if (days <= 0) { label = "Expired · " + days + " day(s)"; ok = false; pct = 100; }
-          else if (days <= 7) { label = "Critical · " + days + " day(s)"; ok = false; pct = 88; }
-          else if (days <= 14) { label = "Bad · " + days + " day(s)"; ok = false; pct = 60; }
-          else { label = "Good · " + days + " day(s)"; ok = true; pct = Math.min(96, 28 + Math.min(days, 200) / 8); }
+          if (days <= 0) { label = t("invExpExpired", "Expired · {{days}} day(s)", { days: days }); ok = false; pct = 100; }
+          else if (days <= 7) { label = t("invExpCritical", "Critical · {{days}} day(s)", { days: days }); ok = false; pct = 88; }
+          else if (days <= 14) { label = t("invExpBad", "Bad · {{days}} day(s)", { days: days }); ok = false; pct = 60; }
+          else { label = t("invExpGood", "Good · {{days}} day(s)", { days: days }); ok = true; pct = Math.min(96, 28 + Math.min(days, 200) / 8); }
           return { sortKey: days, label, days, pct, ok };
         }
 
         function qtyLabel(qty) {
-          if (qty <= 0) return "Out";
-          if (qty <= 3) return "Critical";
-          if (qty <= 10) return "Low";
-          return "Healthy";
+          if (qty <= 0) return t("invQtyOut", "Out");
+          if (qty <= 3) return t("invQtyCritical", "Critical");
+          if (qty <= 10) return t("invQtyLow", "Low");
+          return t("invQtyHealthy", "Healthy");
         }
 
         el.innerHTML =
           "<div class=\"catalog-page\">" +
           "<header class=\"catalog-header\">" +
-          "<div><h1 class=\"catalog-page-title\">Inventory items</h1>" +
-         (hint ? "<p class=\"muted\" style=\"margin:8px 0 0;\">Filtered from dashboard: \"" + esc(hint) + "\" · " + raw.length + " row(s).</p>" : "") +
+          "<div><h1 class=\"catalog-page-title\">" + esc(t("invTitle", "Inventory items")) + "</h1>" +
+         (hint ? "<p class=\"muted\" style=\"margin:8px 0 0;\">" + esc(t("filteredFromDashboard", "Filtered from dashboard: \"{{hint}}\" · {{count}} row(s).", { hint: hint, count: raw.length })) + "</p>" : "") +
           "</div>" +
           "<div class=\"catalog-actions\">" +
-          "<button type=\"button\" class=\"pill-btn\" id=\"invSortExp\">By expiration</button>" +
-          "<button type=\"button\" class=\"pill-btn\" id=\"invSortQty\">By quantity</button>" +
-          "<span class=\"read-only-pill\">Read-only web</span></div></header>" +
-          "<input type=\"search\" class=\"catalog-search\" id=\"invSearch\" placeholder=\"Search inventory…\" autocomplete=\"off\">" +
+          "<button type=\"button\" class=\"pill-btn\" id=\"invSortExp\">" + esc(t("invSortExp", "By expiration")) + "</button>" +
+          "<button type=\"button\" class=\"pill-btn\" id=\"invSortQty\">" + esc(t("invSortQty", "By quantity")) + "</button>" +
+          "<span class=\"read-only-pill\">" + esc(t("readOnlyWeb", "Read-only web")) + "</span></div></header>" +
+          "<input type=\"search\" class=\"catalog-search\" id=\"invSearch\" placeholder=\"" + escAttr(t("invSearch", "Search inventory…")) + "\" autocomplete=\"off\">" +
           "<div class=\"catalog-list\" id=\"invCatalogList\"></div></div>" +
           "<div id=\"invDetailModal\" class=\"modal-backdrop hidden\">" +
           "<div class=\"modal-card-admin\">" +
-          "<h3 id=\"invDetailTitle\">Item</h3>" +
+          "<h3 id=\"invDetailTitle\">" + esc(t("invItem", "Item")) + "</h3>" +
           "<pre id=\"invDetailBody\"></pre>" +
-          "<button type=\"button\" class=\"btn btn-ghost\" id=\"invDetailClose\">Close</button>" +
+          "<button type=\"button\" class=\"btn btn-ghost\" id=\"invDetailClose\">" + esc(t("close", "Close")) + "</button>" +
           "</div></div>";
 
         function paintInv() {
@@ -2111,7 +2982,7 @@
           }
           const list = $("invCatalogList");
           if (!rows.length) {
-            list.innerHTML = "<p class=\"muted\">No inventory rows match.</p>";
+            list.innerHTML = "<p class=\"muted\">" + esc(t("invNoMatch", "No inventory rows match.")) + "</p>";
             return;
           }
           list.innerHTML = rows.map(it => {
@@ -2128,19 +2999,19 @@
               "<div>" +
               "<h2 class=\"inv-name\">" + esc(it.name) + "</h2>" +
               "<div class=\"inv-id\">" + esc(it.uniqueId) + "</div>" +
-              "<div class=\"inv-stock\">Stock: " + esc(String(it.stockQuantity)) + " " + esc(it.unit) +
+              "<div class=\"inv-stock\">" + esc(t("invStock", "Stock")) + ": " + esc(String(it.stockQuantity)) + " " + esc(it.unit) +
               " · <span class=\"muted\">" + esc(qLab) + "</span></div>" +
-              "<div class=\"inv-exp-line\">Expires: " + esc(expDateStr) + "</div>" +
+              "<div class=\"inv-exp-line\">" + esc(t("invExpires", "Expires")) + ": " + esc(expDateStr) + "</div>" +
               "</div>" +
               "<div class=\"inv-actions\">" +
-              "<button type=\"button\" class=\"btn btn-ghost btn-sm js-inv-detail\">Details</button>" +
+              "<button type=\"button\" class=\"btn btn-ghost btn-sm js-inv-detail\">" + esc(t("details", "Details")) + "</button>" +
               "</div></div>" +
               "<div class=\"inv-status-row\">" +
               "<span class=\"muted\" style=\"font-size:14px;\" aria-hidden=\"true\">⏳</span>" +
               "<div class=\"inv-bar-wrap\"><div class=\"inv-bar " + (em.ok ? "ok" : "bad") + "\" style=\"width:" + em.pct.toFixed(1) + "%\"></div></div>" +
               "<span class=\"muted\" style=\"font-size:13px;\">" + esc(em.label) + "</span>" +
               "</div>" +
-              "<div class=\"inv-log\">" + esc(it.notes || "No notes on file. Full stock activity history is in Elite Pro.") + "</div>" +
+              "<div class=\"inv-log\">" + esc(it.notes ? translateInventoryNotes(it.notes) : t("invNoNotes", "No notes on file. Full stock activity history is in Elite Pro.")) + "</div>" +
               "</article>");
           }).join("");
 
@@ -2154,8 +3025,8 @@
               const em = expMeta(it.expirationDate);
               $("invDetailTitle").textContent = it.name;
               $("invDetailBody").textContent =
-                "ID: " + it.uniqueId + "\nStock: " + it.stockQuantity + " " + it.unit + " (" + qtyLabel(it.stockQuantity) + ")\n" +
-                "Expiration: " + (it.expirationDate || "—") + "\nShelf status: " + em.label + "\n\nNotes:\n" + (it.notes || "—");
+                t("invDetailId", "ID") + ": " + it.uniqueId + "\n" + t("invStock", "Stock") + ": " + it.stockQuantity + " " + it.unit + " (" + qtyLabel(it.stockQuantity) + ")\n" +
+                t("invDetailExpiration", "Expiration") + ": " + (it.expirationDate || "—") + "\n" + t("invDetailShelfStatus", "Shelf status") + ": " + em.label + "\n\n" + t("invDetailNotes", "Notes") + ":\n" + (it.notes ? translateInventoryNotes(it.notes) : "—");
               $("invDetailModal").classList.remove("hidden");
             });
           });
@@ -2216,12 +3087,12 @@
         }
 
         function normMenuCat(s) {
-          const t = String(s ?? "").trim();
-          return t || "Uncategorized";
+          const val = String(s ?? "").trim();
+          return val || t("menuUncategorized", "Uncategorized");
         }
         function normMenuSub(s) {
-          const t = String(s ?? "").trim();
-          return t || "General";
+          const val = String(s ?? "").trim();
+          return val || t("menuGeneral", "General");
         }
 
         let raw = normalizeAdminEntityItems(r.body).map(row => {
@@ -2258,7 +3129,7 @@
             for (const b of bits) lines.push("<li>" + esc(b) + "</li>");
           }
           if (!lines.length)
-            return "<ul class=\"menu-prod-ing\"><li>No ingredient breakdown</li></ul>";
+            return "<ul class=\"menu-prod-ing\"><li>" + esc(t("menuNoIngredients", "No ingredient breakdown")) + "</li></ul>";
           return "<ul class=\"menu-prod-ing\">" + lines.join("") + "</ul>";
         }
 
@@ -2268,22 +3139,22 @@
           "<div class=\"catalog-page\">" +
           "<header class=\"catalog-header\">" +
           "<div>" +
-          "<h1 class=\"catalog-page-title\">Menu <span class=\"part-gold\">Products</span></h1>" +
-          (hint ? "<p class=\"muted\" style=\"margin:10px 0 0;\">Filtered from dashboard: \"" + esc(hint) + "\" · " + raw.length + " row(s).</p>" : "") +
+          "<h1 class=\"catalog-page-title\">" + esc(t("menuTitle", "Menu Products")) + "</h1>" +
+          (hint ? "<p class=\"muted\" style=\"margin:10px 0 0;\">" + esc(t("filteredFromDashboard", "Filtered from dashboard: \"{{hint}}\" · {{count}} row(s).", { hint: hint, count: raw.length })) + "</p>" : "") +
           "</div>" +
           "<div class=\"catalog-actions\">" +
-          "<button type=\"button\" class=\"pill-btn\" id=\"menuSortName\">By name</button>" +
-          "<button type=\"button\" class=\"pill-btn\" id=\"menuSortPriceHi\">Price · high</button>" +
-          "<button type=\"button\" class=\"pill-btn\" id=\"menuSortPriceLo\">Price · low</button>" +
-          "<span class=\"read-only-pill\">Read-only web</span></div></header>" +
+          "<button type=\"button\" class=\"pill-btn\" id=\"menuSortName\">" + esc(t("menuSortName", "By name")) + "</button>" +
+          "<button type=\"button\" class=\"pill-btn\" id=\"menuSortPriceHi\">" + esc(t("menuSortPriceHi", "Price · high")) + "</button>" +
+          "<button type=\"button\" class=\"pill-btn\" id=\"menuSortPriceLo\">" + esc(t("menuSortPriceLo", "Price · low")) + "</button>" +
+          "<span class=\"read-only-pill\">" + esc(t("readOnlyWeb", "Read-only web")) + "</span></div></header>" +
           "<div class=\"menu-filter-panel\">" +
           "<div class=\"menu-filter-row\">" +
-          "<div><label class=\"menu-lbl\" for=\"menuCatSel\">Menu type</label>" +
+          "<div><label class=\"menu-lbl\" for=\"menuCatSel\">" + esc(t("menuType", "Menu type")) + "</label>" +
           "<select class=\"menu-filter-select\" id=\"menuCatSel\"></select></div>" +
-          "<div><label class=\"menu-lbl\" for=\"menuSubSel\">Submenu type</label>" +
+          "<div><label class=\"menu-lbl\" for=\"menuSubSel\">" + esc(t("menuSubtype", "Submenu type")) + "</label>" +
           "<select class=\"menu-filter-select\" id=\"menuSubSel\"></select></div></div>" +
-          "<label class=\"menu-lbl\" for=\"menuAdminSearch\">Search by name</label>" +
-          "<input type=\"search\" class=\"catalog-search\" id=\"menuAdminSearch\" placeholder=\"Search products…\" autocomplete=\"off\">" +
+          "<label class=\"menu-lbl\" for=\"menuAdminSearch\">" + esc(t("menuSearchLabel", "Search by name")) + "</label>" +
+          "<input type=\"search\" class=\"catalog-search\" id=\"menuAdminSearch\" placeholder=\"" + escAttr(t("menuSearch", "Search products…")) + "\" autocomplete=\"off\">" +
           "</div>" +
           "<div id=\"menuAdminList\"></div></div>";
 
@@ -2303,13 +3174,13 @@
           const subSel = $("menuSubSel");
           const cats = allCategories();
           const prevC = catSel.value;
-          catSel.innerHTML = "<option value=\"__all__\">All</option>" +
+          catSel.innerHTML = "<option value=\"__all__\">" + esc(t("menuAllTypes", "All types")) + "</option>" +
             cats.map(c => "<option value=\"" + esc(c) + "\">" + esc(c) + "</option>").join("");
           catSel.value = (prevC && (prevC === "__all__" || cats.includes(prevC))) ? prevC : "__all__";
           const c = catSel.value;
           const subs = subsForCat(c);
           const prevS = subSel.value;
-          subSel.innerHTML = "<option value=\"__all__\">All</option>" +
+          subSel.innerHTML = "<option value=\"__all__\">" + esc(t("menuAllSubtypes", "All subtypes")) + "</option>" +
             subs.map(s => "<option value=\"" + esc(s) + "\">" + esc(s) + "</option>").join("");
           subSel.value = (prevS && (prevS === "__all__" || subs.includes(prevS))) ? prevS : "__all__";
         }
@@ -2339,7 +3210,7 @@
           rows = applySort(rows);
           const list = $("menuAdminList");
           if (!rows.length) {
-            list.innerHTML = "<p class=\"muted\">No dishes match these filters.</p>";
+            list.innerHTML = "<p class=\"muted\">" + esc(t("menuNoMatch", "No products match your search.")) + "</p>";
             return;
           }
           const byCat = {};
@@ -2354,7 +3225,7 @@
             html += "<h2 class=\"menu-cat-title\">" + esc(c) + "</h2>";
             const subs = Object.keys(byCat[c]).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
             for (const s of subs) {
-              const showSubHeading = subs.length > 1 || s !== "General";
+              const showSubHeading = subs.length > 1 || s !== t("menuGeneral", "General");
               if (showSubHeading) html += "<h3 class=\"menu-sub-title\">" + esc(s) + "</h3>";
               html += "<div class=\"menu-prod-grid\">";
               for (const p of byCat[c][s]) {
@@ -2417,17 +3288,18 @@
           "<div class=\"catalog-page\">" +
           "<header class=\"catalog-header\">" +
           "<div>" +
-          "<h1 class=\"catalog-page-title\">Table <span class=\"part-gold\">Management</span></h1>" +
+          "<h1 class=\"catalog-page-title\">" + esc(t("tblTitle", "Table Management")) + "</h1>" +
           "</div>" +
-          "<div class=\"catalog-actions\"><span class=\"read-only-pill\">Read-only web</span></div></header>" +
-          "<input type=\"search\" class=\"catalog-search\" id=\"tableAdminSearch\" placeholder=\"Search tables…\" autocomplete=\"off\">" +
+          "<div class=\"catalog-actions\"><span class=\"read-only-pill\">" + esc(t("readOnlyWeb", "Read-only web")) + "</span></div></header>" +
+          "<input type=\"search\" class=\"catalog-search\" id=\"tableAdminSearch\" placeholder=\"" + escAttr(t("tblSearch", "Search tables…")) + "\" autocomplete=\"off\">" +
           "<div id=\"tableAdminList\"></div></div>";
 
         function statusPill(st) {
+          const label = translateTableStatus(st);
           const s = String(st || "").toLowerCase();
-          if (s.includes("avail")) return "<span class=\"tbl-pill tbl-pill-ok\">" + esc(st) + "</span>";
-          if (s.includes("occup")) return "<span class=\"tbl-pill tbl-pill-busy\">" + esc(st) + "</span>";
-          return "<span class=\"tbl-pill tbl-pill-busy\">" + esc(st) + "</span>";
+          if (s.includes("avail")) return "<span class=\"tbl-pill tbl-pill-ok\">" + esc(label) + "</span>";
+          if (s.includes("occup")) return "<span class=\"tbl-pill tbl-pill-busy\">" + esc(label) + "</span>";
+          return "<span class=\"tbl-pill tbl-pill-busy\">" + esc(label) + "</span>";
         }
 
         function paintTables() {
@@ -2437,20 +3309,20 @@
           rows.sort((a, b) => (Number(a.tableNumber) || 0) - (Number(b.tableNumber) || 0));
           const list = $("tableAdminList");
           if (!rows.length) {
-            list.innerHTML = "<p class=\"muted\">No tables match.</p>";
+            list.innerHTML = "<p class=\"muted\">" + esc(t("tblNoMatch", "No tables match.")) + "</p>";
             return;
           }
-          list.innerHTML = rows.map(t => {
-            const srv = t.serverName
-              ? ("<span class=\"tbl-pill tbl-pill-srv\">Server: " + esc(t.serverName) + "</span>")
-              : "<span class=\"tbl-pill tbl-pill-srv\">Server: —</span>";
+          list.innerHTML = rows.map(trow => {
+            const srv = trow.serverName
+              ? ("<span class=\"tbl-pill tbl-pill-srv\">" + esc(t("tblServer", "Server")) + ": " + esc(trow.serverName) + "</span>")
+              : "<span class=\"tbl-pill tbl-pill-srv\">" + esc(t("tblServer", "Server")) + ": —</span>";
             return (
               "<div class=\"table-card\">" +
               "<div class=\"table-card-main\">" +
-              "<div class=\"table-card-title\">Table ID " + esc(String(t.tableNumber)) + " · " + esc(t.name) + "</div>" +
+              "<div class=\"table-card-title\">" + esc(t("tblId", "Table ID")) + " " + esc(String(trow.tableNumber)) + " · " + esc(trow.name) + "</div>" +
               "<div class=\"table-card-pills\">" +
-              "<span class=\"tbl-pill tbl-pill-cap\">Capacity " + esc(String(t.capacity)) + "</span>" +
-              statusPill(t.status) +
+              "<span class=\"tbl-pill tbl-pill-cap\">" + esc(t("tblCapacity", "Capacity")) + " " + esc(String(trow.capacity)) + "</span>" +
+              statusPill(trow.status) +
               srv +
               "</div></div></div>");
           }).join("");
@@ -2563,11 +3435,11 @@
           "<div class=\"catalog-page\">" +
           "<header class=\"catalog-header\">" +
           "<div>" +
-          "<h1 class=\"catalog-page-title\">Employee <span class=\"part-gold\">Management</span></h1>" +
+          "<h1 class=\"catalog-page-title\">" + esc(t("empTitle", "Employee Management")) + "</h1>" +
           "</div>" +
-          "<div class=\"catalog-actions\"><span class=\"read-only-pill\">Read-only web</span></div></header>" +
-          (hint ? "<p class=\"muted\">Filtered: \"" + esc(hint) + "\" · " + raw.length + " staff.</p>" : "") +
-          "<input type=\"search\" class=\"catalog-search\" id=\"empAdminSearch\" placeholder=\"Search staff…\" autocomplete=\"off\">" +
+          "<div class=\"catalog-actions\"><span class=\"read-only-pill\">" + esc(t("readOnlyWeb", "Read-only web")) + "</span></div></header>" +
+          (hint ? "<p class=\"muted\">" + esc(t("filteredStaff", "Filtered: \"{{hint}}\" · {{count}} staff.", { hint: hint, count: raw.length })) + "</p>" : "") +
+          "<input type=\"search\" class=\"catalog-search\" id=\"empAdminSearch\" placeholder=\"" + escAttr(t("empSearch", "Search staff…")) + "\" autocomplete=\"off\">" +
           "<div id=\"empAccList\" class=\"emp-acc-list\"></div>" +
           "</div>";
 
@@ -2585,17 +3457,17 @@
           rows.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
           const list = $("empAccList");
           if (!rows.length) {
-            list.innerHTML = "<p class=\"muted\">No staff match.</p>";
+            list.innerHTML = "<p class=\"muted\">" + esc(t("empNoMatch", "No staff match.")) + "</p>";
             return;
           }
           list.innerHTML = rows.map(row => {
             const ini = initialsFromName(row.name);
             const ph = row.phoneNumber.trim()
-              ? ("<span class=\"emp-tag\">Phone " + esc(row.phoneNumber) + "</span>")
-              : "<span class=\"emp-tag emp-tag-muted\">Phone —</span>";
+              ? ("<span class=\"emp-tag\">" + esc(t("empPhone", "Phone")) + " " + esc(row.phoneNumber) + "</span>")
+              : "<span class=\"emp-tag emp-tag-muted\">" + esc(t("empPhone", "Phone")) + " —</span>";
             const joined = row.joinDate
-              ? ("<span class=\"emp-tag\">Joined " + esc(row.joinDate) + "</span>")
-              : "<span class=\"emp-tag emp-tag-muted\">Joined —</span>";
+              ? ("<span class=\"emp-tag\">" + esc(t("empJoined", "Joined")) + " " + esc(row.joinDate) + "</span>")
+              : "<span class=\"emp-tag emp-tag-muted\">" + esc(t("empJoined", "Joined")) + " —</span>";
             const notesText = row.notes.trim() ? esc(row.notes) : "—";
             const photoUrl = row.profilePhotoUrl.trim();
             const imgTag = photoUrl
@@ -2606,8 +3478,8 @@
               "<button type=\"button\" class=\"emp-acc-hdr\" aria-expanded=\"false\">" +
               "<span class=\"emp-acc-title\">" + esc(row.name) + "</span>" +
               "<span class=\"emp-acc-hdr-pills\">" +
-              "<span class=\"emp-pill emp-pill-role\">" + esc(row.role || "—") + "</span>" +
-              "<span class=\"emp-pill " + statusPillClass(row.employmentStatus) + "\">" + esc(row.employmentStatus || "—") + "</span>" +
+              "<span class=\"emp-pill emp-pill-role\">" + esc(translateEmployeeRole(row.role) || row.role || "—") + "</span>" +
+              "<span class=\"emp-pill " + statusPillClass(row.employmentStatus) + "\">" + esc(translateEmployeeEmploymentStatus(row.employmentStatus) || "—") + "</span>" +
               "</span>" +
               "<span class=\"emp-acc-chev\" aria-hidden=\"true\">▼</span>" +
               "</button>" +
@@ -2618,23 +3490,23 @@
               (imgTag || "") +
               "<div class=\"emp-photo-initials\">" + esc(ini) + "</div>" +
               "</div>" +
-              "<label class=\"emp-notes-lbl\">Notes</label>" +
+              "<label class=\"emp-notes-lbl\">" + esc(t("empNotes", "Notes")) + "</label>" +
               "<div class=\"emp-notes-box\">" + notesText + "</div>" +
               "</div>" +
               "<div>" +
               "<div class=\"emp-detail-sec\">" +
-              "<h4>Contact</h4>" +
+              "<h4>" + esc(t("empContact", "Contact")) + "</h4>" +
               "<div class=\"emp-tag-row\">" + ph + joined + "</div></div>" +
               "<div class=\"emp-detail-sec\">" +
-              "<h4>Attendance (today)</h4>" +
+              "<h4>" + esc(t("empAttendanceToday", "Attendance (today)")) + "</h4>" +
               "<div class=\"emp-tag-row\">" +
-              "<span class=\"emp-tag emp-tag-muted\">Clock in: " + esc(row.todayClockInText) + "</span>" +
-              "<span class=\"emp-tag emp-tag-muted\">Clock out: " + esc(row.todayClockOutText) + "</span>" +
-              "<span class=\"emp-tag\">Status: " + esc(row.attendanceStatus) + "</span>" +
+              "<span class=\"emp-tag emp-tag-muted\">" + esc(t("empClockIn", "Clock in")) + ": " + esc(translateEmployeeClockText(row.todayClockInText)) + "</span>" +
+              "<span class=\"emp-tag emp-tag-muted\">" + esc(t("empClockOut", "Clock out")) + ": " + esc(translateEmployeeClockText(row.todayClockOutText)) + "</span>" +
+              "<span class=\"emp-tag\">" + esc(t("empStatus", "Status")) + ": " + esc(translateEmployeeAttendanceStatus(row.attendanceStatus)) + "</span>" +
               "</div></div>" +
               "<div class=\"emp-detail-sec\">" +
-              "<h4>Work schedule</h4>" +
-              "<div class=\"emp-schedule-bar\">" + esc(row.workScheduleSummary) + "</div>" +
+              "<h4>" + esc(t("empWorkSchedule", "Work schedule")) + "</h4>" +
+              "<div class=\"emp-schedule-bar\">" + esc(translateWorkScheduleSummary(row.workScheduleSummary)) + "</div>" +
               "</div></div></div></div></section>");
           }).join("");
 
@@ -2677,14 +3549,7 @@
         }
 
         function fmtMoneyLedgerWhen(iso) {
-          const d = new Date(iso);
-          if (Number.isNaN(d.getTime())) return "—";
-          const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-          const day = String(d.getDate()).padStart(2, "0");
-          const mon = months[d.getMonth()];
-          const hh = String(d.getHours()).padStart(2, "0");
-          const mm = String(d.getMinutes()).padStart(2, "0");
-          return day + " " + mon + " " + hh + ":" + mm;
+          return fmtMoneyLedgerWhenLocalized(iso);
         }
 
         function escAttr(s) {
@@ -2697,49 +3562,49 @@
           el.innerHTML =
             "<div class=\"money-dash\" id=\"moneyDashRoot\">" +
             "<header class=\"money-dash-head\">" +
-            "<h1 class=\"catalog-page-title\">Money <span class=\"part-gold\">Dashboard</span></h1>" +
+            "<h1 class=\"catalog-page-title\">" + esc(t("moneyTitle", "Money Dashboard")) + "</h1>" +
             "</header>" +
             "<div class=\"money-dash-kpis\">" +
-            "<div class=\"money-kpi\"><div class=\"money-kpi-lbl\">Today revenue</div><div class=\"money-kpi-val\" id=\"moneyKpiRev\">—</div></div>" +
-            "<div class=\"money-kpi\"><div class=\"money-kpi-lbl\">Today expenses</div><div class=\"money-kpi-val\" id=\"moneyKpiExp\">—</div></div>" +
-            "<div class=\"money-kpi\"><div class=\"money-kpi-lbl\">Today net</div><div class=\"money-kpi-val\" id=\"moneyKpiNet\">—</div></div>" +
+            "<div class=\"money-kpi\"><div class=\"money-kpi-lbl\">" + esc(t("moneyTodayRev", "Today revenue")) + "</div><div class=\"money-kpi-val\" id=\"moneyKpiRev\">—</div></div>" +
+            "<div class=\"money-kpi\"><div class=\"money-kpi-lbl\">" + esc(t("moneyTodayExp", "Today expenses")) + "</div><div class=\"money-kpi-val\" id=\"moneyKpiExp\">—</div></div>" +
+            "<div class=\"money-kpi\"><div class=\"money-kpi-lbl\">" + esc(t("moneyTodayNet", "Today net")) + "</div><div class=\"money-kpi-val\" id=\"moneyKpiNet\">—</div></div>" +
             "</div>" +
             "<div class=\"money-toolbar\">" +
-            "<div class=\"money-toolbar-showing\">Showing: <strong id=\"moneyPeriodLabel\">—</strong>" +
+            "<div class=\"money-toolbar-showing\">" + esc(t("moneyShowing", "Showing")) + ": <strong id=\"moneyPeriodLabel\">—</strong>" +
             "<span class=\"muted\" id=\"moneyOriginHint\" style=\"margin-left:10px;font-weight:400;display:none\"></span></div>" +
             "<div class=\"money-preset-group\" id=\"moneyPresetGroup\">" +
-            "<button type=\"button\" class=\"money-preset-btn\" data-money-preset=\"Today\">Today</button>" +
-            "<button type=\"button\" class=\"money-preset-btn\" data-money-preset=\"Week\">Week</button>" +
-            "<button type=\"button\" class=\"money-preset-btn\" data-money-preset=\"Month\">Month</button>" +
-            ("<button type=\"button\" class=\"money-preset-btn\" data-money-preset=\"Year\">Year</button>" +
-            "<button type=\"button\" class=\"money-preset-btn\" data-money-preset=\"All\">All</button>") +
+            "<button type=\"button\" class=\"money-preset-btn\" data-money-preset=\"Today\">" + esc(t("moneyPresetToday", "Today")) + "</button>" +
+            "<button type=\"button\" class=\"money-preset-btn\" data-money-preset=\"Week\">" + esc(t("moneyPresetWeek", "Week")) + "</button>" +
+            "<button type=\"button\" class=\"money-preset-btn\" data-money-preset=\"Month\">" + esc(t("moneyPresetMonth", "Month")) + "</button>" +
+            ("<button type=\"button\" class=\"money-preset-btn\" data-money-preset=\"Year\">" + esc(t("moneyPresetYear", "Year")) + "</button>" +
+            "<button type=\"button\" class=\"money-preset-btn\" data-money-preset=\"All\">" + esc(t("moneyPresetAll", "All")) + "</button>") +
             "</div>" +
             "<div class=\"field\" style=\"min-width:150px\">" +
-            "<label for=\"moneyOriginSelect\" style=\"font-size:11px;color:#94a3b8;display:block;margin-bottom:4px;\">Order origin</label>" +
+            "<label for=\"moneyOriginSelect\" style=\"font-size:11px;color:#94a3b8;display:block;margin-bottom:4px;\">" + esc(t("moneyOrderOrigin", "Order origin")) + "</label>" +
             "<select id=\"moneyOriginSelect\" style=\"width:100%;padding:8px;border-radius:8px;background:#0f172a;color:#e8eef4;border:1px solid #334155\">" +
-            "<option value=\"All\">All</option><option value=\"Online\">Online</option><option value=\"InStore\">In-store</option>" +
+            "<option value=\"All\">" + esc(t("moneyOriginAll", "All")) + "</option><option value=\"Online\">" + esc(t("moneyOriginOnline", "Online")) + "</option><option value=\"InStore\">" + esc(t("moneyOriginInStore", "In-store")) + "</option>" +
             "</select></div>" +
-            "<button type=\"button\" class=\"btn btn-sm\" style=\"background:var(--accent-blue);color:#0b1220;border:none;font-weight:700\" id=\"moneyBtnRefresh\">Refresh</button>" +
+            "<button type=\"button\" class=\"btn btn-sm\" style=\"background:var(--accent-blue);color:#0b1220;border:none;font-weight:700\" id=\"moneyBtnRefresh\">" + esc(t("refresh", "Refresh")) + "</button>" +
             "</div>" +
             "<div class=\"money-dash-main\">" +
             "<div class=\"money-ledger-panel\">" +
-            "<h2>Ledger — latest 200 entries</h2>" +
+            "<h2>" + esc(t("moneyLedgerTitle", "Ledger — latest 200 entries")) + "</h2>" +
             "<div class=\"money-ledger-scroll\"><table class=\"money-ledger\">" +
-            "<thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Justification</th><th class=\"cell-amt\">Amount</th></tr></thead>" +
-            "<tbody id=\"moneyLedgerBody\"><tr><td colspan=\"5\" class=\"muted\">Loading…</td></tr></tbody>" +
+            "<thead><tr><th>" + esc(t("moneyColDate", "Date")) + "</th><th>" + esc(t("moneyColType", "Type")) + "</th><th>" + esc(t("moneyColCategory", "Category")) + "</th><th>" + esc(t("moneyColJustification", "Justification")) + "</th><th class=\"cell-amt\">" + esc(t("moneyColAmount", "Amount")) + "</th></tr></thead>" +
+            "<tbody id=\"moneyLedgerBody\"><tr><td colspan=\"5\" class=\"muted\">" + esc(t("loading", "Loading…")) + "</td></tr></tbody>" +
             "</table></div></div>" +
             "<aside class=\"money-sidebar\">" +
-            "<div class=\"money-side-card\"><div class=\"lbl\">Period revenue</div><div class=\"fig\" id=\"moneySideRev\">—</div></div>" +
-            "<div class=\"money-side-card\"><div class=\"lbl\">Period expenses</div><div class=\"fig\" id=\"moneySideExp\">—</div></div>" +
-            "<div class=\"money-side-card\"><div class=\"lbl\">Period net</div><div class=\"fig\" id=\"moneySideNet\">—</div></div>" +
+            "<div class=\"money-side-card\"><div class=\"lbl\">" + esc(t("moneyPeriodRev", "Period revenue")) + "</div><div class=\"fig\" id=\"moneySideRev\">—</div></div>" +
+            "<div class=\"money-side-card\"><div class=\"lbl\">" + esc(t("moneyPeriodExp", "Period expenses")) + "</div><div class=\"fig\" id=\"moneySideExp\">—</div></div>" +
+            "<div class=\"money-side-card\"><div class=\"lbl\">" + esc(t("moneyPeriodNet", "Period net")) + "</div><div class=\"fig\" id=\"moneySideNet\">—</div></div>" +
             "<div class=\"money-summary-list\">" +
-            "<h3>Summary</h3><dl>" +
-            "<dt>Sales</dt><dd id=\"moneySumSales\">—</dd>" +
-            "<dt>Tips</dt><dd id=\"moneySumTips\">—</dd>" +
-            "<dt>Delivery fees</dt><dd id=\"moneySumDelivery\">—</dd>" +
+            "<h3>" + esc(t("moneySummary", "Summary")) + "</h3><dl>" +
+            "<dt>" + esc(t("moneySales", "Sales")) + "</dt><dd id=\"moneySumSales\">—</dd>" +
+            "<dt>" + esc(t("moneyTips", "Tips")) + "</dt><dd id=\"moneySumTips\">—</dd>" +
+            "<dt>" + esc(t("moneyDeliveryFees", "Delivery fees")) + "</dt><dd id=\"moneySumDelivery\">—</dd>" +
             "</dl></div>" +
-            "<div><button type=\"button\" class=\"money-report-btn\" id=\"moneyBtnReport\">Generate Report (PDF)</button>" +
-            "<p class=\"money-report-note\">Backend export is Excel (Daily timeline) for the dates in this view.</p></div>" +
+            "<div><button type=\"button\" class=\"money-report-btn\" id=\"moneyBtnReport\">" + esc(t("moneyGenReport", "Generate Report (PDF)")) + "</button>" +
+            "<p class=\"money-report-note\">" + esc(t("moneyReportNote", "Backend export is Excel (Daily timeline) for the dates in this view.")) + "</p></div>" +
             "</aside></div></div>";
 
           el.querySelector("#moneyBtnRefresh").addEventListener("click", () => load());
@@ -2774,7 +3639,7 @@
           setMoneyAmountEl(el.querySelector("#moneyKpiExp"), exp, "expense");
           setMoneyAmountEl(el.querySelector("#moneyKpiNet"), net, "net");
 
-          el.querySelector("#moneyPeriodLabel").textContent = lbl || "—";
+          el.querySelector("#moneyPeriodLabel").textContent = translateMoneyPeriodLabel(lbl) || "—";
 
           setMoneyAmountEl(el.querySelector("#moneySideRev"), periodRev, "revenue");
           setMoneyAmountEl(el.querySelector("#moneySideExp"), periodExp, "expense");
@@ -2794,7 +3659,7 @@
           if (hintEl) {
             if (hint) {
               hintEl.style.display = "inline";
-              hintEl.textContent = "· " + hint;
+              hintEl.textContent = "· " + translateMoneyOriginLabel(hint);
             } else {
               hintEl.style.display = "none";
               hintEl.textContent = "";
@@ -2804,13 +3669,13 @@
           const items = snap.ledgerItems ?? snap.LedgerItems ?? [];
           const tb = el.querySelector("#moneyLedgerBody");
           if (!items.length) {
-            tb.innerHTML = "<tr><td colspan=\"5\" class=\"muted\">No ledger rows for this period.</td></tr>";
+            tb.innerHTML = "<tr><td colspan=\"5\" class=\"muted\">" + esc(t("moneyNoLedger", "No ledger rows for this period.")) + "</td></tr>";
           } else {
             tb.innerHTML = items.map(row => {
               const dt = row.date ?? row.Date;
-              const typ = String(row.type ?? row.Type ?? "");
-              const cat = String(row.category ?? row.Category ?? "");
-              const jus = String(row.justification ?? row.Justification ?? "");
+              const typ = translateMoneyType(String(row.type ?? row.Type ?? ""));
+              const cat = translateMoneyCategory(String(row.category ?? row.Category ?? ""));
+              const jus = translateMoneyJustification(String(row.justification ?? row.Justification ?? ""));
               const amt = String(row.amountText ?? row.AmountText ?? "");
               return "<tr><td>" + esc(fmtMoneyLedgerWhen(dt)) + "</td><td>" + esc(typ) + "</td><td>" + esc(cat) + "</td><td>" + esc(jus) + "</td><td class=\"cell-amt\">" + renderMoneyAmountHtml(amt, "ledger") + "</td></tr>";
             }).join("");
@@ -2827,10 +3692,10 @@
           const r = await api(qs, "GET", null, true);
           if (!r.ok) {
             if (!el.querySelector("#moneyDashRoot")) {
-              el.innerHTML = "<div class='danger'>Money dashboard failed (HTTP " + r.status + ").</div>";
+              el.innerHTML = "<div class='danger'>" + esc(t("moneyLoadFailed", "Money dashboard failed (HTTP {{status}}).", { status: r.status })) + "</div>";
             } else {
               el.querySelector("#moneyLedgerBody").innerHTML =
-                "<tr><td colspan=\"5\" class=\"danger\">Could not load snapshot (HTTP " + r.status + ").</td></tr>";
+                "<tr><td colspan=\"5\" class=\"danger\">" + esc(t("moneySnapshotFailed", "Could not load snapshot (HTTP {{status}}).", { status: r.status })) + "</td></tr>";
             }
             return;
           }
@@ -2843,13 +3708,13 @@
           const start = isoLocalDateFromApi(lastSnap.reportStartDate ?? lastSnap.ReportStartDate);
           const end = isoLocalDateFromApi(lastSnap.reportEndDate ?? lastSnap.ReportEndDate);
           if (!start || !end) {
-            alert("Could not determine export range.");
+            alert(t("exportRangeFailed", "Could not determine export range."));
             return;
           }
           const qs = "type=Daily&start=" + encodeURIComponent(start) + "&end=" + encodeURIComponent(end);
           const res = await fetch("/api/admin/reports/export?" + qs, { headers: { "Authorization": "Bearer " + token } });
           if (!res.ok) {
-            alert("Export failed: " + res.status);
+            alert(t("exportFailed", "Export failed: {{status}}", { status: res.status }));
             return;
           }
           const blob = await res.blob();
@@ -2874,35 +3739,35 @@
           "<div class=\"reports-page\">" +
           "<div class=\"reports-hero\">" +
           "<div class=\"reports-hero-text\">" +
-          "<h1 class=\"catalog-page-title\">General Reports</h1>" +
+          "<h1 class=\"catalog-page-title\">" + esc(t("generalReports", "General Reports")) + "</h1>" +
           "</div>" +
           "<div class=\"reports-controls\">" +
-          "<div class=\"field\"><label for=\"repStart\">Start date</label><input type=\"date\" id=\"repStart\" value=\"" + iso(start) + "\"></div>" +
-          "<div class=\"field\"><label for=\"repEnd\">End date</label><input type=\"date\" id=\"repEnd\" value=\"" + iso(today) + "\"></div>" +
-          "<div class=\"field\"><label for=\"repScopeSelect\">Report type</label>" +
+          "<div class=\"field\"><label for=\"repStart\">" + esc(t("startDate", "Start date")) + "</label><input type=\"date\" id=\"repStart\" value=\"" + iso(start) + "\"></div>" +
+          "<div class=\"field\"><label for=\"repEnd\">" + esc(t("endDate", "End date")) + "</label><input type=\"date\" id=\"repEnd\" value=\"" + iso(today) + "\"></div>" +
+          "<div class=\"field\"><label for=\"repScopeSelect\">" + esc(t("reportType", "Report type")) + "</label>" +
           "<select id=\"repScopeSelect\">" +
-          "<option value=\"daily\">Daily</option>" +
-          "<option value=\"orders\">Orders</option>" +
-          "<option value=\"employees\">Employees</option>" +
-          "<option value=\"tables\">Tables</option>" +
-          "<option value=\"inventory\">Inventory</option>" +
-          "<option value=\"menu\">Menu</option>" +
+          "<option value=\"daily\">" + esc(t("dailyReport", "Daily Report")) + "</option>" +
+          "<option value=\"orders\">" + esc(t("ordersReport", "Orders")) + "</option>" +
+          "<option value=\"employees\">" + esc(t("employeesReport", "Employees")) + "</option>" +
+          "<option value=\"tables\">" + esc(t("tablesReport", "Tables")) + "</option>" +
+          "<option value=\"inventory\">" + esc(t("inventoryReport", "Inventory")) + "</option>" +
+          "<option value=\"menu\">" + esc(t("menuReport", "Menu")) + "</option>" +
           "</select></div>" +
           "<div class=\"reports-btn-row\">" +
-          "<button type=\"button\" class=\"btn btn-ghost btn-sm\" id=\"btnReportsExport\">Export Excel</button>" +
-          "<button type=\"button\" class=\"btn btn-ghost btn-sm\" id=\"btnReportsBulk\">Bulk Excel</button>" +
-          "<button type=\"button\" class=\"btn btn-primary btn-sm reports-btn-refresh\" id=\"btnReportsRefresh\">Refresh</button>" +
+          "<button type=\"button\" class=\"btn btn-ghost btn-sm\" id=\"btnReportsExport\">" + esc(t("exportExcel", "Export Excel")) + "</button>" +
+          "<button type=\"button\" class=\"btn btn-ghost btn-sm\" id=\"btnReportsBulk\">" + esc(t("bulkExcel", "Bulk Excel")) + "</button>" +
+          "<button type=\"button\" class=\"btn btn-primary btn-sm reports-btn-refresh\" id=\"btnReportsRefresh\">" + esc(t("refresh", "Refresh")) + "</button>" +
           "</div></div></div>" +
           "<div class=\"reports-tabs\" id=\"reportsTabs\">" +
-          "<button type=\"button\" class=\"reports-tab active\" data-rep-tab=\"daily\">Daily Report</button>" +
-          "<button type=\"button\" class=\"reports-tab\" data-rep-tab=\"orders\">Orders</button>" +
-          "<button type=\"button\" class=\"reports-tab\" data-rep-tab=\"employees\">Employees</button>" +
-          "<button type=\"button\" class=\"reports-tab\" data-rep-tab=\"tables\">Tables</button>" +
-          "<button type=\"button\" class=\"reports-tab\" data-rep-tab=\"inventory\">Inventory</button>" +
-          "<button type=\"button\" class=\"reports-tab\" data-rep-tab=\"menu\">Menu</button>" +
+          "<button type=\"button\" class=\"reports-tab active\" data-rep-tab=\"daily\">" + esc(t("dailyReport", "Daily Report")) + "</button>" +
+          "<button type=\"button\" class=\"reports-tab\" data-rep-tab=\"orders\">" + esc(t("ordersReport", "Orders")) + "</button>" +
+          "<button type=\"button\" class=\"reports-tab\" data-rep-tab=\"employees\">" + esc(t("employeesReport", "Employees")) + "</button>" +
+          "<button type=\"button\" class=\"reports-tab\" data-rep-tab=\"tables\">" + esc(t("tablesReport", "Tables")) + "</button>" +
+          "<button type=\"button\" class=\"reports-tab\" data-rep-tab=\"inventory\">" + esc(t("inventoryReport", "Inventory")) + "</button>" +
+          "<button type=\"button\" class=\"reports-tab\" data-rep-tab=\"menu\">" + esc(t("menuReport", "Menu")) + "</button>" +
           "</div>" +
-          "<div class=\"reports-feed-title\" id=\"reportsFeedSectionTitle\">Chronological daily feed across all entities</div>" +
-          "<div id=\"reportsContent\"><p class=\"muted\">Loading…</p></div>" +
+          "<div class=\"reports-feed-title\" id=\"reportsFeedSectionTitle\">" + esc(t("repTabDailyFeed", "Chronological daily feed across all entities")) + "</div>" +
+          "<div id=\"reportsContent\"><p class=\"muted\">" + esc(t("loading", "Loading…")) + "</p></div>" +
           "</div>";
 
         let activeRepTab = "daily";
@@ -2918,12 +3783,12 @@
         const VALID_REP_TABS = ["daily", "orders"].concat(ENTITY_TABS);
 
         const tabTitles = {
-          daily: "Chronological daily feed across all entities",
-          orders: "Order activity in range",
-          employees: "Employee activity timeline",
-          tables: "Table activity timeline",
-          inventory: "Inventory activity timeline",
-          menu: "Menu item activity timeline"
+          daily: t("repTabDailyFeed", "Chronological daily feed across all entities"),
+          orders: t("repTabOrders", "Order activity in range"),
+          employees: t("repTabEmployees", "Employee activity timeline"),
+          tables: t("repTabTables", "Table activity timeline"),
+          inventory: t("repTabInventory", "Inventory activity timeline"),
+          menu: t("repTabMenu", "Menu item activity timeline")
         };
 
         const exportTypeMap = {
@@ -2973,7 +3838,7 @@
           const sub = item.subtitle ?? item.Subtitle ?? "";
           let label = name;
           if (uid) label += " (" + uid + ")";
-          if (sub) label += " — " + sub;
+          if (sub) label += " — " + translateTableStatus(sub);
           return label;
         }
 
@@ -2990,8 +3855,8 @@
           const selId = selectedEntityId[tab];
           let html =
             "<div class=\"reports-entity-bar\">" +
-            "<div class=\"field\"><label for=\"repEntitySelect\">" + esc(tabTitles[tab] || "Entity") + "</label>" +
-            "<select id=\"repEntitySelect\"><option value=\"\">— Select —</option>";
+            "<div class=\"field\"><label for=\"repEntitySelect\">" + esc(tabTitles[tab] || t("repEntityRecord", "record")) + "</label>" +
+            "<select id=\"repEntitySelect\"><option value=\"\">" + esc(t("select", "— Select —")) + "</option>";
           for (const item of list) {
             const id = item.id ?? item.Id;
             if (id == null) continue;
@@ -3020,17 +3885,17 @@
           if (tab === "employees") {
             const notes = body.employeeNotes ?? body.EmployeeNotes ?? "-";
             const payroll = body.employeePayrollHistory ?? body.EmployeePayrollHistory ?? "-";
-            blocks.push({ title: "Notes", text: notes });
-            blocks.push({ title: "Payroll history (USD)", text: payroll });
+            blocks.push({ title: t("repNotes", "Notes"), text: notes });
+            blocks.push({ title: t("repPayrollHistory", "Payroll history (USD)"), text: payroll });
           } else if (tab === "tables") {
             const server = body.tableCurrentServer ?? body.TableCurrentServer ?? "-";
-            blocks.push({ title: "Current server", text: server });
+            blocks.push({ title: t("repCurrentServer", "Current server"), text: server === "Unassigned" ? t("invActorUnassigned", "Unassigned") : server });
           } else if (tab === "inventory") {
             const notes = body.inventoryNotes ?? body.InventoryNotes ?? "-";
-            blocks.push({ title: "Notes", text: notes });
+            blocks.push({ title: t("repNotes", "Notes"), text: notes === "-" ? "—" : translateInventoryNotes(notes) });
           } else if (tab === "menu") {
             const ing = body.menuIngredientsSummary ?? body.MenuIngredientsSummary ?? "-";
-            blocks.push({ title: "Ingredients", text: ing });
+            blocks.push({ title: t("repIngredients", "Ingredients"), text: ing });
           }
           const visible = blocks.filter(b => b.text && String(b.text).trim() && String(b.text).trim() !== "-");
           if (!visible.length) return "";
@@ -3076,16 +3941,16 @@
           const oc = Number(ent.ordersCount ?? ent.OrdersCount ?? 0) || 0;
           const ic = Number(ent.itemCount ?? ent.ItemCount ?? 0) || 0;
           const uu = Number(ent.unitUsage ?? ent.UnitUsage ?? 0) || 0;
-          if (oc > 0) return oc + " order" + (oc === 1 ? "" : "s");
-          if (ic > 0) return ic + " item" + (ic === 1 ? "" : "s");
-          if (uu > 0) return uu + " units";
+          if (oc > 0) return t(oc === 1 ? "metricOrders_one" : "metricOrders_other", oc === 1 ? "{{count}} order" : "{{count}} orders", { count: oc });
+          if (ic > 0) return t(ic === 1 ? "metricItems_one" : "metricItems_other", ic === 1 ? "{{count}} item" : "{{count}} items", { count: ic });
+          if (uu > 0) return t("metricUnits", "{{count}} units", { count: uu });
           return "—";
         }
 
         function escDetailLines(s) {
           return String(s ?? "")
             .split("\n")
-            .map(line => esc(line))
+            .map(line => esc(translateReportSummary(line)))
             .join("<br>");
         }
 
@@ -3095,22 +3960,20 @@
           for (const ent of entries) {
             const rawT = ent.eventTime ?? ent.EventTime;
             const d = rawT ? new Date(rawT) : null;
-            const timeStr =
-              d && !Number.isNaN(d.getTime())
-                ? d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })
-                : "—";
-            const typ = ent.eventType ?? ent.EventType ?? "";
-            const sum = ent.summary ?? ent.Summary ?? "";
-            const rel = ent.relatedInfo ?? ent.RelatedInfo ?? "";
-            const ctx = ent.entityContext ?? ent.EntityContext ?? "";
+            const timeStr = formatReportTime(d);
+            const typRaw = ent.eventType ?? ent.EventType ?? "";
+            const typ = translateReportEventType(typRaw);
+            const sumRaw = ent.summary ?? ent.Summary ?? "";
+            const rel = translateReportRelated(ent.relatedInfo ?? ent.RelatedInfo ?? "");
+            const ctx = translateReportContext(ent.entityContext ?? ent.EntityContext ?? "");
             let rowClass = "";
-            if (typ === "Clock in") rowClass = "reports-row-clock-in";
-            else if (typ === "Clock out") rowClass = "reports-row-clock-out";
-            else if (typ === "Absence") rowClass = "reports-row-absence";
+            if (typRaw === "Clock in") rowClass = "reports-row-clock-in";
+            else if (typRaw === "Clock out") rowClass = "reports-row-clock-out";
+            else if (typRaw === "Absence") rowClass = "reports-row-absence";
             rows += "<tr" + (rowClass ? " class=\"" + rowClass + "\"" : "") + ">";
             rows += "<td class=\"reports-cell-time\">" + esc(timeStr) + "</td>";
             rows += "<td>" + esc(typ) + "</td>";
-            rows += "<td class=\"reports-cell-detail\">" + escDetailLines(sum) + "</td>";
+            rows += "<td class=\"reports-cell-detail\">" + escDetailLines(sumRaw) + "</td>";
             rows += "<td class=\"reports-cell-related\">" + esc(rel);
             if (ctx)
               rows += "<div class=\"reports-cell-sub\">" + esc(ctx) + "</div>";
@@ -3130,32 +3993,32 @@
             const emptyMsg =
               opts.emptyMessage ??
               opts.EmptyMessage ??
-              "No events in this range.";
+              t("repNoEvents", "No events in this range.");
             return "<p class=\"reports-placeholder\">" + esc(emptyMsg) + "</p>";
           }
 
           let html = "";
 
           if (useDayDropdown) {
-            html += "<div class=\"reports-day-picker field\"><label for=\"repDayPicker\">Day</label>";
+            html += "<div class=\"reports-day-picker field\"><label for=\"repDayPicker\">" + esc(t("day", "Day")) + "</label>";
             html += "<select id=\"repDayPicker\" class=\"reports-day-select\">";
             days.forEach((day, idx) => {
-              const dayText = day.dayText ?? day.DayText ?? ("Day " + (idx + 1));
-              const totals = day.totalsText ?? day.TotalsText ?? "";
+              const dayText = translateReportDayText(day.dayText ?? day.DayText ?? ("Day " + (idx + 1)));
+              const totals = translateReportTotalsText(day.totalsText ?? day.TotalsText ?? "");
               html += "<option value=\"" + idx + "\">" + esc(dayText + " — " + totals) + "</option>";
             });
             html += "</select></div>";
 
             days.forEach((day, idx) => {
-              const dayText = day.dayText ?? day.DayText ?? "";
-              const totals = day.totalsText ?? day.TotalsText ?? "";
+              const dayText = translateReportDayText(day.dayText ?? day.DayText ?? "");
+              const totals = translateReportTotalsText(day.totalsText ?? day.TotalsText ?? "");
               const hiddenAttr = idx === 0 ? "" : " hidden";
               html += "<div class=\"reports-day-panel reports-day-block\"" + hiddenAttr + " data-day-index=\"" + idx + "\">";
               html += "<div class=\"reports-day-inline-head\">";
               html += "<span class=\"reports-day-title\">" + esc(dayText) + "</span>";
               html += "<span class=\"reports-day-meta\">" + esc(totals) + "</span></div>";
               html += "<div class=\"reports-table-wrap\"><table class=\"reports-table\">";
-              html += "<thead><tr><th>Time</th><th>Category</th><th>Details</th><th>Related</th><th>Summary</th></tr></thead><tbody>";
+              html += "<thead><tr><th>" + esc(t("repColTime", "Time")) + "</th><th>" + esc(t("repColCategory", "Category")) + "</th><th>" + esc(t("repColDetails", "Details")) + "</th><th>" + esc(t("repColRelated", "Related")) + "</th><th>" + esc(t("repColSummary", "Summary")) + "</th></tr></thead><tbody>";
               html += renderReportDayTableRows(day);
               html += "</tbody></table></div></div>";
             });
@@ -3163,13 +4026,13 @@
           }
 
           for (const day of days) {
-            const dayText = day.dayText ?? day.DayText ?? "";
-            const totals = day.totalsText ?? day.TotalsText ?? "";
+            const dayText = translateReportDayText(day.dayText ?? day.DayText ?? "");
+            const totals = translateReportTotalsText(day.totalsText ?? day.TotalsText ?? "");
             html += "<div class=\"reports-day-block\">";
             html += "<div class=\"reports-day-head\"><span class=\"reports-day-title\">" + esc(dayText) + "</span>";
             html += "<span class=\"reports-day-meta\">" + esc(totals) + "</span></div>";
             html += "<div class=\"reports-table-wrap\"><table class=\"reports-table\">";
-            html += "<thead><tr><th>Time</th><th>Category</th><th>Details</th><th>Related</th><th>Summary</th></tr></thead><tbody>";
+            html += "<thead><tr><th>" + esc(t("repColTime", "Time")) + "</th><th>" + esc(t("repColCategory", "Category")) + "</th><th>" + esc(t("repColDetails", "Details")) + "</th><th>" + esc(t("repColRelated", "Related")) + "</th><th>" + esc(t("repColSummary", "Summary")) + "</th></tr></thead><tbody>";
             html += renderReportDayTableRows(day);
             html += "</tbody></table></div></div>";
           }
@@ -3205,7 +4068,7 @@
           let html = renderEntityPickerHtml(tab);
 
           if (!entityId) {
-            html += "<p class=\"reports-placeholder\">Select an entity above, then click Refresh.</p>";
+            html += "<p class=\"reports-placeholder\">" + esc(t("repSelectEntity", "Select an entity above, then click Refresh.")) + "</p>";
             content.innerHTML = html;
             wireEntityPicker(content, tab);
             return;
@@ -3223,14 +4086,14 @@
           const timelineData = detailToTimelineData(tab, r.body || {});
           html += renderEntityMetaHtml(tab, r.body || {});
           const entityEmptyLabel = {
-            employees: "employee",
-            tables: "table",
-            inventory: "inventory item",
-            menu: "menu item"
-          }[tab] || "record";
+            employees: t("repEntityEmployee", "employee"),
+            tables: t("repEntityTable", "table"),
+            inventory: t("repEntityInventory", "inventory item"),
+            menu: t("repEntityMenu", "menu item")
+          }[tab] || t("repEntityRecord", "record");
           html += renderReportTimeline(timelineData, {
             useDayDropdown: true,
-            emptyMessage: "No activity recorded for this " + entityEmptyLabel + "."
+            emptyMessage: t("repNoActivity", "No activity recorded for this {{entity}}.", { entity: entityEmptyLabel })
           });
           content.innerHTML = html;
           wireEntityPicker(content, tab);
@@ -3242,7 +4105,7 @@
           const qs = buildReportQueryString();
 
           if (!content) return;
-          content.innerHTML = "<p class=\"muted\">Loading…</p>";
+          content.innerHTML = "<p class=\"muted\">" + esc(t("loading", "Loading…")) + "</p>";
 
           if (activeRepTab === "daily") {
             const r = await api("/api/admin/reports/daily?" + qs, "GET", null, true);
@@ -3274,7 +4137,7 @@
           activeRepTab = "daily";
           syncScopeSelect();
           setActiveTabButtons();
-          content.innerHTML = "<p class=\"reports-placeholder\">Choose a report tab above.</p>";
+          content.innerHTML = "<p class=\"reports-placeholder\">" + esc(t("repChooseTab", "Choose a report tab above.")) + "</p>";
         }
 
         async function onTabClick(tab) {
@@ -3321,7 +4184,7 @@
             { headers: { Authorization: "Bearer " + token } }
           );
           if (!res.ok) {
-            alert("Export failed: " + res.status);
+            alert(t("exportFailed", "Export failed: {{status}}", { status: res.status }));
             return;
           }
           const blob = await res.blob();
@@ -3340,7 +4203,7 @@
             { headers: { Authorization: "Bearer " + token } }
           );
           if (!res.ok) {
-            alert("Bulk export failed: " + res.status);
+            alert(t("bulkExportFailed", "Bulk export failed: {{status}}", { status: res.status }));
             return;
           }
           const blob = await res.blob();
@@ -3372,7 +4235,7 @@
         }));
       }
       el.innerHTML = "<div class=\"panel\"><h2>" + esc(title) + "</h2>" +
-        (filterHint ? "<p class=\"muted\">Filtered: \"" + esc(filterHint) + "\" · " + items.length + " row(s).</p>" : "") +
+        (filterHint ? "<p class=\"muted\">" + esc(t("filtered", "Filtered: \"{{hint}}\" · {{count}} row(s).", { hint: filterHint, count: items.length })) + "</p>" : "") +
         "<table class=\"data\"><thead><tr>" +
         cols.map(c => "<th>" + esc(c) + "</th>").join("") + "</tr></thead><tbody>" +
         items.map(row => "<tr>" + cols.map(c => {
@@ -3392,6 +4255,7 @@
 
     async function navTo(name, opts) {
       opts = opts || {};
+      currentView = name || currentView;
       if (opts.filter && name) setNavFilter(name, opts.filter);
       document.querySelectorAll(".nav-btn").forEach(b => b.classList.toggle("active", b.getAttribute("data-view") === name));
       const el = $("main");
@@ -3400,7 +4264,7 @@
       if (name === "money") mainExtras += " main--money";
       if (name === "reports") mainExtras += " main--reports";
       el.className = "main-area" + mainExtras;
-      el.innerHTML = "<p class=\"muted\">Loading…</p>";
+      el.innerHTML = "<p class=\"muted\">" + esc(t("loading", "Loading…")) + "</p>";
       clearDashClock();
       const fn = views[name];
       if (fn) await fn(el);
@@ -3413,16 +4277,26 @@
     $("adminLoginForm").addEventListener("submit", doLogin);
     $("btnLogout").addEventListener("click", showLogin);
 
-    if (token) {
-      showApp();
-      api("/api/admin/dashboard", "GET", null, true).then(async r => {
-        if (r.ok) {
-          $("sessionLabel").innerHTML = "<span class=\"muted\">Signed in</span>";
-          await loadPortalBranding();
-          navTo("dashboard");
-        } else showLogin();
-      });
-    }
+    (async function initAdminPortal() {
+      if (window.EliteI18n) {
+        await EliteI18n.init();
+        applyAdminStaticI18n();
+        EliteI18n.mountSwitcher("#adminLangLogin");
+        EliteI18n.mountSwitcher("#adminLangSidebar");
+      }
+      if (token) {
+        showApp();
+        api("/api/admin/dashboard", "GET", null, true).then(async r => {
+          if (r.ok) {
+            $("sessionLabel").innerHTML = "<span class=\"muted\">" + esc(t("signedIn", "Signed in")) + "</span>";
+            await loadPortalBranding();
+            navTo("dashboard");
+          } else showLogin();
+        });
+      } else {
+        applyAdminStaticI18n();
+      }
+    })();
   </script>
 </body>
 </html>

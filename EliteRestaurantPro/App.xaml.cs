@@ -1,5 +1,7 @@
 using System.Windows;
 using System.IO;
+using EliteRestaurant.Core.Utils;
+using EliteRestaurantPro.Localization;
 using EliteRestaurantPro.Utils;
 using QuestPDF.Infrastructure;
 
@@ -34,6 +36,7 @@ public partial class App : Application
 
         QuestPDF.Settings.License = LicenseType.Community;
         ThemeManager.ApplySavedPalette();
+        Loc.Initialize(SettingsManager.Load());
         base.OnStartup(e);
     }
 

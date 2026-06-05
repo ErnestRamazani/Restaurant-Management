@@ -22,7 +22,7 @@ public sealed class OrdersStaffController(AppDbContext db, IHubContext<OrderHub>
         if (!r.Ok)
             return BadRequest(new { message = r.ErrorMessage ?? "Release failed." });
 
-        await orderHub.Clients.Group("Kitchen").SendAsync("KitchenQueueChanged", new { reason = "release-to-kitchen", orderId });
+        await OrderHubBroadcasts.NotifyKitchenQueueChangedAsync(orderHub, db, orderId, "release-to-kitchen");
         return Ok(new { ok = true, orderCode = r.ReleasedOrderCode });
     }
 }

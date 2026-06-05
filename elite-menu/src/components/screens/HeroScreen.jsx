@@ -107,6 +107,10 @@ export function HeroScreen({ config, onEnterMenu, onOrderOnline, onReservation, 
       <div className="pointer-events-none absolute -right-1/4 bottom-0 h-[40vw] w-[40vw] rounded-full bg-[rgba(237,232,220,0.02)] blur-3xl" />
       <Particles />
 
+      <div className="absolute right-4 top-[max(0.75rem,env(safe-area-inset-top))] z-20">
+        <LanguageSwitcher />
+      </div>
+
       <div className="relative z-10 flex min-h-0 flex-1 flex-col px-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]">
         <motion.div
           className="flex flex-col items-center"
@@ -191,14 +195,14 @@ export function HeroScreen({ config, onEnterMenu, onOrderOnline, onReservation, 
             className="relative mx-auto mt-16 min-h-[56px] w-full max-w-md rounded-2xl border border-champagne/28 bg-champagne/[0.06] px-6 py-3.5 text-center font-display text-[clamp(0.68rem,3vw,0.82rem)] font-semibold uppercase tracking-[0.16em] text-champagne/90 transition hover:border-gold/40 hover:text-gold active:scale-[0.98] sm:mt-20"
             style={{ fontFamily: '"Cinzel", "Playfair Display", serif' }}
           >
-            {t('menu.orderOnline')} / {t('menu.reservation')}
+            {t('hero.orderOnlineReservation')}
           </button>
         </motion.div>
 
         <div className="relative z-20 mt-16 pt-4 sm:mt-20 sm:pt-6">
           <nav
             className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3"
-            aria-label="Footer"
+            aria-label={t('hero.footerNav')}
           >
             <FooterLink href="#info-about" onSelect={() => setInfo('about')}>
               {t('menu.about')}
@@ -236,7 +240,7 @@ export function HeroScreen({ config, onEnterMenu, onOrderOnline, onReservation, 
           {info === 'about' ? (
             <>
               <h2 id="info-about" className="font-display text-2xl italic text-champagne">
-                About us
+                {t('hero.aboutTitle')}
               </h2>
               <GoldDivider className="my-3" />
               {aboutParagraphs.length > 0 ? (
@@ -250,8 +254,7 @@ export function HeroScreen({ config, onEnterMenu, onOrderOnline, onReservation, 
                 ))
               ) : (
                 <p className="font-body text-[0.9rem] text-[var(--text-muted)]">
-                  Add your About text in Settings → Business Profile on the restaurant desktop app, then save and push
-                  to the cloud.
+                  {t('hero.aboutEmpty')}
                 </p>
               )}
             </>
@@ -259,7 +262,7 @@ export function HeroScreen({ config, onEnterMenu, onOrderOnline, onReservation, 
           {info === 'contact' ? (
             <>
               <h2 id="info-contact" className="font-display text-2xl italic text-champagne">
-                Contact
+                {t('hero.contactTitle')}
               </h2>
               <GoldDivider className="my-3" />
               {contactIntro ? (
@@ -268,7 +271,7 @@ export function HeroScreen({ config, onEnterMenu, onOrderOnline, onReservation, 
               {address ? (
                 <p className="mb-3 font-body text-[0.9rem] leading-relaxed text-champagne/85">{address}</p>
               ) : (
-                <p className="mb-3 font-body text-[0.9rem] text-[var(--text-muted)]">Address is set in the restaurant back office.</p>
+                <p className="mb-3 font-body text-[0.9rem] text-[var(--text-muted)]">{t('hero.addressEmpty')}</p>
               )}
               {phone ? (
                 <a
@@ -278,7 +281,7 @@ export function HeroScreen({ config, onEnterMenu, onOrderOnline, onReservation, 
                   {phone}
                 </a>
               ) : (
-                <p className="font-body text-[0.9rem] text-[var(--text-muted)]">Phone is set in the restaurant back office.</p>
+                <p className="font-body text-[0.9rem] text-[var(--text-muted)]">{t('hero.phoneEmpty')}</p>
               )}
               {websiteHref ? (
                 <a
@@ -298,7 +301,7 @@ export function HeroScreen({ config, onEnterMenu, onOrderOnline, onReservation, 
           {info === 'notes' ? (
             <>
               <h2 id="info-notes" className="font-display text-2xl italic text-champagne">
-                Notes
+                {t('hero.notesTitle')}
               </h2>
               <GoldDivider className="my-3" />
               {notesParagraphs.length > 0 ? (
@@ -312,7 +315,7 @@ export function HeroScreen({ config, onEnterMenu, onOrderOnline, onReservation, 
                 ))
               ) : (
                 <p className="font-body text-[0.9rem] text-[var(--text-muted)]">
-                  Add Notes for guests in Settings → Business Profile, then save and push to the cloud.
+                  {t('hero.notesEmpty')}
                 </p>
               )}
               {taxLegal ? (
@@ -325,7 +328,7 @@ export function HeroScreen({ config, onEnterMenu, onOrderOnline, onReservation, 
             onClick={() => setInfo(null)}
             className="mt-6 w-full min-h-[48px] rounded-xl border border-gold/30 font-body text-sm font-semibold uppercase tracking-wider text-gold"
           >
-            Close
+            {t('common.close')}
           </button>
         </div>
       </BottomSheet>

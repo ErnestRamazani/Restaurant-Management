@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="fr">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Elite Server Portal</title>
+  <title data-i18n="portals.server.pageTitle" data-i18n-attr="textContent">Elite Server Portal</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -356,6 +356,20 @@
       color: var(--text-dark);
       line-height: 1.3;
     }
+    .line-tag {
+      display: inline-block;
+      margin-left: 6px;
+      padding: 1px 6px;
+      border-radius: 6px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      vertical-align: middle;
+    }
+    .line-tag--ready { background: #14532d44; color: #86efac; }
+    .line-tag--served { background: #581c8744; color: #d8b4fe; }
+    .line-tag--wait { background: #334155; color: #94a3b8; }
     .ready-order-card__details {
       padding: 0 14px 10px;
       display: flex;
@@ -767,6 +781,7 @@
       color: #fbbf24;
     }
     .open-check-kind--drink { color: #93c5fd; }
+    .open-check-kind--mixed { color: #c4b5fd; }
     .open-check-lines { color: #9ca3af; margin: 4px 0; }
     .open-check-meta { color: #6b7280; font-size: 11px; }
     .open-check-empty {
@@ -776,7 +791,6 @@
       color: #9ca3af;
       font-size: 12px;
     }
-    #newCheckKindFieldset.hidden { display: none; }
     .pos-draft-row {
       display: flex;
       flex-wrap: wrap;
@@ -2004,6 +2018,8 @@
       0%, 100% { transform: scale(1); }
       50% { transform: scale(1.01); }
     }
+    .server-lang-wrap { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+    #serverLangSidebar.server-lang-wrap { margin-top: 4px; margin-bottom: 8px; justify-content: flex-start; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.7/dist/browser/signalr.min.js" crossorigin="anonymous"></script>
 </head>
@@ -2011,19 +2027,20 @@
   <div id="customerToastHost" class="customer-toast-host" aria-live="polite" aria-atomic="true"></div>
   <div id="loginWrap" class="main-area">
     <div class="card">
-      <h1>Server</h1>
-      <p id="loginFileWarning" class="danger hidden">This page was opened as a local file. Login will not work until you open it from the API site.</p>
+      <div id="serverLangLogin" class="server-lang-wrap"></div>
+      <h1 data-i18n="portals.server.loginTitle">Server</h1>
+      <p id="loginFileWarning" class="danger hidden" data-i18n="portals.server.fileProtocolHint">This page was opened as a local file. Login will not work until you open it from the API site.</p>
       <div id="loginMessage" class="danger hidden" style="white-space:pre-wrap;"></div>
       <div class="login-stack">
         <div class="login-field">
-          <label class="lbl" for="staffId">Sign-in ID</label>
+          <label class="lbl" for="staffId" data-i18n="auth.signInId">Sign-in ID</label>
           <input class="inp" id="staffId" type="text" autocomplete="username">
         </div>
         <div class="login-field">
-          <label class="lbl" for="pin">PIN</label>
+          <label class="lbl" for="pin" data-i18n="auth.pin">PIN</label>
           <input class="inp" id="pin" type="password" autocomplete="current-password">
         </div>
-        <button type="button" class="btn btn-primary btn-block" id="btnLogin">Sign in</button>
+        <button type="button" class="btn btn-primary btn-block" id="btnLogin" data-i18n="common.signIn">Sign in</button>
       </div>
     </div>
   </div>
@@ -2031,73 +2048,75 @@
   <div id="app" class="layout hidden">
     <aside class="sidebar">
       <div class="brand-wrap">
-        <img id="brandLogo" class="brand-logo hidden" alt="Restaurant logo">
-        <div id="brandName" class="brand">ELITE SERVER PORTAL</div>
+        <img id="brandLogo" class="brand-logo hidden" alt="">
+        <div id="brandName" class="brand" data-i18n="portals.server.brandDefault">ELITE SERVER PORTAL</div>
       </div>
-      <button type="button" class="nav-btn active" data-tab="incomingOrderTab">Incoming Order<span id="incomingNavBadge" class="nav-incoming-badge hidden" aria-label="New customer drafts count"></span></button>
-      <button type="button" class="nav-btn" data-tab="takeOrder">Take Order</button>
-      <button type="button" class="nav-btn" data-tab="menuTab">Menu</button>
-      <button type="button" class="nav-btn" data-tab="ongoingOrdersTab">Ongoing Orders<span id="ongoingNavBadge" class="nav-ongoing-badge hidden" aria-label="Active orders count"></span></button>
-      <button type="button" class="nav-btn" data-tab="pickupTab">Pick Up &amp; Serve<span id="pickupNavBadge" class="nav-pickup-badge hidden" aria-label="Ready orders count"></span></button>
-      <button type="button" class="nav-btn" data-tab="tableCallsTab">Table Calls<span id="tableCallsNavBadge" class="nav-table-calls-badge hidden" aria-label="Pending table calls"></span></button>
-      <button type="button" id="btnRefreshAll" class="nav-btn">Refresh Data</button>
+      <div id="serverLangSidebar" class="server-lang-wrap"></div>
+      <button type="button" class="nav-btn active" data-tab="incomingOrderTab"><span data-i18n="portals.server.navIncoming">Incoming Order</span><span id="incomingNavBadge" class="nav-incoming-badge hidden" data-i18n="portals.server.ariaIncomingBadge" data-i18n-attr="aria-label" aria-label="New customer drafts count"></span></button>
+      <button type="button" class="nav-btn" data-tab="takeOrder" data-i18n="portals.server.navTakeOrder">Take Order</button>
+      <button type="button" class="nav-btn" data-tab="menuTab" data-i18n="portals.server.navMenu">Menu</button>
+      <button type="button" class="nav-btn" data-tab="ongoingOrdersTab"><span data-i18n="portals.server.navOngoing">Ongoing Orders</span><span id="ongoingNavBadge" class="nav-ongoing-badge hidden" data-i18n="portals.server.ariaOngoingBadge" data-i18n-attr="aria-label" aria-label="Active orders count"></span></button>
+      <button type="button" class="nav-btn" data-tab="pickupTab"><span data-i18n="portals.server.navPickup">Pick Up &amp; Serve</span><span id="pickupNavBadge" class="nav-pickup-badge hidden" data-i18n="portals.server.ariaPickupBadge" data-i18n-attr="aria-label" aria-label="Ready orders count"></span></button>
+      <button type="button" class="nav-btn" data-tab="tableCallsTab"><span data-i18n="portals.server.navTableCalls">Table Calls</span><span id="tableCallsNavBadge" class="nav-table-calls-badge hidden" data-i18n="portals.server.ariaTableCallsBadge" data-i18n-attr="aria-label" aria-label="Pending table calls"></span></button>
+      <button type="button" id="btnRefreshAll" class="nav-btn" data-i18n="portals.server.refreshAll">Refresh Data</button>
       <div class="who">
         <div class="who-top">
-          <img id="staffPhoto" class="who-photo hidden" alt="Employee photo">
+          <img id="staffPhoto" class="who-photo hidden" alt="">
           <div class="who-text">
             <div id="sessionLabel"></div>
-            <span class="staff-role-chip">Server</span>
+            <span class="staff-role-chip" data-i18n="portals.server.roleChip">Server</span>
           </div>
         </div>
-        <button type="button" id="btnLogout" style="margin-top:8px;width:100%;" class="nav-btn">Logout</button>
+        <button type="button" id="btnLogout" style="margin-top:8px;width:100%;" class="nav-btn" data-i18n="common.signOut">Sign out</button>
       </div>
     </aside>
 
     <main class="main">
+      <p id="orderStageFlash" class="muted" style="font-weight:600;color:#4ade80;min-height:1.2em;margin:0 0 10px;" aria-live="polite"></p>
       <section id="incomingOrderTab" class="tab">
         <div class="card">
-          <h2>Incoming Order</h2>
-          <button type="button" id="btnRefreshIncoming">Refresh drafts</button>
+          <h2 data-i18n="portals.server.incomingHeading">Incoming Order</h2>
+          <button type="button" id="btnRefreshIncoming" data-i18n="portals.server.refreshDrafts">Refresh drafts</button>
           <div id="incomingDraftsList" class="incoming-drafts-grid" role="list" aria-live="polite"></div>
         </div>
       </section>
 
       <section id="takeOrder" class="tab create-order-tab hidden">
         <div class="pos-shell">
-          <aside class="pos-column pos-column--cart" aria-label="Order cart">
+          <aside class="pos-column pos-column--cart" data-i18n="portals.server.ariaOrderCart" data-i18n-attr="aria-label" aria-label="Order cart">
             <div class="pos-zone-b">
-              <div class="pos-zone-label">Items in order</div>
+              <div class="pos-zone-label" data-i18n="portals.server.itemsInOrder">Items in order</div>
               <div class="pos-cart-scroll-inner">
                 <div id="cartItems"></div>
               </div>
             </div>
             <div class="pos-zone-c">
-              <div class="tot-items-note"><span id="itemCount">0</span> items in order</div>
-              <div class="tot-row"><span>Subtotal</span><span id="subtotalUsd" class="tot-val">$ 0.00</span></div>
-              <div id="totRowDiscount" class="tot-row hidden"><span>Discount</span><span id="discountAmount" class="tot-val">$ 0.00</span></div>
-              <div class="tot-row"><span id="taxLabel">Tax</span><span id="taxAmount" class="tot-val">$ 0.00</span></div>
-              <div class="tot-row"><span id="serviceLabel">Service</span><span id="serviceAmount" class="tot-val">$ 0.00</span></div>
-              <div class="tot-row tot-row--grand"><span>Grand total</span><span id="grandTotal" class="tot-val">$ 0.00</span></div>
+              <div class="tot-items-note"><span id="itemCount">0</span> <span id="itemsInOrderSuffix" data-i18n="portals.server.itemsInOrderCount" data-i18n-vars='{"count":0}'>items in order</span></div>
+              <div class="tot-row"><span data-i18n="portals.server.subtotal">Subtotal</span><span id="subtotalUsd" class="tot-val">$ 0.00</span></div>
+              <div id="totRowDiscount" class="tot-row hidden"><span data-i18n="portals.server.discount">Discount</span><span id="discountAmount" class="tot-val">$ 0.00</span></div>
+              <div class="tot-row"><span id="taxLabel" data-i18n="portals.server.tax">Tax</span><span id="taxAmount" class="tot-val">$ 0.00</span></div>
+              <div class="tot-row"><span id="serviceLabel" data-i18n="portals.server.service">Service</span><span id="serviceAmount" class="tot-val">$ 0.00</span></div>
+              <div class="tot-row tot-row--grand"><span data-i18n="portals.server.grandTotal">Grand total</span><span id="grandTotal" class="tot-val">$ 0.00</span></div>
               <div class="pos-actions">
-                <button type="button" id="btnClearOrder" class="btn-cancel-order">Clear Order</button>
-                <button type="button" id="btnSubmit" class="btn-place-order">Place Order</button>
+                <button type="button" id="btnClearOrder" class="btn-cancel-order" data-i18n="portals.server.clearOrder">Clear Order</button>
+                <button type="button" id="btnSubmit" class="btn-place-order" data-i18n="portals.server.placeOrder">Place Order</button>
               </div>
             </div>
           </aside>
 
-          <div class="pos-menu" aria-label="Menu">
+          <div class="pos-menu" data-i18n="portals.server.ariaMenu" data-i18n-attr="aria-label" aria-label="Menu">
             <div id="categoryTabs" class="cat-tabs"></div>
             <select id="category" class="visually-hidden" aria-hidden="true" tabindex="-1"></select>
             <div class="pos-menu-tools">
-              <select id="subCategory" class="pos-subcat" aria-label="Subcategory"></select>
-              <input id="search" class="pos-search" placeholder="Search product by name or ID">
+              <select id="subCategory" class="pos-subcat" data-i18n="portals.server.ariaSubcategory" data-i18n-attr="aria-label" aria-label="Subcategory"></select>
+              <input id="search" class="pos-search" data-i18n="portals.server.searchProduct" placeholder="Search product by name or ID">
             </div>
             <div id="products" class="product-grid"></div>
           </div>
 
-          <aside class="pos-column pos-column--setup" aria-label="Order setup">
+          <aside class="pos-column pos-column--setup" data-i18n="portals.server.orderSetup" data-i18n-attr="aria-label" aria-label="Order setup">
             <div class="pos-zone-a">
-              <div class="pos-zone-label">Order setup</div>
+              <div class="pos-zone-label" data-i18n="portals.server.orderSetup">Order setup</div>
               <div class="pos-cart-controls">
                 <select id="tableSelect" class="full"></select>
                 <select id="paymentCurrency" class="full">
@@ -2106,62 +2125,57 @@
                 </select>
               </div>
               <fieldset class="pos-fieldset">
-                <legend>Send as (this table)</legend>
-                <div class="choice-tiles choice-tiles--2" role="radiogroup" aria-label="Send as">
+                <legend data-i18n="portals.server.sendAsLegend">Send as (this table)</legend>
+                <div class="choice-tiles choice-tiles--2" role="radiogroup" data-i18n="portals.server.ariaSendAs" data-i18n-attr="aria-label" aria-label="Send as">
                   <label class="choice-tile" for="ticketModeAppend">
                     <input type="radio" name="ticketMode" id="ticketModeAppend" value="append" checked>
-                    <span class="choice-tile__text">Same ticket</span>
+                    <span class="choice-tile__text" data-i18n="portals.server.sameTicket">Same ticket</span>
                   </label>
                   <label class="choice-tile" for="ticketModeNew">
                     <input type="radio" name="ticketMode" id="ticketModeNew" value="new">
-                    <span class="choice-tile__text">New ticket</span>
+                    <span class="choice-tile__text" data-i18n="portals.server.newTicket">New ticket</span>
                   </label>
                 </div>
                 <p id="ticketModeHint" class="muted" style="margin:10px 0 0;font-size:12px;line-height:1.35;color:#94a3b8;"></p>
               </fieldset>
-              <fieldset id="newCheckKindFieldset" class="pos-fieldset hidden">
-                <legend>New ticket type</legend>
-                <div class="choice-tiles choice-tiles--2" role="radiogroup" aria-label="New ticket type">
-                  <label class="choice-tile" for="newCheckKindFood">
-                    <input type="radio" name="newCheckKind" id="newCheckKindFood" value="Food" checked>
-                    <span class="choice-tile__text">Food</span>
-                  </label>
-                  <label class="choice-tile" for="newCheckKindDrink">
-                    <input type="radio" name="newCheckKind" id="newCheckKindDrink" value="Drink">
-                    <span class="choice-tile__text">Drink</span>
-                  </label>
-                </div>
-              </fieldset>
               <div class="open-checks-panel">
                 <div class="open-checks-head">
-                  <strong>Open checks</strong>
-                  <button type="button" id="btnRefreshOpenChecks" class="btn-ghost" style="min-height:32px;height:32px;padding:0 10px;font-size:12px;">Refresh</button>
+                  <strong data-i18n="portals.server.openChecks">Open checks</strong>
+                  <button type="button" id="btnRefreshOpenChecks" class="btn-ghost" style="min-height:32px;height:32px;padding:0 10px;font-size:12px;" data-i18n="common.refresh">Refresh</button>
                 </div>
                 <div id="openChecksList" class="open-checks-list" aria-live="polite"></div>
                 <span id="openCheckInfo" class="muted" style="color:#94a3b8;font-size:12px;display:block;"></span>
               </div>
               <div class="pos-draft-row">
                 <select id="drafts" class="grow" style="flex:2;"></select>
-                <button type="button" id="btnLoadDraft">Load</button>
-                <button type="button" id="btnSaveDraft">Save</button>
-                <button type="button" id="btnDeleteDraft">Delete</button>
+                <button type="button" id="btnLoadDraft" data-i18n="portals.server.load">Load</button>
+                <button type="button" id="btnSaveDraft" data-i18n="common.save">Save</button>
+                <button type="button" id="btnDeleteDraft" data-i18n="common.delete">Delete</button>
               </div>
               <div id="draftStatus" class="muted"></div>
               <div class="discount-inline-row">
                 <select id="discountMode">
-                  <option value="None">None</option>
-                  <option value="Percent">Percent</option>
-                  <option value="Usd">Usd</option>
+                  <option value="None" data-i18n="portals.server.discountNone">None</option>
+                  <option value="Percent" data-i18n="portals.server.discountPercent">Percent</option>
+                  <option value="Usd" data-i18n="portals.server.discountUsd">Usd</option>
                 </select>
-                <input id="discountValue" type="number" step="0.01" min="0" placeholder="Discount">
+                <input id="discountValue" type="number" step="0.01" min="0" data-i18n="portals.server.discountPlaceholder" placeholder="Discount">
               </div>
               <div class="notes-block">
-                <label class="notes-block__label" for="customerNotes">Customer notes</label>
-                <textarea id="customerNotes" placeholder="Customer notes"></textarea>
+                <label class="notes-block__label" for="customerNotes" data-i18n="portals.server.customerNotes">Customer notes</label>
+                <textarea id="customerNotes" data-i18n="portals.server.customerNotes" placeholder="Customer notes"></textarea>
               </div>
               <div class="notes-block">
-                <label class="notes-block__label" for="allergyNotes">Allergy notes</label>
-                <textarea id="allergyNotes" placeholder="Allergy notes"></textarea>
+                <label class="notes-block__label" for="allergyNotes" data-i18n="portals.server.allergyNotes">Allergy notes</label>
+                <textarea id="allergyNotes" data-i18n="portals.server.allergyNotes" placeholder="Allergy notes"></textarea>
+              </div>
+              <div class="notes-block">
+                <label class="notes-block__label" data-i18n="portals.server.linkClientOptional">Link to client (optional)</label>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                  <button type="button" class="btn btn-ghost btn-sm" id="btnClientLink" data-i18n="portals.server.linkToClient">Link to client</button>
+                  <button type="button" class="btn btn-ghost btn-sm" id="btnClientClear" data-i18n="portals.server.clear">Clear</button>
+                </div>
+                <p id="linkedClientLabel" class="muted" style="margin:6px 0 0;font-size:12px;" data-i18n="portals.server.noClientLinked">No client linked</p>
               </div>
             </div>
           </aside>
@@ -2170,9 +2184,9 @@
 
       <section id="menuTab" class="tab hidden">
         <div class="card">
-          <h2>Menu Catalog</h2>
-          <label class="visually-hidden" for="menuSearch">Search menu</label>
-          <input type="search" id="menuSearch" class="menu-search" placeholder="Search name or ID…" autocomplete="off">
+          <h2 data-i18n="portals.server.menuCatalogHeading">Menu Catalog</h2>
+          <label class="visually-hidden" for="menuSearch" data-i18n="portals.server.searchMenu">Search menu</label>
+          <input type="search" id="menuSearch" class="menu-search" data-i18n="portals.server.searchMenuPlaceholder" placeholder="Search name or ID…" autocomplete="off">
           <div id="menuCatalog" class="menu-catalog-grid" role="list"></div>
         </div>
       </section>
@@ -2180,25 +2194,25 @@
       <section id="ongoingOrdersTab" class="tab hidden">
         <div class="ongoing-shell">
           <div class="ongoing-toolbar">
-            <h2>Ongoing Orders</h2>
-            <button type="button" id="btnRefreshOngoing" class="btn btn-primary btn-sm">Refresh</button>
+            <h2 data-i18n="portals.server.ongoingHeading">Ongoing Orders</h2>
+            <button type="button" id="btnRefreshOngoing" class="btn btn-primary btn-sm" data-i18n="common.refresh">Refresh</button>
           </div>
-          <div id="ongoingKanban" class="ongoing-kanban" role="region" aria-label="Order status board"></div>
+          <div id="ongoingKanban" class="ongoing-kanban" role="region" data-i18n="portals.server.ariaOrderBoard" data-i18n-attr="aria-label" aria-label="Order status board"></div>
         </div>
       </section>
 
       <section id="pickupTab" class="tab hidden">
         <div class="card">
-          <h2>Pick Up & Serve</h2>
-          <button type="button" id="btnRefreshReady">Refresh Ready Orders</button>
+          <h2 data-i18n="portals.server.pickupHeading">Pick Up & Serve</h2>
+          <button type="button" id="btnRefreshReady" data-i18n="portals.server.refreshReadyOrders">Refresh Ready Orders</button>
           <div id="readyOrders" class="ready-orders-grid" role="list" aria-live="polite"></div>
         </div>
       </section>
 
       <section id="tableCallsTab" class="tab hidden">
         <div class="card">
-          <h2>Table Calls</h2>
-          <button type="button" id="btnRefreshTableCalls">Refresh</button>
+          <h2 data-i18n="portals.server.tableCallsHeading">Table Calls</h2>
+          <button type="button" id="btnRefreshTableCalls" data-i18n="common.refresh">Refresh</button>
           <div id="tableCallsList" class="table-calls-list" role="list" aria-live="polite"></div>
         </div>
       </section>
@@ -2209,16 +2223,180 @@
   <div id="ongoingOrderModal" class="ongoing-modal hidden" role="dialog" aria-modal="true" aria-labelledby="ongoingModalTitle">
     <div class="ongoing-modal__panel">
       <div class="ongoing-modal__head">
-        <h3 id="ongoingModalTitle">Order detail</h3>
-        <button type="button" class="ongoing-modal__close" id="ongoingModalClose" aria-label="Close">&times;</button>
+        <h3 id="ongoingModalTitle" data-i18n="portals.server.orderDetail">Order detail</h3>
+        <button type="button" class="ongoing-modal__close" id="ongoingModalClose" data-i18n="portals.server.ariaClose" data-i18n-attr="aria-label" aria-label="Close">&times;</button>
       </div>
       <div id="ongoingModalBody"></div>
     </div>
   </div>
 
   <script src="/js/elite-portal-session.js"></script>
+  <script src="/shared/api-error-banner.js"></script>
+  <script src="/shared/button-busy.js"></script>
+  <script src="/shared/signalr-connection-banner.js"></script>
+  <script src="/shared/order-cancel-passcode.js"></script>
+  <script src="/shared/order-stage-alert.js"></script>
+  <script src="/shared/client-picker-modal.js?v=2"></script>
+  <script src="/shared/restaurant-datetime.js"></script>
+  <script>window.EliteI18nDisableAutoInit = true;</script>
+  <script src="/js/elite-i18n.js?v=4"></script>
   <script>
     const PORTAL_ID = "Server";
+
+    function t(key, fallback, vars) {
+      const full = key.indexOf("portals.") === 0 || key.indexOf("auth.") === 0 || key.indexOf("common.") === 0 || key.indexOf("orders.") === 0 || key.indexOf("tables.") === 0
+        ? key
+        : "portals.server." + key;
+      return (window.EliteI18n && EliteI18n.t) ? EliteI18n.t(full, fallback, vars) : (fallback != null ? String(fallback) : full);
+    }
+
+    function metaSlug(value) {
+      return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+    }
+
+    function normalizeStatusKey(status) {
+      const raw = String(status ?? "").trim();
+      if (!raw) return "";
+      const spaced = raw.replace(/([a-z])([A-Z])/g, "$1 $2");
+      const n = spaced.replace(/\s+/g, " ").trim().toLowerCase();
+      const aliases = {
+        waiting: "waiting", "pending approval": "pending_approval", "pending cashier": "pending_cashier",
+        "in kitchen": "in_kitchen", ready: "ready", served: "served", completed: "completed",
+        cancelled: "cancelled", canceled: "cancelled", pending: "pending", "on account": "on_account", debt: "on_account"
+      };
+      return aliases[n] || metaSlug(n);
+    }
+
+    const STATUS_FALLBACK_EN = {
+      pending_approval: "Pending approval", pending_cashier: "Pending cashier", waiting: "Waiting",
+      in_kitchen: "In kitchen", ready: "Ready", served: "Served", completed: "Completed",
+      cancelled: "Cancelled", pending: "Pending", on_account: "On account"
+    };
+    const STATUS_FALLBACK_FR = {
+      pending_approval: "En attente d'approbation", pending_cashier: "En attente caisse", waiting: "En attente",
+      in_kitchen: "En cuisine", ready: "Prête", served: "Servie", completed: "Terminée",
+      cancelled: "Annulée", pending: "En attente", on_account: "En compte"
+    };
+    const STATUS_ORDERS_KEY = {
+      pending_approval: "orders.pendingApproval", pending_cashier: "orders.pendingCashier", waiting: "orders.waiting",
+      in_kitchen: "orders.inKitchen", ready: "orders.ready", served: "orders.served",
+      completed: "orders.completed", cancelled: "orders.cancelled", pending: "orders.pending"
+    };
+
+    function currentLangCode() {
+      return (window.EliteI18n && EliteI18n.lang) || "fr";
+    }
+
+    function translateOrderStatus(status) {
+      const raw = String(status ?? "").trim();
+      if (!raw) return raw;
+      const key = normalizeStatusKey(raw);
+      if (!key) return raw;
+      const lang = currentLangCode();
+      const fb = (lang === "fr" ? STATUS_FALLBACK_FR : STATUS_FALLBACK_EN)[key] || raw;
+      let translated = t("status." + key, fb);
+      if (translated && translated.indexOf("portals.server.") !== 0) return translated;
+      const ordersKey = STATUS_ORDERS_KEY[key];
+      if (ordersKey) {
+        translated = t(ordersKey, fb);
+        if (translated && translated.indexOf("orders.") !== 0) return translated;
+      }
+      return fb;
+    }
+
+    function translateCheckKind(kind) {
+      const k = String(kind || "").trim().toLowerCase();
+      if (k === "drink") return t("checkKindDrink", "Drink");
+      if (k === "mixed") return t("checkKindMixed", "Mixed");
+      if (k === "food") return t("checkKindFood", "Food");
+      return kind;
+    }
+
+    const PREP_SUMMARY_EN = {
+      "All items ready to serve": "prepAllReady",
+      "Drinks served": "prepDrinksServed",
+      "Drinks ready": "prepDrinksReady",
+      "Drinks cooking": "prepDrinksCooking",
+      "Food served": "prepFoodServed",
+      "Food ready": "prepFoodReady",
+      "Food cooking": "prepFoodCooking"
+    };
+
+    function translatePrepSummaryPart(part) {
+      const raw = String(part || "").trim();
+      if (!raw) return raw;
+      const key = PREP_SUMMARY_EN[raw];
+      return key ? t(key, raw) : raw;
+    }
+
+    function translatePrepSummary(summary) {
+      const raw = String(summary || "").trim();
+      if (!raw) return raw;
+      if (raw.indexOf(" · ") >= 0) {
+        return raw.split(" · ").map(p => translatePrepSummaryPart(p.trim())).join(" · ");
+      }
+      return translatePrepSummaryPart(raw);
+    }
+
+    function translateTableAvailability(status) {
+      const s = String(status || "").trim().toLowerCase();
+      if (s === "occupied") return t("tables.occupied", "Occupied");
+      if (s === "available") return t("tables.available", "Available");
+      if (s === "closed") return t("tables.closed", "Closed");
+      return status || "";
+    }
+
+    function translateDisplayStatus(raw) {
+      const s = String(raw ?? "").trim();
+      if (!s) return s;
+      if (PREP_SUMMARY_EN[s] || s.indexOf(" · ") >= 0) {
+        const translated = translatePrepSummary(s);
+        if (translated) return translated;
+      }
+      return translateOrderStatus(s);
+    }
+
+    function getOngoingColumns() {
+      return [
+        { key: "cooking", label: t("colCooking", "Cooking"), dot: "#FF9800" },
+        { key: "ready", label: t("colReady", "Ready"), dot: "#4CAF50" },
+        { key: "served", label: t("colServed", "Served"), dot: "#9C27B0" },
+        { key: "completed", label: t("colCompleted", "Completed"), dot: "#64748b" }
+      ];
+    }
+
+    function applyServerStaticI18n(root) {
+      if (window.EliteI18n) EliteI18n.applyToDocument(root || document);
+      document.title = t("pageTitle", "Elite Server Portal");
+    }
+
+    function refreshServerDynamicLabels() {
+      renderTotals();
+      if (token) {
+        renderProducts();
+        renderCart();
+        renderTables();
+        renderMenuCatalog();
+        renderReadyOrders();
+        renderOngoingKanban();
+        renderOpenChecks();
+        updateTicketModeHint();
+        renderIncomingDrafts();
+        renderTableCalls();
+        renderDrafts();
+        refreshLinkedClientLabel();
+        const modal = document.getElementById("ongoingOrderModal");
+        if (modal && !modal.classList.contains("hidden") && selectedOngoingOrderId > 0) {
+          const o = ongoingOrders.find(x => Number(x.id ?? x.Id) === selectedOngoingOrderId);
+          if (o) openOrderDetailModal(o);
+        }
+      }
+    }
+
+    document.addEventListener("elite-language-changed", function () {
+      applyServerStaticI18n();
+      refreshServerDynamicLabels();
+    });
     let token = "";
     let me = null;
     let tables = [];
@@ -2243,6 +2421,17 @@
     const PLACEHOLDER_PALETTE = ["#4a5568", "#5c4d4a", "#4a5c4d", "#544a5c", "#5c5a4a", "#4a5c5c", "#565c4a", "#5c4a52"];
     const setOut = (title, data) => console.log(`[ServerPortal] ${title}`, data);
 
+    async function cancelServerOrder(orderId, onDone) {
+      await EliteOrderCancel.cancelStaffOrder(orderId, async (id, passcode) =>
+        api("/api/staff/orders/" + id + "/cancel", "POST", { passcode }),
+        {
+          confirmMessage: t("confirmCancelOrder", "Cancel this order? An admin passcode is required."),
+          onSuccess: async () => {
+            if (typeof onDone === "function") await onDone();
+          }
+        });
+    }
+
     function esc(s) {
       return String(s ?? "")
         .replace(/&/g, "&amp;")
@@ -2255,8 +2444,10 @@
       return esc(s).replace(/'/g, "&#39;");
     }
 
+    const ALL_CAT = "All";
+
     function categoryTabIcon(cat) {
-      if (cat === "All") return "#";
+      if (cat === ALL_CAT) return "#";
       const ch = String(cat).trim().charAt(0).toUpperCase();
       return /[A-Z0-9]/.test(ch) ? ch : "?";
     }
@@ -2304,9 +2495,13 @@
       return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
     }
 
+    function categoryDisplayLabel(cat) {
+      return cat === ALL_CAT ? t("catAll", "All") : cat;
+    }
+
     function productCookTimeLabel(p) {
       const m = productPrepMinutes(p);
-      return m > 0 ? `${m} min cook` : "Cook time not set";
+      return m > 0 ? t("minCook", "{{min}} min cook", { min: m }) : t("cookTimeNotSet", "Cook time not set");
     }
 
     function formatProductPriceDisplay(price) {
@@ -2338,7 +2533,7 @@
       }
       return `
           <div class="product-card__media">
-            <span class="product-card__dot ${dot}" title="${ok ? "In stock" : "Out of stock"}"></span>
+            <span class="product-card__dot ${dot}" title="${ok ? t("inStock", "In stock") : t("outOfStock", "Out of stock")}"></span>
             ${badgeHtml}
             ${imgHtml}
             <div class="product-card__ph${phHidden}" style="background:${phColor}">${esc(initial)}</div>
@@ -2357,11 +2552,11 @@
       const tabs = document.getElementById("categoryTabs");
       const category = document.getElementById("category");
       if (!tabs || !category) return;
-      const cats = [...category.options].map(o => o.textContent || o.value);
+      const cats = [...category.options].map(o => o.value || o.textContent);
       const cur = category.value;
       tabs.innerHTML = cats.map(c => {
         const active = c === cur ? " cat-tab--active" : "";
-        return `<button type="button" class="cat-tab${active}" data-cat="${escAttr(c)}"><span class="cat-tab-ic">${categoryTabIcon(c)}</span><span class="cat-tab-lb">${esc(c)}</span></button>`;
+        return `<button type="button" class="cat-tab${active}" data-cat="${escAttr(c)}"><span class="cat-tab-ic">${categoryTabIcon(c)}</span><span class="cat-tab-lb">${esc(categoryDisplayLabel(c))}</span></button>`;
       }).join("");
       tabs.querySelectorAll("[data-cat]").forEach(btn => {
         btn.onclick = () => {
@@ -2424,7 +2619,9 @@
       const txt = await res.text();
       let json;
       try { json = JSON.parse(txt); } catch { json = { raw: txt }; }
-      return { ok: res.ok, status: res.status, body: json };
+      var result = { ok: res.ok, status: res.status, body: json };
+      if (global.EliteApiError) global.EliteApiError.wrap(result);
+      return result;
     }
 
     function normalizeDiscount() {
@@ -2454,20 +2651,27 @@
     }
 
     function renderTotals() {
-      const t = computeTotals();
-      document.getElementById("itemCount").textContent = String([...cart.values()].reduce((a, b) => a + b, 0));
-      document.getElementById("subtotalUsd").textContent = fmtUsd(t.subtotal);
-      document.getElementById("taxAmount").textContent = fmtUsd(t.tax);
-      document.getElementById("serviceAmount").textContent = fmtUsd(t.service);
-      document.getElementById("discountAmount").textContent = fmtUsd(t.discount);
+      const t0 = computeTotals();
+      const count = [...cart.values()].reduce((a, b) => a + b, 0);
+      document.getElementById("itemCount").textContent = String(count);
+      const suffixEl = document.getElementById("itemsInOrderSuffix");
+      if (suffixEl) {
+        suffixEl.textContent = count === 1
+          ? t("oneItemInOrder", "1 item in order")
+          : t("itemsInOrderCount", "{{count}} items in order", { count });
+      }
+      document.getElementById("subtotalUsd").textContent = fmtUsd(t0.subtotal);
+      document.getElementById("taxAmount").textContent = fmtUsd(t0.tax);
+      document.getElementById("serviceAmount").textContent = fmtUsd(t0.service);
+      document.getElementById("discountAmount").textContent = fmtUsd(t0.discount);
       const pay = document.getElementById("paymentCurrency").value;
-      document.getElementById("grandTotal").textContent = pay === "FC" ? fmtFc(toFc(t.grand)) : fmtUsd(t.grand);
+      document.getElementById("grandTotal").textContent = pay === "FC" ? fmtFc(toFc(t0.grand)) : fmtUsd(t0.grand);
       const dr = document.getElementById("totRowDiscount");
-      if (dr) dr.classList.toggle("hidden", t.discount <= 0);
+      if (dr) dr.classList.toggle("hidden", t0.discount <= 0);
       const taxLbl = document.getElementById("taxLabel");
-      if (taxLbl) taxLbl.textContent = `Tax (${Number(config.taxPercent || 0)}%)`;
+      if (taxLbl) taxLbl.textContent = t("taxPct", "Tax ({{pct}}%)", { pct: Number(config.taxPercent || 0) });
       const svcLbl = document.getElementById("serviceLabel");
-      if (svcLbl) svcLbl.textContent = `Service (${Number(config.servicePercent || 0)}%)`;
+      if (svcLbl) svcLbl.textContent = t("servicePct", "Service ({{pct}}%)", { pct: Number(config.servicePercent || 0) });
     }
 
     function currentFilteredProducts() {
@@ -2475,20 +2679,20 @@
       const c = document.getElementById("category").value;
       const sub = document.getElementById("subCategory").value;
       return products
-        .filter(p => c === "All" || p.category === c)
-        .filter(p => sub === "All" || p.subCategory === sub)
+        .filter(p => c === ALL_CAT || p.category === c)
+        .filter(p => sub === ALL_CAT || p.subCategory === sub)
         .filter(p => !s || p.name.toLowerCase().includes(s) || p.uniqueId.toLowerCase().includes(s));
     }
 
     function renderCategories() {
       const category = document.getElementById("category");
       const sub = document.getElementById("subCategory");
-      const cats = ["All", ...new Set(products.map(p => p.category).filter(Boolean))];
-      category.innerHTML = cats.map(c => `<option>${esc(c)}</option>`).join("");
+      const cats = [ALL_CAT, ...new Set(products.map(p => p.category).filter(Boolean))];
+      category.innerHTML = cats.map(c => `<option value="${escAttr(c)}">${esc(categoryDisplayLabel(c))}</option>`).join("");
       const applySub = () => {
         const selected = category.value;
-        const subs = ["All", ...new Set(products.filter(p => selected === "All" || p.category === selected).map(p => p.subCategory).filter(Boolean))];
-        sub.innerHTML = subs.map(x => `<option>${esc(x)}</option>`).join("");
+        const subs = [ALL_CAT, ...new Set(products.filter(p => selected === ALL_CAT || p.category === selected).map(p => p.subCategory).filter(Boolean))];
+        sub.innerHTML = subs.map(x => `<option value="${escAttr(x)}">${esc(x === ALL_CAT ? categoryDisplayLabel(ALL_CAT) : x)}</option>`).join("");
         renderProducts();
         renderCategoryTabs();
       };
@@ -2517,7 +2721,7 @@
       const el = document.getElementById("products");
       const rows = currentFilteredProducts();
       if (!rows.length) {
-        el.innerHTML = "<div class='product-grid-empty'>No products found.</div>";
+        el.innerHTML = "<div class='product-grid-empty'>" + esc(t("noProductsFound", "No products found.")) + "</div>";
         return;
       }
       el.innerHTML = rows.map(p => {
@@ -2560,8 +2764,8 @@
       if (!rows.length) {
         el.innerHTML = `<div class="cart-empty-state" role="status">
           <span class="cart-empty-state__icon" aria-hidden="true"></span>
-          <p class="cart-empty-state__title">No items yet</p>
-          <p class="cart-empty-state__hint">Tap a product to add it</p>
+          <p class="cart-empty-state__title">${esc(t("noItemsYet", "No items yet"))}</p>
+          <p class="cart-empty-state__hint">${esc(t("tapProductHint", "Tap a product to add it"))}</p>
         </div>`;
         renderTotals();
         updateProductCardBadges();
@@ -2575,15 +2779,15 @@
             <div class="cart-line-top">
               <div class="cart-line-total">${fmtUsd(lineTot)}</div>
             </div>
-            <button type="button" class="btn-remove" data-remove="${r.p.id}" aria-label="Remove">&times;</button>
+            <button type="button" class="btn-remove" data-remove="${r.p.id}" aria-label="${escAttr(t("remove", "Remove"))}">&times;</button>
             <div class="cart-line-main">
               <div class="cart-line-name">${esc(r.p.name)}</div>
-              <div class="cart-line-unit">${fmtUsd(r.p.price)} each</div>
+              <div class="cart-line-unit">${t("eachPrice", "{{price}} each", { price: fmtUsd(r.p.price) })}</div>
             </div>
             <div class="cart-line-actions">
-              <button type="button" class="qty-btn" data-minus="${r.p.id}" aria-label="Decrease quantity">-</button>
+              <button type="button" class="qty-btn" data-minus="${r.p.id}" aria-label="${escAttr(t("decreaseQty", "Decrease quantity"))}">-</button>
               <span class="qty-val">${r.qty}</span>
-              <button type="button" class="qty-btn" data-plus="${r.p.id}" aria-label="Increase quantity">+</button>
+              <button type="button" class="qty-btn" data-plus="${r.p.id}" aria-label="${escAttr(t("increaseQty", "Increase quantity"))}">+</button>
             </div>
           </div>
         </div>`;
@@ -2610,7 +2814,7 @@
     function renderTables(preferredTableId) {
       const sel = document.getElementById("tableSelect");
       if (!tables.length) {
-        sel.innerHTML = "<option value='0'>No assigned tables</option>";
+        sel.innerHTML = "<option value='0'>" + esc(t("noAssignedTables", "No assigned tables")) + "</option>";
         return;
       }
       const keepId =
@@ -2618,7 +2822,7 @@
           ? Number(preferredTableId)
           : Number(sel.value || "0");
       sel.innerHTML = tables
-        .map(t => `<option value="${t.id}">Table ${t.tableNumber} - ${t.name} (${t.status})</option>`)
+        .map(tbl => `<option value="${tbl.id}">${esc(t("tableOption", "Table {{number}} - {{name}} ({{status}})", { number: tbl.tableNumber, name: tbl.name, status: translateTableAvailability(tbl.status) }))}</option>`)
         .join("");
       const restoreId =
         keepId > 0 && tables.some(t => t.id === keepId) ? keepId : tables[0].id;
@@ -2641,11 +2845,11 @@
       if (!el) return;
       const rows = menuCatalogProducts();
       if (!products.length) {
-        el.innerHTML = "<div class='menu-catalog-empty' role='status'>No products loaded.</div>";
+        el.innerHTML = "<div class='menu-catalog-empty' role='status'>" + esc(t("noProductsLoaded", "No products loaded.")) + "</div>";
         return;
       }
       if (!rows.length) {
-        el.innerHTML = "<div class='menu-catalog-empty' role='status'>No items match your search.</div>";
+        el.innerHTML = "<div class='menu-catalog-empty' role='status'>" + esc(t("noSearchMatch", "No items match your search.")) + "</div>";
         return;
       }
       el.innerHTML = rows.map(p => {
@@ -2670,7 +2874,7 @@
             ${comp ? `<p class="menu-catalog-card__composition">${esc(comp)}</p>` : ""}
             <div class="menu-catalog-card__foot">
               ${priceHtml}
-              <span class="menu-catalog-card__avail ${availCls}">${ok ? "Available" : "Unavailable"}</span>
+              <span class="menu-catalog-card__avail ${availCls}">${ok ? esc(t("available", "Available")) : esc(t("unavailable", "Unavailable"))}</span>
             </div>
           </div>
         </article>`;
@@ -2701,13 +2905,43 @@
         </div>`;
     }
 
+    function orderBool(o, camel, pascal) {
+      return o[camel] === true || o[pascal] === true;
+    }
+
+    function readyOrderPrepSummary(o) {
+      return translatePrepSummary(readyOrderField(o, "prepSummary", "PrepSummary"));
+    }
+
+    async function serveOrderStation(orderId, station) {
+      const r = await api("/api/server/orders/" + orderId + "/serve-station", "POST", { station });
+      setOut("Serve station", r);
+      if (!r.ok) {
+        const m = r.body?.message || r.body?.title || r.body?.detail;
+        if (m) alert(m);
+        return false;
+      }
+      await loadReadyOrders();
+      await loadOngoingOrders();
+      return true;
+    }
+
+    function readyOrderLineStatusHtml(line) {
+      const prepared = line.isPrepared === true || line.IsPrepared === true;
+      const served = line.isServed === true || line.IsServed === true;
+      const isDrink = line.isDrink === true || line.IsDrink === true;
+      const label = served ? t("lineServed", "Served") : prepared ? t("lineReady", "Ready") : isDrink ? t("lineBar", "Bar") : t("lineKitchen", "Kitchen");
+      const cls = served ? "line-tag line-tag--served" : prepared ? "line-tag line-tag--ready" : "line-tag line-tag--wait";
+      return `<span class="${cls}">${label}</span>`;
+    }
+
     function readyOrderLinesHtml(o) {
       const lines = o.lines || o.Lines;
       if (Array.isArray(lines) && lines.length) {
         return lines.map(line => `
           <div class="ready-order-line">
             ${readyOrderLineMediaHtml(line)}
-            <div class="ready-order-line__name">${esc(line.name || line.Name || "Unknown")}</div>
+            <div class="ready-order-line__name">${esc(line.name || line.Name || "Unknown")} ${readyOrderLineStatusHtml(line)}</div>
           </div>`).join("");
       }
       const summary = readyOrderField(o, "itemsSummary", "ItemsSummary") || "-";
@@ -2720,13 +2954,13 @@
       const blocks = [];
       if (notes) {
         blocks.push(`<div class="ready-order-card__detail-block">
-          <span class="ready-order-card__detail-label">Customer notes</span>
+          <span class="ready-order-card__detail-label">${esc(t("customerNotes", "Customer notes"))}</span>
           ${esc(notes)}
         </div>`);
       }
       if (allergy) {
         blocks.push(`<div class="ready-order-card__detail-block ready-order-card__detail-block--allergy">
-          <span class="ready-order-card__detail-label">Allergy info</span>
+          <span class="ready-order-card__detail-label">${esc(t("allergyInfo", "Allergy info"))}</span>
           ${esc(allergy)}
         </div>`);
       }
@@ -2739,7 +2973,8 @@
       if (!readyOrders.length) {
         el.innerHTML = `
           <div class="ready-orders-empty" role="status">
-            <strong>No ready orders</strong>
+            <strong>${esc(t("pickupEmptyTitle", "Nothing to pick up yet"))}</strong>
+            <p class="muted" style="margin:8px 0 0;font-size:13px;">${esc(t("pickupEmptyHint", "Drinks or food will appear here as soon as bar or kitchen marks their side ready."))}</p>
           </div>`;
         updatePickupNavBadge();
         return;
@@ -2755,34 +2990,70 @@
         const totalUsd = Number(o.totalUsd ?? o.TotalUsd) || 0;
         const itemCount = Number(o.itemCount ?? o.ItemCount) || 0;
         const guestHtml = guestName
-          ? `<div class="ready-order-card__guest" title="${isMenu ? "Guest name from Explore our Menu" : "Guest name"}">
-              <span class="ready-order-card__guest-label">Guest</span>
+          ? `<div class="ready-order-card__guest" title="${escAttr(isMenu ? t("guestMenuTitle", "Guest name from Explore our Menu") : t("guestNameTitle", "Guest name"))}">
+              <span class="ready-order-card__guest-label">${esc(t("guest", "Guest"))}</span>
               <span>${esc(guestName)}</span>
             </div>`
           : "";
+        const prepSummary = readyOrderPrepSummary(o);
+        const prepBadge = prepSummary
+          ? `<p class="ready-order-card__prep" style="margin:0 0 8px;font-size:12px;color:#86efac;font-weight:600;">${esc(prepSummary)}</p>`
+          : "";
+        const id = Number(o.id ?? o.Id) || 0;
+        const canServeDrinks = orderBool(o, "canServeBarStation", "CanServeBarStation");
+        const canServeFood = orderBool(o, "canServeFoodStation", "CanServeFoodStation");
+        const canMarkServed = orderBool(o, "canMarkServed", "CanMarkServed");
+        const serveBtns = [
+          canServeDrinks ? `<button type="button" class="btn btn-primary btn-sm" data-serve-bar="${id}">${esc(t("serveDrinks", "Serve drinks"))}</button>` : "",
+          canServeFood ? `<button type="button" class="btn btn-primary btn-sm" data-serve-food="${id}">${esc(t("serveFood", "Serve food"))}</button>` : "",
+          canMarkServed ? `<button type="button" data-serve="${id}">${esc(t("completeTableService", "Complete table service"))}</button>` : ""
+        ].filter(Boolean).join("");
         return `
         <article class="ready-order-card${highlightClass}" role="listitem">
           <header class="ready-order-card__head">
             <div>
               <div class="ready-order-card__title">${esc(orderId)}</div>
-              <div class="ready-order-card__meta">${esc(tableLabel)} · ${itemCount} item${itemCount === 1 ? "" : "s"}</div>
+              <div class="ready-order-card__meta">${esc(tableLabel)} · ${esc(itemCount === 1 ? t("oneItem", "1 item") : t("itemCount", "{{count}} items", { count: itemCount }))}</div>
               ${guestHtml}
             </div>
             <span class="ready-order-card__time">${esc(timeText)}</span>
           </header>
+          ${prepBadge}
           <div class="ready-order-card__lines">${readyOrderLinesHtml(o)}</div>
           ${readyOrderDetailsHtml(o)}
           <footer class="ready-order-card__foot">
             <span class="ready-order-card__total">${fmtUsd(totalUsd)}</span>
-            <button type="button" data-serve="${Number(o.id ?? o.Id)}">Mark Served</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              ${serveBtns}
+              <button type="button" class="btn-cancel-order" data-cancel-ready="${id}">${esc(t("common.cancel", "Cancel"))}</button>
+            </div>
           </footer>
         </article>`;
       }).join("");
+      el.querySelectorAll("[data-serve-bar]").forEach(b => b.onclick = async () => {
+        await serveOrderStation(Number(b.getAttribute("data-serve-bar")), "Bar");
+      });
+      el.querySelectorAll("[data-serve-food]").forEach(b => b.onclick = async () => {
+        await serveOrderStation(Number(b.getAttribute("data-serve-food")), "Kitchen");
+      });
       el.querySelectorAll("[data-serve]").forEach(b => b.onclick = async () => {
         const id = Number(b.getAttribute("data-serve"));
         const r = await api(`/api/server/orders/${id}/serve`, "POST");
         setOut("Mark served result", r);
+        if (!r.ok) {
+          const m = r.body?.message || r.body?.title;
+          if (m) alert(m);
+          return;
+        }
         await loadReadyOrders();
+        await loadOngoingOrders();
+      });
+      el.querySelectorAll("[data-cancel-ready]").forEach(b => b.onclick = async () => {
+        const id = Number(b.getAttribute("data-cancel-ready"));
+        await cancelServerOrder(id, async () => {
+          await loadReadyOrders();
+          await loadOngoingOrders();
+        });
       });
       updatePickupNavBadge();
     }
@@ -2793,13 +3064,6 @@
       renderReadyOrders();
       return r.ok;
     }
-
-    const ONGOING_COLUMNS = [
-      { key: "cooking", label: "Cooking", dot: "#FF9800" },
-      { key: "ready", label: "Ready", dot: "#4CAF50" },
-      { key: "served", label: "Served", dot: "#9C27B0" },
-      { key: "completed", label: "Completed", dot: "#64748b" }
-    ];
 
     function ongoingOrderField(o, camel, pascal) {
       if (!o) return "";
@@ -2831,12 +3095,12 @@
     function renderOngoingKanban() {
       const host = document.getElementById("ongoingKanban");
       if (!host) return;
-      const buckets = Object.fromEntries(ONGOING_COLUMNS.map(c => [c.key, []]));
+      const buckets = Object.fromEntries(getOngoingColumns().map(c => [c.key, []]));
       ongoingOrders.forEach(o => {
         const col = ongoingColumnKey(o);
         if (buckets[col]) buckets[col].push(o);
       });
-      host.innerHTML = ONGOING_COLUMNS.map(col => {
+      host.innerHTML = getOngoingColumns().map(col => {
         const items = buckets[col.key] || [];
         const tickets = items.length
           ? items.map(o => {
@@ -2845,7 +3109,7 @@
               const code = esc(String(ongoingOrderField(o, "orderId", "OrderId") || "#?"));
               const table = esc(String(ongoingOrderField(o, "tableLabel", "TableLabel") || "-"));
               const time = esc(String(ongoingOrderField(o, "timeText", "TimeText") || ""));
-              const display = esc(String(ongoingOrderField(o, "displayStatus", "DisplayStatus") || ongoingOrderField(o, "status", "Status")));
+              const display = esc(translateDisplayStatus(String(ongoingOrderField(o, "displayStatus", "DisplayStatus") || ongoingOrderField(o, "status", "Status"))));
               const color = esc(String(ongoingOrderField(o, "statusColor", "StatusColor") || "#94a3b8"));
               const summary = esc(String(ongoingOrderField(o, "itemsSummary", "ItemsSummary") || ""));
               return (
@@ -2857,7 +3121,7 @@
                 "</article>"
               );
             }).join("")
-          : "<div class=\"ongoing-col__empty\">No orders</div>";
+          : "<div class=\"ongoing-col__empty\">" + esc(t("noOrders", "No orders")) + "</div>";
         return (
           "<section class=\"ongoing-col ongoing-col--" + col.key + "\" aria-label=\"" + esc(col.label) + "\">" +
           "<h3 class=\"ongoing-col__head\"><span><span class=\"ongoing-col__dot\" style=\"background:" + col.dot + "\"></span>" + esc(col.label) + "</span>" +
@@ -2886,7 +3150,7 @@
           const img = photo
             ? `<img src="${escAttr(photo)}" alt="" loading="lazy">`
             : `<span style="width:40px;height:40px;border-radius:8px;background:#1e293b;display:inline-block"></span>`;
-          return `<div class="ongoing-modal__line">${img}<span class="ongoing-modal__line-name">${name}</span><span class="ongoing-modal__line-qty">×${qty}</span></div>`;
+          return `<div class="ongoing-modal__line">${img}<span class="ongoing-modal__line-name">${name} ${readyOrderLineStatusHtml(line)}</span><span class="ongoing-modal__line-qty">×${qty}</span></div>`;
         }).join("");
       }
       const summary = esc(String(ongoingOrderField(o, "itemsSummary", "ItemsSummary") || "-"));
@@ -2910,26 +3174,55 @@
       if (!modal || !body || !title) return;
       const code = String(ongoingOrderField(o, "orderId", "OrderId") || "Order");
       const table = String(ongoingOrderField(o, "tableLabel", "TableLabel") || "-");
-      const display = String(ongoingOrderField(o, "displayStatus", "DisplayStatus") || ongoingOrderField(o, "status", "Status"));
+      const displayRaw = String(ongoingOrderField(o, "displayStatus", "DisplayStatus") || ongoingOrderField(o, "status", "Status"));
+      const display = translateDisplayStatus(displayRaw);
       const color = String(ongoingOrderField(o, "statusColor", "StatusColor") || "#94a3b8");
       const total = Number(o.totalUsd ?? o.TotalUsd) || 0;
       const guest = String(ongoingOrderField(o, "guestCustomerName", "GuestCustomerName") || "").trim();
-      const canServe = o.canMarkServed === true || o.CanMarkServed === true;
+      const canServe = orderBool(o, "canMarkServed", "CanMarkServed");
+      const canServeDrinks = orderBool(o, "canServeBarStation", "CanServeBarStation");
+      const canServeFood = orderBool(o, "canServeFoodStation", "CanServeFoodStation");
+      const statusRaw = String(ongoingOrderField(o, "status", "Status") || "");
+      const canCancel = EliteOrderCancel.canCancelStatus(statusRaw);
       const notes = ongoingOrderField(o, "customerNotes", "CustomerNotes");
       const allergy = ongoingOrderField(o, "allergyNotes", "AllergyNotes");
+      const prepSummary = readyOrderPrepSummary(o);
       title.textContent = code;
       const noteBlocks = [];
-      if (notes) noteBlocks.push(`<div class="ready-order-card__detail-block"><span class="ready-order-card__detail-label">Customer notes</span>${esc(notes)}</div>`);
-      if (allergy) noteBlocks.push(`<div class="ready-order-card__detail-block ready-order-card__detail-block--allergy"><span class="ready-order-card__detail-label">Allergy info</span>${esc(allergy)}</div>`);
+      if (notes) noteBlocks.push(`<div class="ready-order-card__detail-block"><span class="ready-order-card__detail-label">${esc(t("customerNotes", "Customer notes"))}</span>${esc(notes)}</div>`);
+      if (allergy) noteBlocks.push(`<div class="ready-order-card__detail-block ready-order-card__detail-block--allergy"><span class="ready-order-card__detail-label">${esc(t("allergyInfo", "Allergy info"))}</span>${esc(allergy)}</div>`);
       body.innerHTML =
         "<div class=\"ongoing-modal__status-row\">" +
         "<span class=\"ongoing-modal__status-pill\" style=\"background:" + esc(color) + "33;color:" + esc(color) + "\">" + esc(display) + "</span>" +
-        "<span class=\"ongoing-modal__table\">" + esc(table) + (guest ? " · Guest " + esc(guest) : "") + "</span></div>" +
+        "<span class=\"ongoing-modal__table\">" + esc(table) + (guest ? esc(t("guestPrefix", " · Guest {{name}}", { name: guest })) : "") + "</span></div>" +
+        (prepSummary ? "<p style=\"margin:0 0 10px;font-size:13px;color:#86efac;font-weight:600;\">" + esc(prepSummary) + "</p>" : "") +
         "<div class=\"ongoing-modal__lines\">" + ongoingOrderDetailLinesHtml(o) + "</div>" +
         (noteBlocks.length ? "<div class=\"ready-order-card__details\">" + noteBlocks.join("") + "</div>" : "") +
         "<div class=\"ongoing-modal__foot\"><span class=\"ongoing-modal__total\">" + esc(fmtUsd(total)) + "</span>" +
-        (canServe ? "<button type=\"button\" class=\"btn btn-primary btn-sm\" id=\"ongoingModalServeBtn\">Mark Served</button>" : "") +
-        "</div>";
+        "<div style=\"display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;\">" +
+        (canCancel ? "<button type=\"button\" class=\"btn-cancel-order\" id=\"ongoingModalCancelBtn\">" + esc(t("common.cancel", "Cancel")) + "</button>" : "") +
+        (canServeDrinks ? "<button type=\"button\" class=\"btn btn-primary btn-sm\" id=\"ongoingModalServeBarBtn\">" + esc(t("serveDrinks", "Serve drinks")) + "</button>" : "") +
+        (canServeFood ? "<button type=\"button\" class=\"btn btn-primary btn-sm\" id=\"ongoingModalServeFoodBtn\">" + esc(t("serveFood", "Serve food")) + "</button>" : "") +
+        (canServe ? "<button type=\"button\" class=\"btn btn-primary btn-sm\" id=\"ongoingModalServeBtn\">" + esc(t("completeTableService", "Complete table service")) + "</button>" : "") +
+        "</div></div>";
+      const serveBarBtn = document.getElementById("ongoingModalServeBarBtn");
+      if (serveBarBtn) {
+        serveBarBtn.onclick = async () => {
+          if (await serveOrderStation(orderId, "Bar")) {
+            const fresh = ongoingOrders.find(x => Number(x.id ?? x.Id) === orderId) || readyOrders.find(x => Number(x.id ?? x.Id) === orderId);
+            if (fresh) openOrderDetailModal(fresh);
+          }
+        };
+      }
+      const serveFoodBtn = document.getElementById("ongoingModalServeFoodBtn");
+      if (serveFoodBtn) {
+        serveFoodBtn.onclick = async () => {
+          if (await serveOrderStation(orderId, "Kitchen")) {
+            const fresh = ongoingOrders.find(x => Number(x.id ?? x.Id) === orderId) || readyOrders.find(x => Number(x.id ?? x.Id) === orderId);
+            if (fresh) openOrderDetailModal(fresh);
+          }
+        };
+      }
       const serveBtn = document.getElementById("ongoingModalServeBtn");
       if (serveBtn) {
         serveBtn.onclick = async () => {
@@ -2940,7 +3233,20 @@
             await loadOngoingOrders();
             await loadReadyOrders();
             await loadTableCalls();
+          } else {
+            const m = r.body?.message || r.body?.title;
+            if (m) alert(m);
           }
+        };
+      }
+      const cancelBtn = document.getElementById("ongoingModalCancelBtn");
+      if (cancelBtn) {
+        cancelBtn.onclick = async () => {
+          await cancelServerOrder(orderId, async () => {
+            closeOngoingOrderModal();
+            await loadOngoingOrders();
+            await loadReadyOrders();
+          });
         };
       }
       modal.classList.remove("hidden");
@@ -2972,7 +3278,6 @@
       if (!a || !n) return;
       if (v === "new") { n.checked = true; a.checked = false; }
       else { a.checked = true; n.checked = false; }
-      syncNewCheckKindVisibility();
       updateTicketModeHint();
     }
     function eqTax(a, b) {
@@ -3027,51 +3332,62 @@
       }
       return isDrinkCategory(p.category ?? p.Category) ? "Drink" : "Food";
     }
-    function getNewCheckKind() {
-      const d = document.getElementById("newCheckKindDrink");
-      return d && d.checked ? "Drink" : "Food";
+    function cartLineKinds() {
+      const kinds = new Set();
+      for (const [productId] of cart.entries()) {
+        kinds.add(productKind(productId));
+      }
+      return kinds;
     }
-    function setNewCheckKind(kind) {
-      const food = document.getElementById("newCheckKindFood");
-      const drink = document.getElementById("newCheckKindDrink");
-      if (!food || !drink) return;
-      if (String(kind).toLowerCase() === "drink") { drink.checked = true; food.checked = false; }
-      else { food.checked = true; drink.checked = false; }
+    function inferCheckKindFromCart() {
+      const kinds = cartLineKinds();
+      if (kinds.has("Food") && kinds.has("Drink")) return "Mixed";
+      if (kinds.has("Drink")) return "Drink";
+      if (kinds.has("Food")) return "Food";
+      return "Food";
     }
     function selectedOpenCheck() {
       if (!selectedOpenCheckId) return null;
       return openChecks.find(c => Number(c.orderId ?? c.OrderId) === selectedOpenCheckId) || null;
-    }
-    function syncNewCheckKindVisibility() {
-      const fs = document.getElementById("newCheckKindFieldset");
-      if (!fs) return;
-      fs.classList.toggle("hidden", getTicketMode() !== "new");
     }
     function updateTicketModeHint() {
       const el = document.getElementById("ticketModeHint");
       if (!el) return;
       const tableId = Number(document.getElementById("tableSelect").value || "0");
       if (!tableId) {
-        el.textContent = "Select a table to see open checks.";
+        el.textContent = t("selectTableOpenChecks", "Select a table to see open checks.");
         return;
       }
       const mode = getTicketMode();
       if (!openChecks.length) {
         el.textContent = mode === "new"
-          ? "No open checks yet. Choose Food or Drink, then place order to start a ticket."
-          : "No open check to append to. Use New ticket or place order to create one.";
+          ? t("noOpenChecksNew", "No open checks yet. Place order to start a ticket (food, drinks, or both).")
+          : t("noOpenChecksAppend", "No open check to append to. Use New ticket or place order to create one.");
         return;
       }
       const sel = selectedOpenCheck();
       if (mode === "append") {
         if (!sel) {
-          el.textContent = "Select an open check below. Food and drink checks stay separate.";
+          el.textContent = t("selectOpenCheck", "Select an open check below to add items.");
           return;
         }
-        el.textContent = `Adding to ${sel.orderCode ?? sel.OrderCode} (${sel.checkKind ?? sel.CheckKind}, ${sel.status ?? sel.Status}). Only ${sel.checkKind ?? sel.CheckKind} items allowed.`;
+        const kind = sel.checkKind ?? sel.CheckKind ?? "Food";
+        const code = sel.orderCode ?? sel.OrderCode;
+        const status = translateOrderStatus(sel.status ?? sel.Status);
+        if (String(kind).toLowerCase() === "mixed") {
+          el.textContent = t("addingMixed", "Adding to {{code}} (Mixed, {{status}}). Food and drinks allowed.", { code, status });
+          return;
+        }
+        const kindLabel = translateCheckKind(kind);
+        el.textContent = t("addingKind", "Adding to {{code}} ({{kind}}, {{status}}). Only {{kind}} items allowed.", { code, kind: kindLabel, status });
         return;
       }
-      el.textContent = `New ticket on this table (${openChecks.length} open). Pick Food or Drink — cannot mix on one check.`;
+      const inferred = inferCheckKindFromCart();
+      if (inferred === "Mixed") {
+        el.textContent = t("newMixedTicket", "New mixed ticket on this table ({{count}} open). Food and drinks in one check.", { count: openChecks.length });
+        return;
+      }
+      el.textContent = t("newTicketHint", "New ticket on this table ({{count}} open). Food and drinks can go on one ticket.", { count: openChecks.length });
     }
     function formatUsd(n) {
       const v = Number(n);
@@ -3081,9 +3397,8 @@
       const list = document.getElementById("openChecksList");
       const info = document.getElementById("openCheckInfo");
       if (!list || !info) return;
-      syncNewCheckKindVisibility();
       if (!openChecks.length) {
-        list.innerHTML = '<div class="open-check-empty">No open checks on this table.</div>';
+        list.innerHTML = '<div class="open-check-empty">' + esc(t('noOpenChecksTable', 'No open checks on this table.')) + '</div>';
         info.textContent = "";
         selectedOpenCheckId = 0;
         updateTicketModeHint();
@@ -3099,21 +3414,26 @@
         const code = ch.orderCode ?? ch.OrderCode ?? ("#" + id);
         const status = ch.status ?? ch.Status ?? "";
         const kind = ch.checkKind ?? ch.CheckKind ?? "Food";
-        const kindCls = String(kind).toLowerCase() === "drink" ? "open-check-kind open-check-kind--drink" : "open-check-kind";
+        const kindLower = String(kind).toLowerCase();
+        const kindCls = kindLower === "drink"
+          ? "open-check-kind open-check-kind--drink"
+          : kindLower === "mixed"
+            ? "open-check-kind open-check-kind--mixed"
+            : "open-check-kind";
         const lines = ch.lines ?? ch.Lines ?? [];
         const lineText = lines.length
           ? lines.map(l => `${l.quantity ?? l.Quantity}× ${l.name ?? l.Name}`).join(", ")
-          : "No lines yet";
+          : t("noLinesYet", "No lines yet");
         const notes = (ch.customerNotes ?? ch.CustomerNotes ?? "").trim();
         const allergy = (ch.allergyNotes ?? ch.AllergyNotes ?? "").trim();
         const noteBits = [];
-        if (notes) noteBits.push("Notes: " + notes);
-        if (allergy) noteBits.push("Allergy: " + allergy);
+        if (notes) noteBits.push(t("notesPrefix", "Notes: {{text}}", { text: notes }));
+        if (allergy) noteBits.push(t("allergyPrefix", "Allergy: {{text}}", { text: allergy }));
         const selected = id === selectedOpenCheckId ? " selected" : "";
         const grand = ch.grandTotalUsd ?? ch.GrandTotalUsd ?? 0;
         return `<button type="button" class="open-check-card${selected}" data-open-check="${id}">
-          <div class="open-check-card__title"><span>${esc(code)}</span><span class="${kindCls}">${esc(kind)}</span></div>
-          <div class="open-check-meta">${esc(status)} · ${esc(formatUsd(grand))}</div>
+          <div class="open-check-card__title"><span>${esc(code)}</span><span class="${kindCls}">${esc(translateCheckKind(kind))}</span></div>
+          <div class="open-check-meta">${esc(translateOrderStatus(status))} · ${esc(formatUsd(grand))}</div>
           <div class="open-check-lines">${esc(lineText)}</div>
           ${noteBits.length ? `<div class="open-check-meta">${esc(noteBits.join(" · "))}</div>` : ""}
         </button>`;
@@ -3127,8 +3447,8 @@
       });
       const sel = selectedOpenCheck();
       info.textContent = sel
-        ? `${openChecks.length} open check(s). Selected: ${sel.orderCode ?? sel.OrderCode}.`
-        : `${openChecks.length} open check(s). Click one to select.`;
+        ? t("openChecksSelected", "{{count}} open check(s). Selected: {{code}}.", { count: openChecks.length, code: sel.orderCode ?? sel.OrderCode })
+        : t("openChecksClick", "{{count}} open check(s). Click one to select.", { count: openChecks.length });
       updateTicketModeHint();
     }
     async function loadOpenChecks() {
@@ -3144,7 +3464,7 @@
       if (!r.ok) {
         openChecks = [];
         selectedOpenCheckId = 0;
-        if (info) info.textContent = "Cannot load open checks.";
+        if (info) info.textContent = t("cannotLoadOpenChecks", "Cannot load open checks.");
         renderOpenChecks();
         return;
       }
@@ -3157,29 +3477,22 @@
     }
     function validateCartForSubmit() {
       const lines = [...cart.entries()].map(([productId, quantity]) => ({ productId, quantity }));
-      if (!lines.length) return "Cart is empty.";
+      if (!lines.length) return t("cartEmpty", "Cart is empty.");
       const mode = getTicketMode();
       if (mode === "append") {
         if (!openChecks.length) return null;
         const sel = selectedOpenCheck();
-        if (!sel) return "Select an open check to append to, or choose New ticket.";
+        if (!sel) return t("selectOpenCheckOrNew", "Select an open check to append to, or choose New ticket.");
         const kind = sel.checkKind ?? sel.CheckKind ?? "Food";
+        if (String(kind).toLowerCase() === "mixed") return null;
         for (const l of lines) {
           if (productKind(l.productId) !== kind) {
             return kind === "Drink"
-              ? "This drinks check cannot include food items."
-              : "This food check cannot include drink items.";
+              ? t("drinksCheckNoFood", "This drinks check cannot include food items.")
+              : t("foodCheckNoDrinks", "This food check cannot include drink items.");
           }
         }
         return null;
-      }
-      const newKind = getNewCheckKind();
-      for (const l of lines) {
-        if (productKind(l.productId) !== newKind) {
-          return newKind === "Drink"
-            ? "Drink tickets cannot include food items."
-            : "Food tickets cannot include drink items.";
-        }
       }
       return null;
     }
@@ -3193,6 +3506,11 @@
         return false;
       }
       config = cfg.body;
+      if (window.EliteRestaurantDateTime) {
+        EliteRestaurantDateTime.setRestaurantTimeZone(
+          config.restaurantTimeZoneId ?? config.RestaurantTimeZoneId
+        );
+      }
       menuTaxonomy = parseMenuTaxonomyFromConfig(config);
       const brandNameEl = document.getElementById("brandName");
       const brandLogoEl = document.getElementById("brandLogo");
@@ -3262,7 +3580,7 @@
         : [];
       renderDrafts();
       if (!r.ok) {
-        setDraftStatus(`Draft sync failed: ${r.body?.message || "request failed"}`, false);
+        setDraftStatus(t("draftSyncFailed", "Draft sync failed: {{message}}", { message: r.body?.message || "request failed" }), false);
       }
       return r.ok;
     }
@@ -3276,7 +3594,7 @@
 
     function renderDrafts() {
       const sel = document.getElementById("drafts");
-      const options = ["<option value=''>None (empty slot)</option>"];
+      const options = ["<option value=''>" + esc(t("draftNone", "None (empty slot)")) + "</option>"];
       drafts.forEach(d => options.push(`<option value="${escAttr(d.id)}">${esc(d.label)}</option>`));
       sel.innerHTML = options.join("");
     }
@@ -3287,10 +3605,10 @@
 
     function tableLabelForId(tableId) {
       const tid = Number(tableId) || 0;
-      if (tid <= 0) return "Table ?";
-      const t = tables.find(x => x.id === tid);
-      if (!t) return `Table #${tid}`;
-      return `Table ${t.tableNumber} - ${t.name}`;
+      if (tid <= 0) return t("tableUnknown", "Table ?");
+      const tbl = tables.find(x => x.id === tid);
+      if (!tbl) return t("tableHash", "Table #{{id}}", { id: tid });
+      return t("tableLabel", "Table {{number}} - {{name}}", { number: tbl.tableNumber, name: tbl.name });
     }
 
     function draftMetaFromSnapshot(draft) {
@@ -3308,6 +3626,14 @@
     function formatDraftWhen(draft) {
       if (!draft.updatedAtUtc) return "";
       try {
+        if (window.EliteRestaurantDateTime) {
+          return EliteRestaurantDateTime.formatRestaurantDateTime(draft.updatedAtUtc, {
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit"
+          });
+        }
         return draft.updatedAtUtc.toLocaleString(undefined, {
           month: "short",
           day: "numeric",
@@ -3334,7 +3660,7 @@
       const el = document.getElementById("incomingDraftsList");
       if (!el) return;
       if (!incomingDrafts.length) {
-        el.innerHTML = `<div class="incoming-drafts-empty" role="status"><strong>No incoming drafts</strong></div>`;
+        el.innerHTML = `<div class="incoming-drafts-empty" role="status"><strong>${esc(t("noIncomingDrafts", "No incoming drafts"))}</strong></div>`;
         return;
       }
       el.innerHTML = incomingDrafts.map(d => {
@@ -3342,15 +3668,15 @@
         const when = formatDraftWhen(d);
         const tableLine = esc(tableLabelForId(d.tableId));
         const nameLine = meta.customerName ? esc(meta.customerName) + " · " : "";
-        const itemsLine = meta.itemCount === 1 ? "1 item" : `${meta.itemCount} items`;
+        const itemsLine = meta.itemCount === 1 ? t("oneItem", "1 item") : t("itemCount", "{{count}} items", { count: meta.itemCount });
         return `<article class="incoming-draft-card" role="listitem" data-draft-id="${escAttr(d.id)}" data-table-id="${escAttr(String(d.tableId || 0))}">
   <div class="incoming-draft-card__head">
     <h3 class="incoming-draft-card__title">${esc(d.label)}</h3>
   </div>
   <div class="incoming-draft-card__meta">${tableLine}<br>${nameLine}${esc(itemsLine)}${when ? " · " + esc(when) : ""}</div>
   <div class="incoming-draft-card__actions">
-    <button type="button" class="incoming-draft-card__load" data-incoming-load>Load draft</button>
-    <button type="button" class="incoming-draft-card__delete" data-incoming-delete>Delete</button>
+    <button type="button" class="incoming-draft-card__load" data-incoming-load>${esc(t("loadDraft", "Load draft"))}</button>
+    <button type="button" class="incoming-draft-card__delete" data-incoming-delete>${esc(t("common.delete", "Delete"))}</button>
   </div>
 </article>`;
       }).join("");
@@ -3490,18 +3816,21 @@
       return false;
     }
 
-    /** Uses server product categories (same rules as customer menu)  - first line item decides. */
+    /** Uses server product categories — returns Food, Drink, or Mixed. */
     function foodOrDrinkLabelFromItems(items) {
       if (!Array.isArray(items) || !products || !products.length) return "";
+      let sawFood = false;
+      let sawDrink = false;
       for (const l of items) {
         const pid = Number(l.productId ?? l.ProductId ?? 0);
         if (pid <= 0) continue;
-        const p = products.find(x => x.id === pid);
-        if (!p) continue;
-        const c = String(p.category || "").toLowerCase();
-        if (c === "drink" || c === "drinks" || c === "beverage" || c === "beverages" || c === "bar") return "Drink";
-        return "Food";
+        const kind = productKind(pid);
+        if (kind === "Drink") sawDrink = true;
+        else sawFood = true;
+        if (sawFood && sawDrink) return "Mixed";
       }
+      if (sawDrink) return "Drink";
+      if (sawFood) return "Food";
       return "";
     }
 
@@ -3522,13 +3851,15 @@
       setTicketMode("new");
 
       const name = String(customerName).trim();
-      let fd = "";
+      let fdRaw = "";
       const okn = String(orderKindRaw).trim().toLowerCase();
-      if (okn === "drink") fd = "Drink";
-      else if (okn === "food") fd = "Food";
-      else fd = foodOrDrinkLabelFromItems(items) || "";
+      if (okn === "drink") fdRaw = "Drink";
+      else if (okn === "food") fdRaw = "Food";
+      else if (okn === "mixed") fdRaw = "Mixed";
+      else fdRaw = foodOrDrinkLabelFromItems(items) || "";
+      const fdLabel = fdRaw ? translateCheckKind(fdRaw) : "";
       const bits = [];
-      if (name) bits.push("Customer: " + name + (fd ? " (" + fd + ")" : ""));
+      if (name) bits.push(t("customerLabel", "Customer") + ": " + name + (fdLabel ? " (" + fdLabel + ")" : ""));
       if (notes)       bits.push(notes);
       if (cookingNote) bits.push(cookingNote);
       document.getElementById("customerNotes").value = bits.join(" | ");
@@ -3536,9 +3867,11 @@
       if (!allergyStr) {
         document.getElementById("allergyNotes").value = "";
       } else if (name) {
-        document.getElementById("allergyNotes").value = "Allergy: " + name + (fd ? " (" + fd + ") | " : " | ") + allergyStr;
+        document.getElementById("allergyNotes").value = t("allergyPrefix", "Allergy: {{text}}", { text: name + (fdLabel ? " (" + fdLabel + ")" : "") }) + " | " + allergyStr;
+      } else if (fdLabel) {
+        document.getElementById("allergyNotes").value = t("allergyPrefix", "Allergy: {{text}}", { text: "(" + fdLabel + ")" }) + " | " + allergyStr;
       } else {
-        document.getElementById("allergyNotes").value = "Allergy: " + (fd ? "(" + fd + ") | " : "") + allergyStr;
+        document.getElementById("allergyNotes").value = t("allergyPrefix", "Allergy: {{text}}", { text: "" }) + allergyStr;
       }
 
       cart.clear();
@@ -3550,11 +3883,11 @@
       });
 
       document.getElementById("search").value = "";
-      document.getElementById("category").value = "All";
+      document.getElementById("category").value = ALL_CAT;
       renderCategories();
       renderProducts();
       renderCart();
-      void afterPublicMenuPayloadLoaded(fd);
+      void afterPublicMenuPayloadLoaded(fdRaw);
     }
 
     async function afterPublicMenuPayloadLoaded(kindLabel) {
@@ -3568,14 +3901,13 @@
         renderOpenChecks();
       } else {
         setTicketMode("new");
-        setNewCheckKind(kind);
         renderOpenChecks();
       }
     }
 
     async function loadDraft(draftId, options = {}) {
       if (!draftId) {
-        setDraftStatus("Select a draft first.", false);
+        setDraftStatus(t("selectDraftFirst", "Select a draft first."), false);
         setOut("Load draft", { ok: false, message: "Select a draft first." });
         return;
       }
@@ -3583,7 +3915,7 @@
       const hintTableId = Number(options.tableId ?? options.TableId ?? 0) || 0;
       const draft = await resolveDraftRow(draftId, hintTableId);
       if (!draft) {
-        setDraftStatus("Draft not found  - click Refresh Data.", false);
+        setDraftStatus(t("draftNotFound", "Draft not found — click Refresh Data."), false);
         setOut("Load draft", { ok: false, message: "Draft not in list." });
         return;
       }
@@ -3594,7 +3926,7 @@
       try {
         raw = JSON.parse(rawJson || "{}");
       } catch (e) {
-        setDraftStatus("Draft payload is corrupted.", false);
+        setDraftStatus(t("draftCorrupted", "Draft payload is corrupted."), false);
         console.error("[loadDraft] JSON parse failed:", e);
         return;
       }
@@ -3625,7 +3957,7 @@
 
       await checkOpenCheck();
       document.getElementById("drafts").value = draftId;
-      setDraftStatus("Draft loaded.", true);
+      setDraftStatus(t("draftLoaded", "Draft loaded."), true);
       setOut("Draft loaded", { id: draft.id, label: draft.label });
       navigateToTakeOrder();
     }
@@ -3667,14 +3999,30 @@
       if (btn) btn.click();
     }
 
+    let orderStageFlashTimer = null;
+
+    function scheduleServerStageFlash(msg) {
+      const el = document.getElementById("orderStageFlash");
+      if (!el) return;
+      el.textContent = msg || "";
+      if (orderStageFlashTimer) clearTimeout(orderStageFlashTimer);
+      orderStageFlashTimer = setTimeout(() => {
+        el.textContent = "";
+        orderStageFlashTimer = null;
+      }, 12000);
+    }
+
     function unlockServerAudioFromUserGesture() {
-      try {
-        const Ctx = window.AudioContext || window.webkitAudioContext;
-        if (!Ctx) return;
-        const ctx = new Ctx();
-        if (ctx.state === "suspended") void ctx.resume();
-        void ctx.close();
-      } catch { /* ignore */ }
+      if (window.EliteOrderStageAlert) window.EliteOrderStageAlert.unlockAudio();
+      else {
+        try {
+          const Ctx = window.AudioContext || window.webkitAudioContext;
+          if (!Ctx) return;
+          const ctx = new Ctx();
+          if (ctx.state === "suspended") void ctx.resume();
+          void ctx.close();
+        } catch { /* ignore */ }
+      }
     }
 
     function playServerReadyRing() {
@@ -3765,20 +4113,20 @@
       el.className = "server-ready-toast";
       const metaParts = [
         table || null,
-        guest ? "Guest: " + guest : null,
-        itemCount > 0 ? itemCount + " items" : null
+        guest ? t("toastGuestPrefix", "Guest: {{name}}", { name: guest }) : null,
+        itemCount > 0 ? t("itemCount", "{{count}} items", { count: itemCount }) : null
       ].filter(Boolean);
-      const metaLine = metaParts.length ? metaParts.join(" | ") : "Kitchen marked this order Ready for you.";
+      const metaLine = metaParts.length ? metaParts.join(" | ") : t("toastKitchenReady", "Kitchen marked this order Ready for you.");
 
       el.innerHTML = `
 <div class="server-ready-toast__head">
-  <div class="server-ready-toast__title">Ready to serve<span class="server-ready-toast__badge">NEW</span></div>
-  <button type="button" class="server-ready-toast__dismiss" aria-label="Dismiss">&times;</button>
+  <div class="server-ready-toast__title">${esc(t("toastReadyTitle", "Ready to serve"))}<span class="server-ready-toast__badge">${esc(t("toastNewBadge", "NEW"))}</span></div>
+  <button type="button" class="server-ready-toast__dismiss" aria-label="${escAttr(t("toastDismiss", "Dismiss"))}">&times;</button>
 </div>
 <div class="server-ready-toast__meta">${esc(code)} · ${esc(metaLine)}</div>
 ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
-<div class="server-ready-toast__countdown" data-cd>Closing in 20s</div>
-<button type="button" class="server-ready-toast__cta" data-open-pickup>View Pick Up &amp; Serve</button>`;
+<div class="server-ready-toast__countdown" data-cd>${esc(t("toastClosingIn", "Closing in {{sec}}s", { sec: 20 }))}</div>
+<button type="button" class="server-ready-toast__cta" data-open-pickup>${esc(t("toastViewPickup", "View Pick Up & Serve"))}</button>`;
 
       const tickRef = { t: null };
       let countSec = 20;
@@ -3791,7 +4139,7 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
           close();
           return;
         }
-        if (cd) cd.textContent = "Closing in " + countSec + "s";
+        if (cd) cd.textContent = t("toastClosingIn", "Closing in {{sec}}s", { sec: countSec });
       }, 1000);
       el.querySelector("[data-open-pickup]").onclick = async () => {
         close();
@@ -3827,6 +4175,11 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
     function formatCallTime(iso) {
       if (!iso) return "—";
       try {
+        if (window.EliteRestaurantDateTime) {
+          return EliteRestaurantDateTime.formatRestaurantDateTime(iso, {
+            month: "short", day: "numeric", hour: "numeric", minute: "2-digit"
+          }) || "—";
+        }
         const d = new Date(iso);
         return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
       } catch {
@@ -3836,24 +4189,25 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
 
     function tableCallHeadline(tableCode, tableName) {
       const name = String(tableName ?? "").trim();
-      if (tableCode != null && name) return "Table " + String(tableCode) + " : " + name + " Calling";
-      if (tableCode != null) return "Table " + String(tableCode) + " Calling";
-      return "Table Calling";
+      if (tableCode != null && name) return t("tableCallingNamed", "Table {{code}} : {{name}} Calling", { code: String(tableCode), name });
+      if (tableCode != null) return t("tableCallingCode", "Table {{code}} Calling", { code: String(tableCode) });
+      return t("tableCalling", "Table Calling");
     }
 
     function tableCallOrdersHtml(orders) {
       const list = Array.isArray(orders) ? orders : [];
       if (!list.length) {
-        return "<div class=\"table-call-card__orders-empty\">No open orders on this table yet.</div>";
+        return "<div class=\"table-call-card__orders-empty\">" + esc(t("noOpenOrdersTable", "No open orders on this table yet.")) + "</div>";
       }
       return list.map(o => {
         const orderId = Number(o.id ?? o.Id) || 0;
         const code = esc(String(o.orderId ?? o.OrderId ?? "#?"));
-        const display = esc(String(o.displayStatus ?? o.DisplayStatus ?? o.status ?? o.Status ?? ""));
+        const display = esc(translateDisplayStatus(String(o.displayStatus ?? o.DisplayStatus ?? o.status ?? o.Status ?? "")));
         const color = esc(String(o.statusColor ?? o.StatusColor ?? "#94a3b8"));
         const total = esc(fmtUsd(Number(o.totalUsd ?? o.TotalUsd) || 0));
         const summary = esc(String(o.itemsSummary ?? o.ItemsSummary ?? ""));
-        const kind = esc(String(o.checkKind ?? o.CheckKind ?? ""));
+        const kindRaw = String(o.checkKind ?? o.CheckKind ?? "");
+        const kind = kindRaw ? esc(translateCheckKind(kindRaw)) : "";
         return (
           "<button type=\"button\" class=\"table-call-order\" data-table-order-id=\"" + orderId + "\">" +
           "<div class=\"table-call-order__top\"><span class=\"table-call-order__code\">" + code + "</span><span class=\"table-call-order__total\">" + total + "</span></div>" +
@@ -3869,7 +4223,7 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       if (!list) return;
       const tables = tableCallsBoard.tables ?? tableCallsBoard.Tables ?? [];
       if (!tables.length) {
-        list.innerHTML = "<div class=\"table-calls-empty\">No table calls or open orders on your tables.</div>";
+        list.innerHTML = "<div class=\"table-calls-empty\">" + esc(t("noTableCalls", "No table calls or open orders on your tables.")) + "</div>";
         return;
       }
       list.innerHTML = tables.map(row => {
@@ -3878,27 +4232,27 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
         const name = String(row.tableName ?? row.TableName ?? "").trim();
         const orders = row.orders ?? row.Orders ?? [];
         const call = row.pendingCall ?? row.PendingCall ?? null;
-        const tableTitle = esc("Table " + String(num) + (name ? " : " + name : ""));
+        const tableTitle = esc(name ? t("tableTitleNamed", "Table {{number}} : {{name}}", { number: num, name }) : t("tableTitle", "Table {{number}}", { number: num }));
         let callHtml = "";
         if (call) {
           const id = String(call.id ?? call.Id ?? "");
-          const reason = esc(String(call.reasonLabel ?? call.ReasonLabel ?? "Call server"));
+          const reason = esc(String(call.reasonLabel ?? call.ReasonLabel ?? t("callServerDefault", "Call server")));
           const when = formatCallTime(call.calledAtUtc ?? call.CalledAtUtc);
           const callTitle = esc(tableCallHeadline(num, name));
           callHtml =
             "<div class=\"table-call-card__call\" data-call-id=\"" + esc(id) + "\">" +
             "<div class=\"table-call-card__head\"><div class=\"table-call-card__title\">" + callTitle + "<span class=\"server-table-call-toast__badge\" style=\"margin-left:6px\">CALL</span></div>" +
-            "<span class=\"pill\" style=\"font-size:11px;padding:4px 10px;border-radius:999px;border:1px solid #f59e0b;color:#b45309;\">Pending</span></div>" +
+            "<span class=\"pill\" style=\"font-size:11px;padding:4px 10px;border-radius:999px;border:1px solid #f59e0b;color:#b45309;\">" + esc(t("pending", "Pending")) + "</span></div>" +
             "<div class=\"table-call-card__reason\">" + reason + "</div>" +
             "<div class=\"table-call-card__meta\">" + esc(when) + "</div>" +
-            "<div class=\"table-call-card__actions\"><button type=\"button\" class=\"btn btn-primary btn-sm\" data-accept-call data-call-id=\"" + esc(id) + "\" data-table-id=\"" + tableId + "\">Accept</button></div>" +
+            "<div class=\"table-call-card__actions\"><button type=\"button\" class=\"btn btn-primary btn-sm\" data-accept-call data-call-id=\"" + esc(id) + "\" data-table-id=\"" + tableId + "\">" + esc(t("accept", "Accept")) + "</button></div>" +
             "</div>";
         }
         return (
           "<article class=\"table-call-card\" data-table-id=\"" + tableId + "\">" +
           "<div class=\"table-call-card__head\"><div class=\"table-call-card__title\">" + tableTitle + "</div></div>" +
           callHtml +
-          "<div class=\"table-call-card__orders-head\">Orders at this table</div>" +
+          "<div class=\"table-call-card__orders-head\">" + esc(t("ordersAtTable", "Orders at this table")) + "</div>" +
           "<div class=\"table-call-card__orders\">" + tableCallOrdersHtml(orders) + "</div>" +
           "</article>"
         );
@@ -3982,18 +4336,18 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       if (!host || !payload) return;
       const tableCode = payload.tableCode ?? payload.TableCode;
       const tableName = String(payload.tableName ?? payload.TableName ?? "").trim();
-      const reasonLabel = String(payload.reasonLabel ?? payload.ReasonLabel ?? "").trim() || "Call server";
+      const reasonLabel = String(payload.reasonLabel ?? payload.ReasonLabel ?? "").trim() || t("callServerDefault", "Call server");
       const headline = tableCallHeadline(tableCode, tableName);
       const el = document.createElement("div");
       el.className = "server-table-call-toast";
       el.innerHTML =
         "<div class=\"server-table-call-toast__head\">" +
         "<div class=\"server-table-call-toast__title\">" + esc(headline) + "<span class=\"server-table-call-toast__badge\">CALL</span></div>" +
-        "<button type=\"button\" class=\"server-table-call-toast__dismiss\" aria-label=\"Dismiss\">&times;</button>" +
+        "<button type=\"button\" class=\"server-table-call-toast__dismiss\" aria-label=\"" + escAttr(t("toastDismiss", "Dismiss")) + "\">&times;</button>" +
         "</div>" +
         "<div class=\"server-table-call-toast__reason\">" + esc(reasonLabel) + "</div>" +
-        "<div class=\"server-table-call-toast__countdown\" data-cd>Closing in 25s</div>" +
-        "<button type=\"button\" class=\"server-table-call-toast__cta\" data-accept-call>Accept</button>";
+        "<div class=\"server-table-call-toast__countdown\" data-cd>" + esc(t("toastClosingIn", "Closing in {{sec}}s", { sec: 25 })) + "</div>" +
+        "<button type=\"button\" class=\"server-table-call-toast__cta\" data-accept-call>" + esc(t("accept", "Accept")) + "</button>";
       const tickRef = { t: null };
       let countSec = 25;
       const close = () => removeCustomerDraftToastEl(el, tickRef);
@@ -4002,7 +4356,7 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       tickRef.t = setInterval(() => {
         countSec -= 1;
         if (countSec <= 0) { close(); return; }
-        if (cd) cd.textContent = "Closing in " + countSec + "s";
+        if (cd) cd.textContent = t("toastClosingIn", "Closing in {{sec}}s", { sec: countSec });
       }, 1000);
       el.querySelector("[data-accept-call]").onclick = () => {
         const callId = String(payload.callId ?? payload.CallId ?? "");
@@ -4026,6 +4380,79 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       });
     }
 
+    function showServerStationReadyToast(payload) {
+      const host = document.getElementById("customerToastHost");
+      if (!host || !payload) return;
+      const orderId = Number(payload.orderId ?? payload.OrderId) || 0;
+      const code = String(payload.orderCode ?? payload.OrderCode ?? (orderId ? "#" + orderId : "Order")).trim();
+      const table = String(payload.tableLabel ?? payload.TableLabel ?? "").trim();
+      const summary = translatePrepSummary(String(payload.prepSummary ?? payload.PrepSummary ?? "").trim());
+      const station = String(payload.prepStation ?? payload.PrepStation ?? "Kitchen").trim();
+      const label = station.toLowerCase() === "bar" ? t("toastDrinksReady", "Drinks ready") : t("toastFoodReady", "Food ready");
+
+      const el = document.createElement("div");
+      el.className = "server-ready-toast";
+      el.innerHTML = `
+<div class="server-ready-toast__head">
+  <div class="server-ready-toast__title">${esc(label)}<span class="server-ready-toast__badge">${esc(t("toastPickupBadge", "PICK UP"))}</span></div>
+  <button type="button" class="server-ready-toast__dismiss" aria-label="${escAttr(t("toastDismiss", "Dismiss"))}">&times;</button>
+</div>
+<div class="server-ready-toast__meta">${esc(code)}${table ? " · " + esc(table) : ""}</div>
+${summary ? `<div class="server-ready-toast__items">${esc(summary)}</div>` : ""}
+<div class="server-ready-toast__countdown" data-cd>${esc(t("toastClosingIn", "Closing in {{sec}}s", { sec: 20 }))}</div>
+<button type="button" class="server-ready-toast__cta" data-open-pickup>${esc(t("toastViewPickup", "View Pick Up & Serve"))}</button>`;
+
+      const tickRef = { t: null };
+      let countSec = 20;
+      const close = () => removeCustomerDraftToastEl(el, tickRef);
+      el.querySelector(".server-ready-toast__dismiss").onclick = close;
+      const cd = el.querySelector("[data-cd]");
+      tickRef.t = setInterval(() => {
+        countSec -= 1;
+        if (countSec <= 0) { close(); return; }
+        if (cd) cd.textContent = t("toastClosingIn", "Closing in {{sec}}s", { sec: countSec });
+      }, 1000);
+      el.querySelector("[data-open-pickup]").onclick = async () => {
+        close();
+        markReadyOrderHighlighted(orderId);
+        navigateToPickupTab();
+        await loadReadyOrders();
+      };
+      host.prepend(el);
+    }
+
+    async function handleServerStationReadyArrived(payload) {
+      if (!payload || typeof payload !== "object") return;
+      const serverId = Number(payload.serverId ?? payload.ServerId) || 0;
+      const myId = myServerEmployeeId();
+      if (myId > 0 && serverId > 0 && serverId !== myId) return;
+
+      const orderId = Number(payload.orderId ?? payload.OrderId) || 0;
+      const code = String(payload.orderCode ?? payload.OrderCode ?? (orderId ? "#" + orderId : "")).trim();
+      const table = String(payload.tableLabel ?? payload.TableLabel ?? "").trim();
+      const station = String(payload.prepStation ?? payload.PrepStation ?? "Kitchen").trim();
+      const label = station.toLowerCase() === "bar" ? t("toastDrinksReady", "Drinks ready") : t("toastFoodReady", "Food ready");
+      const flashMsg = [label, code, table].filter(Boolean).join(" · ");
+
+      unlockServerAudioFromUserGesture();
+      if (window.EliteOrderStageAlert && typeof window.EliteOrderStageAlert.playRing === "function") {
+        window.EliteOrderStageAlert.playRing();
+      } else {
+        playServerReadyRing();
+      }
+      if (flashMsg) scheduleServerStageFlash(flashMsg);
+
+      markReadyOrderHighlighted(orderId);
+      showServerStationReadyToast(payload);
+
+      try {
+        await loadReadyOrders();
+        await loadOngoingOrders();
+      } catch { /* ignore */ }
+
+      if (!isPickupTabActive()) updatePickupNavBadge();
+    }
+
     async function handleServerReadyOrderArrived(payload) {
       if (!payload || typeof payload !== "object") return;
       const serverId = Number(payload.serverId ?? payload.ServerId) || 0;
@@ -4034,7 +4461,6 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
 
       const orderId = Number(payload.orderId ?? payload.OrderId) || 0;
       markReadyOrderHighlighted(orderId);
-      playServerReadyRing();
       showServerReadyOrderToast(payload);
 
       try {
@@ -4051,14 +4477,14 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       const el = document.createElement("div");
       el.className = "customer-draft-toast";
       const draftId = payload.draftId;
-      const label = payload.label != null ? String(payload.label) : "Customer menu draft";
+      const label = payload.label != null ? String(payload.label) : t("toastCustomerDraft", "Customer menu draft");
       const pSub = [
         payload.tableCode != null && String(payload.tableCode) !== "" ? "Table " + esc(String(payload.tableCode)) : null,
         payload.customerName != null && String(payload.customerName).trim() ? esc(String(payload.customerName).trim()) : null,
-        payload.itemCount != null ? String(Number(payload.itemCount)) + " items" : null,
+        payload.itemCount != null ? t("itemCount", "{{count}} items", { count: Number(payload.itemCount) }) : null,
         payload.totalUsd != null ? esc(fmtUsd(payload.totalUsd)) : null
       ].filter(Boolean);
-      const metaLine = pSub.length ? pSub.join(" | ") : "New customer order draft.";
+      const metaLine = pSub.length ? pSub.join(" | ") : t("toastNewCustomerDraft", "New customer order draft.");
 
       el.innerHTML = `<!--
   CustomerDraftArrived  - primary CTA below calls loadDraft(draftId) (same as draft dropdown + Load),
@@ -4066,12 +4492,12 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
 -->
 <div class="customer-draft-toast__head">
   <div class="customer-draft-toast__title">${esc(label)}</div>
-  <button type="button" class="customer-draft-toast__dismiss" aria-label="Dismiss">&times;</button>
+  <button type="button" class="customer-draft-toast__dismiss" aria-label="${escAttr(t("toastDismiss", "Dismiss"))}">&times;</button>
 </div>
 <div class="customer-draft-toast__meta">${metaLine}</div>
-<div class="customer-draft-toast__countdown" data-cd>Closing in 15s</div>
-<button type="button" class="customer-draft-toast__cta" data-load>Load Draft</button>
-<div class="customer-draft-toast__hint">Switches to the Take Order / Create Order screen; uses the same <code>loadDraft(draftId)</code> path as the draft list + Load action.</div>`;
+<div class="customer-draft-toast__countdown" data-cd>${esc(t("toastClosingIn", "Closing in {{sec}}s", { sec: 15 }))}</div>
+<button type="button" class="customer-draft-toast__cta" data-load>${esc(t("toastLoadDraft", "Load Draft"))}</button>
+<div class="customer-draft-toast__hint">${esc(t("toastDraftHint", "Switches to the Take Order / Create Order screen; uses the same loadDraft path as the draft list + Load action."))}</div>`;
 
       const tickRef = { t: null };
       let countSec = 15;
@@ -4084,7 +4510,7 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
           close();
           return;
         }
-        if (cd) cd.textContent = "Closing in " + countSec + "s";
+        if (cd) cd.textContent = t("toastClosingIn", "Closing in {{sec}}s", { sec: countSec });
       }, 1000);
       el.querySelector("[data-load]").onclick = async () => {
         close();
@@ -4115,6 +4541,9 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       conn.on("ServerReadyOrderArrived", p => {
         void handleServerReadyOrderArrived(p);
       });
+      conn.on("ServerStationReadyArrived", p => {
+        void handleServerStationReadyArrived(p);
+      });
       conn.on("ServerTableCall", p => {
         handleServerTableCall(p);
       });
@@ -4126,6 +4555,28 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
         void loadReadyOrders();
         void loadTableCalls();
       });
+      if (window.EliteOrderStageAlert) {
+        EliteOrderStageAlert.wireHubConnection(conn, {
+          audience: "Server",
+          onFlash: scheduleServerStageFlash,
+          onNotify: () => {
+            void refreshDraftList();
+            void loadIncomingDrafts();
+            void loadOngoingOrders();
+            void loadReadyOrders();
+            updateIncomingNavBadge();
+            if (!isPickupTabActive()) updatePickupNavBadge();
+          }
+        });
+      }
+      if (window.EliteSignalRBanner) {
+        EliteSignalRBanner.wire(conn, function () {
+          conn.invoke("JoinServer").catch(function () {});
+          void loadOngoingOrders();
+          void loadReadyOrders();
+          void loadTableCalls();
+        });
+      }
       try {
         await conn.start();
         await conn.invoke("JoinServer");
@@ -4194,7 +4645,6 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
         discountValue: value,
         appendMode: getTicketMode(),
         selectedOpenCheckId,
-        newCheckKind: getNewCheckKind(),
         customerNotes: document.getElementById("customerNotes").value,
         allergyNotes: document.getElementById("allergyNotes").value,
         cart: [...cart.entries()]
@@ -4208,7 +4658,6 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       document.getElementById("discountValue").value = String(s.discountValue || 0);
       setTicketMode(s.appendMode || "append");
       selectedOpenCheckId = Number(s.selectedOpenCheckId || 0) || 0;
-      if (s.newCheckKind) setNewCheckKind(s.newCheckKind);
       document.getElementById("customerNotes").value = s.customerNotes || "";
       document.getElementById("allergyNotes").value = s.allergyNotes || "";
       cart.clear();
@@ -4217,7 +4666,7 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       });
       // Keep full menu visible after loading a draft.
       document.getElementById("search").value = "";
-      document.getElementById("category").value = "All";
+      document.getElementById("category").value = ALL_CAT;
       renderCategories();
       renderProducts();
       renderCart();
@@ -4232,7 +4681,7 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       document.getElementById("customerNotes").value = "";
       document.getElementById("allergyNotes").value = "";
       document.getElementById("search").value = "";
-      document.getElementById("category").value = "All";
+      document.getElementById("category").value = ALL_CAT;
       renderCategories();
       renderCart();
       checkOpenCheck();
@@ -4276,18 +4725,17 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       const staffId = (document.getElementById("staffId").value || "").trim();
       const pin = document.getElementById("pin").value || "";
       if (!staffId || !pin) {
-        setLoginMessage("Enter SignInId / UniqueId and PIN.", "error");
+        setLoginMessage(t("loginEnterIdPin", "Enter SignInId / UniqueId and PIN."), "error");
         return;
       }
-      setLoginMessage("Signing in...");
+      setLoginMessage(t("signingIn", "Signing in…"));
       btn.disabled = true;
       let res;
       try {
         res = await api("/api/auth/login", "POST", { staffId, pin, portal: "Server" }, false);
       } catch (e) {
         setLoginMessage(
-          "Could not reach the API. Use the hosted URL (for example https://starfish-app-owtoz.ondigitalocean.app/server/), confirm the API is running, and check the browser console for details.\n\n"
-            + (e && e.message ? e.message : String(e)),
+          t("loginNetworkError", "Could not reach the API. Use the hosted URL (for example https://starfish-app-owtoz.ondigitalocean.app/server/), confirm the API is running, and check the browser console for details.\n\n{{detail}}", { detail: e && e.message ? e.message : String(e) }),
           "error"
         );
         setOut("Login network error", { error: String(e) });
@@ -4301,7 +4749,7 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
           res.body?.title ||
           res.body?.detail ||
           (res.body?.errors ? JSON.stringify(res.body.errors) : null);
-        setLoginMessage(`Login failed (HTTP ${res.status}). ${hint || "Check credentials and that this account may use the Server portal."}`, "error");
+        setLoginMessage(t("loginFailed", "Login failed (HTTP {{status}}). {{detail}}", { status: res.status, detail: hint || t("loginFailedDetail", "Check credentials and that this account may use the Server portal.") }), "error");
         setOut("Login failed", res);
         return;
       }
@@ -4330,7 +4778,7 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       if (window.ElitePortalSession) window.ElitePortalSession.clear(PORTAL_ID);
       token = ""; me = null; tables = []; products = []; readyOrders = []; ongoingOrders = []; drafts = []; incomingDrafts = []; tableCallsBoard = { tables: [], pendingCallCount: 0 }; cart.clear();
       closeOngoingOrderModal();
-      document.getElementById("brandName").textContent = "ELITE SERVER PORTAL";
+      document.getElementById("brandName").textContent = t("brandDefault", "ELITE SERVER PORTAL");
       revokeImgBlob(document.getElementById("brandLogo"));
       document.getElementById("brandLogo").classList.add("hidden");
       revokeImgBlob(document.getElementById("staffPhoto"));
@@ -4350,7 +4798,7 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       me = saved.me;
       document.getElementById("sessionLabel").textContent = me
         ? `${me.name} (${me.signInId || me.employeeUniqueId})`
-        : "Server session";
+        : t("serverSession", "Server session");
       document.getElementById("loginWrap").classList.add("hidden");
       document.getElementById("app").classList.remove("hidden");
       const ok = await loadPortalData();
@@ -4409,10 +4857,8 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       if (e.target && e.target.id === "ongoingOrderModal") closeOngoingOrderModal();
     };
     document.getElementById("btnRefreshOpenChecks").onclick = () => { void loadOpenChecks(); };
-    document.getElementById("ticketModeAppend").addEventListener("change", () => { syncNewCheckKindVisibility(); updateTicketModeHint(); });
-    document.getElementById("ticketModeNew").addEventListener("change", () => { syncNewCheckKindVisibility(); updateTicketModeHint(); });
-    document.getElementById("newCheckKindFood").addEventListener("change", updateTicketModeHint);
-    document.getElementById("newCheckKindDrink").addEventListener("change", updateTicketModeHint);
+    document.getElementById("ticketModeAppend").addEventListener("change", () => { updateTicketModeHint(); });
+    document.getElementById("ticketModeNew").addEventListener("change", () => { updateTicketModeHint(); });
 
     document.getElementById("btnSaveDraft").onclick = async () => {
       const snapshot = snapshotState();
@@ -4422,13 +4868,13 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       const payload = { label, snapshotJson: JSON.stringify(snapshot) };
       const res = await api("/api/server/drafts", "POST", payload);
       if (!res.ok) {
-        setDraftStatus(`Save failed: ${res.body?.message || "request failed"}`, false);
+        setDraftStatus(t("saveFailed", "Save failed: {{message}}", { message: res.body?.message || "request failed" }), false);
         setOut("Draft save failed", res);
         return;
       }
       await loadDrafts();
       document.getElementById("drafts").value = res.body.id || "";
-      setDraftStatus("Draft saved to backend.", true);
+      setDraftStatus(t("draftSaved", "Draft saved to backend."), true);
       setOut("Draft saved", { id: res.body.id, drafts: drafts.length });
     };
     document.getElementById("btnLoadDraft").onclick = async () => {
@@ -4437,7 +4883,7 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
     document.getElementById("btnDeleteDraft").onclick = async () => {
       const id = document.getElementById("drafts").value;
       if (!id) {
-        setDraftStatus("Select a draft first.", false);
+        setDraftStatus(t("selectDraftFirst", "Select a draft first."), false);
         setOut("Delete draft", { ok: false, message: "Select a draft first." });
         return;
       }
@@ -4445,14 +4891,14 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       const q = tid > 0 ? `?tableId=${tid}` : "";
       const res = await api(`/api/server/drafts/${id}${q}`, "DELETE");
       if (!res.ok) {
-        setDraftStatus(`Delete failed: ${res.body?.message || "request failed"}`, false);
+        setDraftStatus(t("deleteFailed", "Delete failed: {{message}}", { message: res.body?.message || "request failed" }), false);
         setOut("Delete draft failed", res);
         return;
       }
       await loadDrafts();
       await loadIncomingDrafts();
       document.getElementById("drafts").value = "";
-      setDraftStatus("Draft deleted.", true);
+      setDraftStatus(t("draftDeleted", "Draft deleted."), true);
       setOut("Draft deleted", { id });
     };
 
@@ -4461,16 +4907,67 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
       setOut("Order cleared", { ok: true });
     };
 
+    let linkedRestaurantClientId = null;
+    let linkedRestaurantClientName = "";
+    let linkedRestaurantClientDebt = 0;
+
+    function refreshLinkedClientLabel() {
+      const el = document.getElementById("linkedClientLabel");
+      if (!el) return;
+      if (!linkedRestaurantClientId) {
+        el.textContent = t("noClientLinked", "No client linked");
+        return;
+      }
+      const debtHint = linkedRestaurantClientDebt > 0.009
+        ? t("debtSuffix", " · debt {{amount}}", { amount: fmtUsd(linkedRestaurantClientDebt) })
+        : "";
+      el.textContent = t("linkedClient", "Linked: {{name}} (#{{id}}){{debt}}", { name: linkedRestaurantClientName, id: linkedRestaurantClientId, debt: debtHint });
+    }
+
+    document.getElementById("btnClientLink").onclick = async () => {
+      const res = await api("/api/clients");
+      if (!res.ok) {
+        alert(res.body?.message || t("couldNotLoadClients", "Could not load clients."));
+        return;
+      }
+      const rows = Array.isArray(res.body) ? res.body : [];
+      if (!rows.length) {
+        alert(t("noClientsRegistered", "No clients registered yet."));
+        return;
+      }
+      const picked = await EliteClientPicker.pick(rows, {
+        title: t("clientPickerTitle", "Link to client"),
+        subtitle: t("clientPickerSubtitle", "{{count}} clients — filter below and select who this order is for.", { count: rows.length }),
+        i18n: (key, fallback, vars) => t(key, fallback, vars)
+      });
+      if (!picked) return;
+      linkedRestaurantClientId = picked.id;
+      linkedRestaurantClientName = picked.fullName;
+      linkedRestaurantClientDebt = picked.debtBalanceUsd;
+      refreshLinkedClientLabel();
+    };
+
+    document.getElementById("btnClientClear").onclick = () => {
+      linkedRestaurantClientId = null;
+      linkedRestaurantClientName = "";
+      linkedRestaurantClientDebt = 0;
+      refreshLinkedClientLabel();
+    };
+
     document.getElementById("btnSubmit").onclick = async () => {
+      const submitBtn = document.getElementById("btnSubmit");
+      if (window.EliteButtonBusy) EliteButtonBusy.set(submitBtn, true, "portals.common.saving", "Saving…");
       const tableId = Number(document.getElementById("tableSelect").value || "0");
       const lines = [...cart.entries()].map(([productId, quantity]) => ({ productId, quantity }));
       if (!tableId) {
-        alert("Select a table first.");
+        if (window.EliteButtonBusy) EliteButtonBusy.set(submitBtn, false);
+        alert(t("selectTableFirst", "Select a table first."));
         setOut("Submit blocked", { message: "Select a table first." });
         return;
       }
       if (!lines.length) {
-        alert("Cart is empty.");
+        if (window.EliteButtonBusy) EliteButtonBusy.set(submitBtn, false);
+        alert(t("cartEmpty", "Cart is empty."));
         setOut("Submit blocked", { message: "Cart is empty." });
         return;
       }
@@ -4484,22 +4981,25 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
         paymentCurrencyCode: document.getElementById("paymentCurrency").value,
         appendToOpenCheck: getTicketMode() === "append",
         openOrderId: getTicketMode() === "append" && selectedOpenCheckId > 0 ? selectedOpenCheckId : null,
-        newCheckKind: getTicketMode() === "new" ? getNewCheckKind() : null,
+        newCheckKind: getTicketMode() === "new" ? inferCheckKindFromCart() : null,
         customerNotes: document.getElementById("customerNotes").value || "",
         allergyNotes: document.getElementById("allergyNotes").value || "",
+        restaurantClientId: linkedRestaurantClientId,
         lines
       };
       const cartErr = validateCartForSubmit();
       if (cartErr) {
+        if (window.EliteButtonBusy) EliteButtonBusy.set(submitBtn, false);
         alert(cartErr);
         setOut("Submit blocked", { message: cartErr });
         return;
       }
       const res = await api("/api/server/orders", "POST", payload);
       setOut("Submit order result", res);
+      if (window.EliteButtonBusy) EliteButtonBusy.set(submitBtn, false);
       if (!res.ok) {
         const m = res.body?.message || res.body?.title || res.body?.detail;
-        alert(m || `Could not place order (HTTP ${res.status}).`);
+        alert(m || t("placeOrderFailed", "Could not place order (HTTP {{status}}).", { status: res.status }));
         return;
       }
       clearCurrentOrder();
@@ -4509,6 +5009,14 @@ ${items ? `<div class="server-ready-toast__items">${esc(items)}</div>` : ""}
     if (window.location.protocol !== "file:") {
       void tryRestoreServerSession();
     }
+
+    void (async function initServerI18n() {
+      if (!window.EliteI18n) return;
+      await EliteI18n.init();
+      applyServerStaticI18n();
+      EliteI18n.mountSwitcher("#serverLangLogin");
+      EliteI18n.mountSwitcher("#serverLangSidebar");
+    })();
   </script>
 </body>
 </html>

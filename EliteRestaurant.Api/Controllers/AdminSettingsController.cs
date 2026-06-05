@@ -2,6 +2,7 @@ using EliteRestaurant.Contracts.Admin;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Menu;
+using EliteRestaurant.Api.Services;
 using EliteRestaurant.Core.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -13,7 +14,10 @@ namespace EliteRestaurant.Api.Controllers;
 [ApiController]
 [Route("api/admin/settings")]
 [Authorize(Policy = "AdminOnly")]
-public sealed class AdminSettingsController(AppDbContext db) : ControllerBase
+public sealed class AdminSettingsController(
+    AppDbContext db,
+    PublicMenuSettingsCache menuSettingsCache,
+    CachedAppSettingsProvider appSettings) : ControllerBase
 {
     [HttpPost("cloud-profile")]
     public async Task<ActionResult<AdminCloudSettingsResponse>> SaveCloudProfile(
@@ -40,6 +44,8 @@ public sealed class AdminSettingsController(AppDbContext db) : ControllerBase
             ? null
             : request.CustomerMenuNotesText.Trim();
         row.StaffLoginPasscode = (request.StaffLoginPasscode ?? string.Empty).Trim();
+        row.OrderCancelPasscode = (request.OrderCancelPasscode ?? string.Empty).Trim();
+        row.ClientDebtCapUsd = request.ClientDebtCapUsd > 0 ? request.ClientDebtCapUsd : 250m;
         row.AdminWebSignInId = (request.AdminWebSignInId ?? string.Empty).Trim();
         row.AdminWebPin = (request.AdminWebPin ?? string.Empty).Trim();
         row.TicketFooterText = request.TicketFooterText?.Trim() ?? string.Empty;
@@ -74,6 +80,7 @@ public sealed class AdminSettingsController(AppDbContext db) : ControllerBase
         row.PayrollAbsenceCountsAsAttendanceUnit = request.PayrollAbsenceCountsAsAttendanceUnit;
         row.PayrollSalesBonusPercent = Math.Clamp(request.PayrollSalesBonusPercent, 0m, 100m);
         row.PayrollMaxSalaryAdvancePercentOfGross = Math.Clamp(request.PayrollMaxSalaryAdvancePercentOfGross, 0m, 100m);
+        row.RestaurantTimeZoneId = RestaurantTimeZone.NormalizeId(request.RestaurantTimeZoneId);
 
         row.UpdatedAtUtc = DateTime.UtcNow;
         if (row.Id == 0)
@@ -82,10 +89,11 @@ public sealed class AdminSettingsController(AppDbContext db) : ControllerBase
         MergeLogoAssets(request);
         MergeOnlinePromoAssets(request);
         await db.SaveChangesAsync(cancellationToken);
+        menuSettingsCache.Invalidate();
         AdminWebLoginSeed.EnsureSeeded(db);
 
         // Keep the existing file-based settings as a local fallback for older deployments.
-        var settings = SettingsManager.Load();
+        var settings = appSettings.Load();
         var preservedTicketReceipt = settings.TicketReceipt ?? new TicketReceiptSettings();
         settings.BusinessProfile.RestaurantName = row.RestaurantName;
         settings.BusinessProfile.Phone = row.Phone;
@@ -97,6 +105,8 @@ public sealed class AdminSettingsController(AppDbContext db) : ControllerBase
         settings.BusinessProfile.CustomerMenuContactIntro = row.CustomerMenuContactIntro;
         settings.BusinessProfile.CustomerMenuNotesText = row.CustomerMenuNotesText;
         settings.BusinessProfile.StaffLoginPasscode = row.StaffLoginPasscode;
+        settings.BusinessProfile.OrderCancelPasscode = row.OrderCancelPasscode;
+        settings.BusinessProfile.ClientDebtCapUsd = row.ClientDebtCapUsd;
         settings.BusinessProfile.AdminWebSignInId = row.AdminWebSignInId;
         settings.BusinessProfile.AdminWebPin = row.AdminWebPin;
         settings.BusinessProfile.TicketFooterText = row.TicketFooterText;
@@ -115,6 +125,7 @@ public sealed class AdminSettingsController(AppDbContext db) : ControllerBase
         settings.BusinessProfile.OnlineOrdersTableId = row.OnlineOrdersTableId;
         settings.BusinessProfile.ReservationLeadDays = Math.Clamp(request.ReservationLeadDays, 0, 30);
         settings.BusinessProfile.ReservationMaxMonthsAhead = Math.Clamp(request.ReservationMaxMonthsAhead, 1, 24);
+        settings.BusinessProfile.RestaurantTimeZoneId = row.RestaurantTimeZoneId;
         settings.BusinessProfile.OnlinePromoTitle = row.OnlinePromoTitle;
         settings.BusinessProfile.OnlinePromoSubtitle = row.OnlinePromoSubtitle;
         settings.BusinessProfile.OnlinePromoCtaLabel = row.OnlinePromoCtaLabel;
@@ -128,6 +139,7 @@ public sealed class AdminSettingsController(AppDbContext db) : ControllerBase
         settings.Salary.MaxSalaryAdvancePercentOfGross = Math.Clamp(request.PayrollMaxSalaryAdvancePercentOfGross, 0m, 100m);
         settings.TicketReceipt = preservedTicketReceipt;
         SettingsManager.Save(settings);
+        appSettings.Invalidate();
         return Ok(new AdminCloudSettingsResponse(true, "/api/public/menu/assets/logo", "Cloud settings saved."));
     }
 

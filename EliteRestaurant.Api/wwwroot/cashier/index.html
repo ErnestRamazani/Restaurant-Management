@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="fr">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Elite Cashier</title>
+  <title data-i18n="portals.cashier.pageTitle" data-i18n-attr="textContent">Elite Cashier</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
@@ -584,6 +584,7 @@
     .od-status-pill--kitchen { color: #fcd34d; background: rgba(251, 191, 36, 0.1); border-color: rgba(251, 191, 36, 0.28); }
     .od-status-pill--ready { color: #6ee7b7; background: rgba(45, 212, 191, 0.12); border-color: rgba(45, 212, 191, 0.32); }
     .od-status-pill--served { color: #c4b5fd; background: rgba(167, 139, 250, 0.12); border-color: rgba(167, 139, 250, 0.3); }
+    .od-status-pill--debt { color: #fde68a; background: rgba(245, 158, 11, 0.16); border-color: rgba(245, 158, 11, 0.42); }
     .od-modal-body {
       flex: 1;
       min-height: 0;
@@ -885,23 +886,26 @@
     }
     .pay-flow-footer--three { grid-template-columns: 1fr 1fr 1fr; }
     .pay-step.hidden { display: none !important; }
+    .cashier-lang-wrap { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+    #cashierLangSidebar.cashier-lang-wrap { margin-top: 4px; margin-bottom: 0; justify-content: flex-start; }
   </style>
 </head>
 <body>
   <div id="loginWrap" class="main-area">
     <div class="card">
-      <h1>Cashier</h1>
+      <div id="cashierLangLogin" class="cashier-lang-wrap"></div>
+      <h1 data-i18n="portals.cashier.loginTitle">Cashier</h1>
       <div id="loginErr" class="danger hidden"></div>
       <div class="login-stack">
         <div class="login-field">
-          <label class="lbl" for="staffId">Sign-in ID</label>
+          <label class="lbl" for="staffId" data-i18n="auth.signInId">Sign-in ID</label>
           <input class="inp" id="staffId" type="text" autocomplete="username">
         </div>
         <div class="login-field">
-          <label class="lbl" for="pin">PIN</label>
+          <label class="lbl" for="pin" data-i18n="auth.pin">PIN</label>
           <input class="inp" id="pin" type="password" autocomplete="current-password">
         </div>
-        <button type="button" class="btn btn-primary btn-block" id="btnLogin">Sign in</button>
+        <button type="button" class="btn btn-primary btn-block" id="btnLogin" data-i18n="common.signIn">Sign in</button>
       </div>
     </div>
   </div>
@@ -912,31 +916,32 @@
         <img id="brandLogo" class="brand-logo" alt="">
         <div class="brand" id="brandText">ELITE CASHIER</div>
       </div>
+      <div id="cashierLangSidebar" class="cashier-lang-wrap"></div>
       <div class="nav-stack">
-        <button type="button" class="nav-btn active" id="navOrders" data-view="orders">Orders <span id="navOrdersBadge" class="nav-badge hidden" aria-hidden="true"></span></button>
-        <button type="button" class="nav-btn" id="navMenu" data-view="menu">Menu</button>
+        <button type="button" class="nav-btn active" id="navOrders" data-view="orders"><span data-i18n="portals.cashier.navOrders">Orders</span> <span id="navOrdersBadge" class="nav-badge hidden" aria-hidden="true"></span></button>
+        <button type="button" class="nav-btn" id="navMenu" data-view="menu" data-i18n="portals.cashier.navMenu">Menu</button>
       </div>
       <div class="row-flex" style="margin-top:4px;">
-        <span id="hubPill" class="hub-pill off">Live: …</span>
+        <span id="hubPill" class="hub-pill off" data-i18n="portals.cashier.hubPolling">Live: …</span>
         <span id="orderReadyFlash" class="muted" style="margin-left:8px;font-weight:600;color:#4ade80;flex:1;min-height:1.2em;"></span>
       </div>
-      <button type="button" class="btn btn-ghost btn-block btn-sm" id="btnRefreshAll">Refresh all</button>
+      <button type="button" class="btn btn-ghost btn-block btn-sm" id="btnRefreshAll" data-i18n="portals.cashier.refreshAll">Refresh all</button>
       <div class="who">
         <div class="who-row">
           <img id="staffPhoto" class="who-photo" alt="">
           <div>
             <div id="sessionLabel" class="mono"></div>
-            <span class="staff-role-chip">Cashier</span>
+            <span class="staff-role-chip" data-i18n="portals.cashier.roleChip">Cashier</span>
           </div>
         </div>
-        <button type="button" class="btn btn-ghost btn-block" id="btnLogout" style="margin-top:12px;">Sign out</button>
+        <button type="button" class="btn btn-ghost btn-block" id="btnLogout" style="margin-top:12px;" data-i18n="common.signOut">Sign out</button>
       </div>
     </aside>
 
     <main class="main-area">
       <div id="viewOrders" class="view-panel">
         <div class="toolbar">
-          <h2>Orders</h2>
+          <h2 data-i18n="portals.cashier.ordersHeading">Orders</h2>
           <span id="ordersUpdated" class="muted"></span>
         </div>
         <div class="card-panel">
@@ -944,19 +949,19 @@
         </div>
         <div class="orders-split">
           <div class="card-panel">
-            <h3>Awaiting validation</h3>
+            <h3 data-i18n="portals.cashier.awaitingValidation">Awaiting validation</h3>
             <div id="pendingOrders" class="list-scroll"></div>
           </div>
           <div class="card-panel">
-            <h3>Active</h3>
-            <input class="search-field" id="activeSearch" type="search" placeholder="Search active…" style="width:100%; max-width:none; margin-bottom:8px;">
+            <h3 data-i18n="portals.cashier.active">Active</h3>
+            <input class="search-field" id="activeSearch" type="search" data-i18n="portals.cashier.searchActive" placeholder="Search active…" style="width:100%; max-width:none; margin-bottom:8px;">
             <div id="activeOrders" class="list-scroll"></div>
           </div>
           <div class="card-panel">
-            <h3>Past</h3>
-            <label class="lbl" for="pastDaySelect">Day</label>
+            <h3 data-i18n="portals.cashier.past">Past</h3>
+            <label class="lbl" for="pastDaySelect" data-i18n="portals.cashier.day">Day</label>
             <select class="sel" id="pastDaySelect" style="width:100%; max-width:none; margin-bottom:8px;"></select>
-            <input class="search-field" id="pastSearch" type="search" placeholder="Search past…" style="width:100%; max-width:none; margin-bottom:8px;">
+            <input class="search-field" id="pastSearch" type="search" data-i18n="portals.cashier.searchPast" placeholder="Search past…" style="width:100%; max-width:none; margin-bottom:8px;">
             <div id="pastOrders" class="list-scroll"></div>
           </div>
         </div>
@@ -964,10 +969,10 @@
 
       <div id="viewMenu" class="view-panel hidden">
         <div class="toolbar">
-          <h2>Menu</h2>
+          <h2 data-i18n="portals.cashier.menuHeading">Menu</h2>
           <div class="toolbar-row">
-            <input type="search" id="menuSearch" class="search-field" placeholder="Search menu…" autocomplete="off">
-            <button type="button" class="btn btn-ghost" id="btnRefreshMenu">Refresh</button>
+            <input type="search" id="menuSearch" class="search-field" data-i18n="portals.cashier.searchMenu" placeholder="Search menu…" autocomplete="off">
+            <button type="button" class="btn btn-ghost" id="btnRefreshMenu" data-i18n="common.refresh">Refresh</button>
           </div>
         </div>
         <div id="menuBody" class="menu-list"></div>
@@ -981,10 +986,10 @@
       <header class="od-modal-header">
         <div class="od-modal-header-row">
           <div>
-            <div class="od-modal-label">Order</div>
+            <div class="od-modal-label" data-i18n="portals.cashier.detail.orderLabel">Order</div>
             <div id="detailOrderCode" class="od-modal-code">—</div>
             <div id="detailConfirmationWrap" class="od-modal-confirm hidden" aria-live="polite">
-              <div class="od-modal-confirm-k">Confirmation code</div>
+              <div class="od-modal-confirm-k" data-i18n="portals.cashier.detail.confirmationCode">Confirmation code</div>
               <div id="detailConfirmationCode" class="od-modal-confirm-v">—</div>
             </div>
           </div>
@@ -993,8 +998,8 @@
       </header>
       <div id="detailBodyScroll" class="od-modal-body"></div>
       <footer class="od-modal-footer">
-        <button type="button" class="btn btn-ghost" id="detailPrintTicket">Print ticket</button>
-        <button type="button" class="btn btn-ghost" id="detailClose">Close</button>
+        <button type="button" class="btn btn-ghost" id="detailPrintTicket" data-i18n="portals.cashier.printTicket">Print ticket</button>
+        <button type="button" class="btn btn-ghost" id="detailClose" data-i18n="common.close">Close</button>
       </footer>
     </div>
   </div>
@@ -1004,43 +1009,48 @@
       <!-- Step A: guest payment -->
       <div id="payStepPayment" class="pay-step">
         <header>
-          <h3 id="payFlowTitle" class="pay-flow-title">Complete Order Payment</h3>
-          <p class="pay-flow-meta">Order: <strong id="payOrderCode">—</strong></p>
-          <p class="pay-flow-meta">Amount due: <strong id="payDueUsd">$ 0.00</strong> (<span id="payDueFc">FC 0</span>)</p>
+          <h3 id="payFlowTitle" class="pay-flow-title" data-i18n="portals.cashier.pay.completeTitle">Complete Order Payment</h3>
+          <p class="pay-flow-meta"><span data-i18n="portals.cashier.pay.orderLabel">Order:</span> <strong id="payOrderCode">—</strong></p>
+          <p class="pay-flow-meta"><span data-i18n="portals.cashier.pay.amountDue">Amount due:</span> <strong id="payDueUsd">$ 0.00</strong> (<span id="payDueFc">FC 0</span>)</p>
+          <div id="payClientBlock" class="hidden" style="margin:10px 0 0;padding:10px;border:1px solid rgba(212,175,55,.35);border-radius:8px;">
+            <p class="pay-flow-meta"><span data-i18n="portals.cashier.pay.clientLabel">Client:</span> <strong id="payClientName">—</strong> · <span data-i18n="portals.cashier.pay.debtSuffix">debt</span> <span id="payClientDebt">$0</span></p>
+            <label style="margin-right:14px;"><input type="radio" name="paySettlement" value="PayNow" checked> <span data-i18n="portals.cashier.pay.payNow">Pay now</span></label>
+            <label id="payOnAccountLabel"><input type="radio" name="paySettlement" value="OnAccount" id="payOnAccountRadio"> <span data-i18n="portals.cashier.pay.addToDebt">Add to debt</span></label>
+          </div>
           <hr class="pay-flow-sep" aria-hidden="true">
         </header>
         <div class="pay-flow-body">
           <div class="pay-flow-main">
             <div class="pay-amount-row">
-              <p class="pay-dual-label">USD + FC</p>
+              <p class="pay-dual-label" data-i18n="portals.cashier.pay.usdFc">USD + FC</p>
               <div class="pay-amount-fields">
-                <input type="text" inputmode="decimal" autocomplete="off" class="pay-amount-input is-active" id="payUsdInput" data-numpad-target="PaidUsd" aria-label="Paid USD" placeholder="0.00">
-                <button type="button" class="btn btn-ghost btn-sm pay-edit-btn" data-select-numpad="PaidUsd">Edit Paid USD</button>
-                <input type="text" inputmode="decimal" autocomplete="off" class="pay-amount-input" id="payFcInput" data-numpad-target="PaidFc" aria-label="Paid FC" placeholder="0" style="margin-top:8px;">
-                <button type="button" class="btn btn-ghost btn-sm pay-edit-btn" data-select-numpad="PaidFc">Edit Paid FC</button>
+                <input type="text" inputmode="decimal" autocomplete="off" class="pay-amount-input is-active" id="payUsdInput" data-numpad-target="PaidUsd" data-i18n="portals.cashier.pay.paidUsdAria" data-i18n-attr="aria-label" aria-label="Paid USD" placeholder="0.00">
+                <button type="button" class="btn btn-ghost btn-sm pay-edit-btn" data-select-numpad="PaidUsd" data-i18n="portals.cashier.pay.editPaidUsd">Edit Paid USD</button>
+                <input type="text" inputmode="decimal" autocomplete="off" class="pay-amount-input" id="payFcInput" data-numpad-target="PaidFc" data-i18n="portals.cashier.pay.paidFcAria" data-i18n-attr="aria-label" aria-label="Paid FC" placeholder="0" style="margin-top:8px;">
+                <button type="button" class="btn btn-ghost btn-sm pay-edit-btn" data-select-numpad="PaidFc" data-i18n="portals.cashier.pay.editPaidFc">Edit Paid FC</button>
               </div>
             </div>
-            <div class="pay-kpi-row" aria-label="Payment summary">
+            <div class="pay-kpi-row" data-i18n="portals.cashier.pay.summaryAria" data-i18n-attr="aria-label" aria-label="Payment summary">
               <div class="pay-kpi">
-                <div class="pay-kpi-k pay-kpi-k--due">Due</div>
+                <div class="pay-kpi-k pay-kpi-k--due" data-i18n="portals.cashier.pay.due">Due</div>
                 <div class="pay-kpi-v" id="payKpiDueUsd">$ 0.00</div>
                 <div class="pay-kpi-sub" id="payKpiDueFc">FC 0</div>
               </div>
               <div class="pay-kpi">
-                <div class="pay-kpi-k pay-kpi-k--rem">Remaining</div>
+                <div class="pay-kpi-k pay-kpi-k--rem" data-i18n="portals.cashier.pay.remaining">Remaining</div>
                 <div class="pay-kpi-v" id="payKpiRemUsd">$ 0.00</div>
                 <div class="pay-kpi-sub" id="payKpiRemFc">FC 0</div>
               </div>
               <div class="pay-kpi">
-                <div class="pay-kpi-k pay-kpi-k--chg">Change</div>
+                <div class="pay-kpi-k pay-kpi-k--chg" data-i18n="portals.cashier.pay.change">Change</div>
                 <div class="pay-kpi-v" id="payKpiChgUsd">$ 0.00</div>
                 <div class="pay-kpi-sub" id="payKpiChgFc">FC 0</div>
               </div>
             </div>
-            <p class="pay-hint">Type amounts or use the numpad for Paid USD and Paid FC. If one currency is not used, leave it at 0.</p>
-          <p style="margin:12px 0 0;"><button type="button" class="btn btn-ghost btn-sm" id="payPrintTicket">Print ticket</button></p>
+            <p class="pay-hint" data-i18n="portals.cashier.pay.hint">Type amounts or use the numpad for Paid USD and Paid FC. If one currency is not used, leave it at 0.</p>
+          <p style="margin:12px 0 0;"><button type="button" class="btn btn-ghost btn-sm" id="payPrintTicket" data-i18n="portals.cashier.printTicket">Print ticket</button></p>
           </div>
-          <div class="pay-numpad" aria-label="Numeric keypad">
+          <div class="pay-numpad" data-i18n="portals.cashier.pay.numpadAria" data-i18n-attr="aria-label" aria-label="Numeric keypad">
             <button type="button" class="btn btn-numpad" data-numpad-digit="7">7</button>
             <button type="button" class="btn btn-numpad" data-numpad-digit="8">8</button>
             <button type="button" class="btn btn-numpad" data-numpad-digit="9">9</button>
@@ -1056,42 +1066,42 @@
           </div>
         </div>
         <footer class="pay-flow-footer">
-          <button type="button" class="btn btn-ghost" id="payCancel">Cancel</button>
-          <button type="button" class="btn btn-primary" id="payGoToChange" disabled>Go to change</button>
+          <button type="button" class="btn btn-ghost" id="payCancel" data-i18n="common.cancel">Cancel</button>
+          <button type="button" class="btn btn-primary" id="payGoToChange" disabled data-i18n="portals.cashier.pay.goToChange">Go to change</button>
         </footer>
       </div>
 
       <!-- Step B: change allocation -->
       <div id="payStepChange" class="pay-step hidden">
         <header>
-          <h3 class="pay-flow-title">Change Allocation</h3>
-          <p class="pay-flow-meta">Order: <strong id="payChangeOrderCode">—</strong></p>
-          <p class="pay-flow-meta">Change required: <strong id="payChangeDueUsd">$ 0.00</strong> (<span id="payChangeDueFc">FC 0</span>)</p>
+          <h3 class="pay-flow-title" data-i18n="portals.cashier.pay.changeTitle">Change Allocation</h3>
+          <p class="pay-flow-meta"><span data-i18n="portals.cashier.pay.orderLabel">Order:</span> <strong id="payChangeOrderCode">—</strong></p>
+          <p class="pay-flow-meta"><span data-i18n="portals.cashier.pay.changeRequired">Change required:</span> <strong id="payChangeDueUsd">$ 0.00</strong> (<span id="payChangeDueFc">FC 0</span>)</p>
           <hr class="pay-flow-sep" aria-hidden="true">
         </header>
         <div class="pay-flow-body">
           <div class="pay-flow-main">
             <div class="pay-alloc-panel">
-              <p class="pay-alloc-title">Allocate Change</p>
+              <p class="pay-alloc-title" data-i18n="portals.cashier.pay.allocateTitle">Allocate Change</p>
               <div class="pay-alloc-grid">
-                <span>USD change</span>
+                <span data-i18n="portals.cashier.pay.usdChange">USD change</span>
                 <span class="pay-alloc-due" id="payAllocDueUsd">Due $ 0.00</span>
-                <input type="text" inputmode="decimal" autocomplete="off" class="pay-amount-input is-active" id="chgUsdInput" data-numpad-target="ChangeUsd" aria-label="Change USD" placeholder="0.00">
+                <input type="text" inputmode="decimal" autocomplete="off" class="pay-amount-input is-active" id="chgUsdInput" data-numpad-target="ChangeUsd" data-i18n="portals.cashier.pay.changeUsdAria" data-i18n-attr="aria-label" aria-label="Change USD" placeholder="0.00">
               </div>
-              <button type="button" class="btn btn-ghost btn-sm pay-edit-btn" data-select-numpad="ChangeUsd" style="margin-left:auto;display:block;width:170px;max-width:100%;">Edit USD change</button>
+              <button type="button" class="btn btn-ghost btn-sm pay-edit-btn" data-select-numpad="ChangeUsd" style="margin-left:auto;display:block;width:170px;max-width:100%;" data-i18n="portals.cashier.pay.editUsdChange">Edit USD change</button>
               <div class="pay-alloc-grid" style="margin-top:12px;">
-                <span>FC change</span>
+                <span data-i18n="portals.cashier.pay.fcChange">FC change</span>
                 <span class="pay-alloc-due" id="payAllocDueFc">Due FC 0</span>
-                <input type="text" inputmode="decimal" autocomplete="off" class="pay-amount-input" id="chgFcInput" data-numpad-target="ChangeFc" aria-label="Change FC" placeholder="0">
+                <input type="text" inputmode="decimal" autocomplete="off" class="pay-amount-input" id="chgFcInput" data-numpad-target="ChangeFc" data-i18n="portals.cashier.pay.changeFcAria" data-i18n-attr="aria-label" aria-label="Change FC" placeholder="0">
               </div>
-              <button type="button" class="btn btn-ghost btn-sm pay-edit-btn" data-select-numpad="ChangeFc" style="margin-left:auto;display:block;width:170px;max-width:100%;">Edit FC change</button>
+              <button type="button" class="btn btn-ghost btn-sm pay-edit-btn" data-select-numpad="ChangeFc" style="margin-left:auto;display:block;width:170px;max-width:100%;" data-i18n="portals.cashier.pay.editFcChange">Edit FC change</button>
               <div class="pay-remaining-banner">
-                <div class="pay-kpi-k pay-kpi-k--rem">Remaining to allocate: <span id="payRemAllocUsd" style="font-size:1rem;color:#e2e8f0;">$ 0.00</span></div>
+                <div class="pay-kpi-k pay-kpi-k--rem"><span data-i18n="portals.cashier.pay.remainingAllocate">Remaining to allocate:</span> <span id="payRemAllocUsd" style="font-size:1rem;color:#e2e8f0;">$ 0.00</span></div>
                 <div class="pay-kpi-sub" id="payRemAllocFc" style="margin-top:4px;">FC 0</div>
               </div>
             </div>
           </div>
-          <div class="pay-numpad" aria-label="Numeric keypad">
+          <div class="pay-numpad" data-i18n="portals.cashier.pay.numpadAria" data-i18n-attr="aria-label" aria-label="Numeric keypad">
             <button type="button" class="btn btn-numpad" data-numpad-digit="7">7</button>
             <button type="button" class="btn btn-numpad" data-numpad-digit="8">8</button>
             <button type="button" class="btn btn-numpad" data-numpad-digit="9">9</button>
@@ -1107,9 +1117,9 @@
           </div>
         </div>
         <footer class="pay-flow-footer pay-flow-footer--three">
-          <button type="button" class="btn btn-ghost" id="payChangeBack">Back</button>
-          <button type="button" class="btn btn-ghost" id="payChangeCancel">Cancel</button>
-          <button type="button" class="btn btn-primary" id="payConfirm" disabled>Confirm Complete</button>
+          <button type="button" class="btn btn-ghost" id="payChangeBack" data-i18n="common.back">Back</button>
+          <button type="button" class="btn btn-ghost" id="payChangeCancel" data-i18n="common.cancel">Cancel</button>
+          <button type="button" class="btn btn-primary" id="payConfirm" disabled data-i18n="portals.cashier.pay.confirmComplete">Confirm Complete</button>
         </footer>
       </div>
     </div>
@@ -1117,7 +1127,14 @@
 
   <!-- Absolute URLs so scripts still load if this HTML is ever opened under a mismatched path. -->
   <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.7/dist/browser/signalr.min.js" crossorigin="anonymous"></script>
+  <script>window.EliteI18nDisableAutoInit = true;</script>
+  <script src="/js/elite-i18n.js"></script>
   <script src="/js/elite-portal-session.js"></script>
-  <script src="/cashier/cashier-app.js?v=17"></script>
+  <script src="/shared/order-cancel-passcode.js"></script>
+  <script src="/shared/api-error-banner.js"></script>
+  <script src="/shared/button-busy.js"></script>
+  <script src="/shared/signalr-connection-banner.js"></script>
+  <script src="/shared/order-stage-alert.js"></script>
+  <script src="/cashier/cashier-app.js?v=22"></script>
 </body>
 </html>

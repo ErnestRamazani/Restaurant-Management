@@ -26,7 +26,8 @@ public sealed record PublicMenuConfigDto(
     string? OnlinePromoSubtitle,
     string? OnlinePromoCtaLabel,
     string? OnlinePromoImageUrl,
-    string? MenuTaxonomyJson);
+    string? MenuTaxonomyJson,
+    string RestaurantTimeZoneId);
 
 public sealed record StaffLoginCodeRequest(string? Code, string? SignInId = null, string? Pin = null);
 

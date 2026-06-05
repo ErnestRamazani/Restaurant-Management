@@ -1,3 +1,5 @@
+using EliteRestaurant.Core.Models;
+
 namespace EliteRestaurant.Core.Utils;
 
 /// <summary>
@@ -39,6 +41,25 @@ public static class PricingResolver
 
     public static decimal ResolveRestaurantServicePercent(decimal? cloudServicePercent, decimal fileServicePercent) =>
         cloudServicePercent is > 0m ? cloudServicePercent.Value : RequirePositivePercent(fileServicePercent, "ServicePercent");
+
+    /// <summary>
+    /// Guest menu and public order totals: cloud <see cref="PublicMenuSetting"/> when set, else desktop file pricing.
+    /// </summary>
+    public static PublicMenuSetting ResolveEffectiveRestaurantPricing(PublicMenuSetting? cloud)
+    {
+        var file = SettingsManager.Load().CurrencyPricing;
+        return new PublicMenuSetting
+        {
+            TaxPercent = ResolveRestaurantTaxPercent(cloud?.TaxPercent, file.TaxPercent),
+            ServicePercent = ResolveRestaurantServicePercent(cloud?.ServicePercent, file.ServicePercent),
+            RoundingLine = PreferNonEmpty(cloud?.RoundingLine, file.RoundingLine),
+            RoundingSubtotal = PreferNonEmpty(cloud?.RoundingSubtotal, file.RoundingSubtotal),
+            RoundingGrandTotal = PreferNonEmpty(cloud?.RoundingGrandTotal, file.RoundingGrandTotal),
+        };
+    }
+
+    private static string PreferNonEmpty(string? primary, string? fallback) =>
+        !string.IsNullOrWhiteSpace(primary) ? primary.Trim() : (fallback?.Trim() ?? "Nearest");
 
     private static decimal RequirePositivePercent(decimal value, string fieldName)
     {

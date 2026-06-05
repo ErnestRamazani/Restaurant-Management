@@ -30,10 +30,10 @@
 
             <StackPanel Grid.Row="0" Margin="32,24,32,12">
                 <TextBlock Style="{StaticResource HeadingLarge}" FontSize="26">
-                    <Run Text="Order" Foreground="{StaticResource TextPrimaryBrush}"/>
-                    <Run Text=" Management" Foreground="{StaticResource GoldAccentBrush}"/>
+                    <Run Text="{Binding PageTitleOrder, Mode=OneWay}" Foreground="{StaticResource TextPrimaryBrush}"/>
+                    <Run Text="{Binding PageTitleAccent, Mode=OneWay}" Foreground="{StaticResource GoldAccentBrush}"/>
                 </TextBlock>
-                <TextBlock Text="Active list includes kitchen stages through Served. Cashier completes only after the server marks served (Pick up &amp; serve). Use View order for full lines and notes."
+                <TextBlock Text="{Binding PageSubtitle}"
                            Style="{StaticResource BodyText}" FontSize="13" Margin="0,5,0,0" TextWrapping="Wrap"/>
             </StackPanel>
 
@@ -49,7 +49,7 @@
                 <StackPanel>
                     <TextBlock Text="{Binding PendingCashierSectionTitle}"
                                Foreground="{StaticResource GoldAccentBrush}" FontSize="15" FontWeight="SemiBold"/>
-                    <TextBlock Text="Server tablets send tickets here first. Release to deduct stock and send to the kitchen, or cancel."
+                    <TextBlock Text="{Binding PendingCashierHint}"
                                Foreground="{StaticResource TextMutedBrush}" FontSize="12" Margin="0,4,0,10" TextWrapping="Wrap"/>
                     <ItemsControl ItemsSource="{Binding PendingCashierOrders}">
                         <ItemsControl.ItemTemplate>
@@ -63,22 +63,22 @@
                                         <StackPanel>
                                             <TextBlock Text="{Binding OrderCode}" Foreground="{StaticResource GoldAccentBrush}"
                                                        FontWeight="SemiBold" FontSize="14"/>
-                                            <TextBlock Text="{Binding TableLabel}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,4,0,0"/>
-                                            <TextBlock Text="{Binding ServerName, StringFormat=Server: {0}}" Foreground="{StaticResource StatBlueBrush}" FontSize="11" Margin="0,2,0,0"/>
-                                            <TextBlock Text="{Binding CreatedAtText}" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,2,0,0"/>
+                                            <TextBlock Text="{Binding DisplayTableLabel}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" Margin="0,4,0,0"/>
+                                            <TextBlock Text="{Binding DisplayServerLine}" Foreground="{StaticResource StatBlueBrush}" FontSize="11" Margin="0,2,0,0"/>
+                                            <TextBlock Text="{Binding DisplayCreatedAtText}" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,2,0,0"/>
                                             <TextBlock Text="{Binding LinesSummary}" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,6,0,0" TextWrapping="Wrap" MaxHeight="40" TextTrimming="CharacterEllipsis"/>
                                             <TextBlock Text="{Binding GrandTotalText}" Foreground="{StaticResource GoldAccentBrush}" FontSize="16" Margin="0,6,0,0"/>
                                         </StackPanel>
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
-                                            <Button Content="View order" Margin="0,0,0,8"
+                                            <Button Content="{Binding DataContext.OrdViewOrderLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Margin="0,0,0,8"
                                                     Command="{Binding DataContext.ViewOrderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
                                                     Style="{StaticResource SapphireButton}"/>
-                                            <Button Content="Release to kitchen" Margin="0,0,0,8"
+                                            <Button Content="{Binding DataContext.OrdReleaseKitchenLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Margin="0,0,0,8"
                                                     Command="{Binding DataContext.ReleasePendingCashierCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
                                                     Style="{StaticResource GoldPrimaryButton}"/>
-                                            <Button Content="Cancel ticket"
+                                            <Button Content="{Binding DataContext.OrdCancelTicketLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     Command="{Binding DataContext.CancelPendingCashierCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                     CommandParameter="{Binding}"
                                                     Style="{StaticResource DangerButton}"/>
@@ -118,7 +118,7 @@
                                     <Border Width="8" Height="8" CornerRadius="4"
                                             Background="{StaticResource StatOrangeBrush}"
                                             VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                    <TextBlock Text="Active Orders" Foreground="{StaticResource TextPrimaryBrush}"
+                                    <TextBlock Text="{Binding DataContext.OrdActiveOrdersLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Foreground="{StaticResource TextPrimaryBrush}"
                                                FontFamily="Segoe UI Variable Text, Segoe UI"
                                                FontSize="14" FontWeight="SemiBold"/>
                                 </StackPanel>
@@ -136,7 +136,7 @@
                                  Padding="10,8"
                                  Text="{Binding ActiveOrdersSearchFilter, UpdateSourceTrigger=PropertyChanged}"
                                  Style="{StaticResource EliteTextBox}"
-                                 ToolTip="Search by order #, table, server, items, or status"/>
+                                 ToolTip="{Binding OrdSearchActiveTooltip}"/>
 
                         <Border Grid.Row="2" Padding="12,8">
                             <ItemsControl ItemsSource="{Binding ActiveOrders}">
@@ -155,22 +155,22 @@
                                                                    FontFamily="Segoe UI Variable Text, Segoe UI"
                                                                    FontSize="12" Margin="0,2,0,0"
                                                                    Visibility="{Binding ShowConfirmationCode, Converter={StaticResource BoolToVisibilityConverter}}">
-                                                            <Run Text="Code: "/><Run Text="{Binding ConfirmationCode, Mode=OneWay}" FontWeight="SemiBold" Foreground="{StaticResource GoldAccentBrush}"/>
+                                                            <Run Text="{Binding DisplayConfirmationLine, Mode=OneWay}"/>
                                                         </TextBlock>
                                                     </StackPanel>
                                                     <Border HorizontalAlignment="Right" VerticalAlignment="Center"
                                                             Background="{Binding StatusColor}"
                                                             CornerRadius="6" Padding="7,3" Opacity="0.9">
-                                                        <TextBlock Text="{Binding Status}" Foreground="White"
+                                                        <TextBlock Text="{Binding DisplayStatus}" Foreground="White"
                                                                    FontFamily="Segoe UI Variable Text, Segoe UI"
                                                                    FontSize="10" FontWeight="SemiBold"/>
                                                     </Border>
                                                 </Grid>
-                                                <TextBlock Text="{Binding TableNumber}"
+                                                <TextBlock Text="{Binding DisplayTableLabel}"
                                                            Foreground="{StaticResource TextSecondaryBrush}"
                                                            FontFamily="Segoe UI Variable Text, Segoe UI"
                                                            FontSize="12" Margin="0,5,0,4"/>
-                                                <TextBlock Text="{Binding ServerName, StringFormat=Server: {0}}"
+                                                <TextBlock Text="{Binding DisplayServerLine}"
                                                            Foreground="{StaticResource StatBlueBrush}"
                                                            FontFamily="Segoe UI Variable Text, Segoe UI"
                                                            FontSize="11" Margin="0,0,0,4"/>
@@ -181,7 +181,7 @@
                                                            TextTrimming="CharacterEllipsis" MaxHeight="34"/>
 
                                                 <Button Margin="0,12,0,0"
-                                                        Content="View order"
+                                                        Content="{Binding DataContext.OrdViewOrderLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         Command="{Binding DataContext.ViewOrderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         CommandParameter="{Binding}"
                                                         Style="{StaticResource SapphireButton}"/>
@@ -193,27 +193,27 @@
                                                     </Grid.ColumnDefinitions>
                                                     <Button Grid.Column="0"
                                                             Margin="0,0,6,0"
-                                                            Content="Advance"
+                                                            Content="{Binding DataContext.OrdAdvanceLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                             Command="{Binding DataContext.AdvanceOrderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                             CommandParameter="{Binding}"
                                                             Style="{StaticResource SapphireButton}"
                                                             Visibility="{Binding ShowAdvanceInOrders, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                                     <Button Grid.Column="1"
                                                             Margin="6,0,6,0"
-                                                            Content="Complete"
+                                                            Content="{Binding DataContext.OrdCompleteLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                             Command="{Binding DataContext.CompleteOrderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                             CommandParameter="{Binding}"
                                                             Style="{StaticResource GoldPrimaryButton}"
                                                             Visibility="{Binding ShowCompleteInOrders, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                                     <Button Grid.Column="2"
                                                             Margin="6,0,0,0"
-                                                            Content="Cancel"
+                                                            Content="{Binding DataContext.OrdCancelLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                             Command="{Binding DataContext.CancelOrderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                             CommandParameter="{Binding}"
                                                             Style="{StaticResource DangerButton}"/>
                                                 </Grid>
                                                 <Button Margin="0,8,0,0"
-                                                        Content="View ticket"
+                                                        Content="{Binding DataContext.OrdViewTicketLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         Command="{Binding DataContext.PrintTicketCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         CommandParameter="{Binding}"
                                                         Style="{StaticResource GhostButton}"
@@ -247,7 +247,7 @@
                                     <Border Width="8" Height="8" CornerRadius="4"
                                             Background="{StaticResource StatGreenBrush}"
                                             VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                    <TextBlock Text="Past Orders" Foreground="{StaticResource TextPrimaryBrush}"
+                                    <TextBlock Text="{Binding DataContext.OrdPastOrdersLabel, RelativeSource={RelativeSource AncestorType=UserControl}}" Foreground="{StaticResource TextPrimaryBrush}"
                                                FontFamily="Segoe UI Variable Text, Segoe UI"
                                                FontSize="14" FontWeight="SemiBold"/>
                                 </StackPanel>
@@ -265,7 +265,7 @@
                                  Padding="10,8"
                                  Text="{Binding PastOrdersSearchFilter, UpdateSourceTrigger=PropertyChanged}"
                                  Style="{StaticResource EliteTextBox}"
-                                 ToolTip="Search by order #, table, server, items, or status"/>
+                                 ToolTip="{Binding OrdSearchPastTooltip}"/>
 
                         <Border Grid.Row="2" Padding="12,8">
                             <ItemsControl ItemsSource="{Binding PastOrderDayGroups}">
@@ -280,7 +280,7 @@
                                                                FontFamily="Segoe UI Variable Text, Segoe UI"
                                                                FontSize="13"
                                                                FontWeight="SemiBold"/>
-                                                    <TextBlock Text="{Binding Count, StringFormat= ({0} orders)}"
+                                                    <TextBlock Text="{Binding OrdersCountText}"
                                                                Margin="8,0,0,0"
                                                                Foreground="{StaticResource TextMutedBrush}"
                                                                FontSize="12"/>
@@ -309,20 +309,20 @@
                                                                     <Border HorizontalAlignment="Right" VerticalAlignment="Center"
                                                                             Background="{Binding StatusColor}"
                                                                             CornerRadius="6" Padding="7,3" Opacity="0.9">
-                                                                        <TextBlock Text="{Binding Status}" Foreground="White"
+                                                                        <TextBlock Text="{Binding DisplayStatus}" Foreground="White"
                                                                                    FontFamily="Segoe UI Variable Text, Segoe UI"
                                                                                    FontSize="10" FontWeight="SemiBold"/>
                                                                     </Border>
                                                                 </Grid>
                                                                 <Grid Margin="0,5,0,4">
-                                                                    <TextBlock Text="{Binding TableNumber}"
+                                                                    <TextBlock Text="{Binding DisplayTableLabel}"
                                                                                Foreground="{StaticResource TextSecondaryBrush}"
                                                                                FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="12"/>
-                                                                    <TextBlock Text="{Binding Time}" HorizontalAlignment="Right"
+                                                                    <TextBlock Text="{Binding DisplayTime}" HorizontalAlignment="Right"
                                                                                Foreground="{StaticResource TextMutedBrush}"
                                                                                FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="12"/>
                                                                 </Grid>
-                                                                <TextBlock Text="{Binding ServerName, StringFormat=Server: {0}}"
+                                                                <TextBlock Text="{Binding DisplayServerLine}"
                                                                            Foreground="{StaticResource StatBlueBrush}"
                                                                            FontFamily="Segoe UI Variable Text, Segoe UI"
                                                                            FontSize="11" Margin="0,0,0,4"/>
@@ -332,7 +332,7 @@
                                                                            FontSize="11" TextWrapping="Wrap"
                                                                            TextTrimming="CharacterEllipsis" MaxHeight="34"/>
                                                                 <Button Margin="0,8,0,0"
-                                                                        Content="View ticket"
+                                                                        Content="{Binding DataContext.OrdViewTicketLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                         Command="{Binding DataContext.PrintTicketCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                         CommandParameter="{Binding}"
                                                                         Style="{StaticResource GhostButton}"
@@ -392,7 +392,7 @@
                                            FontSize="32"
                                            FontWeight="Bold"
                                            Foreground="{StaticResource GoldAccentBrush}"/>
-                                <TextBlock Text="CONFIRMATION CODE"
+                                <TextBlock Text="{Binding TicketConfirmationCodeLabel, Mode=OneWay}"
                                            HorizontalAlignment="Center"
                                            Margin="0,4,0,0"
                                            FontSize="10"
@@ -400,41 +400,41 @@
                                            Foreground="{StaticResource TextMutedBrush}"/>
                             </StackPanel>
                             <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,4,0,0">
-                                <Run Text="Date: "/><Run Text="{Binding TicketDateTime, StringFormat={}{0:dd MMM yyyy}}"/>
-                                <Run Text="    Time: "/><Run Text="{Binding TicketDateTime, StringFormat={}{0:HH:mm}}"/>
+                                <Run Text="{Binding TicketDateLabel, Mode=OneWay}"/><Run Text=" "/><Run Text="{Binding TicketDateText, Mode=OneWay}"/>
+                                <Run Text="    "/><Run Text="{Binding TicketTimeLabel, Mode=OneWay}"/><Run Text=" "/><Run Text="{Binding TicketTimeText, Mode=OneWay}"/>
                             </TextBlock>
                             <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0">
-                                <Run Text="Order: "/><Run Text="{Binding TicketOrderId}"/>
-                                <Run Text="    Status: "/><Run Text="{Binding TicketStatus}"/>
+                                <Run Text="{Binding TicketOrderLabel, Mode=OneWay}"/><Run Text=" "/><Run Text="{Binding TicketOrderId}"/>
+                                <Run Text="    "/><Run Text="{Binding TicketStatusLabel, Mode=OneWay}"/><Run Text=" "/><Run Text="{Binding TicketDisplayStatus, Mode=OneWay}"/>
                             </TextBlock>
                             <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"
-                                       Text="{Binding TicketLocationLine}"/>
+                                       Text="{Binding TicketDisplayLocationLine, Mode=OneWay}"/>
                             <StackPanel Margin="0,6,0,0"
                                         Visibility="{Binding TicketShowDeliverySection, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
                                 <TextBlock Text="{Binding TicketFulfillmentSectionTitle, Mode=OneWay}" Foreground="{StaticResource GoldAccentBrush}" FontWeight="SemiBold" FontSize="11"/>
                                 <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"
                                            Visibility="{Binding TicketShowDeliveryCustomerName, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <Run Text="Customer: "/><Run Text="{Binding TicketDeliveryCustomerName, Mode=OneWay}"/>
+                                    <Run Text="{Binding TicketCustomerLabel, Mode=OneWay}"/><Run Text=" "/><Run Text="{Binding TicketDeliveryCustomerName, Mode=OneWay}"/>
                                 </TextBlock>
                                 <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0">
-                                    <Run Text="Phone: "/><Run Text="{Binding TicketDeliveryPhone, Mode=OneWay}"/>
+                                    <Run Text="{Binding TicketPhoneLabel, Mode=OneWay}"/><Run Text=" "/><Run Text="{Binding TicketDeliveryPhone, Mode=OneWay}"/>
                                 </TextBlock>
                                 <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"
                                            Visibility="{Binding TicketShowDeliveryAddress, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <Run Text="Address: "/><Run Text="{Binding TicketDeliveryAddress, Mode=OneWay}"/>
+                                    <Run Text="{Binding TicketAddressLabel, Mode=OneWay}"/><Run Text=" "/><Run Text="{Binding TicketDeliveryAddress, Mode=OneWay}"/>
                                 </TextBlock>
                                 <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"
                                            TextWrapping="Wrap"
                                            Visibility="{Binding TicketShowDeliveryInstructions, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <Run Text="Notes: "/><Run Text="{Binding TicketDeliveryInstructions, Mode=OneWay}"/>
+                                    <Run Text="{Binding TicketNotesLabel, Mode=OneWay}"/><Run Text=" "/><Run Text="{Binding TicketDeliveryInstructions, Mode=OneWay}"/>
                                 </TextBlock>
                             </StackPanel>
                             <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,8"
                                        Visibility="{Binding TicketShowServer, Converter={StaticResource BoolToVisibilityConverter}}">
-                                <Run Text="Server: "/><Run Text="{Binding TicketServer}"/>
+                                <Run Text="{Binding TicketServerLabel, Mode=OneWay}"/><Run Text=" "/><Run Text="{Binding TicketServer}"/>
                             </TextBlock>
                             <TextBlock Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,2">
-                                <Run Text="Equivalent FC: "/><Run Text="{Binding TicketEquivalentFcText}"/>
+                                <Run Text="{Binding TicketEquivalentFcLabel, Mode=OneWay}"/><Run Text=" "/><Run Text="{Binding TicketEquivalentFcText}"/>
                             </TextBlock>
                             <TextBlock Foreground="{StaticResource TextMutedBrush}" Margin="0,0,0,2" FontSize="11"
                                        Text="{Binding TicketPaidBreakdownText}"/>
@@ -457,10 +457,10 @@
                                     <ColumnDefinition Width="95"/>
                                     <ColumnDefinition Width="95"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="QTY" Foreground="{StaticResource GoldAccentBrush}" FontWeight="SemiBold"/>
-                                <TextBlock Grid.Column="1" Text="ITEM" Foreground="{StaticResource GoldAccentBrush}" FontWeight="SemiBold"/>
-                                <TextBlock Grid.Column="2" Text="UNIT PRICE" Foreground="{StaticResource GoldAccentBrush}" HorizontalAlignment="Right" FontWeight="SemiBold"/>
-                                <TextBlock Grid.Column="3" Text="TOTAL" Foreground="{StaticResource GoldAccentBrush}" HorizontalAlignment="Right" FontWeight="SemiBold"/>
+                                <TextBlock Grid.Column="0" Text="{Binding TicketQtyHeader, Mode=OneWay}" Foreground="{StaticResource GoldAccentBrush}" FontWeight="SemiBold"/>
+                                <TextBlock Grid.Column="1" Text="{Binding TicketItemHeader, Mode=OneWay}" Foreground="{StaticResource GoldAccentBrush}" FontWeight="SemiBold"/>
+                                <TextBlock Grid.Column="2" Text="{Binding TicketUnitPriceHeader, Mode=OneWay}" Foreground="{StaticResource GoldAccentBrush}" HorizontalAlignment="Right" FontWeight="SemiBold"/>
+                                <TextBlock Grid.Column="3" Text="{Binding TicketTotalHeader, Mode=OneWay}" Foreground="{StaticResource GoldAccentBrush}" HorizontalAlignment="Right" FontWeight="SemiBold"/>
                             </Grid>
 
                             <ScrollViewer Grid.Row="1" Height="220" VerticalScrollBarVisibility="Auto" Style="{StaticResource EliteScrollViewer}">
@@ -476,8 +476,8 @@
                                                 </Grid.ColumnDefinitions>
                                                 <TextBlock Grid.Column="0" Text="{Binding Quantity}" Foreground="{StaticResource TextPrimaryBrush}"/>
                                                 <TextBlock Grid.Column="1" Text="{Binding Name}" Foreground="{StaticResource TextPrimaryBrush}" TextWrapping="Wrap"/>
-                                                <TextBlock Grid.Column="2" Text="{Binding UnitPrice, StringFormat=$ {0:N2}}" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Right"/>
-                                                <TextBlock Grid.Column="3" Text="{Binding LineTotal, StringFormat=$ {0:N2}}" Foreground="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Right"/>
+                                                <TextBlock Grid.Column="2" Text="{Binding DisplayUnitPrice}" Foreground="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Right"/>
+                                                <TextBlock Grid.Column="3" Text="{Binding DisplayLineTotal}" Foreground="{StaticResource TextPrimaryBrush}" HorizontalAlignment="Right"/>
                                             </Grid>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
@@ -487,7 +487,7 @@
                             <StackPanel Grid.Row="2" Margin="0,10,0,0">
                                 <Separator Background="#55D4AF37"/>
                                 <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,5,0,0">
-                                    <Run Text="Subtotal: $ "/><Run Text="{Binding TicketSubtotal, StringFormat={}{0:N2}}"/>
+                                    <Run Text="{Binding TicketSubtotalLabel, Mode=OneWay}"/><Run Text=" "/><Run Text="{Binding TicketDisplaySubtotal, Mode=OneWay}"/>
                                 </TextBlock>
                                 <TextBlock HorizontalAlignment="Right" Foreground="#E57373" Margin="0,2,0,0"
                                            Text="{Binding TicketDiscountLineText}"
@@ -500,20 +500,20 @@
                                 </TextBlock>
                                 <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource TextSecondaryBrush}"
                                            Visibility="{Binding TicketShowDeliveryFee, Converter={StaticResource BoolToVisibilityConverter}}">
-                                    <Run Text="Delivery: $ "/><Run Text="{Binding TicketDeliveryFeeUsd, StringFormat={}{0:N2}}"/>
+                                    <Run Text="{Binding TicketDeliveryLabel, Mode=OneWay}"/><Run Text=" "/><Run Text="{Binding TicketDeliveryFeeUsd, StringFormat=$ {0:N2}}"/>
                                 </TextBlock>
                                 <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource GoldAccentBrush}" FontSize="20" FontWeight="SemiBold" Margin="0,4,0,0">
-                                    <Run Text="GRAND TOTAL USD: $ "/><Run Text="{Binding TicketGrandTotal, StringFormat={}{0:N2}}"/>
+                                    <Run Text="{Binding TicketGrandTotalUsdLabel, Mode=OneWay}"/><Run Text=" "/><Run Text="{Binding TicketDisplayGrandTotal, Mode=OneWay}"/>
                                 </TextBlock>
                                 <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0">
-                                    <Run Text="Equivalent FC: "/><Run Text="{Binding TicketEquivalentFcText}"/>
+                                    <Run Text="{Binding TicketEquivalentFcLabel, Mode=OneWay}"/><Run Text=" "/><Run Text="{Binding TicketEquivalentFcText}"/>
                                 </TextBlock>
                                 <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" FontSize="11"
                                            Text="{Binding TicketPaidBreakdownText}"/>
                                 <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0" FontSize="11"
                                            Text="{Binding TicketChangeBreakdownText}"/>
                                 <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,6,0,0"
-                                           Text="{Binding TicketVerification, StringFormat=Verification: {0}}"/>
+                                           Text="{Binding TicketDisplayVerification, Mode=OneWay}"/>
                             </StackPanel>
                         </Grid>
 
@@ -524,17 +524,17 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <Button Grid.Column="0"
-                                    Content="Close"
+                                    Content="{Binding TicketCloseLabel, Mode=OneWay}"
                                     Margin="0,0,6,0"
                                     Command="{Binding CloseTicketPreviewCommand}"
                                     Style="{StaticResource GhostButton}"/>
                             <Button Grid.Column="1"
-                                    Content="Print Client Ticket"
+                                    Content="{Binding TicketPrintClientLabel, Mode=OneWay}"
                                     Margin="6,0,6,0"
                                     Command="{Binding ExportClientTicketPdfCommand}"
                                     Style="{StaticResource GhostButton}"/>
                             <Button Grid.Column="2"
-                                    Content="Print Payment Receipt"
+                                    Content="{Binding TicketPrintPaymentLabel, Mode=OneWay}"
                                     Margin="6,0,0,0"
                                     Command="{Binding ExportTicketPdfCommand}"
                                     Style="{StaticResource GoldPrimaryButton}"/>
@@ -563,16 +563,16 @@
                         </Grid.RowDefinitions>
 
                         <StackPanel Grid.Row="0">
-                            <TextBlock Text="Complete Order Payment"
+                            <TextBlock Text="{Binding OrdPayTitle, Mode=OneWay}"
                                        Foreground="{StaticResource GoldAccentBrush}"
                                        FontFamily="Segoe UI Variable Display, Segoe UI"
                                        FontSize="22"
                                        FontWeight="SemiBold"/>
                             <TextBlock Margin="0,6,0,0" Foreground="{StaticResource TextSecondaryBrush}">
-                                <Run Text="Order: "/><Run Text="{Binding PendingCompleteOrderCode, Mode=OneWay}"/>
+                                <Run Text="{Binding OrdPayOrderLabel, Mode=OneWay}"/><Run Text=" "/><Run Text="{Binding PendingCompleteOrderCode, Mode=OneWay}"/>
                             </TextBlock>
                             <TextBlock Margin="0,2,0,0" Foreground="{StaticResource TextSecondaryBrush}">
-                                <Run Text="Amount due: "/><Run Text="{Binding PaymentDueUsd, Mode=OneWay, StringFormat=$ {0:N2}}"/>
+                                <Run Text="{Binding OrdPayAmountDueLabel, Mode=OneWay}"/><Run Text=" "/><Run Text="{Binding PaymentDueUsd, Mode=OneWay, StringFormat=$ {0:N2}}"/>
                                 <Run Text="  ("/><Run Text="{Binding PaymentDueFc, Mode=OneWay, StringFormat=FC {0:N0}}"/><Run Text=")"/>
                             </TextBlock>
                             <Separator Margin="0,10,0,8" Background="#55D4AF37"/>
@@ -596,12 +596,12 @@
                                         <ColumnDefinition Width="140"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="USD + FC" Foreground="{StaticResource GoldAccentBrush}" FontSize="28" FontWeight="Bold" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="0" Text="{Binding OrdPayUsdFcLabel, Mode=OneWay}" Foreground="{StaticResource GoldAccentBrush}" FontSize="28" FontWeight="Bold" VerticalAlignment="Center"/>
                                     <StackPanel Grid.Column="1">
                                         <TextBox Text="{Binding PaidUsdInput, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}" Height="42"/>
-                                        <Button Content="Edit Paid USD" Margin="0,6,0,0" Command="{Binding SelectNumpadTargetCommand}" CommandParameter="PaidUsd" Style="{StaticResource GhostButton}"/>
+                                        <Button Content="{Binding OrdPayEditPaidUsdLabel, Mode=OneWay}" Margin="0,6,0,0" Command="{Binding SelectNumpadTargetCommand}" CommandParameter="PaidUsd" Style="{StaticResource GhostButton}"/>
                                         <TextBox Text="{Binding PaidFcInput, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource EliteTextBox}" Height="42" Margin="0,8,0,0"/>
-                                        <Button Content="Edit Paid FC" Margin="0,6,0,0" Command="{Binding SelectNumpadTargetCommand}" CommandParameter="PaidFc" Style="{StaticResource GhostButton}"/>
+                                        <Button Content="{Binding OrdPayEditPaidFcLabel, Mode=OneWay}" Margin="0,6,0,0" Command="{Binding SelectNumpadTargetCommand}" CommandParameter="PaidFc" Style="{StaticResource GhostButton}"/>
                                     </StackPanel>
                                 </Grid>
 
@@ -613,7 +613,7 @@
                                     </Grid.ColumnDefinitions>
                                     <Border Grid.Column="0" Margin="0,0,8,0" Padding="10" CornerRadius="8" Background="#18FFFFFF">
                                         <StackPanel>
-                                            <TextBlock Text="Due" Foreground="{StaticResource GoldAccentBrush}" FontSize="17" FontWeight="Bold"/>
+                                            <TextBlock Text="{Binding OrdPayDueLabel, Mode=OneWay}" Foreground="{StaticResource GoldAccentBrush}" FontSize="17" FontWeight="Bold"/>
                                             <TextBlock Foreground="{StaticResource TextPrimaryBrush}" FontSize="20" FontWeight="Bold"
                                                        Text="{Binding PaymentDueUsd, Mode=OneWay, StringFormat=$ {0:N2}}"/>
                                             <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="17" FontWeight="SemiBold"
@@ -622,7 +622,7 @@
                                     </Border>
                                     <Border Grid.Column="1" Margin="4,0" Padding="10" CornerRadius="8" Background="#18FFFFFF">
                                         <StackPanel>
-                                            <TextBlock Text="Remaining" Foreground="{StaticResource StatBlueBrush}" FontSize="17" FontWeight="Bold"/>
+                                            <TextBlock Text="{Binding OrdPayRemainingLabel, Mode=OneWay}" Foreground="{StaticResource StatBlueBrush}" FontSize="17" FontWeight="Bold"/>
                                             <TextBlock Foreground="{StaticResource TextPrimaryBrush}" FontSize="20" FontWeight="Bold"
                                                        Text="{Binding RemainingUsd, Mode=OneWay, StringFormat=$ {0:N2}}"/>
                                             <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="17" FontWeight="SemiBold"
@@ -631,7 +631,7 @@
                                     </Border>
                                     <Border Grid.Column="2" Margin="8,0,0,0" Padding="10" CornerRadius="8" Background="#18FFFFFF">
                                         <StackPanel>
-                                            <TextBlock Text="Change" Foreground="{StaticResource StatGreenBrush}" FontSize="17" FontWeight="Bold"/>
+                                            <TextBlock Text="{Binding OrdPayChangeLabel, Mode=OneWay}" Foreground="{StaticResource StatGreenBrush}" FontSize="17" FontWeight="Bold"/>
                                             <TextBlock Foreground="{StaticResource TextPrimaryBrush}" FontSize="20" FontWeight="Bold"
                                                        Text="{Binding ChangeUsd, Mode=OneWay, StringFormat=$ {0:N2}}"/>
                                             <TextBlock Foreground="{StaticResource TextSecondaryBrush}" FontSize="17" FontWeight="SemiBold"
@@ -641,7 +641,7 @@
                                 </Grid>
 
                                 <TextBlock Grid.Row="2" Margin="0,12,0,0" Foreground="{StaticResource TextMutedBrush}" FontSize="11"
-                                           Text="Use the numpad to enter Paid USD and Paid FC. If one currency is not used, leave it at 0."/>
+                                           Text="{Binding OrdPayNumpadHint, Mode=OneWay}"/>
                             </Grid>
 
                             <UniformGrid Grid.Column="1" Columns="3" Rows="4" Margin="16,0,0,0">
@@ -666,12 +666,12 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <Button Grid.Column="0"
-                                    Content="Cancel"
+                                    Content="{Binding OrdPayCancelLabel, Mode=OneWay}"
                                     Margin="0,0,8,0"
                                     Command="{Binding CancelPaymentCommand}"
                                     Style="{StaticResource GhostButton}"/>
                             <Button Grid.Column="1"
-                                    Content="Go to change"
+                                    Content="{Binding OrdPayGoToChangeLabel, Mode=OneWay}"
                                     Margin="8,0,0,0"
                                     Command="{Binding GoToChangeCommand}"
                                     Style="{StaticResource GoldPrimaryButton}"/>
@@ -700,16 +700,16 @@
                         </Grid.RowDefinitions>
 
                         <StackPanel Grid.Row="0">
-                            <TextBlock Text="Change Allocation"
+                            <TextBlock Text="{Binding OrdChangeTitle, Mode=OneWay}"
                                        Foreground="{StaticResource GoldAccentBrush}"
                                        FontFamily="Segoe UI Variable Display, Segoe UI"
                                        FontSize="22"
                                        FontWeight="SemiBold"/>
                             <TextBlock Margin="0,6,0,0" Foreground="{StaticResource TextSecondaryBrush}">
-                                <Run Text="Order: "/><Run Text="{Binding PendingCompleteOrderCode, Mode=OneWay}"/>
+                                <Run Text="{Binding OrdChangeOrderLabel, Mode=OneWay}"/><Run Text=" "/><Run Text="{Binding PendingCompleteOrderCode, Mode=OneWay}"/>
                             </TextBlock>
                             <TextBlock Margin="0,2,0,0" Foreground="{StaticResource TextSecondaryBrush}">
-                                <Run Text="Change required: "/><Run Text="{Binding ChangeUsd, Mode=OneWay, StringFormat=$ {0:N2}}"/>
+                                <Run Text="{Binding OrdChangeRequiredLabel, Mode=OneWay}"/><Run Text=" "/><Run Text="{Binding ChangeUsd, Mode=OneWay, StringFormat=$ {0:N2}}"/>
                                 <Run Text="  ("/><Run Text="{Binding ChangeUsdInFc, Mode=OneWay, StringFormat=FC {0:N0}}"/><Run Text=")"/>
                             </TextBlock>
                             <Separator Margin="0,10,0,8" Background="#55D4AF37"/>
@@ -723,7 +723,7 @@
 
                             <Border Grid.Column="0" CornerRadius="10" Background="#18FFFFFF" Padding="14">
                                 <StackPanel>
-                                    <TextBlock Text="Allocate Change"
+                                    <TextBlock Text="{Binding OrdChangeAllocateLabel, Mode=OneWay}"
                                                Foreground="{StaticResource GoldAccentBrush}"
                                                FontSize="20"
                                                FontWeight="Bold"/>
@@ -735,7 +735,7 @@
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
 
-                                        <TextBlock Grid.Column="0" Text="USD change"
+                                        <TextBlock Grid.Column="0" Text="{Binding OrdChangeUsdLabel, Mode=OneWay}"
                                                    Style="{StaticResource HeadingSmall}" VerticalAlignment="Center"/>
                                         <TextBlock Grid.Column="1" Margin="0,0,10,0"
                                                    Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"
@@ -745,7 +745,7 @@
                                                  Style="{StaticResource EliteTextBox}"/>
                                     </Grid>
 
-                                    <Button Content="Edit USD change" Margin="0,6,0,0" HorizontalAlignment="Right" Width="170"
+                                    <Button Content="{Binding OrdChangeEditUsdLabel, Mode=OneWay}" Margin="0,6,0,0" HorizontalAlignment="Right" Width="170"
                                             Command="{Binding SelectNumpadTargetCommand}" CommandParameter="ChangeUsd"
                                             Style="{StaticResource GhostButton}"/>
 
@@ -756,7 +756,7 @@
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
 
-                                        <TextBlock Grid.Column="0" Text="FC change"
+                                        <TextBlock Grid.Column="0" Text="{Binding OrdChangeFcLabel, Mode=OneWay}"
                                                    Style="{StaticResource HeadingSmall}" VerticalAlignment="Center"/>
                                         <TextBlock Grid.Column="1" Margin="0,0,10,0"
                                                    Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center"
@@ -766,14 +766,14 @@
                                                  Style="{StaticResource EliteTextBox}"/>
                                     </Grid>
 
-                                    <Button Content="Edit FC change" Margin="0,6,0,0" HorizontalAlignment="Right" Width="170"
+                                    <Button Content="{Binding OrdChangeEditFcLabel, Mode=OneWay}" Margin="0,6,0,0" HorizontalAlignment="Right" Width="170"
                                             Command="{Binding SelectNumpadTargetCommand}" CommandParameter="ChangeFc"
                                             Style="{StaticResource GhostButton}"/>
 
                                     <Border Margin="0,14,0,0" Padding="10" CornerRadius="8" Background="#1FFFFFFF">
                                         <StackPanel>
                                             <TextBlock Foreground="{StaticResource StatBlueBrush}" FontWeight="Bold" FontSize="18">
-                                                <Run Text="Remaining to allocate: "/>
+                                                <Run Text="{Binding OrdChangeRemainingAllocateLabel, Mode=OneWay}"/><Run Text=" "/>
                                                 <Run Text="{Binding RemainingChangeUsdToAllocate, Mode=OneWay, StringFormat=$ {0:N2}}"/>
                                             </TextBlock>
                                             <TextBlock Margin="0,2,0,0"
@@ -808,12 +808,12 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <Button Grid.Column="0"
-                                    Content="Cancel"
+                                    Content="{Binding OrdPayCancelLabel, Mode=OneWay}"
                                     Margin="0,0,8,0"
                                     Command="{Binding CancelChangeCommand}"
                                     Style="{StaticResource GhostButton}"/>
                             <Button Grid.Column="1"
-                                    Content="Confirm Complete"
+                                    Content="{Binding OrdChangeConfirmCompleteLabel, Mode=OneWay}"
                                     Margin="8,0,0,0"
                                     Command="{Binding ConfirmChangeCommand}"
                                     Style="{StaticResource GoldPrimaryButton}"/>
@@ -828,7 +828,7 @@
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center"
                     Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}">
-                <TextBlock Text="Loading orders..."
+                <TextBlock Text="{Binding OrdLoadingLabel, Mode=OneWay}"
                            Foreground="{StaticResource TextPrimaryBrush}"
                            FontSize="14"
                            FontWeight="SemiBold"/>

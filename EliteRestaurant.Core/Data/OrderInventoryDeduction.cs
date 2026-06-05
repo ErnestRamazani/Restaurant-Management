@@ -80,13 +80,14 @@ public static class OrderInventoryDeduction
     {
         EnsureAmbientTransaction(db);
 
-        var selectedLines = order.Items
+        var undeductedItems = order.Items.Where(i => !i.InventoryDeductedAt.HasValue).ToList();
+        var selectedLines = undeductedItems
             .GroupBy(i => i.ProductId)
             .Select(g => (ProductId: g.Key, Quantity: g.Sum(i => i.Quantity)))
             .ToList();
 
         if (selectedLines.Count == 0)
-            return "Order has no line items.";
+            return null;
 
         var activeStaff = db.Employees
             .AsNoTracking()
@@ -179,7 +180,29 @@ public static class OrderInventoryDeduction
             }
         }
 
+        var deductedAt = DateTime.UtcNow;
+        foreach (var item in undeductedItems)
+            item.InventoryDeductedAt = deductedAt;
+
         return null;
+    }
+
+    /// <summary>
+    /// Marks lines already on the check (not in <paramref name="newItems"/>) as deducted so a later
+    /// cashier release does not re-deduct stock when appending to in-progress orders.
+    /// </summary>
+    public static void MarkExistingLinesAsDeducted(OrderRecord order, IReadOnlyList<OrderItem> newItems)
+    {
+        if (newItems.Count == 0)
+            return;
+
+        var newSet = new HashSet<OrderItem>(newItems);
+        var deductedAt = DateTime.UtcNow;
+        foreach (var item in order.Items)
+        {
+            if (!newSet.Contains(item) && !item.InventoryDeductedAt.HasValue)
+                item.InventoryDeductedAt = deductedAt;
+        }
     }
 
     /// <summary>
@@ -192,13 +215,14 @@ public static class OrderInventoryDeduction
         IReadOnlyList<Employee> activeStaff,
         IReadOnlyDictionary<int, Product> productById)
     {
-        var selectedLines = order.Items
+        var undeductedItems = order.Items.Where(i => !i.InventoryDeductedAt.HasValue).ToList();
+        var selectedLines = undeductedItems
             .GroupBy(i => i.ProductId)
             .Select(g => (ProductId: g.Key, Quantity: g.Sum(i => i.Quantity)))
             .ToList();
 
         if (selectedLines.Count == 0)
-            return "Order has no line items.";
+            return null;
 
         (int? EmployeeId, string Role, string Name) ResolvePreparationAssignee(int productId)
         {
@@ -275,6 +299,10 @@ public static class OrderInventoryDeduction
                 ? deductionNote
                 : $"{inventoryItem.Notes.Trim()}\n{deductionNote}";
         }
+
+        var deductedAt = DateTime.UtcNow;
+        foreach (var item in undeductedItems)
+            item.InventoryDeductedAt = deductedAt;
 
         return null;
     }
@@ -394,6 +422,10 @@ public static class OrderInventoryDeduction
                     name;
             }
         }
+
+        var deductedAt = DateTime.UtcNow;
+        foreach (var item in additionalItems)
+            item.InventoryDeductedAt = deductedAt;
 
         return null;
     }

@@ -27,11 +27,11 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Row="0" Grid.Column="0">
-                    <TextBlock Style="{StaticResource HeadingLarge}" FontSize="26">
-                        <Run Text="Table" Foreground="{StaticResource TextPrimaryBrush}"/>
-                        <Run Text=" Management" Foreground="{StaticResource GoldAccentBrush}"/>
-                    </TextBlock>
-                    <TextBlock Text="Manage dining capacity and live availability status."
+                    <TextBlock Text="{Binding PageTitle}"
+                               Style="{StaticResource HeadingLarge}"
+                               FontSize="26"
+                               Foreground="{StaticResource TextPrimaryBrush}"/>
+                    <TextBlock Text="{Binding PageSubtitle}"
                                Style="{StaticResource BodyText}"
                                FontSize="13"
                                Margin="0,5,0,0"/>
@@ -39,7 +39,7 @@
 
                 <Button Grid.Row="0" Grid.Column="1"
                         Width="120"
-                        Content="Add Table"
+                        Content="{Binding AddTableLabel}"
                         Command="{Binding OpenAddDialogCommand}"
                         Style="{StaticResource GoldPrimaryButton}"
                         Visibility="{Binding ShowTableManagementChrome, Converter={StaticResource BoolToVisibilityConverter}}"/>
@@ -51,7 +51,7 @@
                          MinHeight="42"
                          FontSize="13"
                          Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                         ToolTip="Search by table number, name, ID, capacity, status, or server"/>
+                         ToolTip="{Binding SearchTooltip}"/>
             </Grid>
 
             <ScrollViewer Grid.Row="1"
@@ -73,15 +73,14 @@
                                         <TextBlock Foreground="{StaticResource TextPrimaryBrush}"
                                                    FontFamily="Segoe UI Variable Display, Segoe UI"
                                                    FontSize="18">
-                                            <Run Text="Table ID "/>
-                                            <Run Text="{Binding TableNumber}" Foreground="{StaticResource GoldAccentBrush}"/>
+                                            <Run Text="{Binding DisplayTableIdLine, Mode=OneWay}"/>
                                             <Run Text="  ·  "/>
                                             <Run Text="{Binding Name}"/>
                                         </TextBlock>
 
                                         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                             <Border Background="#152196F3" CornerRadius="8" Padding="10,4" Margin="0,0,8,0">
-                                                <TextBlock Text="{Binding Capacity, StringFormat=Capacity {0}}"
+                                                <TextBlock Text="{Binding DisplayCapacityText}"
                                                            Foreground="{StaticResource StatBlueBrush}"
                                                            FontFamily="Segoe UI Variable Text, Segoe UI"
                                                            FontSize="11"/>
@@ -100,7 +99,7 @@
                                                         </Style.Triggers>
                                                     </Style>
                                                 </Border.Style>
-                                                <TextBlock Text="{Binding Status}"
+                                                <TextBlock Text="{Binding DisplayStatus}"
                                                            FontFamily="Segoe UI Variable Text, Segoe UI"
                                                            FontSize="11">
                                                     <TextBlock.Style>
@@ -119,12 +118,10 @@
                                                 </TextBlock>
                                             </Border>
                                             <Border Background="#22D4AF37" CornerRadius="8" Padding="10,4" Margin="8,0,0,0">
-                                                <TextBlock FontFamily="Segoe UI Variable Text, Segoe UI"
+                                                <TextBlock Text="{Binding DisplayServerLine}"
+                                                           FontFamily="Segoe UI Variable Text, Segoe UI"
                                                            FontSize="11"
-                                                           Foreground="{StaticResource GoldAccentBrush}">
-                                                    <Run Text="Server: "/>
-                                                    <Run Text="{Binding AssignedServer.Name, TargetNullValue=Unassigned}"/>
-                                                </TextBlock>
+                                                           Foreground="{StaticResource GoldAccentBrush}"/>
                                             </Border>
                                         </StackPanel>
                                     </StackPanel>
@@ -132,7 +129,7 @@
                                     <Button Grid.Column="1"
                                             Width="90"
                                             Margin="12,0,10,0"
-                                            Content="Edit"
+                                            Content="{Binding DataContext.EditLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                             Command="{Binding DataContext.EditTableCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                             CommandParameter="{Binding}"
                                             Style="{StaticResource SapphireButton}"
@@ -140,7 +137,7 @@
 
                                     <Button Grid.Column="2"
                                             Width="90"
-                                            Content="Delete"
+                                            Content="{Binding DataContext.DeleteLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                             Command="{Binding DataContext.DeleteTableCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                             CommandParameter="{Binding}"
                                             Style="{StaticResource DangerButton}"
@@ -164,30 +161,30 @@
                                    Style="{StaticResource HeadingMedium}"
                                    FontSize="22"/>
 
-                        <TextBlock Text="TABLE NUMBER" Style="{StaticResource HeadingSmall}" Margin="0,22,0,8"/>
+                        <TextBlock Text="{Binding FieldTableNumberLabel}" Style="{StaticResource HeadingSmall}" Margin="0,22,0,8"/>
                         <TextBox Text="{Binding TableNumberText, UpdateSourceTrigger=PropertyChanged}"
                                  IsReadOnly="True"
                                  Style="{StaticResource EliteTextBox}"/>
-                        <TextBlock Text="For new tables, ID is assigned automatically."
+                        <TextBlock Text="{Binding AutoIdHint}"
                                    Margin="0,6,0,0"
                                    Foreground="{StaticResource TextMutedBrush}"
                                    FontSize="11"/>
 
-                        <TextBlock Text="TABLE NAME" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                        <TextBlock Text="{Binding FieldTableNameLabel}" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
                         <TextBox Text="{Binding TableNameText, UpdateSourceTrigger=PropertyChanged}"
                                  Style="{StaticResource EliteTextBox}"/>
 
-                        <TextBlock Text="CAPACITY" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                        <TextBlock Text="{Binding FieldCapacityLabel}" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
                         <TextBox Text="{Binding CapacityText, UpdateSourceTrigger=PropertyChanged}"
                                  Style="{StaticResource EliteTextBox}"/>
 
-                        <TextBlock Text="STATUS" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
-                        <ComboBox ItemsSource="{Binding Statuses}"
-                                  SelectedItem="{Binding SelectedStatus}"
+                        <TextBlock Text="{Binding FieldStatusLabel}" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                        <ComboBox ItemsSource="{Binding StatusOptions}"
+                                  SelectedItem="{Binding SelectedStatusOption}"
                                   Style="{StaticResource EliteComboBox}"
                                   ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
 
-                        <TextBlock Text="ASSIGNED SERVER" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
+                        <TextBlock Text="{Binding FieldServerLabel}" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
                         <ComboBox ItemsSource="{Binding Servers}"
                                   SelectedValue="{Binding SelectedServerId}"
                                   SelectedValuePath="Id"
@@ -206,12 +203,12 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <Button Grid.Column="0"
-                                    Content="Cancel"
+                                    Content="{Binding CancelLabel}"
                                     Margin="0,0,8,0"
                                     Command="{Binding CancelDialogCommand}"
                                     Style="{StaticResource GhostButton}"/>
                             <Button Grid.Column="1"
-                                    Content="Save Table"
+                                    Content="{Binding SaveTableLabel}"
                                     Margin="8,0,0,0"
                                     Command="{Binding SaveTableCommand}"
                                     Style="{StaticResource GoldPrimaryButton}"/>

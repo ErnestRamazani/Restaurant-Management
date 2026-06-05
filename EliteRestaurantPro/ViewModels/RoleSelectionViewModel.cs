@@ -4,17 +4,27 @@ using System.Windows.Media.Imaging;
 using System.IO;
 using EliteRestaurant.Core.Staff;
 using EliteRestaurant.Core.Utils;
+using EliteRestaurantPro.Localization;
 
 namespace EliteRestaurantPro.ViewModels;
 
-public class RoleSelectionViewModel : BaseViewModel
+public class RoleSelectionViewModel : LocalizableViewModel
 {
-    private string _roleHeaderRestaurantName = "Elite Restaurant";
+    private string _roleHeaderRestaurantName = string.Empty;
     private ImageSource? _roleHeaderLogoImage;
     private ImageSource? _roleHeaderBackgroundImage;
-    private string _roleHeaderAddressText = "Address: Add your business address in Settings";
-    private string _roleHeaderWebsiteText = "Website: yourdomain.com";
-    private string _roleHeaderSocialText = "Social: @yourbrand";
+    private string _roleHeaderAddressText = string.Empty;
+    private string _roleHeaderWebsiteText = string.Empty;
+    private string _roleHeaderSocialText = string.Empty;
+
+    public string RoleAdminTitle => Loc.Auth("roleSelectAdminTitle", "Admin");
+    public string RoleAdminDesc => Loc.Auth("roleSelectAdminDesc", "Full management access");
+    public string RoleCashierTitle => Loc.Auth("roleSelectCashierTitle", "Cashier");
+    public string RoleCashierDesc => Loc.Auth("roleSelectCashierDesc", "Validate orders and handoff");
+    public string RoleServerTitle => Loc.Auth("roleSelectServerTitle", "Server");
+    public string RoleServerDesc => Loc.Auth("roleSelectServerDesc", "Send requests to cashier");
+    public string RoleKitchenBarTitle => Loc.Auth("roleSelectKitchenBarTitle", "Kitchen / Bar");
+    public string RoleKitchenBarDesc => Loc.Auth("roleSelectKitchenBarDesc", "Prep queue and pickup");
 
     public string RoleHeaderRestaurantName
     {
@@ -74,27 +84,45 @@ public class RoleSelectionViewModel : BaseViewModel
             navigate(new StaffLoginViewModel(navigate, StaffPortalKind.KitchenBar)));
     }
 
+    protected override void RefreshLocalizedStrings()
+    {
+        Notify(
+            nameof(RoleAdminTitle),
+            nameof(RoleAdminDesc),
+            nameof(RoleCashierTitle),
+            nameof(RoleCashierDesc),
+            nameof(RoleServerTitle),
+            nameof(RoleServerDesc),
+            nameof(RoleKitchenBarTitle),
+            nameof(RoleKitchenBarDesc));
+        LoadBrandingFromSettings();
+    }
+
     private void LoadBrandingFromSettings()
     {
         var business = SettingsManager.Load().BusinessProfile;
+        var defaultName = Loc.Auth("roleSelectDefaultRestaurantName", "Elite Restaurant");
         RoleHeaderRestaurantName = string.IsNullOrWhiteSpace(business.RestaurantName)
-            ? "Elite Restaurant"
+            ? defaultName
             : business.RestaurantName.Trim();
 
+        var addressLabel = Loc.Auth("roleSelectAddressLabel", "Address");
         var address = string.IsNullOrWhiteSpace(business.Address)
-            ? "Add your business address in Settings"
+            ? Loc.Auth("roleSelectAddressPlaceholder", "Add your business address in Settings")
             : business.Address.Trim();
-        RoleHeaderAddressText = $"Address: {address}";
+        RoleHeaderAddressText = $"{addressLabel}: {address}";
 
+        var websiteLabel = Loc.Auth("roleSelectWebsiteLabel", "Website");
         var website = string.IsNullOrWhiteSpace(business.WebsiteDomain)
-            ? "yourdomain.com"
+            ? Loc.Auth("roleSelectWebsitePlaceholder", "yourdomain.com")
             : business.WebsiteDomain.Trim();
-        RoleHeaderWebsiteText = $"Website: {website}";
+        RoleHeaderWebsiteText = $"{websiteLabel}: {website}";
 
+        var socialLabel = Loc.Auth("roleSelectSocialLabel", "Social");
         var social = string.IsNullOrWhiteSpace(business.SocialMedia)
-            ? "@yourbrand"
+            ? Loc.Auth("roleSelectSocialPlaceholder", "@yourbrand")
             : business.SocialMedia.Trim();
-        RoleHeaderSocialText = $"Social: {social}";
+        RoleHeaderSocialText = $"{socialLabel}: {social}";
 
         RoleHeaderLogoImage = TryLoadImage(business.LogoPath);
         RoleHeaderBackgroundImage = TryLoadImage(business.HomepageBackgroundImagePath);

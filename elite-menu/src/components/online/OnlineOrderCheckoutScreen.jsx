@@ -1,9 +1,11 @@
 import { motion } from 'framer-motion'
 import { ArrowLeft, Loader2, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { submitOnlineOrder } from '../../utils/api'
 import { formatUsd } from '../../utils/format'
+import { formatRestaurantDateTime } from '../../utils/restaurantDateTime'
 import { computeTotalsWithDelivery } from '../../utils/totals'
 import { GoldDivider } from '../ui/GoldDivider'
 import { QuantityControl } from '../ui/QuantityControl'
@@ -16,23 +18,24 @@ function resolveProductId(product) {
 }
 
 /** @param {{ name: string; fulfillment: string; phone: string; address: string; cart: { lines: unknown[] } }} fields */
-function getCheckoutValidationMessage({ name, fulfillment, phone, address, cart }) {
-  if (!cart.lines.length) return 'Your cart is empty — add items before placing an order.'
-  if (!name.trim()) return 'Enter your name to place the order.'
-  if (phone.trim().length < 5) return 'Enter your phone number (at least 5 characters).'
+function getCheckoutValidationMessage(t, { name, fulfillment, phone, address, cart }) {
+  if (!cart.lines.length) return t('guest.online.validationEmptyCart')
+  if (!name.trim()) return t('guest.online.validationName')
+  if (phone.trim().length < 5) return t('guest.online.validationPhone')
   if (fulfillment === 'Delivery' && address.trim().length < 5) {
-    return 'Enter your delivery address (at least 5 characters).'
+    return t('guest.online.validationAddress')
   }
   const missingId = cart.lines.some((/** @type {{ product: Record<string, unknown> }} */ l) =>
     resolveProductId(l.product) <= 0,
   )
-  if (missingId) return 'Some items could not be sent. Refresh the menu and try again.'
+  if (missingId) return t('guest.online.validationProductIds')
   return ''
 }
 
 export function OnlineOrderCheckoutScreen() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
-  const { cart, completeOrder } = /** @type {import('./OnlineOrderLayout').OnlineOrderOutletContext} */ (
+  const { cart, completeOrder, config } = /** @type {import('./OnlineOrderLayout').OnlineOrderOutletContext} */ (
     useOutletContext()
   )
 
@@ -67,7 +70,7 @@ export function OnlineOrderCheckoutScreen() {
     [merch, cart.taxPercent, cart.servicePercent, deliveryFee],
   )
 
-  const validationMessage = getCheckoutValidationMessage({
+  const validationMessage = getCheckoutValidationMessage(t, {
     name,
     fulfillment,
     phone,
@@ -80,7 +83,7 @@ export function OnlineOrderCheckoutScreen() {
     setErr('')
     setAttemptedSubmit(true)
     if (!canSend) {
-      setErr(validationMessage || 'Complete the required fields above.')
+      setErr(validationMessage || t('guest.online.completeFields'))
       document.getElementById('online-checkout-error')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
       return
     }
@@ -115,7 +118,7 @@ export function OnlineOrderCheckoutScreen() {
         address: fulfillment === 'Delivery' ? address.trim() : '',
         instructions: fulfillment === 'Delivery' ? instructions.trim() : '',
         paymentMethod,
-        placedAtLabel: placedAt.toLocaleString(undefined, {
+        placedAtLabel: formatRestaurantDateTime(placedAt, config, {
           dateStyle: 'medium',
           timeStyle: 'short',
         }),
@@ -123,7 +126,7 @@ export function OnlineOrderCheckoutScreen() {
           const unitPrice = Number(l.product.price ?? l.product.Price ?? 0)
           return {
             quantity: l.quantity,
-            name: String(l.product.name ?? l.product.Name ?? 'Item'),
+            name: String(l.product.name ?? l.product.Name ?? t('guest.online.genericItem')),
             unitPrice,
             lineTotal: unitPrice * l.quantity,
           }
@@ -136,17 +139,18 @@ export function OnlineOrderCheckoutScreen() {
       }
       cart.clearCart()
       completeOrder({
-        label: `Online · ${fulfillment}`,
+        label:
+          fulfillment === 'Delivery' ? t('guest.online.labelDelivery') : t('guest.online.labelPickup'),
         message: confirmationCode
-          ? 'We received your order. Keep your confirmation code below.'
-          : `Order ${orderCode} received. We'll confirm payment and prep time.`,
+          ? t('guest.online.receivedWithCode')
+          : t('guest.online.receivedWithOrder', { orderCode }),
         orderCode,
         confirmationCode,
         receipt,
       })
       navigate('/order-online', { replace: true })
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Could not place order')
+      setErr(e instanceof Error ? e.message : t('guest.online.placeFailed'))
       document.getElementById('online-checkout-error')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
     } finally {
       setBusy(false)
@@ -170,20 +174,22 @@ export function OnlineOrderCheckoutScreen() {
           type="button"
           onClick={() => navigate('/order-online')}
           className="flex h-11 min-w-[44px] items-center justify-center rounded-xl text-champagne"
-          aria-label="Back to menu"
+          aria-label={t('guest.online.backToMenuAria')}
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
         <motion.div className="min-w-0 flex-1 text-center" layout>
-          <p className="font-body text-[0.62rem] font-bold uppercase tracking-[0.22em] text-gold/80">Checkout</p>
-          <h1 className="truncate font-display text-lg font-semibold italic">Almost there</h1>
+          <p className="font-body text-[0.62rem] font-bold uppercase tracking-[0.22em] text-gold/80">
+            {t('guest.online.checkout')}
+          </p>
+          <h1 className="truncate font-display text-lg font-semibold italic">{t('guest.online.almostThere')}</h1>
         </motion.div>
         <div className="w-11" aria-hidden />
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-4 pt-4 [-webkit-overflow-scrolling:touch]">
         <label className="block font-body text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-gold">
-          Your name
+          {t('guest.online.yourName')}
         </label>
         <input
           value={name}
@@ -194,10 +200,10 @@ export function OnlineOrderCheckoutScreen() {
         />
 
         <p className="mt-4 font-body text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-gold">
-          Fulfillment
+          {t('guest.online.fulfillment')}
         </p>
         <motion.div className="mt-2 flex gap-2" layout>
-          {['Pickup', 'Delivery'].map((m) => (
+          {(['Pickup', 'Delivery']).map((m) => (
             <button
               key={m}
               type="button"
@@ -208,13 +214,13 @@ export function OnlineOrderCheckoutScreen() {
                   : 'border-champagne/15 text-champagne/60'
               }`}
             >
-              {m}
+              {m === 'Delivery' ? t('guest.online.delivery') : t('guest.online.pickup')}
             </button>
           ))}
         </motion.div>
 
         <label className="mt-3 block font-body text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-gold">
-          Phone (required)
+          {t('guest.online.phoneRequired')}
         </label>
         <input
           value={phone}
@@ -222,13 +228,13 @@ export function OnlineOrderCheckoutScreen() {
           inputMode="tel"
           maxLength={40}
           autoComplete="tel"
-          placeholder="+243 …"
+          placeholder={t('guest.online.phonePlaceholder')}
           className="mt-2 h-11 w-full rounded-xl border border-champagne/15 bg-champagne/[0.06] px-3 font-body text-sm text-champagne outline-none focus:border-gold/50"
         />
         {fulfillment === 'Delivery' ? (
           <>
             <label className="mt-3 block font-body text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-gold">
-              Delivery address
+              {t('guest.online.address')}
             </label>
             <textarea
               value={address}
@@ -239,7 +245,7 @@ export function OnlineOrderCheckoutScreen() {
               className="mt-2 w-full rounded-xl border border-champagne/15 bg-champagne/[0.06] px-3 py-2 font-body text-sm text-champagne outline-none focus:border-gold/50"
             />
             <label className="mt-3 block font-body text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-champagne/50">
-              Instructions (optional)
+              {t('guest.online.instructionsOptional')}
             </label>
             <input
               value={instructions}
@@ -250,7 +256,7 @@ export function OnlineOrderCheckoutScreen() {
         ) : null}
 
         <p className="mt-4 font-body text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-gold">
-          Pay with (intent)
+          {t('guest.online.payWithIntent')}
         </p>
         <div className="mt-2 flex flex-wrap gap-2">
           {['Cash', 'Card', 'MobileMoney'].map((m) => (
@@ -264,13 +270,17 @@ export function OnlineOrderCheckoutScreen() {
                   : 'border-champagne/15 text-champagne/55'
               }`}
             >
-              {m === 'MobileMoney' ? 'Mobile money' : m}
+              {m === 'MobileMoney'
+                ? t('guest.online.mobileMoney')
+                : m === 'Card'
+                  ? t('guest.online.card')
+                  : t('guest.online.cash')}
             </button>
           ))}
         </div>
 
         <label className="mt-3 block font-body text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-champagne/50">
-          Order notes (optional)
+          {t('guest.online.orderNotesOptional')}
         </label>
         <input
           value={notes}
@@ -278,7 +288,7 @@ export function OnlineOrderCheckoutScreen() {
           className="mt-2 h-10 w-full rounded-xl border border-champagne/15 bg-champagne/[0.06] px-3 font-body text-sm text-champagne outline-none focus:border-gold/50"
         />
         <label className="mt-3 block font-body text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-champagne/50">
-          Allergies (optional)
+          {t('guest.online.allergiesOptional')}
         </label>
         <input
           value={allergyNotes}
@@ -289,9 +299,11 @@ export function OnlineOrderCheckoutScreen() {
         <div className="mt-5">
           <motion.div className="flex items-start justify-between gap-2" layout>
             <motion.div className="min-w-0">
-              <p className="font-body text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-gold">Your order</p>
+              <p className="font-body text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-gold">
+                {t('guest.online.yourOrder')}
+              </p>
               <p className="mt-1 font-body text-[0.7rem] text-champagne/50">
-                {cart.totalItems} item{cart.totalItems === 1 ? '' : 's'}
+                {t('guest.cart.itemsInOrder', { count: cart.totalItems })}
               </p>
             </motion.div>
             <button
@@ -299,7 +311,7 @@ export function OnlineOrderCheckoutScreen() {
               onClick={() => cart.clearCart()}
               className="shrink-0 rounded-xl border border-champagne/20 px-2.5 py-1.5 font-body text-[0.65rem] font-bold uppercase tracking-[0.12em] text-champagne/70 transition hover:border-red-500/35 hover:bg-red-500/10 hover:text-red-200"
             >
-              Clear cart
+              {t('guest.online.clearCart')}
             </button>
           </motion.div>
           <ul className="mt-2 space-y-2">
@@ -320,7 +332,7 @@ export function OnlineOrderCheckoutScreen() {
                   </div>
                   <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                     <p className="font-body text-[0.72rem] text-champagne/55">
-                      <span className="tabular-nums">{formatUsd(unit)}</span> each
+                      <span className="tabular-nums">{formatUsd(unit)}</span> {t('guest.general.each')}
                     </p>
                     <motion.div className="flex items-center gap-1.5" layout>
                       <QuantityControl
@@ -334,7 +346,9 @@ export function OnlineOrderCheckoutScreen() {
                         type="button"
                         onClick={() => cart.removeItem(pid)}
                         className="inline-flex h-[32px] w-[32px] shrink-0 touch-manipulation items-center justify-center rounded-full border border-champagne/20 bg-midnight-2 text-champagne/70 transition hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300 active:scale-95"
-                        aria-label={`Remove ${String(l.product.name ?? 'item')} from cart`}
+                        aria-label={t('guest.online.removeFromCartAria', {
+                          name: String(l.product.name ?? t('guest.online.genericItem')),
+                        })}
                       >
                         <Trash2 className="h-3.5 w-3.5" strokeWidth={2.25} />
                       </button>
@@ -349,23 +363,23 @@ export function OnlineOrderCheckoutScreen() {
         <GoldDivider className="my-4" />
         <div className="space-y-1.5 font-body text-sm text-champagne/80">
           <motion.div className="flex justify-between" layout>
-            <span>Subtotal</span>
+            <span>{t('guest.pricing.subtotal')}</span>
             <span className="font-mono text-gold">{formatUsd(totals.subtotal)}</span>
           </motion.div>
           <div className="flex justify-between">
-            <span>Tax</span>
+            <span>{t('guest.pricing.tax', { percent: cart.taxPercent })}</span>
             <span className="font-mono">{formatUsd(totals.tax)}</span>
           </div>
           <div className="flex justify-between">
-            <span>Service</span>
+            <span>{t('guest.pricing.service', { percent: cart.servicePercent })}</span>
             <span className="font-mono">{formatUsd(totals.service)}</span>
           </div>
           <div className="flex justify-between">
-            <span>Delivery fee</span>
+            <span>{t('guest.online.deliveryFeeLine')}</span>
             <span className="font-mono">{formatUsd(totals.deliveryFee)}</span>
           </div>
           <div className="flex justify-between border-t border-champagne/10 pt-2 font-semibold text-champagne">
-            <span>Total</span>
+            <span>{t('guest.pricing.grandTotal')}</span>
             <span className="font-mono text-gold">{formatUsd(totals.grand)}</span>
           </div>
         </div>
@@ -390,7 +404,7 @@ export function OnlineOrderCheckoutScreen() {
           className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gold font-body text-sm font-extrabold uppercase tracking-[0.1em] text-black transition hover:brightness-105 disabled:opacity-50"
         >
           {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
-          {busy ? 'Sending…' : 'Place order'}
+          {busy ? t('guest.online.sending') : t('guest.online.placeOrder')}
         </button>
       </div>
     </motion.div>

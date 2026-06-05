@@ -21,38 +21,61 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel>
-                    <TextBlock Style="{StaticResource HeadingLarge}" FontSize="26">
-                        <Run Text="Reservations" Foreground="{StaticResource TextPrimaryBrush}"/>
-                    </TextBlock>
-                    <TextBlock Text="Scheduled and checked-in floor bookings. Tap a row for full details and updates."
+                    <TextBlock Text="{Binding ResTitle}"
+                               Style="{StaticResource HeadingLarge}"
+                               FontSize="26"
+                               Foreground="{StaticResource TextPrimaryBrush}"/>
+                    <TextBlock Text="{Binding ResSubtitle}"
                                Style="{StaticResource BodyText}"
                                FontSize="13"
                                Margin="0,6,0,0"/>
                 </StackPanel>
                 <Button Grid.Column="1"
-                        Content="Refresh"
+                        Content="{Binding ResRefreshLabel}"
                         Margin="12,0,0,0"
                         Command="{Binding RefreshCommand}"
                         Style="{StaticResource GhostButton}"/>
             </Grid>
 
-            <ScrollViewer Grid.Row="1" Margin="24,0,24,24" VerticalScrollBarVisibility="Auto" Style="{StaticResource EliteScrollViewer}">
-                <StackPanel>
-                    <Border Style="{StaticResource GlassCard}" Padding="14" Margin="0,0,0,10"
-                            Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}">
-                        <TextBlock Text="Loading reservations..."
-                                   Foreground="{StaticResource TextSecondaryBrush}"
-                                   FontSize="13"/>
-                    </Border>
+            <Grid Grid.Row="1" Margin="24,0,24,24">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
 
-                    <Border Style="{StaticResource GlassCard}" Padding="14" Margin="0,0,0,10">
-                        <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource TextMutedBrush}" FontSize="12" TextWrapping="Wrap"/>
-                    </Border>
+                <Border Grid.Row="0" Style="{StaticResource GlassCard}" Padding="14" Margin="0,0,0,10"
+                        Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <TextBlock Text="{Binding ResLoadingText}"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               FontSize="13"/>
+                </Border>
 
+                <Border Grid.Row="1" Style="{StaticResource GlassCard}" Padding="14" Margin="0,0,0,10">
+                    <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource TextMutedBrush}" FontSize="12" TextWrapping="Wrap"/>
+                </Border>
+
+                <ScrollViewer Grid.Row="2"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              CanContentScroll="False"
+                              VerticalAlignment="Stretch"
+                              Style="{StaticResource EliteScrollViewer}">
                     <ItemsControl ItemsSource="{Binding Reservations}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Border Style="{StaticResource GlassCard}" Margin="0,0,0,10" Padding="0">
+                                <Border Margin="0,0,0,10" Padding="0">
+                                    <Border.Style>
+                                        <Style TargetType="Border" BasedOn="{StaticResource GlassCard}">
+                                            <Setter Property="Margin" Value="0,0,0,10"/>
+                                            <Setter Property="Padding" Value="0"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsRecentlyClosed}" Value="True">
+                                                    <Setter Property="Opacity" Value="0.62"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
                                     <Button Command="{Binding DataContext.OpenDetailCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                             CommandParameter="{Binding Id}"
                                             Style="{StaticResource ReservationRowHitButton}">
@@ -71,29 +94,20 @@
                                                     </Grid.ColumnDefinitions>
                                                     <TextBlock Text="{Binding GuestName}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="24" FontFamily="Segoe UI Variable Display, Segoe UI"/>
                                                     <Border Grid.Column="1" Padding="10,4" CornerRadius="12" Background="#334A3F1D" BorderBrush="#776B5B2A" BorderThickness="1">
-                                                        <TextBlock Text="{Binding Status}" Foreground="{StaticResource GoldAccentBrush}" FontSize="11" FontWeight="SemiBold"/>
+                                                        <TextBlock Text="{Binding StatusText}" Foreground="{StaticResource GoldAccentBrush}" FontSize="11" FontWeight="SemiBold"/>
                                                     </Border>
                                                 </Grid>
-                                                <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="12">
-                                                    <Run Text="REF · "/>
-                                                    <Run Text="{Binding Id}"/>
-                                                </TextBlock>
-                                                <TextBlock Text="{Binding PlannedStartUtc, StringFormat={}{0:g}}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14" Margin="0,4,0,0"/>
+                                                <TextBlock Text="{Binding RefText}" Foreground="{StaticResource TextMutedBrush}" FontSize="12"/>
+                                                <TextBlock Text="{Binding PlannedStartText}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="14" Margin="0,4,0,0"/>
                                                 <WrapPanel Margin="0,10,0,0">
                                                     <Border CornerRadius="10" Padding="8,3" Margin="0,0,8,0" Background="#1AFFFFFF" BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1">
-                                                        <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="12">
-                                                            <Run Text="Table "/><Run Text="{Binding TableLabel}"/>
-                                                        </TextBlock>
+                                                        <TextBlock Text="{Binding TableTagText}" Foreground="{StaticResource TextMutedBrush}" FontSize="12"/>
                                                     </Border>
                                                     <Border CornerRadius="10" Padding="8,3" Margin="0,0,8,0" Background="#1AFFFFFF" BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1">
-                                                        <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="12">
-                                                            <Run Text="Party "/><Run Text="{Binding PartySize}"/>
-                                                        </TextBlock>
+                                                        <TextBlock Text="{Binding PartyTagText}" Foreground="{StaticResource TextMutedBrush}" FontSize="12"/>
                                                     </Border>
                                                     <Border CornerRadius="10" Padding="8,3" Background="#1AFFFFFF" BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1">
-                                                        <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="12">
-                                                            <Run Text="Tel "/><Run Text="{Binding GuestPhone}"/>
-                                                        </TextBlock>
+                                                        <TextBlock Text="{Binding TelTagText}" Foreground="{StaticResource TextMutedBrush}" FontSize="12"/>
                                                     </Border>
                                                 </WrapPanel>
                                             </StackPanel>
@@ -103,8 +117,8 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                </StackPanel>
-            </ScrollViewer>
+                </ScrollViewer>
+            </Grid>
 
             <Grid Grid.RowSpan="2"
                   Background="#88070A13"
@@ -124,8 +138,10 @@
                         <ScrollViewer Grid.Row="0"
                                       VerticalScrollBarVisibility="Auto"
                                       HorizontalScrollBarVisibility="Disabled"
+                                      CanContentScroll="False"
                                       MaxHeight="620"
-                                      Padding="20,16,28,8">
+                                      Padding="20,16,28,8"
+                                      Style="{StaticResource EliteScrollViewer}">
                             <StackPanel>
                                 <TextBlock Text="{Binding SelectedDetail.GuestName}" Style="{StaticResource HeadingMedium}" FontSize="40"/>
                                 <StackPanel Orientation="Horizontal" Margin="0,10,0,10">
@@ -136,42 +152,42 @@
                                     </Border>
                                 </StackPanel>
 
-                                <TextBlock Text="VISIT" Style="{StaticResource HeadingSmall}" Margin="0,6,0,6"/>
+                                <TextBlock Text="{Binding ResSectionVisitLabel}" Style="{StaticResource HeadingSmall}" Margin="0,6,0,6"/>
                                 <Border Style="{StaticResource GlassCard}" Padding="10" Margin="0,0,0,8"><TextBlock Text="{Binding SelectedArrivalText}" Style="{StaticResource BodyText}"/></Border>
                                 <Border Style="{StaticResource GlassCard}" Padding="10" Margin="0,0,0,8"><TextBlock Text="{Binding SelectedEndText}" Style="{StaticResource BodyText}"/></Border>
-                                <Border Style="{StaticResource GlassCard}" Padding="10" Margin="0,0,0,8"><TextBlock Text="{Binding SelectedDetail.PartySize, StringFormat=Party size: {0}}" Style="{StaticResource BodyText}"/></Border>
-                                <Border Style="{StaticResource GlassCard}" Padding="10" Margin="0,0,0,8"><TextBlock Text="{Binding SelectedDetail.TableLabel, StringFormat=Table: {0}}" Style="{StaticResource BodyText}"/></Border>
+                                <Border Style="{StaticResource GlassCard}" Padding="10" Margin="0,0,0,8"><TextBlock Text="{Binding SelectedPartySizeLine}" Style="{StaticResource BodyText}"/></Border>
+                                <Border Style="{StaticResource GlassCard}" Padding="10" Margin="0,0,0,8"><TextBlock Text="{Binding SelectedTableLine}" Style="{StaticResource BodyText}"/></Border>
 
-                                <TextBlock Text="GUEST" Style="{StaticResource HeadingSmall}" Margin="0,8,0,6"/>
-                                <Border Style="{StaticResource GlassCard}" Padding="10" Margin="0,0,0,8"><TextBlock Text="{Binding SelectedDetail.GuestPhone, StringFormat=Phone: {0}}" Style="{StaticResource BodyText}"/></Border>
-                                <Border Style="{StaticResource GlassCard}" Padding="10" Margin="0,0,0,8"><TextBlock Text="{Binding SelectedDetail.GuestEmail, StringFormat=Email: {0}}" Style="{StaticResource BodyText}"/></Border>
-                                <Border Style="{StaticResource GlassCard}" Padding="10" Margin="0,0,0,8"><TextBlock Text="{Binding SelectedDetail.UserNotes, StringFormat=Notes: {0}}" Style="{StaticResource BodyText}" TextWrapping="Wrap"/></Border>
+                                <TextBlock Text="{Binding ResSectionGuestLabel}" Style="{StaticResource HeadingSmall}" Margin="0,8,0,6"/>
+                                <Border Style="{StaticResource GlassCard}" Padding="10" Margin="0,0,0,8"><TextBlock Text="{Binding SelectedPhoneLine}" Style="{StaticResource BodyText}"/></Border>
+                                <Border Style="{StaticResource GlassCard}" Padding="10" Margin="0,0,0,8"><TextBlock Text="{Binding SelectedEmailLine}" Style="{StaticResource BodyText}"/></Border>
+                                <Border Style="{StaticResource GlassCard}" Padding="10" Margin="0,0,0,8"><TextBlock Text="{Binding SelectedNotesLine}" Style="{StaticResource BodyText}" TextWrapping="Wrap"/></Border>
 
-                                <TextBlock Text="ACTIONS" Style="{StaticResource HeadingSmall}" Margin="0,10,0,6"/>
+                                <TextBlock Text="{Binding ResSectionActionsLabel}" Style="{StaticResource HeadingSmall}" Margin="0,10,0,6"/>
                                 <WrapPanel>
-                                    <Button Content="Arrived"
+                                    <Button Content="{Binding ResArrivedLabel}"
                                             Margin="0,0,8,8"
                                             Command="{Binding MarkArrivedCommand}"
                                             IsEnabled="{Binding CanRunScheduledActions}"
                                             Style="{StaticResource GoldPrimaryButton}"/>
-                                    <Button Content="Reschedule"
+                                    <Button Content="{Binding ResRescheduleLabel}"
                                             Margin="0,0,8,8"
                                             Command="{Binding ShowReschedulePanelCommand}"
                                             IsEnabled="{Binding CanRunScheduledActions}"
                                             Style="{StaticResource GhostButton}"/>
-                                    <Button Content="No show"
+                                    <Button Content="{Binding ResNoShowLabel}"
                                             Margin="0,0,8,8"
                                             Command="{Binding MarkNoShowCommand}"
                                             IsEnabled="{Binding CanRunScheduledActions}"
                                             Style="{StaticResource GhostButton}"/>
-                                    <Button Content="Cancelled"
+                                    <Button Content="{Binding ResCancelledActionLabel}"
                                             Margin="0,0,0,8"
                                             Command="{Binding MarkCancelledCommand}"
                                             IsEnabled="{Binding CanRunScheduledActions}"
                                             Style="{StaticResource DangerButton}"/>
                                 </WrapPanel>
 
-                                <TextBlock Text="Reschedule start (local)"
+                                <TextBlock Text="{Binding ResRescheduleStartLocalLabel}"
                                            Style="{StaticResource HeadingSmall}"
                                            Margin="0,8,0,6"
                                            Visibility="{Binding CanRunScheduledActions, Converter={StaticResource BoolToVisibilityConverter}}"/>
@@ -179,7 +195,7 @@
                                     <TextBox Text="{Binding RescheduleLocalText, UpdateSourceTrigger=PropertyChanged}"
                                              Style="{StaticResource EliteTextBox}"
                                              Margin="0,0,0,10"/>
-                                    <Button Content="Save new time"
+                                    <Button Content="{Binding ResSaveNewTimeLabel}"
                                             HorizontalAlignment="Left"
                                             MinWidth="140"
                                             Command="{Binding SaveRescheduleCommand}"
@@ -188,7 +204,7 @@
                             </StackPanel>
                         </ScrollViewer>
                         <Grid Grid.Row="1" Margin="20,0,20,16">
-                            <Button Content="Close"
+                            <Button Content="{Binding ResCloseLabel}"
                                     HorizontalAlignment="Right"
                                     Margin="0,8,0,0"
                                     Command="{Binding CloseDetailCommand}"

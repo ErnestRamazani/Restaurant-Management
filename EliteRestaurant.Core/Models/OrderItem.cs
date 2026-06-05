@@ -12,6 +12,12 @@ public class OrderItem
     public string PreparedByRole { get; set; } = string.Empty;
     public string PreparedByName { get; set; } = string.Empty;
 
-    /// <summary>Set when the kitchen marks the ticket ready — line was prepared in a prior cycle.</summary>
+    /// <summary>Set when the kitchen or bar marks the line prepared on their station.</summary>
     public DateTime? KitchenPreparedAt { get; set; }
+
+    /// <summary>Set when the server delivers this line (or station batch) to the guest.</summary>
+    public DateTime? ServerServedAt { get; set; }
+
+    /// <summary>Set when inventory was deducted for this line (release or add-on while in progress).</summary>
+    public DateTime? InventoryDeductedAt { get; set; }
 }

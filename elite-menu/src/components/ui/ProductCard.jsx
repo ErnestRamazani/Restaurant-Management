@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { getCategoryColor } from '../../utils/placeholders'
 import { formatUsd } from '../../utils/format'
 import { productIsAvailable } from '../../utils/availability'
@@ -22,9 +23,10 @@ function stopBub(e) {
 }
 
 export function ProductCard({ product, qty, onOpen, onAdd, onMinus, onPlus, onRemoveLine }) {
+  const { t } = useTranslation()
   const available = productIsAvailable(product)
   const cat = product.category || ''
-  const sub = product.subcategory || 'General'
+  const sub = product.subcategory || t('guest.general.generalCategory')
   const ph = getCategoryColor(cat)
   const initial = (product.name || '?').trim().charAt(0) || '?'
   const desc = product.description ? String(product.description) : ''
@@ -55,8 +57,8 @@ export function ProductCard({ product, qty, onOpen, onAdd, onMinus, onPlus, onRe
           tabIndex={0}
           aria-label={
             available
-              ? `View details, ${String(product.name ?? '')}`
-              : `View details, ${String(product.name ?? '')} (out of order, not available to add)`
+              ? t('guest.product.viewDetails', { name: String(product.name ?? '') })
+              : t('guest.product.viewDetailsUnavailable', { name: String(product.name ?? '') })
           }
         >
           <div className="relative h-[200px] w-full overflow-hidden">
@@ -132,14 +134,14 @@ export function ProductCard({ product, qty, onOpen, onAdd, onMinus, onPlus, onRe
               className="cursor-pointer font-body text-[0.72rem] text-champagne/35"
             >
               {preview.replace(/…$/, '')}
-              <span className="text-gold/80"> Details</span>
+              <span className="text-gold/80"> {t('guest.product.details')}</span>
             </p>
           ) : (
             <span
               onClick={open}
               className="block cursor-pointer font-body text-[0.72rem] text-champagne/30"
             >
-              <span className="text-gold/80">Details</span>
+              <span className="text-gold/80">{t('guest.product.details')}</span>
             </span>
           )}
         </div>
@@ -157,7 +159,7 @@ export function ProductCard({ product, qty, onOpen, onAdd, onMinus, onPlus, onRe
                   onAdd(product)
                 }}
                 className="flex h-10 w-10 min-h-[40px] min-w-[40px] touch-manipulation select-none items-center justify-center rounded-full bg-gold text-black shadow-md active:scale-95"
-                aria-label="Add to order"
+                aria-label={t('menu.addToCart')}
               >
                 <Plus className="h-5 w-5" strokeWidth={3} />
               </button>
@@ -165,9 +167,9 @@ export function ProductCard({ product, qty, onOpen, onAdd, onMinus, onPlus, onRe
               <span
                 className="flex min-h-10 min-w-[7.5rem] select-none items-center justify-center rounded-full border-2 border-red-600 bg-red-600/10 px-3 font-body text-[0.75rem] font-extrabold uppercase tracking-[0.06em]"
                 style={{ color: '#dc2626' }}
-                aria-label="Not available — out of order"
+                aria-label={t('guest.product.viewDetailsUnavailable', { name: String(product.name ?? '') })}
               >
-                Out of order
+                {t('guest.product.outOfOrderBadge')}
               </span>
             )
           ) : (
@@ -187,7 +189,7 @@ export function ProductCard({ product, qty, onOpen, onAdd, onMinus, onPlus, onRe
                     onRemoveLine(product)
                   }}
                   className="inline-flex h-[32px] w-[32px] min-h-[32px] min-w-[32px] touch-manipulation select-none items-center justify-center rounded-full border border-champagne/20 bg-midnight-2 text-champagne/70 transition hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300 active:scale-95"
-                  aria-label="Remove line from cart"
+                  aria-label={t('guest.general.remove')}
                 >
                   <Trash2 className="h-3.5 w-3.5" strokeWidth={2.25} />
                 </button>

@@ -14,13 +14,23 @@
     "checkingCloud": "Vérification du cloud"
   },
   "menu": {
+    "welcome": "Bienvenue",
     "browseMenu": "Voir le menu",
     "orderOnline": "Commander en ligne",
     "reservation": "Réservation",
     "staffLogin": "Personnel",
+    "about": "À propos",
+    "contact": "Contact",
+    "notes": "Notes",
     "cart": "Panier",
+    "yourCart": "Votre panier",
+    "emptyCart": "Votre panier est vide",
+    "addToCart": "Ajouter au panier",
     "placeOrder": "Envoyer la commande",
     "orderConfirmed": "Commande confirmée"
+  },
+  "reservation": {
+    "reservationFloor": "Plan de réservation"
   },
   "staff": {
     "hubTitle": "Espace de travail",

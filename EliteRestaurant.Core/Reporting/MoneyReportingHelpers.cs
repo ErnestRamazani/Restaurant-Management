@@ -1,3 +1,4 @@
+using System.Globalization;
 using EliteRestaurant.Core.Utils;
 
 namespace EliteRestaurant.Core.Reporting;
@@ -56,17 +57,18 @@ public static class MoneyReportingHelpers
         decimal amountUsd,
         decimal amountFc,
         string? currencyCode,
-        bool isRevenue)
+        bool isRevenue,
+        CultureInfo? culture = null)
     {
         var prefix = isRevenue ? "+" : "-";
         if (IsMixedCurrency(currencyCode) && (amountUsd > 0m || amountFc > 0m))
-            return $"{prefix}{CurrencyHelper.FormatDualCurrency(amountUsd, amountFc)}";
+            return $"{prefix}{CurrencyHelper.FormatDualCurrency(amountUsd, amountFc, culture)}";
 
         var code = NormalizeCurrencyCode(currencyCode);
         var displayAmount = code == CurrencyHelper.CongoleseFranc
             ? (amountFc > 0m ? amountFc : amount)
             : (amountUsd > 0m ? amountUsd : amount);
-        return $"{prefix}{CurrencyHelper.FormatAmount(displayAmount, code)}";
+        return $"{prefix}{CurrencyHelper.FormatAmount(displayAmount, code, culture)}";
     }
 
     private static decimal ReadDecimal(object? value) =>

@@ -1,5 +1,207 @@
 (function () {
   const PORTAL_ID = "Cashier";
+  let hubPillState = "off";
+  let ordersUpdatedTime = "";
+
+  function t(key, fallback, vars) {
+    const full = key.indexOf("portals.") === 0 || key.indexOf("auth.") === 0 || key.indexOf("common.") === 0 || key.indexOf("orders.") === 0
+      ? key
+      : "portals.cashier." + key;
+    return (window.EliteI18n && EliteI18n.t) ? EliteI18n.t(full, fallback, vars) : (fallback != null ? String(fallback) : full);
+  }
+
+  function metaSlug(value) {
+    return String(value || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+  }
+
+  function normalizeStatusKey(status) {
+    const raw = String(status ?? "").trim();
+    if (!raw) return "";
+    const spaced = raw.replace(/([a-z])([A-Z])/g, "$1 $2");
+    const n = spaced.replace(/\s+/g, " ").trim().toLowerCase();
+    const aliases = {
+      "waiting": "waiting",
+      "pending approval": "pending_approval",
+      "pending cashier": "pending_cashier",
+      "in kitchen": "in_kitchen",
+      "ready": "ready",
+      "served": "served",
+      "completed": "completed",
+      "cancelled": "cancelled",
+      "canceled": "cancelled",
+      "pending": "pending",
+      "on account": "on_account",
+      "debt": "on_account"
+    };
+    return aliases[n] || metaSlug(n);
+  }
+
+  const STATUS_FALLBACK_EN = {
+    pending_approval: "Pending approval",
+    pending_cashier: "Pending cashier",
+    waiting: "Waiting",
+    in_kitchen: "In kitchen",
+    ready: "Ready",
+    served: "Served",
+    completed: "Completed",
+    cancelled: "Cancelled",
+    pending: "Pending",
+    on_account: "On account"
+  };
+
+  const STATUS_FALLBACK_FR = {
+    pending_approval: "En attente d'approbation",
+    pending_cashier: "En attente caisse",
+    waiting: "En attente",
+    in_kitchen: "En cuisine",
+    ready: "Prête",
+    served: "Servie",
+    completed: "Terminée",
+    cancelled: "Annulée",
+    pending: "En attente",
+    on_account: "En compte"
+  };
+
+  const STATUS_ORDERS_KEY = {
+    pending_approval: "orders.pendingApproval",
+    pending_cashier: "orders.pendingCashier",
+    waiting: "orders.waiting",
+    in_kitchen: "orders.inKitchen",
+    ready: "orders.ready",
+    served: "orders.served",
+    completed: "orders.completed",
+    cancelled: "orders.cancelled",
+    pending: "orders.pending"
+  };
+
+  const META_FALLBACK_FR = {
+    payment: { deferred: "Différé", immediate: "Immédiat", pay_now: "Payer maintenant", on_account: "En compte" },
+    origin: { online: "En ligne", dine_in: "Sur place", walk_in: "Sans réservation" },
+    source: { delivery: "Livraison", pickup: "À emporter", dine_in: "Sur place", table: "Table" },
+    table: { online: "En ligne" }
+  };
+
+  const META_FALLBACK_EN = {
+    payment: { deferred: "Deferred", immediate: "Immediate", pay_now: "Pay now", on_account: "On account" },
+    origin: { online: "Online", dine_in: "Dine-in", walk_in: "Walk-in" },
+    source: { delivery: "Delivery", pickup: "Pickup", dine_in: "Dine-in", table: "Table" },
+    table: { online: "Online" }
+  };
+
+  function currentLangCode() {
+    return (window.EliteI18n && EliteI18n.lang) || "fr";
+  }
+
+  function translateOrderStatus(status) {
+    const raw = String(status ?? "").trim();
+    if (!raw) return raw;
+    const key = normalizeStatusKey(raw);
+    if (!key) return raw;
+    const lang = currentLangCode();
+    const fb = (lang === "fr" ? STATUS_FALLBACK_FR : STATUS_FALLBACK_EN)[key] || raw;
+    let translated = t("status." + key, fb);
+    if (translated && translated.indexOf("portals.cashier.") !== 0) return translated;
+    const ordersKey = STATUS_ORDERS_KEY[key];
+    if (ordersKey) {
+      translated = t(ordersKey, fb);
+      if (translated && translated.indexOf("orders.") !== 0) return translated;
+    }
+    return fb;
+  }
+
+  function normalizeMetaKey(kind, value) {
+    const raw = String(value ?? "").trim();
+    if (!raw) return "";
+    const spaced = raw.replace(/([a-z])([A-Z])/g, "$1 $2");
+    const n = spaced.replace(/\s+/g, " ").trim().toLowerCase();
+    const aliases = {
+      payment: {
+        deferred: "deferred",
+        immediate: "immediate",
+        "pay now": "pay_now",
+        "on account": "on_account"
+      },
+      origin: {
+        online: "online",
+        "dine in": "dine_in",
+        "dine-in": "dine_in",
+        "walk in": "walk_in",
+        "walk-in": "walk_in"
+      },
+      source: {
+        delivery: "delivery",
+        pickup: "pickup",
+        "dine in": "dine_in",
+        "dine-in": "dine_in",
+        table: "table"
+      },
+      table: {
+        online: "online"
+      }
+    };
+    return (aliases[kind] && aliases[kind][n]) || metaSlug(n);
+  }
+
+  function translateMetaValue(kind, value) {
+    const raw = String(value ?? "").trim();
+    if (!raw) return raw;
+    if (raw.includes("·")) {
+      return raw.split("·").map(part => translateMetaValue(kind, part.trim())).join(" · ");
+    }
+    const slug = normalizeMetaKey(kind, raw);
+    if (!slug) return raw;
+    const lang = currentLangCode();
+    const fbMap = lang === "fr" ? META_FALLBACK_FR : META_FALLBACK_EN;
+    const fb = (fbMap[kind] && fbMap[kind][slug]) || raw;
+    const translated = t("meta." + kind + "." + slug, fb);
+    if (translated && translated.indexOf("portals.cashier.") !== 0) return translated;
+    return fb;
+  }
+
+  function applyCashierStaticI18n(root) {
+    if (window.EliteI18n) EliteI18n.applyToDocument(root || document);
+    document.title = t("pageTitle", "Elite Cashier");
+  }
+
+  function refreshCashierDynamicLabels() {
+    setHubPill(hubPillState);
+    const ou = $("ordersUpdated");
+    if (ou && ordersUpdatedTime) {
+      ou.textContent = t("updatedPrefix", "Updated") + " " + ordersUpdatedTime;
+    }
+    if (token) {
+      if (currentView === "orders") {
+        renderPendingOrders();
+        renderActiveOrders();
+        renderPastOrders();
+        updateOrdersNavBadge();
+      }
+      if (currentView === "menu") renderMenuFromCatalog();
+      const payModal = $("paymentModal");
+      if (payModal && !payModal.classList.contains("hidden")) {
+        updatePaymentFlowUI();
+        const debtLbl = $("payOnAccountLabel");
+        if (debtLbl) debtLbl.title = paymentCanAddToDebt ? "" : t("pay.debtCapTitle", "Debt cap reached — collect payment first.");
+      }
+      if (detailOrderId && detailOrderStatus) {
+        const pill = $("detailStatusPill");
+        if (pill) pill.textContent = translateOrderStatus(detailOrderStatus) || detailOrderStatus || "—";
+        if (!$("orderDetailModal").classList.contains("hidden")) {
+          openOrderDetail(detailOrderId).catch(() => {});
+        }
+      }
+    }
+  }
+
+  document.addEventListener("elite-language-changed", function () {
+    applyCashierStaticI18n();
+    refreshCashierDynamicLabels();
+  });
+
   let token = "";
   let me = null;
   let activeOrderRows = [];
@@ -16,6 +218,8 @@
   let paidFcInput = "";
   let changeUsdInput = "";
   let changeFcInput = "";
+  let paymentHasLinkedClient = false;
+  let paymentCanAddToDebt = false;
   let config = { restaurantName: "Elite Restaurant", restaurantLogoUrl: "", employeePhotoUrl: "", currencyDisplayMode: "Dual", usdToFcRate: 2250, taxPercent: 7, servicePercent: 10 };
   let currentView = "orders";
   let menuCatalogRows = [];
@@ -30,6 +234,7 @@
 
   function orderDetailStatusPillClass(stRaw) {
     const s = String(stRaw || "").toLowerCase();
+    if (s.includes("debt")) return "od-status-pill--debt";
     if (s.includes("pending")) return "od-status-pill--pending";
     if (s.includes("waiting")) return "od-status-pill--wait";
     if (s.includes("kitchen")) return "od-status-pill--kitchen";
@@ -39,9 +244,9 @@
   }
 
   function orderDetailNoteInnerHtml(bodyRaw) {
-    const t = String(bodyRaw ?? "").trim();
-    if (!t || t === "-") return "<span class=\"od-note-empty\">None noted</span>";
-    return escapeHtml(t);
+    const note = String(bodyRaw ?? "").trim();
+    if (!note || note === "-") return "<span class=\"od-note-empty\">" + escapeHtml(t("detail.noneNoted", "None noted")) + "</span>";
+    return escapeHtml(note);
   }
 
   function orderConfirmationCode(o) {
@@ -51,7 +256,7 @@
   function orderCardCodeHtml(o) {
     const code = orderConfirmationCode(o);
     if (!code) return "";
-    return "<div class='order-card__code'>Code <strong>" + escapeHtml(code) + "</strong></div>";
+    return "<div class='order-card__code'>" + escapeHtml(t("orderCodeLabel", "Code")) + " <strong>" + escapeHtml(code) + "</strong></div>";
   }
 
   function setDetailConfirmationCode(code) {
@@ -108,7 +313,7 @@
       }
 
       const iframe = document.createElement("iframe");
-      iframe.setAttribute("title", "Receipt print");
+      iframe.setAttribute("title", t("receiptPrintTitle", "Receipt print"));
       iframe.style.cssText =
         "position:fixed;left:0;top:0;width:0;height:0;border:0;visibility:hidden";
       document.body.appendChild(iframe);
@@ -149,7 +354,7 @@
     }
   }
 
-  async function api(url, method, body, auth) {
+  async function api(url, method, body, auth, wrapOptions) {
     const headers = {};
     if (body) headers["Content-Type"] = "application/json";
     if (auth !== false && token) headers["Authorization"] = "Bearer " + token;
@@ -157,7 +362,9 @@
     const txt = await res.text();
     let json;
     try { json = JSON.parse(txt); } catch { json = { raw: txt }; }
-    return { ok: res.ok, status: res.status, body: json };
+    var result = { ok: res.ok, status: res.status, body: json };
+    if (window.EliteApiError) window.EliteApiError.wrap(result, wrapOptions);
+    return result;
   }
 
   function revokeImgBlob(el) {
@@ -211,7 +418,7 @@
     }
     if (!rows.length) {
       $("menuBody").innerHTML =
-        q ? '<p class="muted">No dishes match your search.</p>' : '<p class="muted">No products.</p>';
+        q ? '<p class="muted">' + escapeHtml(t("noDishesSearch", "No dishes match your search.")) + '</p>' : '<p class="muted">' + escapeHtml(t("noProducts", "No products.")) + '</p>';
       return;
     }
     const byCat = {};
@@ -249,9 +456,9 @@
           html += '<div class="price">$ ' + p.price.toFixed(2) + '</div>';
           if (p.description)
             html += '<div class="muted menu-card-desc">' + escapeHtml(p.description) + '</div>';
-          html += '<div class="ing"><strong>Ingredients</strong> · ' + escapeHtml(row.ingText || "—") + '</div>';
+          html += '<div class="ing"><strong>' + escapeHtml(t("ingredients", "Ingredients")) + '</strong> · ' + escapeHtml(row.ingText || "—") + '</div>';
           if (p.composition)
-            html += '<div class="comp"><strong>Composition</strong> · ' + escapeHtml(p.composition) + '</div>';
+            html += '<div class="comp"><strong>' + escapeHtml(t("composition", "Composition")) + '</strong> · ' + escapeHtml(p.composition) + '</div>';
           html += '</div></div>';
         }
         html += '</div>';
@@ -268,8 +475,8 @@
       api("/api/admin/data/inventory", "GET", null, true),
       api("/api/public/menu/products", "GET", null, false)
     ]);
-    if (!rp.ok) throw new Error(rp.body?.message || "Failed to load products");
-    if (!rpi.ok) throw new Error(rpi.body?.message || "Failed to load product ingredients");
+    if (!rp.ok) throw new Error(rp.body?.message || t("failedLoadProducts", "Failed to load products"));
+    if (!rpi.ok) throw new Error(rpi.body?.message || t("failedLoadIngredients", "Failed to load product ingredients"));
     const photoById = {};
     if (rpub.ok && Array.isArray(rpub.body)) {
       for (const x of rpub.body) {
@@ -405,7 +612,8 @@
     renderActiveOrders();
     renderPastOrders();
     updateOrdersNavBadge();
-    $("ordersUpdated").textContent = "Updated " + new Date().toLocaleTimeString();
+    ordersUpdatedTime = new Date().toLocaleTimeString();
+    $("ordersUpdated").textContent = t("updatedPrefix", "Updated") + " " + ordersUpdatedTime;
   }
 
   function updateOrdersNavBadge() {
@@ -424,7 +632,7 @@
   function renderPendingOrders() {
     const el = $("pendingOrders");
     if (!el) return;
-    if (!pendingRows.length) { el.innerHTML = "<div class='muted' style='padding:16px;'>No tickets awaiting validation.</div>"; return; }
+    if (!pendingRows.length) { el.innerHTML = "<div class='muted' style='padding:16px;'>" + escapeHtml(t("noTicketsAwaiting", "No tickets awaiting validation.")) + "</div>"; return; }
     el.innerHTML = pendingRows.map(o => {
       const id = o.id ?? o.Id;
       const code = o.orderCode ?? o.OrderCode ?? "";
@@ -438,29 +646,35 @@
         "<button type='button' class='order-card__hit' data-open-p='" + id + "'>" +
         "<div><strong>" + escapeHtml(code) + "</strong> · " + escapeHtml(tbl) + "</div>" +
         orderCardCodeHtml(o) +
-        "<div class='muted'>Server: " + escapeHtml(srv) + " · " + escapeHtml(cat) + "</div>" +
+        "<div class='muted'>" + escapeHtml(t("serverLabel", "Server")) + ": " + escapeHtml(srv) + " · " + escapeHtml(cat) + "</div>" +
         "<div class='muted'>" + escapeHtml(lines) + "</div><div>" + escapeHtml(gt) + "</div>" +
         "</button>" +
         "<div class='order-card__actions'>" +
-        "<button type='button' class='btn btn-ghost btn-sm' data-print-ticket='" + id + "' data-print-status='" + escapeHtml(o.status ?? o.Status ?? "") + "'>Print ticket</button>" +
-        "<button type='button' class='btn btn-primary btn-sm' data-release='" + id + "'>Release to kitchen</button>" +
-        "<button type='button' class='btn btn-danger btn-sm' data-cancel-p='" + id + "'>Cancel</button></div></div>");
+        "<button type='button' class='btn btn-ghost btn-sm' data-print-ticket='" + id + "' data-print-status='" + escapeHtml(o.status ?? o.Status ?? "") + "'>" + escapeHtml(t("printTicket", "Print ticket")) + "</button>" +
+        "<button type='button' class='btn btn-primary btn-sm' data-release='" + id + "'>" + escapeHtml(t("releaseToKitchen", "Release to kitchen")) + "</button>" +
+        "<button type='button' class='btn btn-danger btn-sm' data-cancel-p='" + id + "'>" + escapeHtml(t("cancel", "Cancel")) + "</button></div></div>");
     }).join("");
     el.querySelectorAll("[data-open-p]").forEach(b => b.onclick = () => openOrderDetail(Number(b.getAttribute("data-open-p"))));
     el.querySelectorAll("[data-print-ticket]").forEach(b => b.onclick = () =>
       printOrderTicket(Number(b.getAttribute("data-print-ticket")), b.getAttribute("data-print-status")));
     el.querySelectorAll("[data-release]").forEach(b => b.onclick = async () => {
       const id = Number(b.getAttribute("data-release"));
-      if (!confirm("Release to kitchen? Inventory will be deducted.")) return;
-      const r = await api("/api/cashier/orders/pending/" + id + "/release", "POST");
-      if (!r.ok) { alert(r.body?.message || "Release failed"); return; }
+      if (!confirm(t("confirmRelease", "Release to kitchen? Inventory will be deducted."))) return;
+      if (window.EliteButtonBusy) EliteButtonBusy.set(b, true, "portals.common.saving", "Saving…");
+      let r;
+      try {
+        r = await api("/api/cashier/orders/pending/" + id + "/release", "POST");
+      } finally {
+        if (window.EliteButtonBusy) EliteButtonBusy.set(b, false);
+      }
+      if (!r.ok) { alert(r.body?.message || t("releaseFailed", "Release failed")); return; }
       await loadOrdersTab();
     });
     el.querySelectorAll("[data-cancel-p]").forEach(b => b.onclick = async () => {
       const id = Number(b.getAttribute("data-cancel-p"));
-      if (!confirm("Cancel this ticket? Stock has not been deducted.")) return;
-      await api("/api/cashier/orders/pending/" + id + "/cancel", "POST");
-      await loadOrdersTab();
+      await EliteOrderCancel.cancelStaffOrder(id, async (orderId, passcode) =>
+        api("/api/cashier/orders/pending/" + orderId + "/cancel", "POST", { passcode }),
+        { confirmMessage: t("confirmCancelTicket", "Cancel this ticket? Stock has not been deducted."), onSuccess: () => loadOrdersTab() });
     });
   }
 
@@ -468,7 +682,7 @@
     const el = $("activeOrders");
     const needle = ($("activeSearch") && $("activeSearch").value) || "";
     const rows = filterRows(activeOrderRows, needle);
-    if (!rows.length) { el.innerHTML = "<div class='muted' style='padding:16px;'>No active orders.</div>"; return; }
+    if (!rows.length) { el.innerHTML = "<div class='muted' style='padding:16px;'>" + escapeHtml(t("noActiveOrders", "No active orders.")) + "</div>"; return; }
     el.innerHTML = rows.map(o => {
       const id = o.id ?? o.Id;
       const oid = o.orderId ?? o.OrderId ?? "";
@@ -477,26 +691,27 @@
       return (
         "<div class='order-card'>" +
         "<button type='button' class='order-card__hit' data-open='" + id + "'>" +
-        "<div><strong>" + escapeHtml(oid) + "</strong> <span class='muted'>" + escapeHtml(st) + "</span></div>" +
+        "<div><strong>" + escapeHtml(oid) + "</strong> <span class='muted'>" + escapeHtml(translateOrderStatus(st)) + "</span></div>" +
         orderCardCodeHtml(o) +
         "<div class='muted'>" + escapeHtml(o.tableNumber ?? o.TableNumber ?? "") + "</div>" +
-        "<div class='muted'>Server: " + escapeHtml(o.serverName ?? o.ServerName ?? "") + "</div>" +
+        "<div class='muted'>" + escapeHtml(t("serverLabel", "Server")) + ": " + escapeHtml(o.serverName ?? o.ServerName ?? "") + "</div>" +
         "<div class='muted'>" + escapeHtml(o.items ?? o.Items ?? "") + "</div>" +
         "<div style=\"font-size:1.05rem;font-weight:700;margin-top:6px;\">" + fmtUsd(o.total ?? o.Total) + "</div>" +
         "</button>" +
         "<div class='order-card__actions'>" +
-        "<button type='button' class='btn btn-ghost btn-sm' data-print-ticket='" + id + "' data-print-status='" + escapeHtml(st) + "'>Print ticket</button>" +
-        (complete ? "<button type='button' class='btn btn-primary btn-sm' data-complete='" + id + "'>Complete payment</button>" : "") +
-        "<button type='button' class='btn btn-danger btn-sm' data-cancel-o='" + id + "'>Cancel</button></div></div>");
+        "<button type='button' class='btn btn-ghost btn-sm' data-print-ticket='" + id + "' data-print-status='" + escapeHtml(st) + "'>" + escapeHtml(t("printTicket", "Print ticket")) + "</button>" +
+        (complete ? "<button type='button' class='btn btn-primary btn-sm' data-complete='" + id + "'>" + escapeHtml(t("completePayment", "Complete payment")) + "</button>" : "") +
+        "<button type='button' class='btn btn-danger btn-sm' data-cancel-o='" + id + "'>" + escapeHtml(t("cancel", "Cancel")) + "</button></div></div>");
     }).join("");
     el.querySelectorAll("[data-open]").forEach(b => b.onclick = () => openOrderDetail(Number(b.getAttribute("data-open"))));
     el.querySelectorAll("[data-print-ticket]").forEach(b => b.onclick = () =>
       printOrderTicket(Number(b.getAttribute("data-print-ticket")), b.getAttribute("data-print-status")));
     el.querySelectorAll("[data-complete]").forEach(b => b.onclick = () => openPaymentModal(Number(b.getAttribute("data-complete"))));
     el.querySelectorAll("[data-cancel-o]").forEach(b => b.onclick = async () => {
-      if (!confirm("Cancel this order?")) return;
-      await api("/api/cashier/orders/" + Number(b.getAttribute("data-cancel-o")) + "/cancel", "POST");
-      await loadOrdersTab();
+      const id = Number(b.getAttribute("data-cancel-o"));
+      await EliteOrderCancel.cancelStaffOrder(id, async (orderId, passcode) =>
+        api("/api/cashier/orders/" + orderId + "/cancel", "POST", { passcode }),
+        { confirmMessage: t("confirmCancelOrder", "Cancel this order?"), onSuccess: () => loadOrdersTab() });
     });
   }
 
@@ -508,12 +723,12 @@
     const dayKeys = collectSortedPastDayKeys(pastOrderRows, getTs);
     if (!pastOrderRows.length) {
       sel.innerHTML = "";
-      el.innerHTML = "<div class='muted' style='padding:16px;'>No past orders.</div>";
+      el.innerHTML = "<div class='muted' style='padding:16px;'>" + escapeHtml(t("noPastOrders", "No past orders.")) + "</div>";
       return;
     }
     let rows;
     if (!dayKeys.length) {
-      sel.innerHTML = "<option value=\"\">All past orders</option>";
+      sel.innerHTML = "<option value=\"\">" + escapeHtml(t("pastAllOrders", "All past orders")) + "</option>";
       sel.disabled = true;
       sel.value = "";
       const needle = ($("pastSearch") && $("pastSearch").value) || "";
@@ -540,8 +755,8 @@
     if (!rows.length) {
       const searched = Boolean(($("pastSearch") && $("pastSearch").value || "").trim());
       const msg = searched
-        ? "No past orders match your search."
-        : (!dayKeys.length ? "No past orders to show." : "No past orders for this day.");
+        ? t("noPastOrdersSearch", "No past orders match your search.")
+        : (!dayKeys.length ? t("noPastOrdersShow", "No past orders to show.") : t("noPastOrdersDay", "No past orders for this day."));
       el.innerHTML = "<div class='muted' style='padding:16px;'>" + msg + "</div>";
       return;
     }
@@ -554,13 +769,13 @@
       return (
         "<div class='order-card'>" +
         "<button type='button' class='order-card__hit' data-open-pt='" + id + "'>" +
-        "<div class='muted' style='font-size:11px;margin-bottom:4px;'>Tap for details</div>" +
-        "<div><strong>" + escapeHtml(oid) + "</strong> <span class='muted'>" + escapeHtml(st) + "</span> · " + escapeHtml(time) + "</div>" +
+        "<div class='muted' style='font-size:11px;margin-bottom:4px;'>" + escapeHtml(t("tapForDetails", "Tap for details")) + "</div>" +
+        "<div><strong>" + escapeHtml(oid) + "</strong> <span class='muted'>" + escapeHtml(translateOrderStatus(st)) + "</span> · " + escapeHtml(time) + "</div>" +
         orderCardCodeHtml(o) +
         "<div class='muted'>" + tbl + " · " + fmtUsd(o.total ?? o.Total) + "</div>" +
         "</button>" +
         "<div class='order-card__actions'>" +
-        "<button type='button' class='btn btn-ghost btn-sm' data-print-ticket='" + id + "' data-print-status='" + escapeHtml(st) + "'>Print ticket</button>" +
+        "<button type='button' class='btn btn-ghost btn-sm' data-print-ticket='" + id + "' data-print-status='" + escapeHtml(st) + "'>" + escapeHtml(t("printTicket", "Print ticket")) + "</button>" +
         "</div></div>");
     }).join("");
     el.querySelectorAll("[data-open-pt]").forEach(b => b.onclick = () => openOrderDetail(Number(b.getAttribute("data-open-pt"))));
@@ -570,7 +785,7 @@
 
   async function openOrderDetail(orderId) {
     const r = await api("/api/cashier/orders/" + orderId + "/invoice");
-    if (!r.ok) { alert(r.body?.message || "Could not load order"); return; }
+    if (!r.ok) { alert(r.body?.message || t("couldNotLoadOrder", "Could not load order")); return; }
     const d = r.body;
     detailOrderId = orderId;
     const linesRaw = d.lines ?? d.Lines ?? [];
@@ -580,7 +795,7 @@
     $("detailOrderCode").textContent = code || "—";
     setDetailConfirmationCode(orderConfirmationCode(d));
     const pill = $("detailStatusPill");
-    pill.textContent = st || "—";
+    pill.textContent = translateOrderStatus(st) || st || "—";
     pill.className = "od-status-pill " + orderDetailStatusPillClass(st);
     const sub = d.subtotalUsd ?? d.SubtotalUsd ?? 0;
     const disc = d.discountAppliedUsd ?? d.DiscountAppliedUsd ?? 0;
@@ -615,50 +830,51 @@
     const itemsBlock = linesRaw.length
       ? (
           "<div class=\"od-items-table\" role=\"table\">" +
-          "<div class=\"od-items-head\" role=\"row\"><span>Qty</span><span>Item</span><span class=\"od-num\">Unit</span><span class=\"od-num\">Line</span></div>" +
+          "<div class=\"od-items-head\" role=\"row\"><span>" + escapeHtml(t("detail.qty", "Qty")) + "</span><span>" + escapeHtml(t("detail.item", "Item")) + "</span><span class=\"od-num\">" + escapeHtml(t("detail.unit", "Unit")) + "</span><span class=\"od-num\">" + escapeHtml(t("detail.line", "Line")) + "</span></div>" +
           lineRows +
           "</div>"
         )
-      : "<div class=\"muted\" style=\"padding:12px 14px;font-size:13px;\">No line items.</div>";
+      : "<div class=\"muted\" style=\"padding:12px 14px;font-size:13px;\">" + escapeHtml(t("detail.noLineItems", "No line items.")) + "</div>";
     const deliveryRow = dFee > 0
-      ? "<div class=\"od-total-row\"><span>Delivery fee (20%)</span><span>" + escapeHtml(fmtUsd(dFee)) + "</span></div>"
+      ? "<div class=\"od-total-row\"><span>" + escapeHtml(t("detail.deliveryFee", "Delivery fee (20%)")) + "</span><span>" + escapeHtml(fmtUsd(dFee)) + "</span></div>"
       : "";
     const grandLine = escapeHtml(fmtUsd(gusd) + " (" + fmtFc(gfc) + ")");
     $("detailBodyScroll").innerHTML =
-      "<section class=\"od-section\" aria-label=\"Order details\">" +
-      "<h4 class=\"od-section-title\">Details</h4>" +
+      "<section class=\"od-section\" aria-label=\"" + escapeHtml(t("detail.details", "Details")) + "\">" +
+      "<h4 class=\"od-section-title\">" + escapeHtml(t("detail.details", "Details")) + "</h4>" +
       "<div class=\"od-meta-grid\">" +
       (orderConfirmationCode(d)
-        ? "<div class=\"od-meta-cell\" style=\"grid-column:1/-1;\"><span class=\"od-meta-k\">Confirmation code</span><span class=\"od-meta-v\" style=\"font-family:ui-monospace,monospace;font-size:1.15rem;font-weight:700;letter-spacing:0.14em;\">" + escapeHtml(orderConfirmationCode(d)) + "</span></div>"
+        ? "<div class=\"od-meta-cell\" style=\"grid-column:1/-1;\"><span class=\"od-meta-k\">" + escapeHtml(t("detail.confirmationCode", "Confirmation code")) + "</span><span class=\"od-meta-v\" style=\"font-family:ui-monospace,monospace;font-size:1.15rem;font-weight:700;letter-spacing:0.14em;\">" + escapeHtml(orderConfirmationCode(d)) + "</span></div>"
         : "") +
-      "<div class=\"od-meta-cell\"><span class=\"od-meta-k\">Table</span><span class=\"od-meta-v\">" + escapeHtml(String(tableLabel)) + "</span></div>" +
-      "<div class=\"od-meta-cell\"><span class=\"od-meta-k\">Server</span><span class=\"od-meta-v\">" + escapeHtml(String(serverName)) + "</span></div>" +
-      "<div class=\"od-meta-cell\"><span class=\"od-meta-k\">Origin</span><span class=\"od-meta-v\">" + escapeHtml(String(origin)) + "</span></div>" +
-      "<div class=\"od-meta-cell\"><span class=\"od-meta-k\">Source</span><span class=\"od-meta-v\">" + escapeHtml(String(src)) + "</span></div>" +
-      "<div class=\"od-meta-cell\" style=\"grid-column:1/-1;\"><span class=\"od-meta-k\">Payment timing</span><span class=\"od-meta-v\">" + escapeHtml(String(pt)) + "</span></div>" +
+      "<div class=\"od-meta-cell\"><span class=\"od-meta-k\">" + escapeHtml(t("detail.table", "Table")) + "</span><span class=\"od-meta-v\">" + escapeHtml(translateMetaValue("table", tableLabel)) + "</span></div>" +
+      "<div class=\"od-meta-cell\"><span class=\"od-meta-k\">" + escapeHtml(t("detail.server", "Server")) + "</span><span class=\"od-meta-v\">" + escapeHtml(String(serverName)) + "</span></div>" +
+      "<div class=\"od-meta-cell\"><span class=\"od-meta-k\">" + escapeHtml(t("detail.origin", "Origin")) + "</span><span class=\"od-meta-v\">" + escapeHtml(translateMetaValue("origin", origin)) + "</span></div>" +
+      "<div class=\"od-meta-cell\"><span class=\"od-meta-k\">" + escapeHtml(t("detail.source", "Source")) + "</span><span class=\"od-meta-v\">" + escapeHtml(translateMetaValue("source", src)) + "</span></div>" +
+      "<div class=\"od-meta-cell\" style=\"grid-column:1/-1;\"><span class=\"od-meta-k\">" + escapeHtml(t("detail.paymentTiming", "Payment timing")) + "</span><span class=\"od-meta-v\">" + escapeHtml(translateMetaValue("payment", pt)) + "</span></div>" +
       "</div></section>" +
-      "<section class=\"od-section\" aria-label=\"Line items\">" +
-      "<h4 class=\"od-section-title\">Line items</h4>" + itemsBlock + "</section>" +
-      "<section class=\"od-section\" aria-label=\"Totals\">" +
-      "<h4 class=\"od-section-title\">Totals</h4>" +
+      "<section class=\"od-section\" aria-label=\"" + escapeHtml(t("detail.lineItems", "Line items")) + "\">" +
+      "<h4 class=\"od-section-title\">" + escapeHtml(t("detail.lineItems", "Line items")) + "</h4>" + itemsBlock + "</section>" +
+      "<section class=\"od-section\" aria-label=\"" + escapeHtml(t("detail.totals", "Totals")) + "\">" +
+      "<h4 class=\"od-section-title\">" + escapeHtml(t("detail.totals", "Totals")) + "</h4>" +
       "<div class=\"od-totals\">" +
-      "<div class=\"od-total-row\"><span>Line subtotal</span><span>" + escapeHtml(fmtUsd(sub)) + "</span></div>" +
-      "<div class=\"od-total-row\"><span>Taxable (after discount)</span><span>" + escapeHtml(fmtUsd(taxable)) + "</span></div>" +
-      "<div class=\"od-total-row\"><span>Discount</span><span>" + escapeHtml(fmtUsd(disc)) + "</span></div>" +
-      "<div class=\"od-total-row\"><span>Tax</span><span>" + escapeHtml(fmtUsd(tax)) + "</span></div>" +
-      "<div class=\"od-total-row\"><span>Service</span><span>" + escapeHtml(fmtUsd(svc)) + "</span></div>" +
-      "<div class=\"od-total-row\"><span>Merchandise total</span><span>" + escapeHtml(fmtUsd(merch)) + "</span></div>" +
+      "<div class=\"od-total-row\"><span>" + escapeHtml(t("detail.lineSubtotal", "Line subtotal")) + "</span><span>" + escapeHtml(fmtUsd(sub)) + "</span></div>" +
+      "<div class=\"od-total-row\"><span>" + escapeHtml(t("detail.taxableAfterDiscount", "Taxable (after discount)")) + "</span><span>" + escapeHtml(fmtUsd(taxable)) + "</span></div>" +
+      "<div class=\"od-total-row\"><span>" + escapeHtml(t("detail.discount", "Discount")) + "</span><span>" + escapeHtml(fmtUsd(disc)) + "</span></div>" +
+      "<div class=\"od-total-row\"><span>" + escapeHtml(t("detail.tax", "Tax")) + "</span><span>" + escapeHtml(fmtUsd(tax)) + "</span></div>" +
+      "<div class=\"od-total-row\"><span>" + escapeHtml(t("detail.service", "Service")) + "</span><span>" + escapeHtml(fmtUsd(svc)) + "</span></div>" +
+      "<div class=\"od-total-row\"><span>" + escapeHtml(t("detail.merchandiseTotal", "Merchandise total")) + "</span><span>" + escapeHtml(fmtUsd(merch)) + "</span></div>" +
       deliveryRow +
-      "<div class=\"od-total-row od-total-row--grand\"><span>Grand total</span><span>" + grandLine + "</span></div>" +
+      "<div class=\"od-total-row od-total-row--grand\"><span>" + escapeHtml(t("detail.grandTotal", "Grand total")) + "</span><span>" + grandLine + "</span></div>" +
       "</div></section>" +
-      "<section class=\"od-section\" aria-label=\"Notes and allergies\">" +
-      "<h4 class=\"od-section-title\">Notes &amp; allergies</h4>" +
+      "<section class=\"od-section\" aria-label=\"" + escapeHtml(t("detail.notesAllergies", "Notes & allergies")) + "\">" +
+      "<h4 class=\"od-section-title\">" + escapeHtml(t("detail.notesAllergies", "Notes & allergies")) + "</h4>" +
       "<div class=\"od-notes-grid\">" +
-      "<div class=\"od-note\"><div class=\"od-note-title\">Customer notes</div><div class=\"od-note-body\">" + orderDetailNoteInnerHtml(cn) + "</div></div>" +
-      "<div class=\"od-note od-note--allergy\"><div class=\"od-note-title\">Allergy</div><div class=\"od-note-body\">" + orderDetailNoteInnerHtml(an) + "</div></div>" +
+      "<div class=\"od-note\"><div class=\"od-note-title\">" + escapeHtml(t("detail.customerNotes", "Customer notes")) + "</div><div class=\"od-note-body\">" + orderDetailNoteInnerHtml(cn) + "</div></div>" +
+      "<div class=\"od-note od-note--allergy\"><div class=\"od-note-title\">" + escapeHtml(t("detail.allergy", "Allergy")) + "</div><div class=\"od-note-body\">" + orderDetailNoteInnerHtml(an) + "</div></div>" +
       "</div></section>";
     $("detailBodyScroll").scrollTop = 0;
     $("orderDetailModal").classList.remove("hidden");
+    applyCashierStaticI18n($("orderDetailModal"));
   }
 
   function closeOrderDetail() {
@@ -836,8 +1052,8 @@
 
     $("payChangeDueUsd").textContent = fmtUsd(chgUsd);
     $("payChangeDueFc").textContent = fmtFc(chgFc);
-    $("payAllocDueUsd").textContent = "Due " + fmtUsd(chgUsd);
-    $("payAllocDueFc").textContent = "Due " + fmtFc(chgFc);
+    $("payAllocDueUsd").textContent = t("pay.duePrefix", "Due") + " " + fmtUsd(chgUsd);
+    $("payAllocDueFc").textContent = t("pay.duePrefix", "Due") + " " + fmtFc(chgFc);
 
     const remAllocUsd = getRemainingChangeToAlloc();
     $("payRemAllocUsd").textContent = fmtUsd(remAllocUsd);
@@ -864,11 +1080,31 @@
     paymentTargetOrderId = orderId;
     resetPaymentFlowState();
     api("/api/cashier/orders/" + orderId + "/invoice").then(r => {
-      if (!r.ok) { alert(r.body?.message || "Load failed"); return; }
+      if (!r.ok) { alert(r.body?.message || t("loadFailed", "Load failed")); return; }
       paymentDueUsd = Number(r.body.grandTotalUsd ?? r.body.GrandTotalUsd ?? 0);
       paymentOrderCode = String(r.body.orderCode ?? r.body.OrderCode ?? orderId);
+      const clientName = r.body.clientFullName ?? r.body.ClientFullName ?? "";
+      const clientDebt = Number(r.body.clientDebtBalanceUsd ?? r.body.ClientDebtBalanceUsd ?? 0);
+      paymentHasLinkedClient = !!(r.body.restaurantClientId ?? r.body.RestaurantClientId);
+      paymentCanAddToDebt = !!(r.body.canAddToDebt ?? r.body.CanAddToDebt);
+      const block = $("payClientBlock");
+      if (block) {
+        if (paymentHasLinkedClient && clientName) {
+          block.classList.remove("hidden");
+          $("payClientName").textContent = clientName;
+          $("payClientDebt").textContent = fmtUsd(clientDebt);
+          const debtRadio = $("payOnAccountRadio");
+          const debtLbl = $("payOnAccountLabel");
+          if (debtRadio) debtRadio.disabled = !paymentCanAddToDebt;
+          if (debtLbl) debtLbl.title = paymentCanAddToDebt ? "" : t("pay.debtCapTitle", "Debt cap reached — collect payment first.");
+          document.querySelectorAll('input[name="paySettlement"]').forEach(el => { el.checked = el.value === "PayNow"; });
+        } else {
+          block.classList.add("hidden");
+        }
+      }
       updatePaymentFlowUI();
       $("paymentModal").classList.remove("hidden");
+      applyCashierStaticI18n($("paymentModal"));
     });
   }
 
@@ -882,8 +1118,8 @@
 
   function goToChangeStep() {
     if (!canGoToChange()) {
-      if (getPaidUsd() <= 0 && getPaidFc() <= 0) alert("Enter amount paid.");
-      else alert("Payment is less than amount due.");
+      if (getPaidUsd() <= 0 && getPaidFc() <= 0) alert(t("pay.enterAmountPaid", "Enter amount paid."));
+      else alert(t("pay.lessThanDue", "Payment is less than amount due."));
       return;
     }
     const chg = getChangeUsd();
@@ -911,11 +1147,12 @@
   }
 
   function setHubPill(state) {
+    hubPillState = state;
     const el = $("hubPill");
     el.classList.remove("ok", "warn", "off");
-    if (state === "live") { el.textContent = "Live: connected"; el.classList.add("ok"); }
-    else if (state === "degraded") { el.textContent = "Live: reconnecting"; el.classList.add("warn"); }
-    else { el.textContent = "Live: polling"; el.classList.add("off"); }
+    if (state === "live") { el.textContent = t("hubLive", "Live: connected"); el.classList.add("ok"); }
+    else if (state === "degraded") { el.textContent = t("hubReconnecting", "Live: reconnecting"); el.classList.add("warn"); }
+    else { el.textContent = t("hubPolling", "Live: polling"); el.classList.add("off"); }
   }
 
   let orderReadyHubDebounce = null;
@@ -932,16 +1169,23 @@
    * Hub-driven beeps after that may still be silenced in strict modes — silent failure is OK.
    */
   function unlockCashierAudioFromUserGesture() {
-    try {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) return;
-      const ctx = new Ctx();
-      if (ctx.state === "suspended") void ctx.resume();
-      void ctx.close();
-    } catch (_) {}
+    if (window.EliteOrderStageAlert) window.EliteOrderStageAlert.unlockAudio();
+    else {
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        const ctx = new Ctx();
+        if (ctx.state === "suspended") void ctx.resume();
+        void ctx.close();
+      } catch (_) {}
+    }
   }
 
   function playOrderReadyBeep() {
+    if (window.EliteOrderStageAlert) {
+      window.EliteOrderStageAlert.playRing();
+      return;
+    }
     try {
       const Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) return;
@@ -975,16 +1219,7 @@
       .withUrl(location.origin + "/hubs/order", { accessTokenFactory: () => token || "" })
       .withAutomaticReconnect()
       .build();
-    conn.on("CashierOrderBoardChanged", (payload) => {
-      const p = payload && typeof payload === "object" ? payload : {};
-      const code = (p.orderCode ?? p.OrderCode ?? "").toString().replace(/^#/, "");
-      const reason = (p.reason ?? p.Reason ?? "").toString();
-      const codePart = code ? "#" + code + " " : "";
-      if (reason === "online-order-submitted" || reason === "server-order-submitted" || reason === "admin-order-submitted") {
-        scheduleOrderReadyFlash(codePart + "new ticket awaiting validation");
-      } else if (reason === "released-to-kitchen" || reason === "pending-cancelled") {
-        scheduleOrderReadyFlash(codePart + (reason === "pending-cancelled" ? "ticket removed" : "released to kitchen"));
-      }
+    function refreshCashierOrdersFromHub() {
       void loadCashierAlerts();
       if (currentView === "orders") loadOrdersTab().catch(() => {});
       else {
@@ -995,7 +1230,18 @@
           }
         }).catch(() => {});
       }
+    }
+
+    conn.on("CashierOrderBoardChanged", () => {
+      refreshCashierOrdersFromHub();
     });
+    if (window.EliteOrderStageAlert) {
+      EliteOrderStageAlert.wireHubConnection(conn, {
+        audience: "Cashier",
+        onFlash: scheduleOrderReadyFlash,
+        onNotify: refreshCashierOrdersFromHub
+      });
+    }
     conn.on("OrderReady", (payload) => {
       const p = payload && typeof payload === "object" ? payload : {};
       const code = (p.orderCode ?? p.OrderCode ?? "").toString().replace(/^#/, "");
@@ -1005,12 +1251,10 @@
       const origin = (p.orderOrigin ?? p.OrderOrigin ?? "").toString();
       const loc = table.trim() || guest.trim() || "—";
       const codePart = code ? "#" + code : "";
-      const bits = ["Order ready", codePart, loc, disp].filter(x => x && String(x).trim());
+      const bits = [t("orderReadyPrefix", "Order ready"), codePart, loc, disp].filter(x => x && String(x).trim());
       const msg = bits.join(" · ") + (origin ? " (" + origin + ")" : "");
       scheduleOrderReadyFlash(msg);
-      playOrderReadyBeep();
-      void loadCashierAlerts();
-      if (currentView === "orders") loadOrdersTab().catch(() => {});
+      refreshCashierOrdersFromHub();
     });
     conn.onreconnecting(() => setHubPill("degraded"));
     conn.onreconnected(() => {
@@ -1019,6 +1263,14 @@
       conn.invoke("JoinCashierDashboard").catch(() => {});
     });
     conn.onclose(() => setHubPill("off"));
+    if (window.EliteSignalRBanner) {
+      EliteSignalRBanner.wire(conn, function () {
+        setHubPill("live");
+        conn.invoke("JoinServer").catch(function () {});
+        conn.invoke("JoinCashierDashboard").catch(function () {});
+        refreshCashierOrdersFromHub();
+      });
+    }
     try {
       await conn.start();
       await conn.invoke("JoinServer");
@@ -1055,13 +1307,16 @@
     const staffId = ($("staffId").value || "").trim();
     const pin = $("pin").value || "";
     if (!staffId || !pin) {
-      $("loginErr").textContent = "Enter sign-in ID and PIN.";
+      $("loginErr").textContent = t("auth.enterIdAndPin", "Enter sign-in ID and PIN.");
       $("loginErr").classList.remove("hidden");
       return;
     }
-    const res = await api("/api/auth/login", "POST", { staffId, pin, portal: "Cashier" }, false);
+    const res = await api("/api/auth/login", "POST", { staffId, pin, portal: "Cashier" }, false, { silent: true });
     if (!res.ok || !res.body?.accessToken) {
-      $("loginErr").textContent = "Login failed (" + res.status + "). " + (res.body?.message || res.body?.title || "Check cashier role.");
+      $("loginErr").textContent = t("loginFailed", "Login failed ({{status}}). {{detail}}", {
+        status: String(res.status),
+        detail: res.body?.message || res.body?.title || t("loginFailedDetail", "Check cashier role.")
+      });
       $("loginErr").classList.remove("hidden");
       return;
     }
@@ -1103,7 +1358,7 @@
     me = saved.me;
     $("sessionLabel").textContent = me
       ? (me.name || "") + " (" + (me.signInId || me.employeeUniqueId || "") + ")"
-      : "Cashier session";
+      : t("cashierSession", "Cashier session");
     $("loginWrap").classList.add("hidden");
     $("app").classList.remove("hidden");
     const ok = await loadPortalData();
@@ -1165,28 +1420,52 @@
     }
   });
 
+  function selectedPaymentSettlement() {
+    const el = document.querySelector('input[name="paySettlement"]:checked');
+    return el ? el.value : "PayNow";
+  }
+
   $("payConfirm").onclick = async () => {
     if (!canGoToChange()) {
-      if (getPaidUsd() <= 0 && getPaidFc() <= 0) { alert("Enter amount paid."); return; }
-      alert("Payment is less than amount due.");
+      if (getPaidUsd() <= 0 && getPaidFc() <= 0) { alert(t("pay.enterAmountPaid", "Enter amount paid.")); return; }
+      alert(t("pay.lessThanDue", "Payment is less than amount due."));
       return;
     }
     if (!canConfirmChange()) {
-      alert("Change allocation must match change due.");
+      alert(t("pay.allocMustMatch", "Change allocation must match change due."));
       return;
     }
     const paidUsd = getPaidUsd();
     const paidFc = getPaidFc();
     const cUsd = getChangeAllocUsd();
     const cFc = getChangeAllocFc();
+    const settlement = paymentHasLinkedClient ? selectedPaymentSettlement() : "PayNow";
+    if (settlement === "OnAccount") {
+      if (!paymentCanAddToDebt) { alert(t("pay.cannotAddDebt", "Cannot add more debt — cap reached.")); return; }
+      if (!confirm(t("pay.confirmAddDebt", "Add this ticket total to the client's account (no cash collected now)?"))) return;
+      const rDebt = await api("/api/cashier/orders/" + paymentTargetOrderId + "/complete", "POST", {
+        paymentCurrencyCode: "MIXED",
+        paidUsd: 0,
+        paidFc: 0,
+        changeUsd: 0,
+        changeFc: 0,
+        settlement: "OnAccount"
+      });
+      if (!rDebt.ok) { alert(rDebt.body?.message || t("pay.completeFailed", "Complete failed")); return; }
+      closePaymentModal();
+      closeOrderDetail();
+      await loadOrdersTab();
+      return;
+    }
     const r = await api("/api/cashier/orders/" + paymentTargetOrderId + "/complete", "POST", {
       paymentCurrencyCode: "MIXED",
       paidUsd: paidUsd,
       paidFc: paidFc,
       changeUsd: cUsd,
-      changeFc: cFc
+      changeFc: cFc,
+      settlement: "PayNow"
     });
-    if (!r.ok) { alert(r.body?.message || "Complete failed"); return; }
+    if (!r.ok) { alert(r.body?.message || t("pay.completeFailed", "Complete failed")); return; }
     closePaymentModal();
     closeOrderDetail();
     await loadOrdersTab();
@@ -1197,9 +1476,17 @@
   $("pastDaySelect").addEventListener("change", renderPastOrders);
 
   if (window.location.protocol === "file:") {
-    $("loginErr").textContent = "Open this page from the API site (e.g. http://localhost:8080/cashier/) so login works.";
+    $("loginErr").textContent = t("fileProtocolHint", "Open this page from the API site (e.g. http://localhost:8080/cashier/) so login works.");
     $("loginErr").classList.remove("hidden");
   } else {
     void tryRestoreCashierSession();
   }
+
+  void (async function initCashierI18n() {
+    if (!window.EliteI18n) return;
+    await EliteI18n.init();
+    applyCashierStaticI18n();
+    EliteI18n.mountSwitcher("#cashierLangLogin");
+    EliteI18n.mountSwitcher("#cashierLangSidebar");
+  })();
 })();

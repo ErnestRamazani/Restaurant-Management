@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { useMenu } from '../../hooks/useMenu'
 import { useOnlineOrderCart } from '../../hooks/useOnlineOrderCart'
@@ -23,6 +24,7 @@ import { OnlineOrderConfirmScreen } from './OnlineOrderConfirmScreen'
  */
 
 export function OnlineOrderLayout() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { config, products, loading, error, refetch } = useMenu()
   const cart = useOnlineOrderCart(config)
@@ -35,7 +37,7 @@ export function OnlineOrderLayout() {
   const restaurantName =
     config?.restaurantName != null && String(config.restaurantName).trim()
       ? String(config.restaurantName).trim()
-      : 'Restaurant'
+      : t('guest.general.restaurant')
 
   const completeOrder = useCallback(
     (res) => {
@@ -67,7 +69,7 @@ export function OnlineOrderLayout() {
 
   if (loading) return <LoadingScreen />
   if (error) return <ErrorScreen message={error} onRetry={refetch} />
-  if (!config) return <ErrorScreen message="Missing menu configuration." onRetry={refetch} />
+  if (!config) return <ErrorScreen message={t('guest.general.missingConfig')} onRetry={refetch} />
 
   if (confirm) {
     return (

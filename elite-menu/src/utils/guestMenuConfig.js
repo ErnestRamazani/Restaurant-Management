@@ -28,6 +28,20 @@ export function menuNotesText(config) {
   return configString(config, 'menuNotesText', 'MenuNotesText')
 }
 
+/**
+ * Tax and service % from GET /api/public/menu/config.
+ * No hardcoded fallback — callers should wait until config is loaded (see useMenu).
+ * @param {Record<string, unknown> | null | undefined} config
+ * @returns {{ taxPercent: number; servicePercent: number } | null}
+ */
+export function pricingPercentsFromConfig(config) {
+  if (!config) return null
+  const tax = Number(config.taxPercent ?? config.TaxPercent)
+  const service = Number(config.servicePercent ?? config.ServicePercent)
+  if (!Number.isFinite(tax) || tax < 0 || !Number.isFinite(service) || service < 0) return null
+  return { taxPercent: tax, servicePercent: service }
+}
+
 /** Split plain-text settings into paragraphs for display. */
 export function textParagraphs(text) {
   const raw = String(text ?? '').trim()

@@ -39,6 +39,9 @@ public class Employee : IRestaurantScoped
     /// <summary>UI language preference: <c>en</c> or <c>fr</c>.</summary>
     public string PreferredLanguage { get; set; } = "en";
 
+    /// <summary>Auto-applied when an order is linked to this employee's mirrored client record.</summary>
+    public decimal StaffMealDiscountPercent { get; set; }
+
     [NotMapped]
     public int TotalOrdersServed { get; set; }
 
@@ -78,6 +81,62 @@ public class Employee : IRestaurantScoped
 
     [NotMapped]
     public decimal PendingSalaryToday { get; set; }
+
+    [NotMapped]
+    [JsonIgnore]
+    public string DisplayRole { get; set; } = string.Empty;
+
+    [NotMapped]
+    [JsonIgnore]
+    public string DisplayEmploymentStatus { get; set; } = string.Empty;
+
+    [NotMapped]
+    [JsonIgnore]
+    public string DisplayAttendanceStatus { get; set; } = string.Empty;
+
+    [NotMapped]
+    [JsonIgnore]
+    public string DisplaySignInBadge { get; set; } = string.Empty;
+
+    [NotMapped]
+    [JsonIgnore]
+    public string DisplayOrdersServedText { get; set; } = string.Empty;
+
+    [NotMapped]
+    [JsonIgnore]
+    public string DisplaySalesGeneratedText { get; set; } = string.Empty;
+
+    [NotMapped]
+    [JsonIgnore]
+    public string DisplayPendingSalaryText { get; set; } = string.Empty;
+
+    [NotMapped]
+    [JsonIgnore]
+    public string DisplayMonthlySalaryText { get; set; } = string.Empty;
+
+    [NotMapped]
+    [JsonIgnore]
+    public string DisplayTenureText { get; set; } = string.Empty;
+
+    [NotMapped]
+    [JsonIgnore]
+    public string DisplayPhoneText { get; set; } = string.Empty;
+
+    [NotMapped]
+    [JsonIgnore]
+    public string DisplayJoinedText { get; set; } = string.Empty;
+
+    [NotMapped]
+    [JsonIgnore]
+    public string DisplayClockInLine { get; set; } = string.Empty;
+
+    [NotMapped]
+    [JsonIgnore]
+    public string DisplayClockOutLine { get; set; } = string.Empty;
+
+    [NotMapped]
+    [JsonIgnore]
+    public string DisplayNotesForView { get; set; } = string.Empty;
 
     [NotMapped]
     public string WorkScheduleSummary

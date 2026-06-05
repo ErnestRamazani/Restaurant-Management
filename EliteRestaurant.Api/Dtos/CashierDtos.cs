@@ -19,7 +19,9 @@ public sealed record CashierCompleteOrderRequest(
     decimal PaidUsd,
     decimal PaidFc,
     decimal ChangeUsd,
-    decimal ChangeFc);
+    decimal ChangeFc,
+    /// <summary><c>PayNow</c> (default) or <c>OnAccount</c> when order is linked to a client.</summary>
+    string? Settlement = "PayNow");
 
 public sealed record CashierOrderDetailDto(
     int Id,
@@ -44,7 +46,11 @@ public sealed record CashierOrderDetailDto(
     decimal DeliveryFeeUsd,
     string PaymentTiming,
     decimal TaxableSubtotalUsd,
-    decimal MerchandiseGrandUsd);
+    decimal MerchandiseGrandUsd,
+    int? RestaurantClientId,
+    string? ClientFullName,
+    decimal ClientDebtBalanceUsd,
+    bool CanAddToDebt);
 
 public sealed record CashierOrderLineDto(
     int ProductId,

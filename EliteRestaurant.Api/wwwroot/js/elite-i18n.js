@@ -6,7 +6,7 @@
   'use strict';
 
   const STORAGE_KEY = 'elite_lang';
-  let currentLang = 'en';
+  let currentLang = 'fr';
   let nestedStrings = {};
   let flatStrings = {};
 
@@ -17,9 +17,11 @@
 
   function getSavedLanguage() {
     try {
-      return normalizeLanguage(localStorage.getItem(STORAGE_KEY));
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw == null || String(raw).trim() === '') return 'fr';
+      return normalizeLanguage(raw);
     } catch (e) {
-      return 'en';
+      return 'fr';
     }
   }
 
@@ -61,12 +63,36 @@
     return result;
   }
 
+  function elementI18nFallback(el) {
+    const explicit = el.getAttribute('data-i18n-fallback');
+    if (explicit) return explicit;
+    const attr = el.getAttribute('data-i18n-attr');
+    if (attr === 'placeholder' || (!attr && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA'))) {
+      return el.getAttribute('placeholder') || '';
+    }
+    if (attr === 'aria-label') return el.getAttribute('aria-label') || '';
+    if (attr === 'title') return el.getAttribute('title') || '';
+    if (attr === 'value') return el.value || '';
+    return el.textContent || '';
+  }
+
+  function lookupString(key) {
+    if (!key) return null;
+    let result = resolvePath(EliteI18n.nested, key);
+    if (result != null && typeof result !== 'object') return String(result);
+    if (EliteI18n.flat && Object.prototype.hasOwnProperty.call(EliteI18n.flat, key)) {
+      const direct = EliteI18n.flat[key];
+      if (direct != null && typeof direct !== 'object') return String(direct);
+    }
+    return null;
+  }
+
   function applyToDOM(root) {
     const scope = root || document;
     const elements = scope.querySelectorAll('[data-i18n]');
     elements.forEach(function (el) {
       const key = el.getAttribute('data-i18n');
-      const fallback = el.getAttribute('data-i18n-fallback') || key;
+      const fallback = elementI18nFallback(el) || key;
       const text = EliteI18n.t(key, fallback);
       let attr = el.getAttribute('data-i18n-attr');
 
@@ -101,9 +127,10 @@
       return;
     }
 
+    el.querySelectorAll('.elite-lang-switcher').forEach(function (old) { old.remove(); });
+
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.id = 'elite-lang-switcher';
     btn.className = 'elite-lang-switcher';
     btn.setAttribute('aria-label', 'Toggle language');
     btn.style.cssText = [
@@ -122,12 +149,21 @@
     ].join('; ');
 
     function updateButton() {
+      // Show the language you will switch *to* (not the active one).
       btn.textContent = EliteI18n.lang === 'fr' ? 'EN' : 'FR';
+      btn.title = EliteI18n.lang === 'fr' ? 'Switch to English' : 'Passer en français';
+      btn.setAttribute('aria-label', btn.title);
     }
 
     updateButton();
     btn.addEventListener('click', function () {
-      EliteI18n.toggleLanguage();
+      const next = EliteI18n.lang === 'fr' ? 'en' : 'fr';
+      btn.disabled = true;
+      EliteI18n.setLanguage(next).catch(function (err) {
+        console.error('[EliteI18n] Language switch failed:', err);
+      }).finally(function () {
+        btn.disabled = false;
+      });
     });
     document.addEventListener('elite-language-changed', updateButton);
     el.appendChild(btn);
@@ -140,7 +176,7 @@
     ready: false,
 
     t: function (key, fallback, vars) {
-      let result = resolvePath(this.nested, key) || resolvePath(this.flat, key);
+      let result = lookupString(key);
       if (!result && fallback != null) {
         result = String(fallback);
       }
@@ -163,7 +199,10 @@
           localStorage.setItem(STORAGE_KEY, code);
         } catch (e) {}
         document.documentElement.lang = code;
-        global.dispatchEvent(new CustomEvent('elite-language-changed', { detail: { language: code } }));
+        applyToDOM();
+        var langEvt = new CustomEvent('elite-language-changed', { bubbles: true, detail: { language: code } });
+        if (global.document) global.document.dispatchEvent(langEvt);
+        else global.dispatchEvent(langEvt);
         return code;
       } catch (err) {
         console.error('[EliteI18n] setLanguage failed:', err);

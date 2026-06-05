@@ -1,22 +1,16 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { CALL_SERVER_REASON_CODES, callServerReasonLabel } from '../../utils/i18nLabels'
 
 const spring = { type: 'spring', stiffness: 380, damping: 34 }
-
-/** @type {{ code: string; label: string }[]} */
-export const CALL_SERVER_REASONS = [
-  { code: 'bring_bill', label: 'Bring the bill' },
-  { code: 'refill_drink', label: 'Refill drink' },
-  { code: 'pack_leftover', label: 'Pack leftover' },
-  { code: 'extra_cutlery', label: 'Missing items / Extra cutlery' },
-  { code: 'problem_food', label: 'Problem with food' },
-  { code: 'other', label: 'Other / Call server' },
-]
 
 /**
  * @param {{ open: boolean; busy?: boolean; onSelect: (code: string) => void; onClose: () => void }} props
  */
 export function CallServerReasonSheet({ open, busy = false, onSelect, onClose }) {
+  const { t } = useTranslation()
+
   return (
     <AnimatePresence>
       {open ? (
@@ -29,7 +23,7 @@ export function CallServerReasonSheet({ open, busy = false, onSelect, onClose })
         >
           <button
             type="button"
-            aria-label="Close"
+            aria-label={t('common.close')}
             className="absolute inset-0 bg-black/75"
             onClick={onClose}
           />
@@ -49,27 +43,27 @@ export function CallServerReasonSheet({ open, busy = false, onSelect, onClose })
                 id="call-server-reason-title"
                 className="font-display text-xl italic text-champagne"
               >
-                What do you need?
+                {t('callServer.title')}
               </h2>
               <button
                 type="button"
                 onClick={onClose}
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-champagne/70 hover:bg-champagne/10"
-                aria-label="Close"
+                aria-label={t('common.close')}
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
             <div className="flex flex-col gap-2">
-              {CALL_SERVER_REASONS.map((r) => (
+              {CALL_SERVER_REASON_CODES.map((code) => (
                 <button
-                  key={r.code}
+                  key={code}
                   type="button"
                   disabled={busy}
-                  onClick={() => onSelect(r.code)}
+                  onClick={() => onSelect(code)}
                   className="min-h-[48px] rounded-xl border border-champagne/20 bg-midnight-3 px-4 py-3 text-left font-body text-[0.92rem] font-semibold text-champagne transition hover:border-gold/45 hover:bg-gold/10 disabled:opacity-50"
                 >
-                  {r.label}
+                  {callServerReasonLabel(t, code)}
                 </button>
               ))}
             </div>

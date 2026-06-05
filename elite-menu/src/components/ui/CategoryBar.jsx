@@ -32,14 +32,16 @@ function pillText(raw) {
   return t
 }
 
-export function CategoryBar({ categories, active, onSelect, sectionKind = 'food' }) {
+export function CategoryBar({ categories, active, onSelect, sectionKind = 'food', translateLabel }) {
+  const labelFor = (cat) => (translateLabel ? translateLabel(cat) : pillText(cat))
+
   return (
     <div className="min-h-[78px] shrink-0 border-b border-champagne/10 bg-midnight-2">
       <div className="flex h-full min-h-[78px] gap-2 overflow-x-auto px-3 py-2 [-webkit-overflow-scrolling:touch]">
         {categories.map((cat) => {
           const Icon = iconFor(cat, sectionKind)
           const isActive = active === cat
-          const display = pillText(cat)
+          const display = labelFor(cat)
           return (
             <button
               key={cat}

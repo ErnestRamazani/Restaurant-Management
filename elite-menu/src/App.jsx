@@ -16,7 +16,6 @@ import { OnlineOrderLayout } from './components/online/OnlineOrderLayout'
 import { ReservationFloorScreen } from './components/screens/ReservationFloorScreen'
 import { ReservationScreen } from './components/screens/ReservationScreen'
 import { CallServerButton } from './components/ui/CallServerButton'
-import { ConfirmDialog } from './components/ui/ConfirmDialog'
 import { ErrorScreen } from './components/ui/ErrorScreen'
 import { LoadingScreen } from './components/ui/LoadingScreen'
 import { validateStaffLoginCode } from './utils/api'
@@ -168,6 +167,7 @@ function ReservationPage() {
 }
 
 function CustomerMenuApp() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { tableId: tableIdFromUrl, hadInvalidTableParam } = useTable()
   const { config, products, loading, error, refetch } = useMenu()
@@ -253,7 +253,7 @@ function CustomerMenuApp() {
   const submitStaffLogin = useCallback(async () => {
     const code = staffLoginCode.trim()
     if (!code) {
-      setStaffLoginError('Enter the staff passcode.')
+      setStaffLoginError(t('guest.staffLogin.enterCodeError'))
       return
     }
 
@@ -265,11 +265,11 @@ function CustomerMenuApp() {
       setStaffLoginCode('')
       navigate('/staff')
     } catch (error) {
-      setStaffLoginError(error instanceof Error ? error.message : 'Incorrect staff passcode.')
+      setStaffLoginError(error instanceof Error ? error.message : t('guest.staffLogin.incorrectCode'))
     } finally {
       setStaffLoginBusy(false)
     }
-  }, [navigate, staffLoginCode])
+  }, [navigate, staffLoginCode, t])
 
   useEffect(() => {
     if (typeof window === 'undefined' || loading || error) return
@@ -378,17 +378,6 @@ function CustomerMenuApp() {
         cart={cart}
       />
 
-      <ConfirmDialog
-        open={cart.sectionConflict != null}
-        title="Switch order type?"
-        confirmLabel="Continue"
-        cancelLabel="Cancel"
-        onConfirm={cart.confirmSectionSwitch}
-        onCancel={cart.cancelSectionSwitch}
-      >
-        {cart.sectionConflict?.message ?? ''}
-      </ConfirmDialog>
-
       {tableIdFromUrl != null && screen === 'menu' ? (
         <CallServerButton tableId={tableIdFromUrl} />
       ) : null}
@@ -397,12 +386,14 @@ function CustomerMenuApp() {
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 px-4 pb-6 backdrop-blur-sm sm:items-center sm:pb-0">
           <div className="w-full max-w-sm rounded-3xl border border-champagne/10 bg-midnight-2 p-5 text-champagne shadow-[0_22px_70px_rgba(0,0,0,0.45)]">
             <div className="text-center">
-              <p className="font-body text-[0.66rem] font-bold uppercase tracking-[0.24em] text-gold/80">Staff access</p>
-              <h2 className="mt-2 font-display text-2xl italic">Enter passcode</h2>
+              <p className="font-body text-[0.66rem] font-bold uppercase tracking-[0.24em] text-gold/80">
+                {t('guest.staffLogin.access')}
+              </p>
+              <h2 className="mt-2 font-display text-2xl italic">{t('guest.staffLogin.enterPasscode')}</h2>
             </div>
 
             <label className="mt-6 block font-body text-xs font-bold uppercase tracking-[0.16em] text-champagne/55" htmlFor="staffLoginCode">
-              Passcode
+              {t('guest.staffLogin.passcode')}
             </label>
             <input
               id="staffLoginCode"
@@ -437,7 +428,7 @@ function CustomerMenuApp() {
                 disabled={staffLoginBusy}
                 className="h-11 rounded-xl border border-champagne/10 font-body text-sm font-bold text-champagne/70 transition hover:border-champagne/25 hover:text-champagne disabled:opacity-50"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 type="button"
@@ -445,7 +436,7 @@ function CustomerMenuApp() {
                 disabled={staffLoginBusy}
                 className="h-11 rounded-xl bg-gold font-body text-sm font-extrabold uppercase tracking-[0.08em] text-black transition hover:brightness-105 disabled:opacity-60"
               >
-                {staffLoginBusy ? 'Checking...' : 'Unlock'}
+                {staffLoginBusy ? t('guest.staffLogin.checking') : t('guest.staffLogin.unlock')}
               </button>
             </div>
           </div>

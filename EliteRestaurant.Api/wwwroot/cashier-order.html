@@ -1035,7 +1035,7 @@
       btn.disabled = true;
       let res;
       try {
-        res = await api("/api/auth/login", "POST", { staffId, pin, portal: "Cashier" }, false);
+        res = await api("/api/auth/login", "POST", { staffId, pin, portal: "Cashier" }, false, { silent: true });
       } catch (e) {
         setLoginMessage(
           "Could not reach the API. Open this page from the API host (for example https://starfish-app-owtoz.ondigitalocean.app/cashier-order.html).\n\n"

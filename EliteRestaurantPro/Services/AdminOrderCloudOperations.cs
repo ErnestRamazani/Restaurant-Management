@@ -18,9 +18,23 @@ public sealed class AdminOrderCloudOperations
         return new AdminOrderOperationsService.ReleasePendingResult(r.Ok, r.ErrorMessage, r.ReleasedOrderCode);
     }
 
-    public async Task<string?> TryCancelPendingCashierAsync(int orderId, CancellationToken cancellationToken = default)
+    public async Task<string?> TryCancelPendingCashierAsync(
+        int orderId,
+        string passcode,
+        CancellationToken cancellationToken = default)
     {
-        var r = await _ordersApi.CancelPendingAsync(orderId, cancellationToken).ConfigureAwait(false);
+        var r = await _ordersApi.CancelPendingAsync(orderId, passcode, cancellationToken).ConfigureAwait(false);
+        if (r is null)
+            return "Empty response from API.";
+        return r.Ok ? null : r.Message;
+    }
+
+    public async Task<string?> TryCancelOrderAsync(
+        int orderId,
+        string passcode,
+        CancellationToken cancellationToken = default)
+    {
+        var r = await _ordersApi.CancelOrderAsync(orderId, passcode, cancellationToken).ConfigureAwait(false);
         if (r is null)
             return "Empty response from API.";
         return r.Ok ? null : r.Message;

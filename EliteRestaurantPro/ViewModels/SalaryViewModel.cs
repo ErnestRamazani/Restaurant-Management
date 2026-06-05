@@ -10,6 +10,7 @@ using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Utils;
 using EliteRestaurantPro.ApiClients;
+using EliteRestaurantPro.Localization;
 using EliteRestaurantPro.Services;
 
 namespace EliteRestaurantPro.ViewModels;
@@ -38,14 +39,6 @@ public sealed class SalaryEmployeeRowVm
     public ImageSource? HeaderProfileImage { get; init; }
     public bool HeaderHasProfilePhoto => HeaderProfileImage is not null;
 
-    public string RateColumnText => UsesMonthlySalary
-        ? $"{ContractMonthlyUsd:N2}/mo"
-        : "Set monthly";
-
-    /// <summary>Primary rate line for the payroll card chips (monthly-only UX; legacy hourly is not shown).</summary>
-    public string PayrollPrimaryRateChipText => UsesMonthlySalary
-        ? $"Monthly ${ContractMonthlyUsd:N2}/mo"
-        : "Set monthly salary (Employees)";
     public int AbsenceDays { get; init; }
     public int LateDays { get; init; }
     public int LatePenaltyAbsences { get; init; }
@@ -63,20 +56,44 @@ public sealed class SalaryEmployeeRowVm
     public bool HasPayrollRecord { get; init; }
     public bool IsPartiallyPaid { get; init; }
     public bool AlreadyPaid { get; init; }
-    public string StatusText { get; init; } = string.Empty;
+    public DateTime MonthEndDate { get; init; }
+    public int DaysLate { get; init; }
+    public DateTime? PaidAtUtc { get; init; }
+    public bool NeedsSalarySetup { get; init; }
 
-    public string PayrollActionLabel { get; init; } = "Confirm payroll";
-    public string PayrollActionLabelShort { get; init; } = "Pay";
-    public string HeaderMoneyChipText { get; init; } = string.Empty;
-    public string NetPaySectionTitle { get; init; } = "Net pay";
+    public string RateColumnText { get; set; } = string.Empty;
+    public string PayrollPrimaryRateChipText { get; set; } = string.Empty;
+    public string ScheduledHoursChipText { get; set; } = string.Empty;
+    public string ScheduledWorkdaysChipText { get; set; } = string.Empty;
+    public string BaseGrossChipText { get; set; } = string.Empty;
+    public string AbsencesChipText { get; set; } = string.Empty;
+    public string LatesChipText { get; set; } = string.Empty;
+    public string LateUnitsChipText { get; set; } = string.Empty;
+    public string TotalUnitsChipText { get; set; } = string.Empty;
+    public string AfterAttendanceChipText { get; set; } = string.Empty;
+    public string SalesServedChipText { get; set; } = string.Empty;
+    public string SalesBonusChipText { get; set; } = string.Empty;
+    public string AdvancesDisplayText { get; set; } = string.Empty;
+    public string NetPayDisplayText { get; set; } = string.Empty;
+    public string TableBaseGrossText { get; set; } = string.Empty;
+    public string TableAfterAttText { get; set; } = string.Empty;
+    public string TableSalesText { get; set; } = string.Empty;
+    public string TableBonusText { get; set; } = string.Empty;
+    public string TableAdvancesText { get; set; } = string.Empty;
+    public string TableNetPayText { get; set; } = string.Empty;
+    public string PayStatusBadgeText { get; set; } = string.Empty;
+    public string StatusText { get; set; } = string.Empty;
+    public string PayrollActionLabel { get; set; } = string.Empty;
+    public string PayrollActionLabelShort { get; set; } = string.Empty;
+    public string HeaderMoneyChipText { get; set; } = string.Empty;
+    public string NetPaySectionTitle { get; set; } = string.Empty;
+    public string PaidPrefix { get; set; } = string.Empty;
+    public string PaidOnSeparator { get; set; } = string.Empty;
+    public string PaidAmountDisplay { get; set; } = string.Empty;
+    public string PaidDateDisplay { get; set; } = string.Empty;
 
     /// <summary>True when a stored payroll payment record exists (amount and paid date available for display).</summary>
     public bool HasPaidReceiptDetail { get; init; }
-
-    /// <summary>Formatted for inline display, e.g. <c>$1,322.65 USD</c>.</summary>
-    public string PaidAmountDisplay { get; init; } = string.Empty;
-
-    public string PaidDateDisplay { get; init; } = string.Empty;
 
     /// <summary>Shows generic <see cref="StatusText"/> line when there is no receipt breakdown.</summary>
     public bool ShowPlainStatusLine => !HasPaidReceiptDetail;
@@ -117,11 +134,60 @@ public sealed class SalaryViewModel : AdminBaseViewModel
     private SalaryEmployeeRowVm? _payrollPaymentDialogRow;
 
     private bool _isShiftHistoryOpen;
-    private string _shiftHistoryTitle = "Shift history";
+    private string _shiftHistoryTitle = string.Empty;
     private string _shiftHistorySubtitle = string.Empty;
     private string _shiftHistoryBanner = string.Empty;
 
     public override string ActivePage => "Salary";
+
+    public string PageTitlePrimary => Loc.Admin("salTitlePrimary", "Salary");
+    public string PageTitleAccent => Loc.Admin("salTitleAccent", "& Payroll");
+    public string SimpleTableLayoutLabel => Loc.Admin("salSimpleTableLayout", "Simple table layout");
+    public string RefreshLabel => Loc.Admin("refresh", "Refresh");
+    public string OverdueTitle => Loc.Admin("salOverdueTitle", "Payroll overdue");
+    public string DaysPastMonthEndLabel => Loc.Admin("salDaysPastMonthEnd", "Days past month end: ");
+    public string AdvanceSectionTitle => Loc.Admin("salAdvanceTitle", "Salary advance");
+    public string EmployeeLabel => Loc.Admin("salEmployee", "Employee");
+    public string AmountUsdLabel => Loc.Admin("salAmountUsd", "Amount (USD)");
+    public string NoteLabel => Loc.Admin("salNote", "Note");
+    public string RecordAdvanceLabel => Loc.Admin("salRecordAdvance", "Record advance");
+    public string PayAllRemainingLabel => Loc.Admin("salPayAllRemaining", "Pay all remaining balances");
+    public string PayPeriodLabel => Loc.Admin("salPayPeriod", "Pay period");
+    public string YearLabel => Loc.Admin("salYear", "Year");
+    public string MonthLabel => Loc.Admin("salMonth", "Month");
+    public string ShowLabel => Loc.Admin("salShow", "Show:");
+    public string FilterAllEmployeesLabel => Loc.Admin("salFilterAll", "All employees");
+    public string FilterPaidOnlyLabel => Loc.Admin("salFilterPaidOnly", "Paid only");
+    public string FilterUnpaidOnlyLabel => Loc.Admin("salFilterUnpaidOnly", "Not paid yet");
+    public string ScheduleBaseSectionTitle => Loc.Admin("salScheduleBase", "Schedule & payroll base");
+    public string AttendanceSectionTitle => Loc.Admin("salAttendance", "Attendance");
+    public string ShiftHistoryLabel => Loc.Admin("salShiftHistory", "Shift history");
+    public string SalesBonusSectionTitle => Loc.Admin("salSalesBonusSection", "Sales & bonus");
+    public string AdvanceNetSectionTitle => Loc.Admin("salAdvanceNetSection", "Advance and Net Salary");
+    public string AdvancesDeductedLabel => Loc.Admin("salAdvancesDeducted", "Advances (deducted)");
+    public string PaymentDialogTitle => Loc.Admin("salPaymentDialogTitle", "Record payroll payment");
+    public string AmountToPayLabel => Loc.Admin("salAmountToPay", "Amount to pay (USD)");
+    public string CancelLabel => Loc.Admin("salCancel", "Cancel");
+    public string RecordPaymentLabel => Loc.Admin("salRecordPayment", "Record payment");
+    public string ColEmployeeLabel => Loc.Admin("salColEmployee", "Employee");
+    public string ColIdLabel => Loc.Admin("salColId", "ID");
+    public string ColMonthlyLabel => Loc.Admin("salColMonthly", "Monthly");
+    public string ColHrsLabel => Loc.Admin("salColHrs", "Hrs");
+    public string ColDaysLabel => Loc.Admin("salColDays", "Days");
+    public string ColBaseLabel => Loc.Admin("salColBase", "Base");
+    public string ColAbsLabel => Loc.Admin("salColAbs", "Abs");
+    public string ColLateLabel => Loc.Admin("salColLate", "Late");
+    public string ColLateUnitsLabel => Loc.Admin("salColLateUnits", "L→U");
+    public string ColUnitsLabel => Loc.Admin("salColUnits", "Units");
+    public string ColAfterAttLabel => Loc.Admin("salColAfterAtt", "After att.");
+    public string ColSalesLabel => Loc.Admin("salColSales", "Sales");
+    public string ColBonusLabel => Loc.Admin("salColBonus", "Bonus");
+    public string ColAdvancesLabel => Loc.Admin("salColAdvances", "Advances");
+    public string ColOwedLabel => Loc.Admin("salColOwed", "Owed");
+    public string ColPayLabel => Loc.Admin("salColPay", "Pay");
+    public string ColStatusLabel => Loc.Admin("salColStatus", "Status");
+    public string MsgBoxTitle => Loc.Admin("salMsgTitle", "Salary");
+    public string MsgBoxAdvanceTitle => Loc.Admin("salMsgAdvanceTitle", "Salary advance");
 
     /// <summary>Card / expander layout. When false, <see cref="UseTableView"/> is true.</summary>
     public bool UseInteractiveCards
@@ -192,7 +258,8 @@ public sealed class SalaryViewModel : AdminBaseViewModel
         }
     }
 
-    public string PayrollPeriodLabel => PayrollCalculator.FormatPayrollMonthLabel(SelectedPayrollYear, SelectedPayrollMonth);
+    public string PayrollPeriodLabel =>
+        SalaryUiLocalizer.FormatPayrollMonth(SelectedPayrollYear, SelectedPayrollMonth);
 
     /// <summary>Filtered list for the UI (cards and table). Full month data lives in <see cref="_allPayrollRows"/>.</summary>
     public ObservableCollection<SalaryEmployeeRowVm> Rows { get; } = [];
@@ -323,7 +390,77 @@ public sealed class SalaryViewModel : AdminBaseViewModel
         CancelPayrollPaymentDialogCommand = new RelayCommand(_ => ClosePayrollPaymentDialog());
         ShowShiftHistoryCommand = new RelayCommand(p => _ = ShowShiftHistoryAsync(p as SalaryEmployeeRowVm));
         CloseShiftHistoryCommand = new RelayCommand(_ => CloseShiftHistory());
+        _shiftHistoryTitle = Loc.Admin("salShiftHistory", "Shift history");
         _ = ReloadRowsAsync();
+    }
+
+    protected override void RefreshLocalizedStrings()
+    {
+        base.RefreshLocalizedStrings();
+        Notify(
+            nameof(PageTitlePrimary),
+            nameof(PageTitleAccent),
+            nameof(SimpleTableLayoutLabel),
+            nameof(RefreshLabel),
+            nameof(OverdueTitle),
+            nameof(DaysPastMonthEndLabel),
+            nameof(AdvanceSectionTitle),
+            nameof(EmployeeLabel),
+            nameof(AmountUsdLabel),
+            nameof(NoteLabel),
+            nameof(RecordAdvanceLabel),
+            nameof(PayAllRemainingLabel),
+            nameof(PayPeriodLabel),
+            nameof(YearLabel),
+            nameof(MonthLabel),
+            nameof(ShowLabel),
+            nameof(FilterAllEmployeesLabel),
+            nameof(FilterPaidOnlyLabel),
+            nameof(FilterUnpaidOnlyLabel),
+            nameof(ScheduleBaseSectionTitle),
+            nameof(AttendanceSectionTitle),
+            nameof(ShiftHistoryLabel),
+            nameof(SalesBonusSectionTitle),
+            nameof(AdvanceNetSectionTitle),
+            nameof(AdvancesDeductedLabel),
+            nameof(PaymentDialogTitle),
+            nameof(AmountToPayLabel),
+            nameof(CancelLabel),
+            nameof(RecordPaymentLabel),
+            nameof(ColEmployeeLabel),
+            nameof(ColIdLabel),
+            nameof(ColMonthlyLabel),
+            nameof(ColHrsLabel),
+            nameof(ColDaysLabel),
+            nameof(ColBaseLabel),
+            nameof(ColAbsLabel),
+            nameof(ColLateLabel),
+            nameof(ColLateUnitsLabel),
+            nameof(ColUnitsLabel),
+            nameof(ColAfterAttLabel),
+            nameof(ColSalesLabel),
+            nameof(ColBonusLabel),
+            nameof(ColAdvancesLabel),
+            nameof(ColOwedLabel),
+            nameof(ColPayLabel),
+            nameof(ColStatusLabel),
+            nameof(MsgBoxTitle),
+            nameof(MsgBoxAdvanceTitle),
+            nameof(PayrollPeriodLabel));
+        RelocalizePayrollRows();
+        if (_payrollPaymentDialogRow is not null)
+            PayrollPaymentRemainingHint = SalaryUiLocalizer.FormatPaymentRemainingHint(
+                _payrollPaymentDialogRow.HasPayrollRecord,
+                _payrollPaymentDialogRow.TotalNetUsd,
+                _payrollPaymentDialogRow.PaidToDateUsd,
+                _payrollPaymentDialogRow.NetPay);
+    }
+
+    private void RelocalizePayrollRows()
+    {
+        foreach (var row in _allPayrollRows)
+            SalaryUiLocalizer.Apply(row);
+        ApplyEmployeeFilter();
     }
 
     public bool IsPayrollPaymentDialogOpen
@@ -367,8 +504,8 @@ public sealed class SalaryViewModel : AdminBaseViewModel
         if (row is null)
             return;
 
-        ShiftHistoryTitle = $"Shift history — {row.EmployeeName}";
-        ShiftHistoryBanner = "Loading…";
+        ShiftHistoryTitle = AdminTextLocalizer.FormatShiftHistoryTitle(row.EmployeeName);
+        ShiftHistoryBanner = AdminTextLocalizer.ShiftHistoryLoadingText;
         ShiftHistorySubtitle = string.Empty;
         ShiftHistoryRows.Clear();
         IsShiftHistoryOpen = true;
@@ -381,7 +518,7 @@ public sealed class SalaryViewModel : AdminBaseViewModel
             {
                 ShiftHistoryRows.Clear();
                 ShiftHistorySubtitle = string.Empty;
-                ShiftHistoryBanner = "Employee not found.";
+                ShiftHistoryBanner = AdminTextLocalizer.ShiftHistoryEmployeeNotFoundText;
                 return;
             }
 
@@ -412,18 +549,18 @@ public sealed class SalaryViewModel : AdminBaseViewModel
                 ShiftHistoryRows.Add(new ShiftHistoryRowViewModel
                 {
                     WorkDateDisplay = a.WorkDate.ToString("ddd yyyy-MM-dd", CultureInfo.CurrentCulture),
-                    ShiftType = shiftDefinition.Name,
+                    ShiftType = AdminTextLocalizer.TranslateShift(shiftDefinition.Name),
                     ClockIn = a.ClockInTime?.ToString("HH:mm", CultureInfo.CurrentCulture) ?? "—",
                     ClockOut = a.ClockOutTime?.ToString("HH:mm", CultureInfo.CurrentCulture) ?? "—",
-                    Status = status,
+                    Status = AdminTextLocalizer.TranslateShiftHistoryStatus(status),
                     Justification = string.IsNullOrEmpty(lateJust) ? "—" : lateJust,
                     Notes = string.IsNullOrEmpty(absenceNote) ? "—" : absenceNote
                 });
             }
 
-            ShiftHistorySubtitle = history.Count == 1 ? "1 row" : $"{history.Count} rows";
+            ShiftHistorySubtitle = AdminTextLocalizer.FormatShiftHistoryRowCount(history.Count);
             ShiftHistoryBanner = history.Count == 0
-                ? "No attendance rows stored for this employee yet."
+                ? AdminTextLocalizer.ShiftHistoryEmptyText
                 : string.Empty;
         }
         catch (Exception ex)
@@ -588,71 +725,10 @@ public sealed class SalaryViewModel : AdminBaseViewModel
             var netDisplay = fullyPaid ? 0m : remaining;
 
             var isPartiallyPaid = hasPayrollRecord && !fullyPaid && paidToDate > 0.005m;
-
-            var payrollActionLabel = fullyPaid ? "Confirmed" : isPartiallyPaid ? "Add payment" : "Confirm payroll";
-            var payrollActionLabelShort = fullyPaid ? "Done" : isPartiallyPaid ? "Add" : "Pay";
-
-            string headerMoneyChipText;
-            if (fullyPaid)
-                headerMoneyChipText = "Paid in full";
-            else if (isPartiallyPaid)
-                headerMoneyChipText = $"Still owed ${remaining:N2} of ${totalNet:N2}";
-            else
-                headerMoneyChipText = $"Net ${remaining:N2}";
-
-            var netPaySectionTitle = fullyPaid ? "Net pay" : isPartiallyPaid ? "Still to pay" : "Net pay";
-
-            var lastDay = monthEnd;
-            var daysLate = DateTime.Today > lastDay ? Math.Max(0, (DateTime.Today - lastDay).Days) : 0;
-
+            var daysLate = DateTime.Today > monthEnd ? Math.Max(0, (DateTime.Today - monthEnd).Days) : 0;
             var hasReceipt = payRec is not null;
-            string paidAmountDisplay = string.Empty;
-            string paidDateDisplay = string.Empty;
-            if (payRec is not null)
-            {
-                var localPaid = payRec.PaidAtUtc.ToLocalTime();
-                paidDateDisplay = localPaid.ToString("MMM d, yyyy", CultureInfo.CurrentCulture);
-                paidAmountDisplay = remaining <= 0.005m
-                    ? $"${payRec.NetPayUsd:N2} USD in full"
-                    : $"${payRec.PaidToDateUsd:N2} of ${payRec.NetPayUsd:N2} USD";
-            }
 
-            string status;
-            if (fullyPaid && payRec is not null)
-            {
-                var localPaid = payRec.PaidAtUtc.ToLocalTime();
-                status = $"Paid in full (${payRec.NetPayUsd:N2} USD). Last posting {localPaid:MMM d, yyyy}.";
-            }
-            else if (fullyPaid)
-            {
-                status = "Paid";
-            }
-            else if (payRec is not null)
-            {
-                var localPaid = payRec.PaidAtUtc.ToLocalTime();
-                status =
-                    $"Partially paid ${payRec.PaidToDateUsd:N2} of ${payRec.NetPayUsd:N2} USD — still owe ${remaining:N2}. Last payment {localPaid:MMM d, yyyy}.";
-            }
-            else if (emp.MonthlySalaryUSD <= 0m && emp.HourlyRate <= 0m)
-            {
-                status = "Set monthly salary (USD) in Employees — required for payroll";
-            }
-            else if (monthBase.GrossPayUsd <= 0m)
-            {
-                status = monthBase.UsesMonthlySalary
-                    ? "No payroll gross this month — check join date or monthly salary in Employees"
-                    : "No payroll gross this month — set a positive monthly salary in Employees (or check join date and schedule)";
-            }
-            else if (daysLate > 0)
-            {
-                status = $"Pending — you are {daysLate} day(s) late for pay (due last day of month)";
-            }
-            else
-            {
-                status = $"Due on {lastDay:MMM d, yyyy} (last day of month)";
-            }
-
-            _allPayrollRows.Add(new SalaryEmployeeRowVm
+            var rowVm = new SalaryEmployeeRowVm
             {
                 EmployeeId = emp.Id,
                 EmployeeName = emp.Name,
@@ -678,15 +754,14 @@ public sealed class SalaryViewModel : AdminBaseViewModel
                 HasPayrollRecord = hasPayrollRecord,
                 IsPartiallyPaid = isPartiallyPaid,
                 AlreadyPaid = fullyPaid,
-                StatusText = status,
                 HasPaidReceiptDetail = hasReceipt,
-                PaidAmountDisplay = paidAmountDisplay,
-                PaidDateDisplay = paidDateDisplay,
-                PayrollActionLabel = payrollActionLabel,
-                PayrollActionLabelShort = payrollActionLabelShort,
-                HeaderMoneyChipText = headerMoneyChipText,
-                NetPaySectionTitle = netPaySectionTitle
-            });
+                MonthEndDate = monthEnd,
+                DaysLate = daysLate,
+                PaidAtUtc = payRec?.PaidAtUtc,
+                NeedsSalarySetup = emp.MonthlySalaryUSD <= 0m && emp.HourlyRate <= 0m
+            };
+            SalaryUiLocalizer.Apply(rowVm);
+            _allPayrollRows.Add(rowVm);
         }
 
             ApplyEmployeeFilter();
@@ -696,7 +771,7 @@ public sealed class SalaryViewModel : AdminBaseViewModel
             ShowPayrollOverdueWarning = anyUnpaid && pastMonthEnd;
             DaysPastPayDay = ShowPayrollOverdueWarning ? Math.Max(0, (DateTime.Today - monthEnd).Days) : 0;
             PayrollOverdueWarningText = ShowPayrollOverdueWarning
-                ? $"Payroll for {PayrollPeriodLabel} is overdue. You are {DaysPastPayDay} day(s) past the pay date (last day of the month). Confirm payments below."
+                ? SalaryUiLocalizer.FormatOverdueWarning(PayrollPeriodLabel, DaysPastPayDay)
                 : string.Empty;
 
             OnPropertyChanged(nameof(PayrollPeriodLabel));
@@ -706,7 +781,7 @@ public sealed class SalaryViewModel : AdminBaseViewModel
         {
             MessageBox.Show(
                 ex.GetBaseException().Message,
-                "Salary load failed",
+                Loc.Admin("salMsgLoadFailedTitle", "Salary load failed"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
@@ -718,16 +793,22 @@ public sealed class SalaryViewModel : AdminBaseViewModel
         if (pending.Count == 0)
         {
             MessageBox.Show(
-                "No payroll payments to record for this month. Each employee needs a positive monthly salary (or an existing partial payroll row with a balance due).",
-                "Salary",
+                Loc.Admin("salMsgNoPayments", "No payroll payments to record for this month. Each employee needs a positive monthly salary (or an existing partial payroll row with a balance due)."),
+                MsgBoxTitle,
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
             return;
         }
 
         var confirm = MessageBox.Show(
-            $"Record payroll for all {pending.Count} employee(s) with a balance due for {PayrollPeriodLabel}? Each person’s payment will use their remaining net amount. You can still enter a custom amount when paying one employee at a time.",
-            "Confirm all payroll",
+            Loc.Admin("salMsgConfirmAll",
+                "Record payroll for all {{count}} employee(s) with a balance due for {{period}}? Each person's payment will use their remaining net amount. You can still enter a custom amount when paying one employee at a time.",
+                new Dictionary<string, string>
+                {
+                    ["count"] = pending.Count.ToString(CultureInfo.InvariantCulture),
+                    ["period"] = PayrollPeriodLabel
+                }),
+            Loc.Admin("salMsgConfirmAllTitle", "Confirm all payroll"),
             MessageBoxButton.YesNo,
             MessageBoxImage.Question);
         if (confirm != MessageBoxResult.Yes)
@@ -751,9 +832,11 @@ public sealed class SalaryViewModel : AdminBaseViewModel
         PayrollPaymentAmountText = row.NetPay > 0.005m
             ? row.NetPay.ToString("0.00", CultureInfo.InvariantCulture)
             : string.Empty;
-        PayrollPaymentRemainingHint = row.HasPayrollRecord
-            ? $"Net this month: ${row.TotalNetUsd:N2} — paid so far: ${row.PaidToDateUsd:N2} — remaining: ${row.NetPay:N2}"
-            : $"Net pay due: ${row.NetPay:N2}";
+        PayrollPaymentRemainingHint = SalaryUiLocalizer.FormatPaymentRemainingHint(
+            row.HasPayrollRecord,
+            row.TotalNetUsd,
+            row.PaidToDateUsd,
+            row.NetPay);
         IsPayrollPaymentDialogOpen = true;
     }
 
@@ -780,8 +863,8 @@ public sealed class SalaryViewModel : AdminBaseViewModel
             amt <= 0m)
         {
             MessageBox.Show(
-                "Enter a positive payment amount in USD.",
-                "Salary",
+                Loc.Admin("salMsgPositivePayment", "Enter a positive payment amount in USD."),
+                MsgBoxTitle,
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
             return;
@@ -795,7 +878,11 @@ public sealed class SalaryViewModel : AdminBaseViewModel
             var employee = employees.FirstOrDefault(e => e.Id == row.EmployeeId);
             if (employee is null)
             {
-                MessageBox.Show("Employee not found.", "Salary", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(
+                    Loc.Admin("salMsgEmployeeNotFound", "Employee not found."),
+                    MsgBoxTitle,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
                 return;
             }
 
@@ -835,15 +922,16 @@ public sealed class SalaryViewModel : AdminBaseViewModel
                 out var upserts);
             if (err is not null)
             {
-                MessageBox.Show(err, "Salary", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(err, MsgBoxTitle, MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             DesktopCloudPersistence.PushBatchBlocking(DesktopCloudPersistence.ToUpsertOperations(upserts));
             ClosePayrollPaymentDialog();
             MessageBox.Show(
-                "Payroll payment saved. Money shows a Salary expense for the amount you entered. Run Refresh if amounts look stale.",
-                "Salary",
+                Loc.Admin("salMsgPaymentSaved",
+                    "Payroll payment saved. Money shows a Salary expense for the amount you entered. Run Refresh if amounts look stale."),
+                MsgBoxTitle,
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
             await ReloadRowsAsync().ConfigureAwait(true);
@@ -852,7 +940,7 @@ public sealed class SalaryViewModel : AdminBaseViewModel
         {
             MessageBox.Show(
                 ex.GetBaseException().Message,
-                "Salary",
+                MsgBoxTitle,
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
@@ -869,7 +957,12 @@ public sealed class SalaryViewModel : AdminBaseViewModel
                 var employee = employees.FirstOrDefault(e => e.Id == row.EmployeeId);
                 if (employee is null)
                 {
-                    MessageBox.Show($"{row.EmployeeName}: Employee not found.", "Salary", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show(
+                        Loc.Admin("salMsgEmployeeNotFoundFor", "{{name}}: Employee not found.",
+                            new Dictionary<string, string> { ["name"] = row.EmployeeName }),
+                        MsgBoxTitle,
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
                     return;
                 }
 
@@ -910,8 +1003,9 @@ public sealed class SalaryViewModel : AdminBaseViewModel
                 if (err is not null)
                 {
                     MessageBox.Show(
-                        $"{row.EmployeeName}: {err}",
-                        "Salary",
+                        Loc.Admin("salMsgEmployeeError", "{{name}}: {{error}}",
+                            new Dictionary<string, string> { ["name"] = row.EmployeeName, ["error"] = err }),
+                        MsgBoxTitle,
                         MessageBoxButton.OK,
                         MessageBoxImage.Warning);
                     return;
@@ -921,8 +1015,9 @@ public sealed class SalaryViewModel : AdminBaseViewModel
             }
 
             MessageBox.Show(
-                "Payroll saved. Daily and Employees reports include Money salary lines for each payment. Employee timeline shows advances and payments.",
-                "Salary",
+                Loc.Admin("salMsgPayrollSaved",
+                    "Payroll saved. Daily and Employees reports include Money salary lines for each payment. Employee timeline shows advances and payments."),
+                MsgBoxTitle,
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
             await ReloadRowsAsync().ConfigureAwait(true);
@@ -931,7 +1026,7 @@ public sealed class SalaryViewModel : AdminBaseViewModel
         {
             MessageBox.Show(
                 ex.GetBaseException().Message,
-                "Salary",
+                MsgBoxTitle,
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }
@@ -941,14 +1036,22 @@ public sealed class SalaryViewModel : AdminBaseViewModel
     {
         if (SelectedAdvanceEmployee is null)
         {
-            MessageBox.Show("Select an employee.", "Salary advance", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(
+                Loc.Admin("salAdvMsgSelectEmployee", "Select an employee."),
+                MsgBoxAdvanceTitle,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 
         if (!decimal.TryParse(AdvanceAmountText.Trim(), NumberStyles.Number, CultureInfo.InvariantCulture, out var amt) ||
             amt <= 0m)
         {
-            MessageBox.Show("Enter a positive amount (USD).", "Salary advance", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(
+                Loc.Admin("salAdvMsgPositiveAmount", "Enter a positive amount (USD)."),
+                MsgBoxAdvanceTitle,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
         }
 
@@ -966,8 +1069,9 @@ public sealed class SalaryViewModel : AdminBaseViewModel
                     SelectedPayrollMonth))
             {
                 MessageBox.Show(
-                    "Payroll is already confirmed for this employee for the selected month. Advances are not allowed for that period.",
-                    "Salary advance",
+                    Loc.Admin("salAdvMsgPayrollConfirmed",
+                        "Payroll is already confirmed for this employee for the selected month. Advances are not allowed for that period."),
+                    MsgBoxAdvanceTitle,
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;
@@ -976,7 +1080,11 @@ public sealed class SalaryViewModel : AdminBaseViewModel
             var emp = (await _data.GetEmployeesAsync().ConfigureAwait(true)).FirstOrDefault(e => e.Id == SelectedAdvanceEmployee.Id);
             if (emp is null)
             {
-                MessageBox.Show("Employee not found.", "Salary advance", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(
+                    Loc.Admin("salMsgEmployeeNotFound", "Employee not found."),
+                    MsgBoxAdvanceTitle,
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
                 return;
             }
 
@@ -987,8 +1095,13 @@ public sealed class SalaryViewModel : AdminBaseViewModel
             if ((emp.MonthlySalaryUSD <= 0m && emp.HourlyRate <= 0m) || scheduledGrossUsd <= 0m)
             {
                 MessageBox.Show(
-                    $"Advances are limited to {payrollRules.MaxSalaryAdvancePercentOfGross:0.##}% of payroll gross for the month. This employee has no payroll base for the selected period — set a positive monthly salary (USD) in Employees, then try again.",
-                    "Salary advance",
+                    Loc.Admin("salAdvMsgNoPayrollBase",
+                        "Advances are limited to {{pct}}% of payroll gross for the month. This employee has no payroll base for the selected period — set a positive monthly salary (USD) in Employees, then try again.",
+                        new Dictionary<string, string>
+                        {
+                            ["pct"] = payrollRules.MaxSalaryAdvancePercentOfGross.ToString("0.##", CultureInfo.InvariantCulture)
+                        }),
+                    MsgBoxAdvanceTitle,
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;
@@ -1008,12 +1121,20 @@ public sealed class SalaryViewModel : AdminBaseViewModel
             if (amt > remainingUsd)
             {
                 MessageBox.Show(
-                    $"Each employee’s advances for this payroll month cannot exceed {payrollRules.MaxSalaryAdvancePercentOfGross:0.##}% of that month’s payroll gross (prorated monthly salary).{Environment.NewLine}{Environment.NewLine}" +
-                    $"Payroll gross for {PayrollPeriodLabel}: ${scheduledGrossUsd:N2}{Environment.NewLine}" +
-                    $"{payrollRules.MaxSalaryAdvancePercentOfGross:0.##}% cap: ${advanceCapUsd:N2}{Environment.NewLine}" +
-                    $"Pending advances already recorded for this month: ${existingPendingUsd:N2}{Environment.NewLine}" +
-                    $"You can add at most ${remainingUsd:N2} now (requested ${amt:N2}).",
-                    "Salary advance",
+                    Loc.Admin("salAdvMsgCapExceeded",
+                        "Each employee's advances for this payroll month cannot exceed {{pct}}% of that month's payroll gross (prorated monthly salary).{{nl}}{{nl}}Payroll gross for {{period}}: {{gross}}{{nl}}{{pct}}% cap: {{cap}}{{nl}}Pending advances already recorded for this month: {{pending}}{{nl}}You can add at most {{remaining}} now (requested {{requested}}).",
+                        new Dictionary<string, string>
+                        {
+                            ["pct"] = payrollRules.MaxSalaryAdvancePercentOfGross.ToString("0.##", CultureInfo.InvariantCulture),
+                            ["nl"] = Environment.NewLine,
+                            ["period"] = PayrollPeriodLabel,
+                            ["gross"] = SalaryUiLocalizer.FormatUsd(scheduledGrossUsd),
+                            ["cap"] = SalaryUiLocalizer.FormatUsd(advanceCapUsd),
+                            ["pending"] = SalaryUiLocalizer.FormatUsd(existingPendingUsd),
+                            ["remaining"] = SalaryUiLocalizer.FormatUsd(remainingUsd),
+                            ["requested"] = SalaryUiLocalizer.FormatUsd(amt)
+                        }),
+                    MsgBoxAdvanceTitle,
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;
@@ -1046,8 +1167,9 @@ public sealed class SalaryViewModel : AdminBaseViewModel
             if (created is null)
             {
                 MessageBox.Show(
-                    "Advance was saved but could not be confirmed from the server. Refresh Salary and check Money.",
-                    "Salary advance",
+                    Loc.Admin("salAdvMsgSaveUnconfirmed",
+                        "Advance was saved but could not be confirmed from the server. Refresh Salary and check Money."),
+                    MsgBoxAdvanceTitle,
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
                 _ = ReloadRowsAsync();
@@ -1067,8 +1189,10 @@ public sealed class SalaryViewModel : AdminBaseViewModel
             AdvanceAmountText = string.Empty;
             AdvanceNoteText = string.Empty;
             MessageBox.Show(
-                $"Advance recorded for payroll {PayrollPeriodLabel} and posted to Money. It is deducted when you confirm that month for this employee.",
-                "Salary advance",
+                Loc.Admin("salAdvMsgRecorded",
+                    "Advance recorded for payroll {{period}} and posted to Money. It is deducted when you confirm that month for this employee.",
+                    new Dictionary<string, string> { ["period"] = PayrollPeriodLabel }),
+                MsgBoxAdvanceTitle,
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
             _ = ReloadRowsAsync();
@@ -1077,7 +1201,7 @@ public sealed class SalaryViewModel : AdminBaseViewModel
         {
             MessageBox.Show(
                 ex.GetBaseException().Message,
-                "Salary advance",
+                MsgBoxAdvanceTitle,
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }

@@ -3,6 +3,7 @@ using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Orders;
 using EliteRestaurant.Core.Utils;
 using EliteRestaurantPro.ApiClients;
+using EliteRestaurantPro.Localization;
 using EliteRestaurantPro.Utils;
 
 namespace EliteRestaurantPro.Services;
@@ -19,7 +20,7 @@ public sealed class OrderSubmissionService
         {
             return new CreateOrderPhaseResult(
                 true,
-                "Create Order",
+                CreateOrderUiLocalizer.DialogTitle,
                 string.Empty,
                 0,
                 "Delivery",
@@ -32,15 +33,15 @@ public sealed class OrderSubmissionService
 
         var table = (await tablesTask.ConfigureAwait(false)).SingleOrDefault(t => t.Id == snap.TableId);
         if (table is null || table.AssignedServerId is null)
-            return new CreateOrderPhaseResult(false, "Create Order", "Selected table must have an assigned server.", 0, string.Empty, new CreateOrderOpenCheckInfo(null, string.Empty, string.Empty));
+            return new CreateOrderPhaseResult(false, CreateOrderUiLocalizer.DialogTitle, CreateOrderUiLocalizer.ErrTableNeedsServer, 0, string.Empty, new CreateOrderOpenCheckInfo(null, string.Empty, string.Empty));
 
         var assigned = await _data.GetEmployeesAsync(cancellationToken).ConfigureAwait(false);
         var server = assigned.FirstOrDefault(e => e.Id == table.AssignedServerId.Value);
         if (server is null)
-            return new CreateOrderPhaseResult(false, "Create Order", "Selected table must have an assigned server.", 0, string.Empty, new CreateOrderOpenCheckInfo(null, string.Empty, string.Empty));
+            return new CreateOrderPhaseResult(false, CreateOrderUiLocalizer.DialogTitle, CreateOrderUiLocalizer.ErrTableNeedsServer, 0, string.Empty, new CreateOrderOpenCheckInfo(null, string.Empty, string.Empty));
 
         if (AppSession.IsServerTablet && table.AssignedServerId != snap.ServerEmployeeId)
-            return new CreateOrderPhaseResult(false, "Create Order", "This table is not assigned to your session.", 0, string.Empty, new CreateOrderOpenCheckInfo(null, string.Empty, string.Empty));
+            return new CreateOrderPhaseResult(false, CreateOrderUiLocalizer.DialogTitle, CreateOrderUiLocalizer.ErrTableNotAssignedToYou, 0, string.Empty, new CreateOrderOpenCheckInfo(null, string.Empty, string.Empty));
 
         var allOrders = await ordersTask.ConfigureAwait(false);
         var open = allOrders
@@ -52,7 +53,7 @@ public sealed class OrderSubmissionService
 
         return new CreateOrderPhaseResult(
             true,
-            "Create Order",
+            CreateOrderUiLocalizer.DialogTitle,
             string.Empty,
             table.TableNumber,
             tableName,
@@ -73,7 +74,7 @@ public sealed class OrderSubmissionService
         }
         catch (Exception ex)
         {
-            return new CreateOrderAppendResult(false, "Cloud API", ex.GetBaseException().Message);
+            return new CreateOrderAppendResult(false, CreateOrderUiLocalizer.CloudApiCaption, ex.GetBaseException().Message);
         }
     }
 
@@ -90,7 +91,7 @@ public sealed class OrderSubmissionService
         }
         catch (Exception ex)
         {
-            return new CreateOrderSaveResult(false, "Cloud API", ex.GetBaseException().Message);
+            return new CreateOrderSaveResult(false, CreateOrderUiLocalizer.CloudApiCaption, ex.GetBaseException().Message);
         }
     }
 
@@ -118,9 +119,7 @@ public sealed class OrderSubmissionService
         if (string.Equals(response.Title, "Insufficient Inventory", StringComparison.OrdinalIgnoreCase))
         {
             var body = (response.Message ?? string.Empty).Trim();
-            var intro = "This order cannot be created until inventory is updated or the order is changed.";
-            var message = string.IsNullOrEmpty(body) ? intro : $"{intro}\n\n{body}";
-            return ("Not enough inventory", message);
+            return (CreateOrderUiLocalizer.InsufficientInventoryTitle, CreateOrderUiLocalizer.InsufficientInventoryBody(body));
         }
 
         return (response.Title, response.Message);

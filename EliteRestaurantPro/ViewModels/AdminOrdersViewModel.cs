@@ -9,7 +9,9 @@ using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Orders;
 using EliteRestaurant.Core.Utils;
 using EliteRestaurant.Core.Tickets;
+using EliteRestaurantPro.Localization;
 using EliteRestaurantPro.Services;
+using EliteRestaurantPro.Views;
 
 namespace EliteRestaurantPro.ViewModels;
 
@@ -74,7 +76,10 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
 
             PendingCashierOrders.Clear();
             foreach (var row in snapshot.PendingCashier)
+            {
+                OrderUiLocalizer.Apply(row);
                 PendingCashierOrders.Add(row);
+            }
             ShowPendingCashierSection = PendingCashierOrders.Count > 0;
             OnPropertyChanged(nameof(PendingCashierSectionTitle));
 
@@ -83,8 +88,10 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
 
             _masterActiveOrders.Clear();
             _masterActiveOrders.AddRange(snapshot.ActiveOrders);
+            OrderUiLocalizer.ApplyAll(_masterActiveOrders);
             _masterPastOrders.Clear();
             _masterPastOrders.AddRange(snapshot.PastOrders);
+            OrderUiLocalizer.ApplyAll(_masterPastOrders);
 
             ApplyOrderSearchFilters();
 
@@ -101,8 +108,9 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
         catch (Exception ex)
         {
             MessageBox.Show(
-                $"Orders failed to load:\n{ex.Message}",
-                "Orders",
+                Loc.Admin("ordLoadErrorBody", "Orders failed to load:\n{{message}}",
+                    new Dictionary<string, string> { ["message"] = ex.Message }),
+                Loc.Admin("ordLoadErrorTitle", "Orders"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
         }
@@ -116,7 +124,10 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
     {
         ActiveOrders.Clear();
         foreach (var o in _masterActiveOrders.Where(o => MatchesOrderFilter(o, _activeOrdersSearchFilter)))
+        {
+            OrderUiLocalizer.Apply(o);
             ActiveOrders.Add(o);
+        }
 
         PastOrders.Clear();
         PastOrderDayGroups.Clear();
@@ -124,24 +135,123 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
         foreach (var o in filteredPast)
             PastOrders.Add(o);
 
+        var tz = SettingsManager.Load().BusinessProfile.RestaurantTimeZoneId;
+        var today = RestaurantTimeZone.RestaurantCalendarDate(DateTime.UtcNow, tz);
         foreach (var group in filteredPast
-                     .GroupBy(o => o.CreatedAt.Date)
+                     .GroupBy(o => RestaurantTimeZone.RestaurantCalendarDate(o.CreatedAt, tz))
                      .OrderByDescending(g => g.Key))
         {
             var dayGroup = new PastOrderDayGroup
             {
                 Day = group.Key,
-                DayText = group.Key == DateTime.Today
-                    ? $"Today - {group.Key:dddd, MMM dd yyyy}"
-                    : group.Key.ToString("dddd, MMM dd yyyy"),
-                IsExpanded = group.Key == DateTime.Today
+                IsExpanded = group.Key == today
             };
-
             foreach (var order in group.OrderByDescending(o => o.CreatedAt))
+            {
+                OrderUiLocalizer.Apply(order);
                 dayGroup.Orders.Add(order);
+            }
 
+            OrderUiLocalizer.ApplyDayGroup(dayGroup, today);
             PastOrderDayGroups.Add(dayGroup);
         }
+    }
+
+    protected override void RefreshLocalizedStrings()
+    {
+        base.RefreshLocalizedStrings();
+        Notify(
+            nameof(PageTitleOrder),
+            nameof(PageTitleAccent),
+            nameof(PageSubtitle),
+            nameof(PendingCashierHint),
+            nameof(PendingCashierSectionTitle),
+            nameof(OrdViewOrderLabel),
+            nameof(OrdReleaseKitchenLabel),
+            nameof(OrdCancelTicketLabel),
+            nameof(OrdActiveOrdersLabel),
+            nameof(OrdPastOrdersLabel),
+            nameof(OrdSearchActiveTooltip),
+            nameof(OrdSearchPastTooltip),
+            nameof(OrdAdvanceLabel),
+            nameof(OrdCompleteLabel),
+            nameof(OrdCancelLabel),
+            nameof(OrdViewTicketLabel),
+            nameof(OrdLoadingLabel),
+            nameof(TicketConfirmationCodeLabel),
+            nameof(TicketDateLabel),
+            nameof(TicketTimeLabel),
+            nameof(TicketOrderLabel),
+            nameof(TicketStatusLabel),
+            nameof(TicketCustomerLabel),
+            nameof(TicketPhoneLabel),
+            nameof(TicketAddressLabel),
+            nameof(TicketNotesLabel),
+            nameof(TicketServerLabel),
+            nameof(TicketEquivalentFcLabel),
+            nameof(TicketQtyHeader),
+            nameof(TicketItemHeader),
+            nameof(TicketUnitPriceHeader),
+            nameof(TicketTotalHeader),
+            nameof(TicketSubtotalLabel),
+            nameof(TicketDeliveryLabel),
+            nameof(TicketGrandTotalUsdLabel),
+            nameof(TicketCloseLabel),
+            nameof(TicketPrintClientLabel),
+            nameof(TicketPrintPaymentLabel),
+            nameof(OrdPayTitle),
+            nameof(OrdPayOrderLabel),
+            nameof(OrdPayAmountDueLabel),
+            nameof(OrdPayUsdFcLabel),
+            nameof(OrdPayEditPaidUsdLabel),
+            nameof(OrdPayEditPaidFcLabel),
+            nameof(OrdPayDueLabel),
+            nameof(OrdPayRemainingLabel),
+            nameof(OrdPayChangeLabel),
+            nameof(OrdPayNumpadHint),
+            nameof(OrdPayCancelLabel),
+            nameof(OrdPayGoToChangeLabel),
+            nameof(OrdChangeTitle),
+            nameof(OrdChangeOrderLabel),
+            nameof(OrdChangeRequiredLabel),
+            nameof(OrdChangeAllocateLabel),
+            nameof(OrdChangeUsdLabel),
+            nameof(OrdChangeFcLabel),
+            nameof(OrdChangeEditUsdLabel),
+            nameof(OrdChangeEditFcLabel),
+            nameof(OrdChangeRemainingAllocateLabel),
+            nameof(OrdChangeConfirmCompleteLabel));
+
+        if (IsTicketPreviewOpen && !string.IsNullOrWhiteSpace(TicketStatus))
+            TicketDisplayStatus = AdminTextLocalizer.TranslateOrderStatus(TicketStatus);
+        if (IsTicketPreviewOpen)
+        {
+            TicketDateText = OrderTicketUiLocalizer.FormatTicketDate(TicketDateTime);
+            TicketTimeText = OrderTicketUiLocalizer.FormatTicketTime(TicketDateTime);
+            TicketDisplayLocationLine = OrderTicketUiLocalizer.TranslateLocationLine(TicketLocationLine);
+            TicketDisplaySubtotal = OrderTicketUiLocalizer.FormatUsdLine(TicketSubtotal);
+            TicketDisplayGrandTotal = OrderTicketUiLocalizer.FormatUsdLine(TicketGrandTotal);
+            TicketDisplayVerification = OrderTicketUiLocalizer.FormatVerification(TicketVerification);
+            TicketPaidBreakdownText = OrderTicketUiLocalizer.FormatPaidBreakdown(_ticketLastPaidUsd, _ticketLastPaidFc);
+            TicketChangeBreakdownText = OrderTicketUiLocalizer.FormatChangeBreakdown(_ticketLastChangeUsd, _ticketLastChangeFc);
+            var settings = SettingsManager.Load();
+            TicketTaxLabel = OrderTicketUiLocalizer.FormatTaxLabel(settings.CurrencyPricing.TaxPercent);
+            TicketServiceLabel = OrderTicketUiLocalizer.FormatServiceLabel(settings.CurrencyPricing.ServicePercent);
+            OnPropertyChanged(nameof(TicketFulfillmentSectionTitle));
+            OrderTicketUiLocalizer.ApplyAllLines(TicketLines);
+        }
+
+        OrderUiLocalizer.ApplyAll(_masterActiveOrders);
+        OrderUiLocalizer.ApplyAll(_masterPastOrders);
+        foreach (var row in PendingCashierOrders)
+            OrderUiLocalizer.Apply(row);
+
+        var tz = SettingsManager.Load().BusinessProfile.RestaurantTimeZoneId;
+        var today = RestaurantTimeZone.RestaurantCalendarDate(DateTime.UtcNow, tz);
+        foreach (var group in PastOrderDayGroups)
+            OrderUiLocalizer.ApplyDayGroup(group, today);
+
+        ApplyOrderSearchFilters();
     }
 
     private static bool MatchesOrderFilter(OrderEntry o, string filter)
@@ -149,6 +259,7 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
         if (string.IsNullOrWhiteSpace(filter))
             return true;
 
+        var tz = SettingsManager.Load().BusinessProfile.RestaurantTimeZoneId;
         var needle = filter.Trim().ToLowerInvariant();
         var hay = string.Join(" ",
             o.OrderId,
@@ -161,8 +272,8 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
             o.AllergyNotes,
             o.Id.ToString(CultureInfo.InvariantCulture),
             o.Time,
-            o.CreatedAt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-            o.CreatedAt.ToString("MMM d", CultureInfo.InvariantCulture),
+            RestaurantTimeZone.FormatUtc(o.CreatedAt, tz, "yyyy-MM-dd", CultureInfo.InvariantCulture),
+            RestaurantTimeZone.FormatUtc(o.CreatedAt, tz, Loc.Language == "fr" ? "d MMM yyyy" : "MMM d, yyyy", AdminTextLocalizer.UiCulture),
             o.Total.ToString("0.##", CultureInfo.InvariantCulture)).ToLowerInvariant();
         return hay.Contains(needle);
     }
@@ -220,14 +331,18 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
         if (confirm != MessageBoxResult.Yes)
             return;
 
-        _ = CancelPendingCashierCoreAsync(row);
+        var passcode = OrderCancelPasscodeDialog.Prompt(Application.Current.MainWindow, row.OrderCode);
+        if (passcode is null)
+            return;
+
+        _ = CancelPendingCashierCoreAsync(row, passcode);
     }
 
-    private async Task CancelPendingCashierCoreAsync(CashierQueueRow row)
+    private async Task CancelPendingCashierCoreAsync(CashierQueueRow row, string passcode)
     {
         try
         {
-            var err = await _cloudOps.TryCancelPendingCashierAsync(row.OrderId);
+            var err = await _cloudOps.TryCancelPendingCashierAsync(row.OrderId, passcode);
             if (err is not null)
             {
                 MessageBox.Show(err, "Orders", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -387,7 +502,32 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
         if (confirmDelete != MessageBoxResult.Yes)
             return;
 
-        UpdateOrderStatus(entry, "Cancelled");
+        var passcode = OrderCancelPasscodeDialog.Prompt(Application.Current.MainWindow, entry.OrderId);
+        if (passcode is null)
+            return;
+
+        _ = CancelOrderCoreAsync(entry, passcode);
+    }
+
+    private async Task CancelOrderCoreAsync(OrderEntry entry, string passcode)
+    {
+        try
+        {
+            var err = await _cloudOps.TryCancelOrderAsync(entry.Id, passcode);
+            if (err is not null)
+            {
+                MessageBox.Show(err, "Orders", MessageBoxButton.OK, MessageBoxImage.Information);
+                await LoadOrdersAsync();
+                return;
+            }
+
+            await LoadOrdersAsync();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.GetBaseException().Message, "Orders", MessageBoxButton.OK, MessageBoxImage.Warning);
+            await LoadOrdersAsync();
+        }
     }
 
     private void UpdateOrderStatus(
@@ -502,14 +642,19 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
         TicketOrderId = string.IsNullOrWhiteSpace(order.UniqueId) ? $"#{order.Id:000}" : order.UniqueId;
         TicketConfirmationCode = (order.ConfirmationCode ?? string.Empty).Trim();
         TicketStatus = order.Status;
+        TicketDisplayStatus = AdminTextLocalizer.TranslateOrderStatus(order.Status);
         TicketLocationLine = OrderRecordUiLabels.TicketLocationLine(order);
+        TicketDisplayLocationLine = OrderTicketUiLocalizer.TranslateLocationLine(TicketLocationLine);
         TicketTable = OrderRecordUiLabels.TableCaption(order);
         ApplyTicketDeliveryInfo(
             OrderRecordUiLabels.TryGetOnlineGuestTicketInfo(order),
             OrderRecordUiLabels.IsDeliveryOrder(order));
         TicketShowServer = OrderRecordUiLabels.ShowServerOnTicket(order);
         TicketServer = OrderRecordUiLabels.ServerCaption(order);
-        TicketDateTime = order.CreatedAt;
+        var tz = SettingsManager.Load().BusinessProfile.RestaurantTimeZoneId;
+        TicketDateTime = RestaurantTimeZone.OrderCreatedAtForDisplay(order.CreatedAt, tz);
+        TicketDateText = OrderTicketUiLocalizer.FormatTicketDate(TicketDateTime);
+        TicketTimeText = OrderTicketUiLocalizer.FormatTicketTime(TicketDateTime);
         var lineSum = TicketLines.Sum(l => l.LineTotal);
         var totals = OrderTotalsHelper.ComputeTotalsWithDeliveryFee(
             lineSum,
@@ -530,26 +675,35 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
             order.PaymentCurrencyCode == CurrencyHelper.CongoleseFranc && order.PaymentAmount > 0m
                 ? order.PaymentAmount
                 : CurrencyHelper.ConvertUsdToFc(TicketGrandTotal),
-            CurrencyHelper.CongoleseFranc);
+            CurrencyHelper.CongoleseFranc,
+            AdminTextLocalizer.UiCulture);
         TicketPaymentText = order.PaymentAmount > 0m
-            ? CurrencyHelper.FormatAmount(order.PaymentAmount, string.IsNullOrWhiteSpace(order.PaymentCurrencyCode) ? CurrencyHelper.Usd : order.PaymentCurrencyCode)
-            : CurrencyHelper.FormatAmount(TicketGrandTotal, CurrencyHelper.Usd);
-        TicketPaidBreakdownText =
-            $"Paid USD: {CurrencyHelper.FormatAmount(order.CustomerPaidUsd, CurrencyHelper.Usd)} | Paid FC: {CurrencyHelper.FormatAmount(order.CustomerPaidFc, CurrencyHelper.CongoleseFranc)}";
-        TicketChangeBreakdownText =
-            $"Change USD: {CurrencyHelper.FormatAmount(order.ChangeGivenUsd, CurrencyHelper.Usd)} | Change FC: {CurrencyHelper.FormatAmount(order.ChangeGivenFc, CurrencyHelper.CongoleseFranc)}";
+            ? CurrencyHelper.FormatAmount(order.PaymentAmount, string.IsNullOrWhiteSpace(order.PaymentCurrencyCode) ? CurrencyHelper.Usd : order.PaymentCurrencyCode, AdminTextLocalizer.UiCulture)
+            : CurrencyHelper.FormatAmount(TicketGrandTotal, CurrencyHelper.Usd, AdminTextLocalizer.UiCulture);
+        _ticketLastPaidUsd = order.CustomerPaidUsd;
+        _ticketLastPaidFc = order.CustomerPaidFc;
+        _ticketLastChangeUsd = order.ChangeGivenUsd;
+        _ticketLastChangeFc = order.ChangeGivenFc;
+        TicketPaidBreakdownText = OrderTicketUiLocalizer.FormatPaidBreakdown(_ticketLastPaidUsd, _ticketLastPaidFc);
+        TicketChangeBreakdownText = OrderTicketUiLocalizer.FormatChangeBreakdown(_ticketLastChangeUsd, _ticketLastChangeFc);
         var uid = string.IsNullOrWhiteSpace(order.UniqueId) ? string.Empty : order.UniqueId;
         TicketVerification = $"ERP-DB-{order.Id}-{uid[..Math.Min(4, uid.Length)]}";
+        TicketDisplayVerification = OrderTicketUiLocalizer.FormatVerification(TicketVerification);
+        TicketDisplaySubtotal = OrderTicketUiLocalizer.FormatUsdLine(TicketSubtotal);
+        TicketDisplayGrandTotal = OrderTicketUiLocalizer.FormatUsdLine(TicketGrandTotal);
         var settings = SettingsManager.Load();
         TicketRestaurantName = string.IsNullOrWhiteSpace(settings.BusinessProfile.RestaurantName)
             ? "ELITE RESTAURANT PRO"
             : settings.BusinessProfile.RestaurantName.ToUpperInvariant();
-        TicketTaxLabel = $"TVA ({settings.CurrencyPricing.TaxPercent:0.##}%)";
-        TicketServiceLabel = $"Service ({settings.CurrencyPricing.ServicePercent:0.##}%)";
+        TicketTaxLabel = OrderTicketUiLocalizer.FormatTaxLabel(settings.CurrencyPricing.TaxPercent);
+        TicketServiceLabel = OrderTicketUiLocalizer.FormatServiceLabel(settings.CurrencyPricing.ServicePercent);
+
+        OrderTicketUiLocalizer.ApplyAllLines(TicketLines);
 
         OnPropertyChanged(nameof(TicketOrderId));
         OnPropertyChanged(nameof(TicketConfirmationCode));
         OnPropertyChanged(nameof(TicketStatus));
+        OnPropertyChanged(nameof(TicketFulfillmentSectionTitle));
         IsTicketPreviewOpen = true;
     }
 

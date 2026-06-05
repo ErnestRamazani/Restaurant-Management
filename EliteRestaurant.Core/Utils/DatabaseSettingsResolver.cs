@@ -51,6 +51,7 @@ public static class DatabaseSettingsResolver
         }
 
         EnsureCloudSsl(builder, ensureCloudSsl);
+        ApplyProductionPoolTuning(builder);
         connectionString = builder.ConnectionString;
         return true;
     }
@@ -102,6 +103,7 @@ public static class DatabaseSettingsResolver
             Username = username,
             Password = password
         };
+        ApplyProductionPoolTuning(b);
         connectionString = b.ConnectionString;
         return true;
     }
@@ -127,6 +129,7 @@ public static class DatabaseSettingsResolver
         {
             var builder = new NpgsqlConnectionStringBuilder(raw);
             EnsureCloudSsl(builder, ensureCloudSsl);
+            ApplyProductionPoolTuning(builder);
             connectionString = builder.ConnectionString;
             return true;
         }
@@ -143,5 +146,14 @@ public static class DatabaseSettingsResolver
 
         if (builder.SslMode is SslMode.Disable or SslMode.Allow or SslMode.Prefer)
             builder.SslMode = SslMode.Require;
+    }
+
+    private static void ApplyProductionPoolTuning(NpgsqlConnectionStringBuilder builder)
+    {
+        if (builder.MaxPoolSize is 0 or > 25)
+            builder.MaxPoolSize = 25;
+        if (builder.MinPoolSize < 2)
+            builder.MinPoolSize = 2;
+        builder.ConnectionIdleLifetime = 300;
     }
 }

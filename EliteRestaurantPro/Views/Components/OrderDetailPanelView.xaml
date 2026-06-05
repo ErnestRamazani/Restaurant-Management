@@ -29,20 +29,18 @@
                 <Border Grid.Row="0" Padding="20,18" BorderBrush="#33FFFFFF" BorderThickness="0,0,0,1">
                     <Grid>
                         <StackPanel>
-                            <TextBlock Text="View order" Foreground="{StaticResource GoldAccentBrush}"
+                            <TextBlock Text="{Binding ViewOrderTitle}" Foreground="{StaticResource GoldAccentBrush}"
                                        FontSize="18" FontWeight="SemiBold"/>
                             <TextBlock Text="{Binding OrderCode}" Foreground="{StaticResource TextPrimaryBrush}"
                                        FontSize="15" FontWeight="SemiBold" Margin="0,6,0,0"/>
-                            <TextBlock Text="{Binding TableLabel}" Foreground="{StaticResource TextSecondaryBrush}"
+                            <TextBlock Text="{Binding DisplayTableLabel}" Foreground="{StaticResource TextSecondaryBrush}"
                                        FontSize="12" Margin="0,4,0,0"/>
-                            <TextBlock Foreground="{StaticResource StatBlueBrush}" FontSize="11" Margin="0,4,0,0">
-                                <Run Text="Server: "/><Run Text="{Binding ServerName, Mode=OneWay}"/>
-                            </TextBlock>
+                            <TextBlock Text="{Binding ServerLine}" Foreground="{StaticResource StatBlueBrush}" FontSize="11" Margin="0,4,0,0"/>
                             <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                                 <Border Background="#332196F3" CornerRadius="6" Padding="8,3">
-                                    <TextBlock Text="{Binding Status}" Foreground="White" FontSize="11" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding DisplayStatus}" Foreground="White" FontSize="11" FontWeight="SemiBold"/>
                                 </Border>
-                                <TextBlock Text="{Binding CreatedText}" Foreground="{StaticResource TextMutedBrush}"
+                                <TextBlock Text="{Binding DisplayCreatedText}" Foreground="{StaticResource TextMutedBrush}"
                                            FontSize="11" VerticalAlignment="Center" Margin="10,0,0,0"/>
                             </StackPanel>
                         </StackPanel>
@@ -58,7 +56,7 @@
                         <TextBlock Text="{Binding PackagingBannerLine}" TextWrapping="Wrap" FontSize="13" FontWeight="Bold"
                                    Foreground="#FFF59E0B" Margin="0,0,0,10"
                                    Visibility="{Binding ShowPackagingBanner, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                        <TextBlock Text="Lines" Foreground="{StaticResource GoldAccentBrush}" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,8"/>
+                        <TextBlock Text="{Binding LinesLabel}" Foreground="{StaticResource GoldAccentBrush}" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,8"/>
                         <ItemsControl ItemsSource="{Binding Lines}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
@@ -74,9 +72,7 @@
                                             <StackPanel Grid.Column="1">
                                                 <TextBlock Text="{Binding Name}" Foreground="{StaticResource TextPrimaryBrush}"
                                                            TextWrapping="Wrap" FontSize="13"/>
-                                                <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,4,0,0">
-                                                    <Run Text="Station: "/><Run Text="{Binding Station, Mode=OneWay}"/>
-                                                </TextBlock>
+                                                <TextBlock Text="{Binding StationLine}" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,4,0,0"/>
                                             </StackPanel>
                                             <TextBlock Grid.Column="2" Text="{Binding LineTotalText}"
                                                        Foreground="{StaticResource GoldAccentBrush}" FontWeight="SemiBold"
@@ -88,9 +84,9 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <TextBlock Text="Customer notes" Foreground="{StaticResource GoldAccentBrush}" FontWeight="SemiBold" FontSize="12" Margin="0,16,0,6"/>
+                        <TextBlock Text="{Binding CustomerNotesLabel}" Foreground="{StaticResource GoldAccentBrush}" FontWeight="SemiBold" FontSize="12" Margin="0,16,0,6"/>
                         <TextBlock Text="{Binding CustomerNotes}" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" FontSize="12"/>
-                        <TextBlock Text="Allergy notes" Foreground="#FFE57373" FontWeight="SemiBold" FontSize="12" Margin="0,14,0,6"/>
+                        <TextBlock Text="{Binding AllergyNotesLabel}" Foreground="#FFE57373" FontWeight="SemiBold" FontSize="12" Margin="0,14,0,6"/>
                         <TextBlock Text="{Binding AllergyNotes}" Foreground="#FFFFCDD2" TextWrapping="Wrap" FontSize="12"/>
                     </StackPanel>
                 </ScrollViewer>
@@ -99,9 +95,9 @@
                     <StackPanel>
                         <TextBlock HorizontalAlignment="Right" Foreground="{StaticResource GoldAccentBrush}" FontSize="18" FontWeight="SemiBold"
                                    Visibility="{Binding ShowPricing, Converter={StaticResource BoolToVisibilityConverter}}">
-                            <Run Text="Total "/><Run Text="{Binding GrandTotalText, Mode=OneWay}"/>
+                            <Run Text="{Binding TotalPrefix, Mode=OneWay}"/><Run Text="{Binding GrandTotalText, Mode=OneWay}"/>
                         </TextBlock>
-                        <Button Content="Close" Command="{Binding CloseCommand}" Style="{StaticResource GhostButton}" Margin="0,10,0,0" HorizontalAlignment="Stretch"/>
+                        <Button Content="{Binding CloseLabel, Mode=OneWay}" Command="{Binding CloseCommand}" Style="{StaticResource GhostButton}" Margin="0,10,0,0" HorizontalAlignment="Stretch"/>
                     </StackPanel>
                 </Border>
             </Grid>

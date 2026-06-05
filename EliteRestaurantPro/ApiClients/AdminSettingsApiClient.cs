@@ -30,6 +30,7 @@ public sealed class AdminSettingsApiClient(EliteApiClient? apiClient = null)
             settings.BusinessProfile.SocialMedia,
             settings.BusinessProfile.CustomerMenuTagline,
             settings.BusinessProfile.StaffLoginPasscode,
+            settings.BusinessProfile.OrderCancelPasscode,
             settings.BusinessProfile.AdminWebSignInId,
             settings.BusinessProfile.AdminWebPin,
             settings.BusinessProfile.TicketFooterText,
@@ -63,7 +64,9 @@ public sealed class AdminSettingsApiClient(EliteApiClient? apiClient = null)
             settings.Salary.MaxSalaryAdvancePercentOfGross,
             settings.BusinessProfile.CustomerMenuAboutText,
             settings.BusinessProfile.CustomerMenuContactIntro,
-            settings.BusinessProfile.CustomerMenuNotesText);
+            settings.BusinessProfile.CustomerMenuNotesText,
+            settings.BusinessProfile.ClientDebtCapUsd,
+            settings.BusinessProfile.RestaurantTimeZoneId);
 
         await _apiClient.PostAsync<AdminCloudSettingsRequest, AdminCloudSettingsResponse>(
             pushApiBaseUrl,

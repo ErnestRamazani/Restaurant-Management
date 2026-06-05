@@ -60,11 +60,9 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel>
-                            <TextBlock Style="{StaticResource HeadingLarge}" FontSize="28">
-                                <Run Text="Welcome, " Foreground="{StaticResource TextPrimaryBrush}"/>
-                                <Run Text="{Binding WelcomeName, Mode=OneWay}" Foreground="{StaticResource GoldAccentBrush}"/>
-                            </TextBlock>
-                            <TextBlock Text="Operations command center — today's performance, inventory risk, and team status."
+                            <TextBlock Text="{Binding WelcomeTitle, Mode=OneWay}"
+                                       Style="{StaticResource HeadingLarge}" FontSize="28"/>
+                            <TextBlock Text="{Binding DashSubtitle, Mode=OneWay}"
                                        Style="{StaticResource BodyText}" FontSize="13" Margin="0,6,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
                         <StackPanel Grid.Column="1" VerticalAlignment="Top" HorizontalAlignment="Right">
@@ -100,7 +98,7 @@
                             BorderThickness="1"
                             Visibility="{Binding ShowSalaryPayrollWarning, Converter={StaticResource BoolToVisibilityConverter}}">
                         <StackPanel>
-                            <TextBlock Text="Salary payroll overdue"
+                            <TextBlock Text="{Binding SalaryPayrollOverdueTitle, Mode=OneWay}"
                                        Foreground="#FFEF9A9A"
                                        FontWeight="SemiBold"
                                        FontSize="14"/>
@@ -110,7 +108,7 @@
                                        Margin="0,6,0,0"
                                        TextWrapping="Wrap"/>
                             <TextBlock Margin="0,4,0,0" FontSize="12" Foreground="#FFB0B0B0">
-                                <Run Text="Days past month end: "/>
+                                <Run Text="{Binding DaysPastMonthEndLabel, Mode=OneWay}"/>
                                 <Run Text="{Binding SalaryPayrollDaysPastDue, Mode=OneWay}" FontWeight="SemiBold"/>
                             </TextBlock>
                         </StackPanel>
@@ -141,16 +139,16 @@
                                     </Grid.RowDefinitions>
                                     <Border Grid.Row="0" CornerRadius="2" Background="{StaticResource StatBlueBrush}" Margin="-16,-18,-16,0"/>
                                     <StackPanel Grid.Row="1" Margin="0,16,0,0">
-                                        <TextBlock Text="Today's revenue (USD)" Style="{StaticResource DashboardKpiTitle}"/>
+                                        <TextBlock Text="{Binding KpiTodayUsdTitle, Mode=OneWay}" Style="{StaticResource DashboardKpiTitle}"/>
                                         <TextBlock Text="{Binding TodayRevenueUsd, Mode=OneWay}" Style="{StaticResource StatValue}" FontSize="32" Margin="0,10,0,0"/>
                                         <TextBlock Text="{Binding RevenueUsdVsYesterdayText, Mode=OneWay}" Foreground="{StaticResource StatBlueBrush}" Style="{StaticResource DashboardKpiHint}" Margin="0,8,0,0"/>
-                                        <TextBlock Text="Money · entries in USD only" Style="{StaticResource DashboardKpiHint}" Margin="0,4,0,0" Opacity="0.85"/>
+                                        <TextBlock Text="{Binding KpiTodayUsdSub, Mode=OneWay}" Style="{StaticResource DashboardKpiHint}" Margin="0,4,0,0" Opacity="0.85"/>
                                         <Viewbox Height="42" Stretch="Uniform" HorizontalAlignment="Stretch" Margin="0,12,0,0" MaxHeight="48">
                                             <Canvas Width="120" Height="28" ClipToBounds="True">
                                                 <Polyline Points="{Binding SparklinePoints, Mode=OneWay}" Stroke="{StaticResource StatBlueBrush}" StrokeThickness="2" StrokeLineJoin="Round"/>
                                             </Canvas>
                                         </Viewbox>
-                                        <TextBlock Text="Sparkline: 7-day USD revenue (Money)" Style="{StaticResource DashboardKpiHint}" Margin="0,6,0,0" FontSize="11" Opacity="0.75"/>
+                                        <TextBlock Text="{Binding DashSparklineCap, Mode=OneWay}" Style="{StaticResource DashboardKpiHint}" Margin="0,6,0,0" FontSize="11" Opacity="0.75"/>
                                     </StackPanel>
                                 </Grid>
                             </Border>
@@ -166,10 +164,10 @@
                                     </Grid.RowDefinitions>
                                     <Border Grid.Row="0" CornerRadius="2" Background="#FFB8860B" Margin="-16,-18,-16,0"/>
                                     <StackPanel Grid.Row="1" Margin="0,16,0,0">
-                                        <TextBlock Text="Today's revenue (FC)" Style="{StaticResource DashboardKpiTitle}"/>
+                                        <TextBlock Text="{Binding KpiTodayFcTitle, Mode=OneWay}" Style="{StaticResource DashboardKpiTitle}"/>
                                         <TextBlock Text="{Binding TodayRevenueFc, Mode=OneWay}" Style="{StaticResource StatValue}" FontSize="32" Margin="0,10,0,0"/>
                                         <TextBlock Text="{Binding RevenueFcVsYesterdayText, Mode=OneWay}" Foreground="{StaticResource GoldAccentBrush}" Style="{StaticResource DashboardKpiHint}" Margin="0,8,0,0"/>
-                                        <TextBlock Text="Money · entries in FC only (not converted from USD)" Style="{StaticResource DashboardKpiHint}" Margin="0,4,0,0" Opacity="0.85"/>
+                                        <TextBlock Text="{Binding KpiTodayFcSub, Mode=OneWay}" Style="{StaticResource DashboardKpiHint}" Margin="0,4,0,0" Opacity="0.85"/>
                                     </StackPanel>
                                 </Grid>
                             </Border>
@@ -185,10 +183,10 @@
                                     </Grid.RowDefinitions>
                                     <Border Grid.Row="0" CornerRadius="2" Background="#FFDC143C" Margin="-16,-18,-16,0"/>
                                     <StackPanel Grid.Row="1" Margin="0,16,0,0">
-                                        <TextBlock Text="Today's expenses" Style="{StaticResource DashboardKpiTitle}"/>
+                                        <TextBlock Text="{Binding KpiTodayExpTitle, Mode=OneWay}" Style="{StaticResource DashboardKpiTitle}"/>
                                         <TextBlock Text="{Binding TodayExpensesUsd, Mode=OneWay}" Style="{StaticResource StatValue}" FontSize="32" Margin="0,10,0,0"/>
                                         <TextBlock Text="{Binding ExpensesVsYesterdayText, Mode=OneWay}" Foreground="#FFEF9A9A" Style="{StaticResource DashboardKpiHint}" Margin="0,8,0,0"/>
-                                        <TextBlock Text="All expenses in USD (FC rows use stored USD equivalent)" Style="{StaticResource DashboardKpiHint}" Margin="0,4,0,0" Opacity="0.85"/>
+                                        <TextBlock Text="{Binding KpiTodayExpSub, Mode=OneWay}" Style="{StaticResource DashboardKpiHint}" Margin="0,4,0,0" Opacity="0.85"/>
                                     </StackPanel>
                                 </Grid>
                             </Border>
@@ -204,11 +202,11 @@
                                     </Grid.RowDefinitions>
                                     <Border Grid.Row="0" CornerRadius="2" Background="#FF00BCD4" Margin="-16,-18,-16,0"/>
                                     <StackPanel Grid.Row="1" Margin="0,16,0,0">
-                                        <TextBlock Text="Tables occupied" Style="{StaticResource DashboardKpiTitle}"/>
+                                        <TextBlock Text="{Binding KpiTablesTitle, Mode=OneWay}" Style="{StaticResource DashboardKpiTitle}"/>
                                         <TextBlock Text="{Binding OccupiedTablesText, Mode=OneWay}" Style="{StaticResource StatValue}" FontSize="30" Margin="0,10,0,0"/>
                                         <ProgressBar Value="{Binding OccupiedTablesPercent, Mode=OneWay}" Maximum="100" Height="12" Margin="0,14,0,0"
                                                      Foreground="{StaticResource StatBlueBrush}" Background="#22000000" BorderThickness="0"/>
-                                        <TextBlock Text="{Binding ActiveOrdersCount, Mode=OneWay, StringFormat={}{0} active orders}" Style="{StaticResource DashboardKpiHint}" Margin="0,10,0,0"/>
+                                        <TextBlock Text="{Binding ActiveOrdersSubText, Mode=OneWay}" Style="{StaticResource DashboardKpiHint}" Margin="0,10,0,0"/>
                                     </StackPanel>
                                 </Grid>
                             </Border>
@@ -224,7 +222,7 @@
                                     </Grid.RowDefinitions>
                                     <Border Grid.Row="0" CornerRadius="2" Background="{StaticResource StatGreenBrush}" Margin="-16,-18,-16,0"/>
                                     <StackPanel Grid.Row="1" Margin="0,16,0,0">
-                                        <TextBlock Text="Active orders" Style="{StaticResource DashboardKpiTitle}"/>
+                                        <TextBlock Text="{Binding KpiActiveOrdersTitle, Mode=OneWay}" Style="{StaticResource DashboardKpiTitle}"/>
                                         <TextBlock Text="{Binding ActiveOrdersCount, Mode=OneWay}" Style="{StaticResource StatValue}" FontSize="32" Margin="0,10,0,0"/>
                                         <TextBlock Text="{Binding InKitchenNowText, Mode=OneWay}" Foreground="{StaticResource StatGreenBrush}" Style="{StaticResource DashboardKpiHint}" Margin="0,8,0,0"/>
                                     </StackPanel>
@@ -242,10 +240,10 @@
                                     </Grid.RowDefinitions>
                                     <Border Grid.Row="0" CornerRadius="2" Background="#FF5C6BC0" Margin="-16,-18,-16,0"/>
                                     <StackPanel Grid.Row="1" Margin="0,16,0,0">
-                                        <TextBlock Text="Orders completed today" Style="{StaticResource DashboardKpiTitle}"/>
+                                        <TextBlock Text="{Binding KpiCompletedTodayTitle, Mode=OneWay}" Style="{StaticResource DashboardKpiTitle}"/>
                                         <TextBlock Text="{Binding OrdersCompletedToday, Mode=OneWay}" Style="{StaticResource StatValue}" FontSize="32" Margin="0,10,0,0"/>
                                         <TextBlock Text="{Binding CompletedVsYesterdayText, Mode=OneWay}" Foreground="{StaticResource TextSecondaryBrush}" Style="{StaticResource DashboardKpiHint}" Margin="0,8,0,0"/>
-                                        <TextBlock Text="From orders (not Money ledger)" Style="{StaticResource DashboardKpiHint}" Margin="0,4,0,0" Opacity="0.85"/>
+                                        <TextBlock Text="{Binding KpiCompletedTodaySub, Mode=OneWay}" Style="{StaticResource DashboardKpiHint}" Margin="0,4,0,0" Opacity="0.85"/>
                                     </StackPanel>
                                 </Grid>
                             </Border>
@@ -268,10 +266,10 @@
                                     <RowDefinition Height="*"/>
                                 </Grid.RowDefinitions>
                                 <DockPanel Grid.Row="0" LastChildFill="True" Margin="0,0,0,10">
-                                    <Button DockPanel.Dock="Right" Content="Inventory" Command="{Binding NavigateToInventoryCommand}"
+                                    <Button DockPanel.Dock="Right" Content="{Binding DashInventoryBtn, Mode=OneWay}" Command="{Binding NavigateToInventoryCommand}"
                                             Style="{StaticResource GhostButton}" Padding="12,6" FontSize="11"/>
                                     <StackPanel>
-                                        <TextBlock Text="Inventory" Style="{StaticResource HeadingMedium}" FontSize="16"/>
+                                        <TextBlock Text="{Binding DashInventoryTitle, Mode=OneWay}" Style="{StaticResource HeadingMedium}" FontSize="16"/>
                                     </StackPanel>
                                 </DockPanel>
                                 <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" MaxHeight="280" CanContentScroll="False" Style="{StaticResource EliteScrollViewer}">
@@ -322,8 +320,8 @@
                         <!-- Hourly + top dishes -->
                         <Border Grid.Column="2" Style="{StaticResource GlassCard}" Padding="18,16">
                             <StackPanel>
-                                <TextBlock Text="Today's sales rhythm" Style="{StaticResource HeadingMedium}" FontSize="16" Margin="0,0,0,4"/>
-                                <TextBlock Text="Revenue by hour (completed &amp; open orders created today)" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,0,0,12"/>
+                                <TextBlock Text="{Binding DashSalesRhythmTitle, Mode=OneWay}" Style="{StaticResource HeadingMedium}" FontSize="16" Margin="0,0,0,4"/>
+                                <TextBlock Text="{Binding DashSalesCaption, Mode=OneWay}" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,0,0,12"/>
 
                                 <Grid Height="150">
                                     <Grid.ColumnDefinitions>
@@ -359,7 +357,7 @@
                                     <TextBlock Text="23h" FontSize="9" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Right"/>
                                 </UniformGrid>
 
-                                <TextBlock Text="Top dishes today" Style="{StaticResource HeadingSmall}" FontSize="13" Margin="0,18,0,10"/>
+                                <TextBlock Text="{Binding DashTopDishesTitle, Mode=OneWay}" Style="{StaticResource HeadingSmall}" FontSize="13" Margin="0,18,0,10"/>
                                 <ItemsControl ItemsSource="{Binding TopSellingDishes}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
@@ -389,10 +387,10 @@
                     <Border Style="{StaticResource GlassCard}" Padding="18,16" Margin="0,0,0,18">
                         <StackPanel>
                             <Grid Margin="0,0,0,12">
-                                <TextBlock Text="Team on roster" Style="{StaticResource HeadingMedium}" FontSize="16" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding DashTeamRosterTitle, Mode=OneWay}" Style="{StaticResource HeadingMedium}" FontSize="16" VerticalAlignment="Center"/>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                     <TextBlock Text="{Binding ClockedInStaff, Mode=OneWay}" Foreground="{StaticResource GoldAccentBrush}" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                    <Button Content="Attendance" Command="{Binding OpenClockedInStaffCommand}" Style="{StaticResource GhostButton}" Padding="12,6" FontSize="11"/>
+                                    <Button Content="{Binding DashAttendanceBtn, Mode=OneWay}" Command="{Binding OpenClockedInStaffCommand}" Style="{StaticResource GhostButton}" Padding="12,6" FontSize="11"/>
                                 </StackPanel>
                             </Grid>
                             <TextBlock Text="{Binding NotYetInText, Mode=OneWay}" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,-6,0,12"/>
@@ -458,10 +456,10 @@
                             <Border Style="{StaticResource GlassCard}" Padding="22,18">
                                 <StackPanel>
                                     <Grid Margin="0,0,0,14">
-                                        <TextBlock Text="Weekly revenue" Style="{StaticResource HeadingMedium}" FontSize="16" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding DashWeeklyRevenueTitle, Mode=OneWay}" Style="{StaticResource HeadingMedium}" FontSize="16" VerticalAlignment="Center"/>
                                         <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
                                             <Ellipse Width="8" Height="8" Fill="{StaticResource StatBlueBrush}" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                            <TextBlock Text="This week (Mon–Fri)" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding DashThisWeekLabel, Mode=OneWay}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" VerticalAlignment="Center"/>
                                         </StackPanel>
                                     </Grid>
                                     <Grid>
@@ -510,8 +508,8 @@
 
                         <Border Grid.Column="2" Style="{StaticResource GlassCard}" Padding="18,18">
                             <StackPanel>
-                                <TextBlock Text="Recent activity" Style="{StaticResource HeadingMedium}" FontSize="16" Margin="0,0,0,14"/>
-                                <TextBlock Text="Last 25 events · tap a card to open Orders, Attendance, or Inventory." Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,-8,0,12" TextWrapping="Wrap"/>
+                                <TextBlock Text="{Binding DashRecentActivityTitle, Mode=OneWay}" Style="{StaticResource HeadingMedium}" FontSize="16" Margin="0,0,0,14"/>
+                                <TextBlock Text="{Binding DashRecentHint, Mode=OneWay}" Foreground="{StaticResource TextMutedBrush}" FontSize="11" Margin="0,-8,0,12" TextWrapping="Wrap"/>
                                 <ScrollViewer MaxHeight="520"
                                               VerticalScrollBarVisibility="Auto"
                                               HorizontalScrollBarVisibility="Disabled"

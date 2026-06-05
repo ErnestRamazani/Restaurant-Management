@@ -74,8 +74,8 @@
                 </Grid.RowDefinitions>
                 <StackPanel Grid.Row="0">
                     <TextBlock Style="{StaticResource HeadingLarge}" FontSize="26">
-                        <Run Text="Attendance" Foreground="{StaticResource TextPrimaryBrush}"/>
-                        <Run Text=" Control" Foreground="{StaticResource GoldAccentBrush}"/>
+                        <Run Text="{Binding PageTitle, Mode=OneWay}" Foreground="{StaticResource TextPrimaryBrush}"/>
+                        <Run Text="{Binding PageTitleAccent, Mode=OneWay}" Foreground="{StaticResource GoldAccentBrush}"/>
                     </TextBlock>
                     <TextBlock Text="{Binding AttendanceShiftSummaryText}"
                                Style="{StaticResource BodyText}"
@@ -84,21 +84,21 @@
                                TextWrapping="Wrap"/>
                 </StackPanel>
                 <StackPanel Grid.Row="1" Margin="0,14,0,0" Orientation="Horizontal">
-                    <TextBlock Text="Show:"
+                    <TextBlock Text="{Binding ShowLabel}"
                                Foreground="{StaticResource TextMutedBrush}"
                                VerticalAlignment="Center"
                                Margin="0,0,12,0"
                                FontSize="13"/>
-                    <Button Content="All"
+                    <Button Content="{Binding FilterAllLabel}"
                             Command="{Binding SetShiftFilterAllCommand}"
                             Style="{StaticResource ShiftFilterButtonAllStyle}"/>
-                    <Button Content="Morning shift"
+                    <Button Content="{Binding FilterMorningLabel}"
                             Command="{Binding SetShiftFilterMorningCommand}"
                             Style="{StaticResource ShiftFilterButtonMorningStyle}"/>
-                    <Button Content="Night shift"
+                    <Button Content="{Binding FilterNightLabel}"
                             Command="{Binding SetShiftFilterNightCommand}"
                             Style="{StaticResource ShiftFilterButtonNightStyle}"/>
-                    <Button Content="Full day"
+                    <Button Content="{Binding FilterFullDayLabel}"
                             Margin="0"
                             Command="{Binding SetShiftFilterFullDayCommand}"
                             Style="{StaticResource ShiftFilterButtonStyle}"/>
@@ -110,7 +110,7 @@
                          MinHeight="42"
                          FontSize="13"
                          Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                         ToolTip="Search by employee name, ID, shift, or status"/>
+                         ToolTip="{Binding SearchTooltip}"/>
             </Grid>
             </Border>
 
@@ -123,7 +123,7 @@
                                 <Expander.Header>
                                     <DockPanel LastChildFill="True" Margin="2,2,2,2">
                                         <Button DockPanel.Dock="Right"
-                                                Content="Validate attendance"
+                                                Content="{Binding DataContext.ValidateLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 Margin="12,0,0,0"
                                                 Padding="14,6"
                                                 VerticalAlignment="Center"
@@ -137,7 +137,7 @@
                                                        FontSize="14"
                                                        Foreground="{StaticResource GoldAccentBrush}"
                                                        VerticalAlignment="Center"/>
-                                            <TextBlock Text="{Binding RowCount, StringFormat= ({0} employees)}"
+                                            <TextBlock Text="{Binding EmployeesCountText}"
                                                        Foreground="{StaticResource TextMutedBrush}"
                                                        FontSize="12"
                                                        Margin="8,0,0,0"
@@ -157,18 +157,18 @@
                                                     </Grid.ColumnDefinitions>
                                                     <StackPanel>
                                                         <TextBlock Text="{Binding EmployeeName}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="17"/>
-                                                        <TextBlock Text="{Binding LateJustificationText}"
+                                                        <TextBlock Text="{Binding DisplayLateJustificationText}"
                                                                    Foreground="{StaticResource StatRedBrush}"
                                                                    FontSize="12"
                                                                    Margin="0,3,0,0"
                                                                    Visibility="{Binding ShowLateJustification, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                                                        <TextBlock Text="ABSENCE JUSTIFICATION (required before Validate)"
+                                                        <TextBlock Text="{Binding DataContext.AbsenceEditorLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                    Style="{StaticResource HeadingSmall}"
                                                                    FontSize="11"
                                                                    Margin="0,12,0,6"
                                                                    Foreground="{StaticResource TextMutedBrush}"
                                                                    Visibility="{Binding ShowAbsenceJustificationEditor, Converter={StaticResource BoolToVisibilityConverter}}"/>
-                                                        <TextBlock Text="ABSENCE JUSTIFICATION (validated — read only)"
+                                                        <TextBlock Text="{Binding DataContext.AbsenceReadOnlyLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                    Style="{StaticResource HeadingSmall}"
                                                                    FontSize="11"
                                                                    Margin="0,12,0,6"
@@ -195,43 +195,14 @@
                                                                    Background="#22000000"
                                                                    Visibility="{Binding ShowAbsenceJustificationReadOnly, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                                         <TextBlock Text="{Binding EmployeeUniqueId}" Foreground="{StaticResource TextMutedBrush}" FontFamily="Consolas" FontSize="11" Margin="0,2,0,0"/>
-                                                        <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="12" Margin="0,8,0,0">
-                                                            <Run Text="Shift: "/>
-                                                            <Run Text="{Binding ShiftName}"/>
-                                                            <Run Text=" ("/>
-                                                            <Run Text="{Binding ShiftWindowText}"/>
-                                                            <Run Text=")"/>
-                                                        </TextBlock>
-                                                        <TextBlock Foreground="{StaticResource TextMutedBrush}" FontSize="12" Margin="0,2,0,0">
-                                                            <Run Text="Clock In: "/>
-                                                            <Run Text="{Binding ClockInText}"/>
-                                                            <Run Text=" | Clock Out: "/>
-                                                            <Run Text="{Binding ClockOutText}"/>
-                                                        </TextBlock>
-                                                        <TextBlock Margin="0,6,0,0" FontSize="12">
-                                                            <TextBlock.Style>
-                                                                <Style TargetType="TextBlock">
-                                                                    <Setter Property="Foreground" Value="{StaticResource StatBlueBrush}"/>
-                                                                    <Style.Triggers>
-                                                                        <DataTrigger Binding="{Binding StatusText}" Value="Late">
-                                                                            <Setter Property="Foreground" Value="{StaticResource StatRedBrush}"/>
-                                                                        </DataTrigger>
-                                                                        <DataTrigger Binding="{Binding StatusText}" Value="On Time">
-                                                                            <Setter Property="Foreground" Value="{StaticResource StatBlueBrush}"/>
-                                                                        </DataTrigger>
-                                                                        <DataTrigger Binding="{Binding StatusText}" Value="Early">
-                                                                            <Setter Property="Foreground" Value="{StaticResource StatOrangeBrush}"/>
-                                                                        </DataTrigger>
-                                                                        <DataTrigger Binding="{Binding StatusText}" Value="Absent">
-                                                                            <Setter Property="Foreground" Value="{StaticResource StatRedBrush}"/>
-                                                                        </DataTrigger>
-                                                                    </Style.Triggers>
-                                                                </Style>
-                                                            </TextBlock.Style>
-                                                            <Run Text="Status: "/>
-                                                            <Run Text="{Binding StatusText}"/>
-                                                        </TextBlock>
-                                                        <TextBlock Text="{Binding PendingSalaryText}"
+                                                        <TextBlock Text="{Binding DisplayShiftLine}"
+                                                                   Foreground="{StaticResource TextMutedBrush}" FontSize="12" Margin="0,8,0,0"/>
+                                                        <TextBlock Text="{Binding DisplayClockLine}"
+                                                                   Foreground="{StaticResource TextMutedBrush}" FontSize="12" Margin="0,2,0,0"/>
+                                                        <TextBlock Text="{Binding DisplayStatusLine}"
+                                                                   Foreground="{StaticResource StatBlueBrush}"
+                                                                   FontSize="12" Margin="0,6,0,0"/>
+                                                        <TextBlock Text="{Binding DisplayPendingSalaryText}"
                                                                    Foreground="{StaticResource GoldAccentBrush}"
                                                                    FontSize="12"
                                                                    Margin="0,6,0,0"/>
@@ -240,20 +211,20 @@
                                                     <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="16,2,0,0" VerticalAlignment="Top">
                                                         <Button Width="100"
                                                                 Margin="0,0,6,0"
-                                                                Content="Clock In"
+                                                                Content="{Binding DataContext.ClockInLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                 Command="{Binding DataContext.ClockInCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                 CommandParameter="{Binding}"
                                                                 IsEnabled="{Binding CanClockIn}"
                                                                 Style="{StaticResource GoldPrimaryButton}"/>
                                                         <Button Width="100"
                                                                 Margin="0,0,6,0"
-                                                                Content="Clock Out"
+                                                                Content="{Binding DataContext.ClockOutLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                 Command="{Binding DataContext.ClockOutCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                 CommandParameter="{Binding}"
                                                                 IsEnabled="{Binding CanClockOut}"
                                                                 Style="{StaticResource SapphireButton}"/>
                                                         <Button Width="100"
-                                                                Content="Absence"
+                                                                Content="{Binding DataContext.AbsenceLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                 ToolTip="Mark as absent and enter justification"
                                                                 Command="{Binding DataContext.MarkAbsenceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                 CommandParameter="{Binding}"
@@ -277,11 +248,11 @@
                 <Border Style="{StaticResource DialogCard}" HorizontalAlignment="Center" VerticalAlignment="Center" Width="460">
                     <StackPanel>
                         <TextBlock Text="{Binding MarkAbsenceDialogTitle}" Style="{StaticResource HeadingMedium}" FontSize="22"/>
-                        <TextBlock Text="Record that this employee did not work this day. Justification is required."
+                        <TextBlock Text="{Binding MarkAbsenceBody}"
                                    Foreground="{StaticResource TextMutedBrush}"
                                    Margin="0,8,0,0"
                                    TextWrapping="Wrap"/>
-                        <TextBlock Text="JUSTIFICATION (required)" Style="{StaticResource HeadingSmall}" Margin="0,20,0,8"/>
+                        <TextBlock Text="{Binding JustificationRequiredLabel}" Style="{StaticResource HeadingSmall}" Margin="0,20,0,8"/>
                         <TextBox Text="{Binding MarkAbsenceJustification, UpdateSourceTrigger=PropertyChanged}"
                                  Height="110"
                                  TextWrapping="Wrap"
@@ -297,8 +268,8 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Button Grid.Column="0" Content="Cancel" Margin="0,0,8,0" Command="{Binding CancelMarkAbsenceCommand}" Style="{StaticResource GhostButton}"/>
-                            <Button Grid.Column="1" Content="Save absence" Margin="8,0,0,0" Command="{Binding SaveMarkAbsenceCommand}" Style="{StaticResource DangerButton}"/>
+                            <Button Grid.Column="0" Content="{Binding CancelLabel}" Margin="0,0,8,0" Command="{Binding CancelMarkAbsenceCommand}" Style="{StaticResource GhostButton}"/>
+                            <Button Grid.Column="1" Content="{Binding SaveAbsenceLabel}" Margin="8,0,0,0" Command="{Binding SaveMarkAbsenceCommand}" Style="{StaticResource DangerButton}"/>
                         </Grid>
                     </StackPanel>
                 </Border>
@@ -310,11 +281,11 @@
                 <Border Style="{StaticResource DialogCard}" HorizontalAlignment="Center" VerticalAlignment="Center" Width="460">
                     <StackPanel>
                         <TextBlock Text="{Binding DialogTitle}" Style="{StaticResource HeadingMedium}" FontSize="22"/>
-                        <TextBlock Text="Employee clocked in after 08:30 AM. Please provide a justification."
+                        <TextBlock Text="{Binding LateDialogBody}"
                                    Foreground="{StaticResource TextMutedBrush}"
                                    Margin="0,8,0,0"
                                    TextWrapping="Wrap"/>
-                        <TextBlock Text="JUSTIFICATION (required)" Style="{StaticResource HeadingSmall}" Margin="0,20,0,8"/>
+                        <TextBlock Text="{Binding JustificationRequiredLabel}" Style="{StaticResource HeadingSmall}" Margin="0,20,0,8"/>
                         <TextBox Text="{Binding LateJustification, UpdateSourceTrigger=PropertyChanged}"
                                  Height="110"
                                  TextWrapping="Wrap"
@@ -331,8 +302,8 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Button Grid.Column="0" Content="Cancel" Margin="0,0,8,0" Command="{Binding CancelLateClockInCommand}" Style="{StaticResource GhostButton}"/>
-                            <Button Grid.Column="1" Content="Save Late Clock-In" Margin="8,0,0,0" Command="{Binding SaveLateClockInCommand}" Style="{StaticResource DangerButton}"/>
+                            <Button Grid.Column="0" Content="{Binding CancelLabel}" Margin="0,0,8,0" Command="{Binding CancelLateClockInCommand}" Style="{StaticResource GhostButton}"/>
+                            <Button Grid.Column="1" Content="{Binding SaveLateClockInLabel}" Margin="8,0,0,0" Command="{Binding SaveLateClockInCommand}" Style="{StaticResource DangerButton}"/>
                         </Grid>
                     </StackPanel>
                 </Border>

@@ -40,10 +40,22 @@ public static class OrderSubmissionHelper
     /// <summary>Tablet/API path: subtotal from preloaded product map; clears customer payment fields for a fresh ticket.</summary>
     public static void SyncPaymentFields(OrderRecord order, IReadOnlyDictionary<int, Product> products)
     {
+        SyncPaymentFields(order, products, pricing: null);
+    }
+
+    /// <summary>
+    /// Guest/public menu orders: use <paramref name="pricing"/> (cloud + file merge) so charged totals match
+    /// <c>GET /api/public/menu/config</c>.
+    /// </summary>
+    public static void SyncPaymentFields(
+        OrderRecord order,
+        IReadOnlyDictionary<int, Product> products,
+        PublicMenuSetting? pricing)
+    {
         var items = order.Items.ToList();
         var prices = items.Select(i => i.ProductId).Distinct()
             .ToDictionary(id => id, id => products.TryGetValue(id, out var p) ? p.Price : 0m);
-        ApplyComputedPaymentAmounts(order, items, prices);
+        ApplyComputedPaymentAmounts(order, items, prices, pricing);
         order.CustomerPaidUsd = 0m;
         order.CustomerPaidFc = 0m;
         order.ChangeGivenUsd = 0m;
@@ -54,12 +66,18 @@ public static class OrderSubmissionHelper
     private static void ApplyComputedPaymentAmounts(
         OrderRecord order,
         List<OrderItem> items,
-        IReadOnlyDictionary<int, decimal> priceByProductId)
+        IReadOnlyDictionary<int, decimal> priceByProductId,
+        PublicMenuSetting? pricing = null)
     {
         var subtotal = items.Sum(i => (priceByProductId.TryGetValue(i.ProductId, out var price) ? price : 0m) * i.Quantity);
-        var totals = OrderTotalsHelper.ComputeTotalsWithDeliveryFee(subtotal, order.DiscountMode, order.DiscountValue, order.DeliveryFeeUsd);
+        var totals = pricing is not null
+            ? OrderTotalsHelper.ComputeTotalsWithDeliveryFee(
+                subtotal, order.DiscountMode, order.DiscountValue, order.DeliveryFeeUsd, pricing)
+            : OrderTotalsHelper.ComputeTotalsWithDeliveryFee(
+                subtotal, order.DiscountMode, order.DiscountValue, order.DeliveryFeeUsd);
         var grand = totals.GrandTotal;
         order.DiscountAmountUsd = totals.DiscountApplied;
+        order.MerchandiseGrandTotalUsd = Math.Round(grand, 2);
         order.PaymentAmountUsd = Math.Round(grand, 2);
         order.PaymentAmountFc = CurrencyHelper.ConvertUsdToFc(grand);
         order.PaymentAmount = string.Equals(order.PaymentCurrencyCode, CurrencyHelper.CongoleseFranc, StringComparison.OrdinalIgnoreCase)
