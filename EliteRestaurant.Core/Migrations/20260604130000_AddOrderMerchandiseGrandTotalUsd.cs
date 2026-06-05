@@ -1,12 +1,15 @@
+using EliteRestaurant.Core.Data;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace EliteRestaurant.Core.Migrations
+namespace EliteRestaurant.Core.Migrations;
+
+[DbContext(typeof(AppDbContext))]
+[Migration("20260604130000_AddOrderMerchandiseGrandTotalUsd")]
+public class AddOrderMerchandiseGrandTotalUsd : Migration
 {
-    /// <inheritdoc />
-    public partial class AddOrderMerchandiseGrandTotalUsd : Migration
-    {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
@@ -44,5 +47,4 @@ namespace EliteRestaurant.Core.Migrations
                 name: "MerchandiseGrandTotalUsd",
                 table: "Orders");
         }
-    }
 }

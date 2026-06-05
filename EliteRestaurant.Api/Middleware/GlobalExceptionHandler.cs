@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Hosting;
 
 namespace EliteRestaurant.Api.Middleware;
 
@@ -30,11 +32,16 @@ public sealed class GlobalExceptionHandler(RequestDelegate next, ILogger<GlobalE
             context.Response.Clear();
             context.Response.StatusCode = StatusCodes.Status500InternalServerError;
             context.Response.ContentType = "application/json";
-            await context.Response.WriteAsync(JsonSerializer.Serialize(new
+            var payload = new Dictionary<string, object?>
             {
-                error = "An unexpected error occurred",
-                correlationId
-            }));
+                ["error"] = "An unexpected error occurred",
+                ["correlationId"] = correlationId
+            };
+            var hostEnv = context.RequestServices.GetService<IWebHostEnvironment>();
+            if (hostEnv?.IsDevelopment() == true)
+                payload["detail"] = ex.Message;
+
+            await context.Response.WriteAsync(JsonSerializer.Serialize(payload));
         }
     }
 }

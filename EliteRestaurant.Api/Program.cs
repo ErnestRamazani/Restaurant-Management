@@ -352,8 +352,9 @@ try
             headers["Content-Security-Policy"] =
                 "default-src 'self'; " +
                 "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
-                "style-src 'self'; " +
+                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
                 "style-src-attr 'unsafe-inline'; " +
+                "font-src 'self' https://fonts.gstatic.com data:; " +
                 "img-src 'self' blob: data:; " +
                 "frame-src 'self' blob:; " +
                 $"connect-src 'self' {connectOrigins};";
@@ -398,96 +399,28 @@ try
             }
         }
     });
-    app.MapGet("/server", () => Results.Redirect("/server/index.html"));
-    app.MapGet("/cashier", () => Results.Redirect("/cashier/index.html"));
-    app.MapGet("/reception", () => Results.Redirect("/reception/index.html"));
-    app.MapGet("/front-desk", () => Results.Redirect("/reception/index.html"));
-    app.MapGet("/server/", async (IWebHostEnvironment env, HttpContext context) =>
+    // Staff portal folder URLs → index.html (middleware avoids AmbiguousMatchException from paired MapGet + MapFallback).
+    app.Use(async (context, next) =>
     {
-        var serverPortal = Path.Combine(env.WebRootPath, "server", "index.html");
-        context.Response.ContentType = "text/html; charset=utf-8";
-        ApplyHtmlNoStore(context.Response);
-        await context.Response.SendFileAsync(serverPortal);
-    });
-    app.MapGet("/server/index.html", async (IWebHostEnvironment env, HttpContext context) =>
-    {
-        var serverPortal = Path.Combine(env.WebRootPath, "server", "index.html");
-        context.Response.ContentType = "text/html; charset=utf-8";
-        ApplyHtmlNoStore(context.Response);
-        await context.Response.SendFileAsync(serverPortal);
-    });
-    app.MapGet("/cashier/", async (IWebHostEnvironment env, HttpContext context) =>
-    {
-        var cashierPortal = Path.Combine(env.WebRootPath, "cashier", "index.html");
-        context.Response.ContentType = "text/html; charset=utf-8";
-        ApplyHtmlNoStore(context.Response);
-        await context.Response.SendFileAsync(cashierPortal);
-    });
-    app.MapGet("/cashier/index.html", async (IWebHostEnvironment env, HttpContext context) =>
-    {
-        var cashierPortal = Path.Combine(env.WebRootPath, "cashier", "index.html");
-        context.Response.ContentType = "text/html; charset=utf-8";
-        ApplyHtmlNoStore(context.Response);
-        await context.Response.SendFileAsync(cashierPortal);
-    });
-    app.MapGet("/reception/", async (IWebHostEnvironment env, HttpContext context) =>
-    {
-        var receptionPortal = Path.Combine(env.WebRootPath, "reception", "index.html");
-        context.Response.ContentType = "text/html; charset=utf-8";
-        ApplyHtmlNoStore(context.Response);
-        await context.Response.SendFileAsync(receptionPortal);
-    });
-    app.MapGet("/reception/index.html", async (IWebHostEnvironment env, HttpContext context) =>
-    {
-        var receptionPortal = Path.Combine(env.WebRootPath, "reception", "index.html");
-        context.Response.ContentType = "text/html; charset=utf-8";
-        ApplyHtmlNoStore(context.Response);
-        await context.Response.SendFileAsync(receptionPortal);
-    });
-    app.MapGet("/kitchen", () => Results.Redirect("/kitchen/index.html"));
-    app.MapGet("/kitchen/", async (IWebHostEnvironment env, HttpContext context) =>
-    {
-        var path = Path.Combine(env.WebRootPath, "kitchen", "index.html");
-        context.Response.ContentType = "text/html; charset=utf-8";
-        ApplyHtmlNoStore(context.Response);
-        await context.Response.SendFileAsync(path);
-    });
-    app.MapGet("/kitchen/index.html", async (IWebHostEnvironment env, HttpContext context) =>
-    {
-        var path = Path.Combine(env.WebRootPath, "kitchen", "index.html");
-        context.Response.ContentType = "text/html; charset=utf-8";
-        ApplyHtmlNoStore(context.Response);
-        await context.Response.SendFileAsync(path);
-    });
-    app.MapGet("/bar", () => Results.Redirect("/bar/index.html"));
-    app.MapGet("/bar/", async (IWebHostEnvironment env, HttpContext context) =>
-    {
-        var path = Path.Combine(env.WebRootPath, "bar", "index.html");
-        context.Response.ContentType = "text/html; charset=utf-8";
-        ApplyHtmlNoStore(context.Response);
-        await context.Response.SendFileAsync(path);
-    });
-    app.MapGet("/bar/index.html", async (IWebHostEnvironment env, HttpContext context) =>
-    {
-        var path = Path.Combine(env.WebRootPath, "bar", "index.html");
-        context.Response.ContentType = "text/html; charset=utf-8";
-        ApplyHtmlNoStore(context.Response);
-        await context.Response.SendFileAsync(path);
-    });
-    app.MapGet("/admin", () => Results.Redirect("/admin/index.html"));
-    app.MapGet("/admin/", async (IWebHostEnvironment env, HttpContext context) =>
-    {
-        var path = Path.Combine(env.WebRootPath, "admin", "index.html");
-        context.Response.ContentType = "text/html; charset=utf-8";
-        ApplyHtmlNoStore(context.Response);
-        await context.Response.SendFileAsync(path);
-    });
-    app.MapGet("/admin/index.html", async (IWebHostEnvironment env, HttpContext context) =>
-    {
-        var path = Path.Combine(env.WebRootPath, "admin", "index.html");
-        context.Response.ContentType = "text/html; charset=utf-8";
-        ApplyHtmlNoStore(context.Response);
-        await context.Response.SendFileAsync(path);
+        var path = context.Request.Path.Value ?? "";
+        var target = path switch
+        {
+            "/server" or "/server/" => "/server/index.html",
+            "/cashier" or "/cashier/" => "/cashier/index.html",
+            "/reception" or "/reception/" => "/reception/index.html",
+            "/front-desk" or "/front-desk/" => "/reception/index.html",
+            "/kitchen" or "/kitchen/" => "/kitchen/index.html",
+            "/bar" or "/bar/" => "/bar/index.html",
+            "/admin" or "/admin/" => "/admin/index.html",
+            _ => null
+        };
+        if (target is not null)
+        {
+            context.Response.Redirect(target);
+            return;
+        }
+
+        await next(context);
     });
     app.MapControllers();
     app.MapHub<OrderHub>("/hubs/order");

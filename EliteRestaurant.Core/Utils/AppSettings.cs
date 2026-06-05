@@ -14,12 +14,20 @@ public static class CloudEndpoints
         if (string.IsNullOrWhiteSpace(trimmed))
             return preferProduction ? ProductionApiBaseUrl : LocalApiBaseUrl;
 
-        // Older docs/tools used :5223; current API launch profile listens on :8080. Rewire localhost URLs so
-        // the desktop client hits the same host as the browser (avoid silently forcing production).
-        trimmed = trimmed.Replace("localhost:5223", "localhost:8080", StringComparison.OrdinalIgnoreCase);
-        trimmed = trimmed.Replace("127.0.0.1:5223", "127.0.0.1:8080", StringComparison.OrdinalIgnoreCase);
+        // Older docs/tools used :5223; current API listens on :8080. :5173 is the Vite guest-menu dev server only.
+        trimmed = RewriteLegacyApiPort(trimmed, 5223, 8080);
+        trimmed = RewriteLegacyApiPort(trimmed, 5173, 8080);
 
         return trimmed;
+    }
+
+    private static string RewriteLegacyApiPort(string url, int fromPort, int toPort)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Port != fromPort)
+            return url;
+
+        var builder = new UriBuilder(uri) { Port = toPort };
+        return builder.Uri.ToString().TrimEnd('/');
     }
 
     /// <summary>True when the API base URL targets this PC (localhost), not hosted production.</summary>

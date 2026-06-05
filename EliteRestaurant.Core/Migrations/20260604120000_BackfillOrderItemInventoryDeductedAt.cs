@@ -1,13 +1,16 @@
 using System;
+using EliteRestaurant.Core.Data;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace EliteRestaurant.Core.Migrations
+namespace EliteRestaurant.Core.Migrations;
+
+[DbContext(typeof(AppDbContext))]
+[Migration("20260604120000_BackfillOrderItemInventoryDeductedAt")]
+public class BackfillOrderItemInventoryDeductedAt : Migration
 {
-    /// <inheritdoc />
-    public partial class BackfillOrderItemInventoryDeductedAt : Migration
-    {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
@@ -18,7 +21,7 @@ namespace EliteRestaurant.Core.Migrations
                 UPDATE "OrderItems" oi
                 SET "InventoryDeductedAt" = COALESCE(o."PaymentConfirmedAt", o."CreatedAt")
                 FROM "Orders" o
-                WHERE oi."OrderId" = o."Id"
+                WHERE oi."OrderRecordId" = o."Id"
                   AND oi."InventoryDeductedAt" IS NULL
                   AND o."Status" IN ('In Kitchen', 'Ready', 'Served')
                 """);
@@ -29,5 +32,4 @@ namespace EliteRestaurant.Core.Migrations
         {
             // Cannot reliably distinguish backfilled rows from organically set flags.
         }
-    }
 }

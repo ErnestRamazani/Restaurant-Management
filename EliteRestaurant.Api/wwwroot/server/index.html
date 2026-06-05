@@ -2021,6 +2021,7 @@
     .server-lang-wrap { display: flex; justify-content: flex-end; margin-bottom: 10px; }
     #serverLangSidebar.server-lang-wrap { margin-top: 4px; margin-bottom: 8px; justify-content: flex-start; }
   </style>
+  <script src="/shared/portal-globals.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.7/dist/browser/signalr.min.js" crossorigin="anonymous"></script>
 </head>
 <body>
@@ -2620,7 +2621,7 @@
       let json;
       try { json = JSON.parse(txt); } catch { json = { raw: txt }; }
       var result = { ok: res.ok, status: res.status, body: json };
-      if (global.EliteApiError) global.EliteApiError.wrap(result);
+      if (window.EliteApiError) window.EliteApiError.wrap(result);
       return result;
     }
 

@@ -1,13 +1,16 @@
 using System;
+using EliteRestaurant.Core.Data;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace EliteRestaurant.Core.Migrations
+namespace EliteRestaurant.Core.Migrations;
+
+[DbContext(typeof(AppDbContext))]
+[Migration("20260530160000_AddOrderItemServerServedAt")]
+public class AddOrderItemServerServedAt : Migration
 {
-    /// <inheritdoc />
-    public partial class AddOrderItemServerServedAt : Migration
-    {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
@@ -25,5 +28,4 @@ namespace EliteRestaurant.Core.Migrations
                 name: "ServerServedAt",
                 table: "OrderItems");
         }
-    }
 }

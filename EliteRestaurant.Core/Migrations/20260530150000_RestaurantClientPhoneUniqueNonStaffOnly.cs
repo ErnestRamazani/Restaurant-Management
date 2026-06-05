@@ -1,3 +1,5 @@
+using EliteRestaurant.Core.Data;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -5,7 +7,9 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace EliteRestaurant.Core.Migrations;
 
 /// <summary>Phone uniqueness applies to regular clients only; staff mirrors may share numbers.</summary>
-public partial class RestaurantClientPhoneUniqueNonStaffOnly : Migration
+[DbContext(typeof(AppDbContext))]
+[Migration("20260530150000_RestaurantClientPhoneUniqueNonStaffOnly")]
+public class RestaurantClientPhoneUniqueNonStaffOnly : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
     {

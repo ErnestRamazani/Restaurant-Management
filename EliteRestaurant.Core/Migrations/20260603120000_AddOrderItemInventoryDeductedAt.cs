@@ -1,13 +1,16 @@
 using System;
+using EliteRestaurant.Core.Data;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace EliteRestaurant.Core.Migrations
+namespace EliteRestaurant.Core.Migrations;
+
+[DbContext(typeof(AppDbContext))]
+[Migration("20260603120000_AddOrderItemInventoryDeductedAt")]
+public class AddOrderItemInventoryDeductedAt : Migration
 {
-    /// <inheritdoc />
-    public partial class AddOrderItemInventoryDeductedAt : Migration
-    {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
@@ -25,5 +28,4 @@ namespace EliteRestaurant.Core.Migrations
                 name: "InventoryDeductedAt",
                 table: "OrderItems");
         }
-    }
 }

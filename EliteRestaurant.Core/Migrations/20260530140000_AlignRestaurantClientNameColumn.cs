@@ -1,3 +1,5 @@
+using EliteRestaurant.Core.Data;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -5,7 +7,9 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace EliteRestaurant.Core.Migrations;
 
 /// <summary>Unify client display name to <c>FullName</c> and remove legacy unique index that broke staff sync.</summary>
-public partial class AlignRestaurantClientNameColumn : Migration
+[DbContext(typeof(AppDbContext))]
+[Migration("20260530140000_AlignRestaurantClientNameColumn")]
+public class AlignRestaurantClientNameColumn : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
     {
