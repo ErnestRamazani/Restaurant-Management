@@ -4,7 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/dev-8080.mjs",
+    "dev:hot": "vite",
+    "dev:watch": "node scripts/merge-guest-locales.mjs && vite build --watch",
     "build": "node scripts/merge-guest-locales.mjs && vite build",
     "sync-locales": "node scripts/merge-guest-locales.mjs",
     "lint": "eslint .",

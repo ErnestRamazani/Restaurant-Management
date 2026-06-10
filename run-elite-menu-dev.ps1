@@ -1,5 +1,4 @@
-# One-liner from repo root: starts elite-menu the same as elite-menu\run-dev.ps1
-# (new PowerShell window for Vite by default, or  -Foreground  in this window).
+# From repo root: build guest menu and open http://localhost:8080 (starts API if needed).
 param(
     [switch]$Foreground
 )

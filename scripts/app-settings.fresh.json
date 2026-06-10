@@ -7,7 +7,7 @@
     "socialMedia": "",
     "logoPath": "",
     "homepageBackgroundImagePath": "",
-    "publicMenuBaseUrl": "https://starfish-app-owtoz.ondigitalocean.app",
+    "publicMenuBaseUrl": "http://localhost:8080",
     "staffLoginPasscode": "",
     "adminWebSignInId": "",
     "adminWebPin": "",
@@ -18,7 +18,7 @@
     "socialMediaRows": []
   },
   "cloudApi": {
-    "baseUrl": "https://starfish-app-owtoz.ondigitalocean.app",
+    "baseUrl": "http://localhost:8080",
     "accessToken": "",
     "tokenExpiresAtUtc": null
   },
