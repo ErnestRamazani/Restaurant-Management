@@ -76,5 +76,8 @@ public sealed class PublicMenuSetting : IRestaurantScoped
     /// <summary>Salary advance cap as percent of scheduled gross for the month (legacy default 30).</summary>
     public decimal PayrollMaxSalaryAdvancePercentOfGross { get; set; } = 30m;
 
+    /// <summary>JSON array of ticket social footer rows (icons stored in <c>PublicMenuAssets</c>).</summary>
+    public string? TicketSocialMediaJson { get; set; }
+
     public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
 }

@@ -58,10 +58,16 @@ public sealed class EliteApiClient
 
     public async Task<T?> GetAsync<T>(string path, CancellationToken cancellationToken = default)
     {
+        return await GetAsync<T>(_apiBaseUrl, path, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<T?> GetAsync<T>(string apiBaseUrl, string path, CancellationToken cancellationToken = default)
+    {
+        var uri = BuildAbsoluteRequestUri(apiBaseUrl, path);
         using var response = await SendWithRetryAsync(
                 () =>
                 {
-                    var r = new HttpRequestMessage(HttpMethod.Get, BuildRequestUri(path));
+                    var r = new HttpRequestMessage(HttpMethod.Get, uri);
                     ApplyBearer(r, _bearerToken);
                     ApplyTenantHeaders(r);
                     return r;

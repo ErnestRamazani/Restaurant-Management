@@ -16,6 +16,7 @@ public static class CloudSettingsPushService
         AppSettings settings,
         bool applyLogoChanges,
         bool applyOnlinePromoImageChanges,
+        bool applyTicketBrandingChanges = false,
         CancellationToken cancellationToken = default)
     {
         if (!HasCloudAdminToken(settings))
@@ -28,6 +29,7 @@ public static class CloudSettingsPushService
                 settings,
                 applyLogoChanges,
                 applyOnlinePromoImageChanges,
+                applyTicketBrandingChanges,
                 cancellationToken)
             .ConfigureAwait(false);
     }

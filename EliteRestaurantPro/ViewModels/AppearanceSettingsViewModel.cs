@@ -1787,7 +1787,11 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         SettingsManager.Save(_settings);
         ReloadTicketReceiptSettingsFromDisk();
         _adminData.ReloadFromSettings();
-        _ = new AdminSettingsApiClient().PushSettingsAsync(_settings, applyLogoChanges: false, applyOnlinePromoImageChanges: false);
+        _ = CloudSettingsPushService.PushAsync(
+            _settings,
+            applyLogoChanges: false,
+            applyOnlinePromoImageChanges: false,
+            applyTicketBrandingChanges: true);
         RefreshBusinessProfileBindings();
         StatusMessage = SettingsUiLocalizer.StatusTicketsSaved();
     }

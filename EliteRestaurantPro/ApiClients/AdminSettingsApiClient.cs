@@ -13,14 +13,18 @@ public sealed class AdminSettingsApiClient(EliteApiClient? apiClient = null)
         AppSettings settings,
         bool applyLogoChanges = false,
         bool applyOnlinePromoImageChanges = false,
+        bool applyTicketBrandingChanges = false,
         CancellationToken cancellationToken = default)
     {
-        var logo = ReadLogo(settings.BusinessProfile.LogoPath);
-        var promo = ReadOnlinePromo(settings.BusinessProfile.OnlinePromoImagePath);
+        var logo = ReadImageFile(settings.BusinessProfile.LogoPath);
+        var promo = ReadImageFile(settings.BusinessProfile.OnlinePromoImagePath);
+        var ticketHeader = ReadImageFile(settings.TicketReceipt?.HeaderLogoPath);
+        var ticketSocialRows = ReadTicketSocialRows(settings.TicketReceipt);
         var pushApiBaseUrl = EliteApiClient.ResolvePublicMenuCloudBaseUrl(settings);
         var menuBaseUrl = pushApiBaseUrl;
 
         settings.Salary ??= new SalarySettings();
+        settings.TicketReceipt ??= new TicketReceiptSettings();
 
         var request = new AdminCloudSettingsRequest(
             settings.BusinessProfile.RestaurantName,
@@ -66,7 +70,12 @@ public sealed class AdminSettingsApiClient(EliteApiClient? apiClient = null)
             settings.BusinessProfile.CustomerMenuContactIntro,
             settings.BusinessProfile.CustomerMenuNotesText,
             settings.BusinessProfile.ClientDebtCapUsd,
-            settings.BusinessProfile.RestaurantTimeZoneId);
+            settings.BusinessProfile.RestaurantTimeZoneId,
+            ticketHeader.FileName,
+            ticketHeader.ContentType,
+            ticketHeader.Base64,
+            applyTicketBrandingChanges,
+            ticketSocialRows);
 
         await _apiClient.PostAsync<AdminCloudSettingsRequest, AdminCloudSettingsResponse>(
             pushApiBaseUrl,
@@ -75,7 +84,22 @@ public sealed class AdminSettingsApiClient(EliteApiClient? apiClient = null)
             cancellationToken);
     }
 
-    private static (string? FileName, string? ContentType, string? Base64) ReadLogo(string? path)
+    private static IReadOnlyList<TicketSocialMediaCloudRowDto> ReadTicketSocialRows(TicketReceiptSettings? ticketReceipt)
+    {
+        var rows = ticketReceipt?.SocialMediaRows ?? [];
+        return rows.Select(row =>
+        {
+            var icon = ReadImageFile(row.IconPath);
+            return new TicketSocialMediaCloudRowDto(
+                row.PlatformName ?? string.Empty,
+                row.UserText ?? string.Empty,
+                icon.FileName,
+                icon.ContentType,
+                icon.Base64);
+        }).ToList();
+    }
+
+    private static (string? FileName, string? ContentType, string? Base64) ReadImageFile(string? path)
     {
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
             return (null, null, null);
@@ -90,12 +114,10 @@ public sealed class AdminSettingsApiClient(EliteApiClient? apiClient = null)
             ".gif" => "image/gif",
             ".webp" => "image/webp",
             ".svg" => "image/svg+xml",
+            ".bmp" => "image/bmp",
             _ => "image/png"
         };
 
         return (Path.GetFileName(path), contentType, Convert.ToBase64String(bytes));
     }
-
-    private static (string? FileName, string? ContentType, string? Base64) ReadOnlinePromo(string? path)
-        => ReadLogo(path);
 }

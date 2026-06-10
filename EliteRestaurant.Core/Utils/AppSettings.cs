@@ -46,7 +46,7 @@ public static class CloudEndpoints
 public sealed class AppSettings
 {
     public BusinessProfileSettings BusinessProfile { get; set; } = new();
-    /// <summary>Printed/PDF ticket layout (local paths; not synced to cloud).</summary>
+    /// <summary>Printed/PDF ticket layout. Image paths are local; image bytes sync to cloud via settings push.</summary>
     public TicketReceiptSettings TicketReceipt { get; set; } = new();
     public CurrencyPricingSettings CurrencyPricing { get; set; } = new();
     public NavigationBackgroundSettings NavigationBackgrounds { get; set; } = new();

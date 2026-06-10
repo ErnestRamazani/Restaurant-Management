@@ -2,6 +2,7 @@ using EliteRestaurant.Contracts.Admin;
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Menu;
+using EliteRestaurant.Core.Tickets;
 using EliteRestaurant.Api.Services;
 using EliteRestaurant.Core.Utils;
 using Microsoft.AspNetCore.Authorization;
@@ -88,6 +89,7 @@ public sealed class AdminSettingsController(
 
         MergeLogoAssets(request);
         MergeOnlinePromoAssets(request);
+        MergeTicketBrandingAssets(request, row);
         await db.SaveChangesAsync(cancellationToken);
         menuSettingsCache.Invalidate();
         AdminWebLoginSeed.EnsureSeeded(db);
@@ -262,6 +264,131 @@ public sealed class AdminSettingsController(
         asset.UpdatedAtUtc = DateTime.UtcNow;
         if (asset.Id == 0)
             db.PublicMenuAssets.Add(asset);
+    }
+
+    private void MergeTicketBrandingAssets(AdminCloudSettingsRequest request, PublicMenuSetting row)
+    {
+        if (!request.ApplyTicketBrandingChanges)
+            return;
+
+        if (string.IsNullOrWhiteSpace(request.TicketHeaderLogoBase64))
+        {
+            var staleHeader = db.PublicMenuAssets.FirstOrDefault(a => a.Key == TicketBrandingAssetKeys.HeaderLogo);
+            if (staleHeader is not null)
+                db.PublicMenuAssets.Remove(staleHeader);
+        }
+        else
+        {
+            SaveTicketHeaderLogoFromPayload(request);
+        }
+
+        var staleSocial = db.PublicMenuAssets
+            .Where(a => a.Key.StartsWith(TicketBrandingAssetKeys.SocialIconPrefix))
+            .ToList();
+        foreach (var asset in staleSocial)
+            db.PublicMenuAssets.Remove(asset);
+
+        var entries = new List<TicketSocialMediaCloudEntry>();
+        var iconIndex = 0;
+        foreach (var socialRow in request.TicketSocialMediaRows ?? Array.Empty<TicketSocialMediaCloudRowDto>())
+        {
+            var plat = (socialRow.PlatformName ?? string.Empty).Trim();
+            var user = (socialRow.UserText ?? string.Empty).Trim();
+            if (plat.Length == 0 && user.Length == 0)
+                continue;
+
+            var iconKey = string.Empty;
+            if (!string.IsNullOrWhiteSpace(socialRow.IconBase64))
+            {
+                iconKey = TicketBrandingAssetKeys.SocialIconPrefix + iconIndex;
+                SaveTicketSocialIconFromPayload(iconKey, socialRow);
+                iconIndex++;
+            }
+
+            entries.Add(new TicketSocialMediaCloudEntry
+            {
+                PlatformName = plat,
+                UserText = user,
+                IconKey = iconKey
+            });
+        }
+
+        row.TicketSocialMediaJson = entries.Count == 0 ? null : TicketSocialMediaCloudJson.Serialize(entries);
+    }
+
+    private void SaveTicketHeaderLogoFromPayload(AdminCloudSettingsRequest request)
+    {
+        var bytes = TryDecodeImageBase64(request.TicketHeaderLogoBase64);
+        if (bytes is null)
+            return;
+
+        var extension = ResolveImageExtension(request.TicketHeaderLogoFileName, request.TicketHeaderLogoContentType);
+        var asset = db.PublicMenuAssets.FirstOrDefault(a => a.Key == TicketBrandingAssetKeys.HeaderLogo)
+                    ?? new PublicMenuAsset { Key = TicketBrandingAssetKeys.HeaderLogo };
+        asset.FileName = string.IsNullOrWhiteSpace(request.TicketHeaderLogoFileName)
+            ? "ticket-header-logo" + extension
+            : request.TicketHeaderLogoFileName.Trim();
+        asset.ContentType = string.IsNullOrWhiteSpace(request.TicketHeaderLogoContentType)
+            ? "image/png"
+            : request.TicketHeaderLogoContentType.Trim();
+        asset.Content = bytes;
+        asset.UpdatedAtUtc = DateTime.UtcNow;
+        if (asset.Id == 0)
+            db.PublicMenuAssets.Add(asset);
+    }
+
+    private void SaveTicketSocialIconFromPayload(string iconKey, TicketSocialMediaCloudRowDto row)
+    {
+        var bytes = TryDecodeImageBase64(row.IconBase64);
+        if (bytes is null)
+            return;
+
+        var extension = ResolveImageExtension(row.IconFileName, row.IconContentType);
+        var asset = new PublicMenuAsset
+        {
+            Key = iconKey,
+            FileName = string.IsNullOrWhiteSpace(row.IconFileName)
+                ? "ticket-social-icon" + extension
+                : row.IconFileName.Trim(),
+            ContentType = string.IsNullOrWhiteSpace(row.IconContentType)
+                ? "image/png"
+                : row.IconContentType.Trim(),
+            Content = bytes,
+            UpdatedAtUtc = DateTime.UtcNow
+        };
+        db.PublicMenuAssets.Add(asset);
+    }
+
+    private static byte[]? TryDecodeImageBase64(string? base64)
+    {
+        if (string.IsNullOrWhiteSpace(base64))
+            return null;
+
+        try
+        {
+            var bytes = Convert.FromBase64String(base64);
+            if (bytes.Length == 0 || bytes.Length > 4 * 1024 * 1024)
+                return null;
+            return bytes;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string ResolveImageExtension(string? fileName, string? contentType)
+    {
+        var extension = Path.GetExtension(fileName ?? string.Empty);
+        if (string.IsNullOrWhiteSpace(extension)
+            && !string.IsNullOrWhiteSpace(contentType)
+            && new FileExtensionContentTypeProvider().Mappings
+                .FirstOrDefault(m => string.Equals(m.Value, contentType, StringComparison.OrdinalIgnoreCase)).Key is { } mapped)
+        {
+            extension = mapped;
+        }
+
+        return string.IsNullOrWhiteSpace(extension) ? ".png" : extension.ToLowerInvariant();
     }
 
     private static string Normalize(string? value, string fallback) =>

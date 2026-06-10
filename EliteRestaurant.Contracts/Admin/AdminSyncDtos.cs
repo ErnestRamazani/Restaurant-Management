@@ -85,6 +85,18 @@ public sealed record AdminCloudSettingsRequest(
     string? CustomerMenuContactIntro = null,
     string? CustomerMenuNotesText = null,
     decimal ClientDebtCapUsd = 250m,
-    string? RestaurantTimeZoneId = null);
+    string? RestaurantTimeZoneId = null,
+    string? TicketHeaderLogoFileName = null,
+    string? TicketHeaderLogoContentType = null,
+    string? TicketHeaderLogoBase64 = null,
+    bool ApplyTicketBrandingChanges = false,
+    IReadOnlyList<TicketSocialMediaCloudRowDto>? TicketSocialMediaRows = null);
+
+public sealed record TicketSocialMediaCloudRowDto(
+    string PlatformName,
+    string UserText,
+    string? IconFileName,
+    string? IconContentType,
+    string? IconBase64);
 
 public sealed record AdminCloudSettingsResponse(bool Success, string? LogoUrl, string Message);

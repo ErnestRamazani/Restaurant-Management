@@ -234,9 +234,7 @@ public sealed class CashierPortalController(
             _ => OrderTicketPdfBuilder.UsePaymentReceiptVariant(order)
         };
 
-        var settings = SettingsManager.Load();
-        var headerBytes = TicketBrandingImageResolver.ResolveHeaderLogoBytes(settings, db, env);
-        var model = OrderTicketPdfBuilder.Build(order, settings, headerBytes);
+        var model = BuildOrderTicketModel(order);
         var pdfBytes = usePayment
             ? AdminTicketPdfExportService.GeneratePaymentReceiptPdfBytes(model)
             : AdminTicketPdfExportService.GenerateClientTicketPdfBytes(model);
@@ -272,9 +270,7 @@ public sealed class CashierPortalController(
             _ => OrderTicketPdfBuilder.UsePaymentReceiptVariant(order)
         };
 
-        var settings = SettingsManager.Load();
-        var headerBytes = TicketBrandingImageResolver.ResolveHeaderLogoBytes(settings, db, env);
-        var model = OrderTicketPdfBuilder.Build(order, settings, headerBytes);
+        var model = BuildOrderTicketModel(order);
         var html = usePayment
             ? OrderTicketHtmlBuilder.BuildPaymentReceiptHtml(model)
             : OrderTicketHtmlBuilder.BuildClientTicketHtml(model);
@@ -351,6 +347,15 @@ public sealed class CashierPortalController(
         var business = SettingsManager.Load().BusinessProfile;
         var cloud = menuSettings.GetDefault();
         return RestaurantTimeZone.ResolveId(cloud, business);
+    }
+
+    private TicketReceiptPdfModel BuildOrderTicketModel(OrderRecord order)
+    {
+        var cloudRow = db.PublicMenuSettings.AsNoTracking().FirstOrDefault(s => s.Key == "default");
+        var settings = TicketReceiptSettingsMerger.MergeForTicketReceipt(SettingsManager.Load(), cloudRow);
+        var headerBytes = TicketBrandingImageResolver.ResolveHeaderLogoBytes(settings, db, env);
+        var socialRows = TicketBrandingImageResolver.ResolveSocialFooterRows(db, cloudRow, settings);
+        return OrderTicketPdfBuilder.Build(order, settings, headerBytes, socialRows);
     }
 
     private AuthenticatedStaffSession? RequireCashierSession()

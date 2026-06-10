@@ -11,7 +11,11 @@ public static class OrderTicketPdfBuilder
     public static bool UsePaymentReceiptVariant(OrderRecord order) =>
         string.Equals(order.Status, "Completed", StringComparison.OrdinalIgnoreCase);
 
-    public static TicketReceiptPdfModel Build(OrderRecord order, AppSettings settings, byte[]? headerLogoBytes)
+    public static TicketReceiptPdfModel Build(
+        OrderRecord order,
+        AppSettings settings,
+        byte[]? headerLogoBytes,
+        IReadOnlyList<TicketSocialMediaPdfRow>? socialFooterRows = null)
     {
         var business = settings.BusinessProfile;
         var ticketReceipt = settings.TicketReceipt ?? new TicketReceiptSettings();
@@ -54,16 +58,7 @@ public static class OrderTicketPdfBuilder
                 string.IsNullOrWhiteSpace(order.PaymentCurrencyCode) ? CurrencyHelper.Usd : order.PaymentCurrencyCode)
             : CurrencyHelper.FormatAmount(totals.GrandTotal, CurrencyHelper.Usd);
 
-        var socialRows = new List<TicketSocialMediaPdfRow>();
-        foreach (var row in ticketReceipt.SocialMediaRows)
-        {
-            var plat = (row.PlatformName ?? string.Empty).Trim();
-            var user = (row.UserText ?? string.Empty).Trim();
-            if (plat.Length == 0 && user.Length == 0)
-                continue;
-            var iconBytes = TicketReceiptPdfImageHelper.TryLoadRasterImage(row.IconPath);
-            socialRows.Add(new TicketSocialMediaPdfRow(plat, user, iconBytes));
-        }
+        var socialRows = socialFooterRows?.ToList() ?? BuildSocialFooterRowsFromLocal(ticketReceipt);
 
         return new TicketReceiptPdfModel
         {
@@ -109,6 +104,22 @@ public static class OrderTicketPdfBuilder
             SocialFooterRows = socialRows,
             LegalInfo = business.TaxIdLegalInfo
         };
+    }
+
+    private static List<TicketSocialMediaPdfRow> BuildSocialFooterRowsFromLocal(TicketReceiptSettings ticketReceipt)
+    {
+        var socialRows = new List<TicketSocialMediaPdfRow>();
+        foreach (var row in ticketReceipt.SocialMediaRows)
+        {
+            var plat = (row.PlatformName ?? string.Empty).Trim();
+            var user = (row.UserText ?? string.Empty).Trim();
+            if (plat.Length == 0 && user.Length == 0)
+                continue;
+            var iconBytes = TicketReceiptPdfImageHelper.TryLoadRasterImage(row.IconPath);
+            socialRows.Add(new TicketSocialMediaPdfRow(plat, user, iconBytes));
+        }
+
+        return socialRows;
     }
 
     private static string FormatReceiptWebsiteLine(string? domain)
