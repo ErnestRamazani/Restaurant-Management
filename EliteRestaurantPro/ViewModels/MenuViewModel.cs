@@ -1,8 +1,10 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using EliteRestaurant.Core.Models;
@@ -79,8 +81,9 @@ public class MenuViewModel : AdminBaseViewModel
     private bool _removeProductImage;
     private ImageSource? _editorImagePreview;
     private ImageSource? _detailsImagePreview;
+    private string _ingredientSearchText = string.Empty;
 
-    public override string ActivePage => "Menu";
+    public ICollectionView FilteredInventoryView { get; }
 
     public string PageTitle => Loc.Admin("menuTitle", "Menu Products");
     public string PageSubtitle => Loc.Admin("menuSubtitle", "Curate the premium product catalog for service and POS.");
@@ -115,6 +118,46 @@ public class MenuViewModel : AdminBaseViewModel
     public string MenuFieldProductIdLabel => Loc.Admin("menuFieldProductId", "PRODUCT ID");
     public string MenuFieldCookingTimeShortLabel => Loc.Admin("menuFieldCookingTimeShort", "COOKING TIME");
     public string MenuIngredientsLabel => Loc.Admin("menuIngredientsLabel", "Ingredients");
+    public string MenuIngredientsPanelTitle => Loc.Admin("menuIngredientsPanelTitle", "Recipe & inventory");
+    public string MenuIngredientsPanelHint => Loc.Admin("menuIngredientsPanelHint",
+        "Link stock items and quantities used for one serving. Search by name or SKU.");
+    public string MenuIngredientSearchPlaceholder => Loc.Admin("menuIngredientSearchPlaceholder", "Search ingredients…");
+    public string MenuEditorDialogSubtitle => Loc.Admin("menuEditorDialogSubtitle",
+        "Complete the dish profile and link inventory for costing and stock deduction.");
+    public string MenuIngredientQtyLabel => Loc.Admin("menuIngredientQtyLabel", "Qty");
+    public string SelectedIngredientsCountText => Loc.Admin("menuIngredientsSelectedCount", "{{count}} selected",
+        new Dictionary<string, string>
+        {
+            ["count"] = SelectedIngredientsCount.ToString(CultureInfo.InvariantCulture)
+        });
+    public string SelectedIngredientsSummaryText
+    {
+        get
+        {
+            var selected = InventorySelections.Where(i => i.IsSelected).ToList();
+            if (selected.Count == 0)
+                return Loc.Admin("menuNoIngredientsSelected", "No ingredients selected yet.");
+            return string.Join(", ",
+                selected.Select(i =>
+                    $"{i.Name} ({i.Quantity:0.##} {i.Unit})"));
+        }
+    }
+
+    public int SelectedIngredientsCount => InventorySelections.Count(i => i.IsSelected);
+
+    public string IngredientSearchText
+    {
+        get => _ingredientSearchText;
+        set
+        {
+            if (!SetField(ref _ingredientSearchText, value))
+                return;
+            FilteredInventoryView.Refresh();
+        }
+    }
+
+    public override string ActivePage => "Menu";
+
     public string DescriptionCharCountRemainingText => Loc.Admin("menuCharactersRemaining", "Characters remaining: {{count}}",
         new Dictionary<string, string>
         {
@@ -385,6 +428,9 @@ public class MenuViewModel : AdminBaseViewModel
         BrowseProductImageCommand = new RelayCommand(_ => BrowseProductImage());
         ClearProductImageCommand = new RelayCommand(_ => ClearProductImage());
 
+        FilteredInventoryView = CollectionViewSource.GetDefaultView(InventorySelections);
+        FilteredInventoryView.Filter = FilterInventoryItem;
+
         SettingsManager.SettingsChanged += OnMenuSettingsChanged;
 
         RebuildCategoryUiFromSettings();
@@ -491,15 +537,22 @@ public class MenuViewModel : AdminBaseViewModel
 
             foreach (var item in invList.OrderBy(i => i.Name))
             {
-                InventorySelections.Add(new InventorySelectionItemViewModel
+                var row = new InventorySelectionItemViewModel
                 {
                     InventoryItemId = item.Id,
                     UniqueId = item.UniqueId,
                     Name = item.Name,
                     Unit = item.Unit,
-                    StockQuantity = item.StockQuantity,
-                    Quantity = 1m
-                });
+                    StockQuantity = item.StockQuantity
+                };
+                row.PropertyChanged += (_, e) =>
+                {
+                    if (e.PropertyName is nameof(InventorySelectionItemViewModel.IsSelected)
+                        or nameof(InventorySelectionItemViewModel.Quantity))
+                        RefreshIngredientSelectionSummary();
+                };
+                row.ResetQuantity(1m);
+                InventorySelections.Add(row);
             }
 
             RefreshReadyPickupBanner();
@@ -692,12 +745,14 @@ public class MenuViewModel : AdminBaseViewModel
         ProductImagePath = string.Empty;
         _removeProductImage = false;
         DetailsImagePreview = null;
+        ResetIngredientSearch();
         foreach (var ingredient in InventorySelections)
         {
             ingredient.IsSelected = false;
-            ingredient.Quantity = 1m;
+            ingredient.ResetQuantity(1m);
         }
         IsDialogOpen = true;
+        RefreshIngredientSelectionSummary();
     }
 
     private async Task<Dictionary<int, decimal>> GetIngredientQuantitiesForProductAsync(Product product)
@@ -742,10 +797,11 @@ public class MenuViewModel : AdminBaseViewModel
         OnPropertyChanged(nameof(DescriptionCharCountRemainingText));
         RefreshEditorImagePreview();
 
+        ResetIngredientSearch();
         foreach (var ingredient in InventorySelections)
         {
             ingredient.IsSelected = false;
-            ingredient.Quantity = 1m;
+            ingredient.ResetQuantity(1m);
         }
 
         try
@@ -770,6 +826,7 @@ public class MenuViewModel : AdminBaseViewModel
         }
 
         IsDialogOpen = true;
+        RefreshIngredientSelectionSummary();
     }
 
     private void OpenDetailsDialog(Product? product)
@@ -846,6 +903,23 @@ public class MenuViewModel : AdminBaseViewModel
 
         if (ProductIngredientsSummary.Count == 0)
             ProductIngredientsSummary.Add(Loc.Admin("menuNoInventoryIngredients", "No inventory ingredients linked."));
+
+        OnPropertyChanged(nameof(DetailsIngredientsPanelSubtitle));
+    }
+
+    public string DetailsIngredientsPanelSubtitle
+    {
+        get
+        {
+            var count = (_detailsProduct?.Ingredients ?? []).Count;
+            if (count == 0)
+                return Loc.Admin("menuNoInventoryIngredients", "No inventory ingredients linked.");
+            return Loc.Admin("menuDetailsIngredientCount", "{{count}} linked from inventory",
+                new Dictionary<string, string>
+                {
+                    ["count"] = count.ToString(CultureInfo.InvariantCulture)
+                });
+        }
     }
 
     private async Task SaveProductAsync()
@@ -883,6 +957,9 @@ public class MenuViewModel : AdminBaseViewModel
         var comp = (ProductComposition ?? string.Empty).Trim();
 
         var selectedIngredients = InventorySelections.Where(i => i.IsSelected).ToList();
+        foreach (var ingredient in InventorySelections.Where(i => i.IsSelected))
+            ingredient.CommitQuantityFromText();
+        selectedIngredients = InventorySelections.Where(i => i.IsSelected).ToList();
         if (!selectedIngredients.Any())
         {
             MessageBox.Show(
@@ -1058,6 +1135,36 @@ public class MenuViewModel : AdminBaseViewModel
         _removeProductImage = false;
         EditorImagePreview = null;
         DetailsImagePreview = null;
+        ResetIngredientSearch();
+    }
+
+    private void ResetIngredientSearch()
+    {
+        if (string.IsNullOrEmpty(_ingredientSearchText))
+            return;
+        _ingredientSearchText = string.Empty;
+        OnPropertyChanged(nameof(IngredientSearchText));
+        FilteredInventoryView.Refresh();
+    }
+
+    private bool FilterInventoryItem(object obj)
+    {
+        if (obj is not InventorySelectionItemViewModel item)
+            return false;
+
+        var query = (_ingredientSearchText ?? string.Empty).Trim();
+        if (query.Length == 0)
+            return true;
+
+        return item.Name.Contains(query, StringComparison.OrdinalIgnoreCase)
+               || item.UniqueId.Contains(query, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void RefreshIngredientSelectionSummary()
+    {
+        OnPropertyChanged(nameof(SelectedIngredientsCount));
+        OnPropertyChanged(nameof(SelectedIngredientsCountText));
+        OnPropertyChanged(nameof(SelectedIngredientsSummaryText));
     }
 
     private void BrowseProductImage()
@@ -1188,6 +1295,14 @@ public class MenuViewModel : AdminBaseViewModel
             nameof(MenuFieldProductIdLabel),
             nameof(MenuFieldCookingTimeShortLabel),
             nameof(MenuIngredientsLabel),
+            nameof(MenuIngredientsPanelTitle),
+            nameof(MenuIngredientsPanelHint),
+            nameof(MenuIngredientSearchPlaceholder),
+            nameof(MenuEditorDialogSubtitle),
+            nameof(MenuIngredientQtyLabel),
+            nameof(SelectedIngredientsCountText),
+            nameof(SelectedIngredientsSummaryText),
+            nameof(DetailsIngredientsPanelSubtitle),
             nameof(DescriptionCharCountRemainingText));
 
         if (IsDialogOpen && IsDetailsDialogMode)

@@ -371,6 +371,48 @@
         </Setter>
     </Style>
 
+    <Style x:Key="MenuIngredientQtyTextBox" TargetType="TextBox">
+        <Setter Property="Height" Value="36"/>
+        <Setter Property="MinWidth" Value="88"/>
+        <Setter Property="Width" Value="88"/>
+        <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="CaretBrush" Value="{DynamicResource GoldAccentBrush}"/>
+        <Setter Property="SelectionBrush" Value="{DynamicResource GoldAccentBrush}"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="TextAlignment" Value="Center"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Border x:Name="Bd"
+                            CornerRadius="8"
+                            BorderThickness="1"
+                            BorderBrush="{DynamicResource BorderSubtleBrush}"
+                            Background="#33101828"
+                            MinWidth="{TemplateBinding MinWidth}">
+                        <ScrollViewer x:Name="PART_ContentHost"
+                                      Margin="6,0"
+                                      VerticalAlignment="Center"
+                                      HorizontalScrollBarVisibility="Hidden"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsFocused" Value="True">
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource GoldAccentBrush}"/>
+                            <Setter TargetName="Bd" Property="Background" Value="#44101828"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- ═══════════════════════════════════════════════════
          PASSWORD BOX
     ═══════════════════════════════════════════════════ -->
