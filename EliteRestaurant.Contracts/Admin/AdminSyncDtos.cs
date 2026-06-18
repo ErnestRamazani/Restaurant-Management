@@ -50,6 +50,7 @@ public sealed record AdminCloudSettingsRequest(
     string? CustomerMenuTagline,
     string StaffLoginPasscode,
     string OrderCancelPasscode,
+    string EmployeeDeletePasscode,
     string AdminWebSignInId,
     string AdminWebPin,
     string TicketFooterText,

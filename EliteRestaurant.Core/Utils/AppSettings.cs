@@ -157,6 +157,9 @@ public sealed class BusinessProfileSettings
     /// <summary>Admin passcode required to cancel orders from staff portals and desktop.</summary>
     public string OrderCancelPasscode { get; set; } = string.Empty;
 
+    /// <summary>Passcode required before deleting any employee from desktop admin.</summary>
+    public string EmployeeDeletePasscode { get; set; } = string.Empty;
+
     /// <summary>Maximum open client debt (USD) before new on-account charges are blocked.</summary>
     public decimal ClientDebtCapUsd { get; set; } = 250m;
 

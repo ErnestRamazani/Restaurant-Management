@@ -190,4 +190,138 @@ public class OrderInventoryDeductionTests
         Assert.Equal(94m, inv.StockQuantity);
         Assert.NotNull(newLine.InventoryDeductedAt);
     }
+
+    [Fact]
+    public void TryApplyForAdditionalItems_SkipsAlreadyDeductedLines()
+    {
+        using var db = BuildDb($"inv-addon-idem-{Guid.NewGuid():N}");
+        var inv = new InventoryItem
+        {
+            UniqueId = "INV-FLOUR2",
+            Name = "Flour",
+            Unit = "kg",
+            StockQuantity = 100m
+        };
+        db.InventoryItems.Add(inv);
+        var product = new Product
+        {
+            UniqueId = "P5",
+            Name = "Bread",
+            Category = "Food",
+            SubCategory = "Bakery",
+            Price = 5m
+        };
+        db.Products.Add(product);
+        db.ProductIngredients.Add(new ProductIngredient
+        {
+            ProductId = product.Id,
+            InventoryItemId = inv.Id,
+            Quantity = 2m
+        });
+        db.Employees.Add(new Employee
+        {
+            UniqueId = "EMP-CHEF-2",
+            SignInId = "chef2",
+            Name = "Chef",
+            Role = "Chef",
+            PinCode = "x",
+            EmploymentStatus = "Active",
+            JoinDate = DateTime.Today
+        });
+        db.SaveChanges();
+
+        var order = new OrderRecord
+        {
+            UniqueId = "ORD-5",
+            Status = "Waiting",
+            OrderOrigin = OrderOrigin.InStore,
+            CreatedAt = DateTime.UtcNow
+        };
+        var alreadyDeducted = new OrderItem
+        {
+            ProductId = product.Id,
+            Quantity = 1,
+            InventoryDeductedAt = DateTime.UtcNow
+        };
+        order.Items.Add(alreadyDeducted);
+        db.Orders.Add(order);
+        db.SaveChanges();
+
+        var err = OrderInventoryDeduction.TryApplyForAdditionalItems(db, order, [alreadyDeducted]);
+        Assert.Null(err);
+        Assert.Equal(100m, inv.StockQuantity);
+    }
+
+    [Fact]
+    public void AppendFlow_AfterFirstLineDeducted_SecondAppendMarksOnlyNewLine()
+    {
+        using var db = BuildDb($"inv-append-flow-{Guid.NewGuid():N}");
+        var product = new Product
+        {
+            UniqueId = "P6",
+            Name = "Bread",
+            Category = "Food",
+            SubCategory = "Bakery",
+            Price = 5m
+        };
+        db.Products.Add(product);
+        db.SaveChanges();
+
+        var order = new OrderRecord
+        {
+            UniqueId = "ORD-6",
+            Status = "Waiting",
+            OrderOrigin = OrderOrigin.InStore,
+            CreatedAt = DateTime.UtcNow
+        };
+        var firstLine = new OrderItem
+        {
+            ProductId = product.Id,
+            Quantity = 1,
+            InventoryDeductedAt = DateTime.UtcNow
+        };
+        order.Items.Add(firstLine);
+        db.Orders.Add(order);
+        db.SaveChanges();
+
+        var secondLine = new OrderItem { ProductId = product.Id, Quantity = 2 };
+        order.Items.Add(secondLine);
+        Assert.Null(OrderInventoryAppendHelper.TryDeductNewLinesForAppend(db, order, [secondLine]));
+        db.SaveChanges();
+
+        Assert.NotNull(firstLine.InventoryDeductedAt);
+        Assert.NotNull(secondLine.InventoryDeductedAt);
+        Assert.Null(OrderInventoryDeduction.TryApplyForPlacedOrder(db, order));
+    }
+
+    [Fact]
+    public void ShouldDeductNewLinesImmediately_WhenPendingCashierButPriorLinesDeducted()
+    {
+        var order = new OrderRecord
+        {
+            Status = OrderWorkflow.PendingCashier,
+            OrderOrigin = OrderOrigin.InStore
+        };
+        order.Items.Add(new OrderItem
+        {
+            ProductId = 1,
+            Quantity = 1,
+            InventoryDeductedAt = DateTime.UtcNow
+        });
+
+        Assert.True(OrderInventoryAppendHelper.ShouldDeductNewLinesImmediately(order));
+    }
+
+    [Fact]
+    public void ShouldNotDeductNewLinesImmediately_WhenPurePendingCashier()
+    {
+        var order = new OrderRecord
+        {
+            Status = OrderWorkflow.PendingCashier,
+            OrderOrigin = OrderOrigin.InStore
+        };
+        order.Items.Add(new OrderItem { ProductId = 1, Quantity = 1 });
+
+        Assert.False(OrderInventoryAppendHelper.ShouldDeductNewLinesImmediately(order));
+    }
 }

@@ -15,6 +15,9 @@ public class Employee : IRestaurantScoped
     public string SignInId { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Role { get; set; } = string.Empty;
+
+    /// <summary>When <see cref="Role"/> is <c>Other</c>, free-text job title (e.g. Janitor, Security).</summary>
+    public string? CustomRoleTitle { get; set; }
     /// <summary>BCrypt hash of the tablet PIN (never a plaintext PIN in normal operation).</summary>
     public string PinCode { get; set; } = string.Empty;
     public string ProfileImagePath { get; set; } = string.Empty;
@@ -81,6 +84,10 @@ public class Employee : IRestaurantScoped
 
     [NotMapped]
     public decimal PendingSalaryToday { get; set; }
+
+    [NotMapped]
+    [JsonIgnore]
+    public bool CanDeleteFromEmployeesScreen { get; set; } = true;
 
     [NotMapped]
     [JsonIgnore]

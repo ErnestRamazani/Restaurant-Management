@@ -497,16 +497,10 @@ public sealed class ServerPortalController(
         OrderInventoryDeduction.InventoryValidationKind validationKind;
         if (request.AppendToOpenCheck && openOrder is not null)
         {
-            if (OrderWorkflow.IsPendingCashier(openOrder.Status) || OrderWorkflow.IsPendingApproval(openOrder.Status))
-            {
-                linesToValidate = MergeOrderItemsWithNewLines(openOrder.Items, normalizedLines);
-                validationKind = OrderInventoryDeduction.InventoryValidationKind.FullOrder;
-            }
-            else
-            {
-                linesToValidate = normalizedLines.Select(l => (l.ProductId, l.Quantity)).ToList();
-                validationKind = OrderInventoryDeduction.InventoryValidationKind.AdditionalLinesOnly;
-            }
+            var newLineTuples = normalizedLines.Select(l => (l.ProductId, l.Quantity)).ToList();
+            var plan = OrderInventoryAppendHelper.ResolveAppendValidation(openOrder, newLineTuples);
+            linesToValidate = plan.LinesToValidate;
+            validationKind = plan.ValidationKind;
         }
         else
         {
@@ -520,8 +514,7 @@ public sealed class ServerPortalController(
 
         if (request.AppendToOpenCheck && openOrder is not null)
         {
-            var requiresImmediateDeduction = !OrderWorkflow.IsPendingCashier(openOrder.Status)
-                && !OrderWorkflow.IsPendingApproval(openOrder.Status);
+            var deductNewLinesNow = OrderInventoryAppendHelper.ShouldDeductNewLinesImmediately(openOrder);
 
             foreach (var item in newItems)
                 openOrder.Items.Add(item);
@@ -540,12 +533,7 @@ public sealed class ServerPortalController(
                     : $"{openOrder.AllergyNotes.Trim()}\n{request.AllergyNotes.Trim()}";
             }
 
-            if (string.Equals(openOrder.Status, "Ready", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(openOrder.Status, OrderWorkflow.Served, StringComparison.OrdinalIgnoreCase)
-                || OrderWorkflow.IsKitchenQueueStatus(openOrder.Status))
-            {
-                openOrder.Status = OrderWorkflow.PendingCashier;
-            }
+            InStoreOrderPlacement.RequeueOpenCheckToKitchen(openOrder);
 
             // Preserve existing discount when appending unless caller sends a meaningful non-None discount.
             var explicitDiscount = !discountMode.Equals("None", StringComparison.OrdinalIgnoreCase)
@@ -569,48 +557,55 @@ public sealed class ServerPortalController(
             table.Status = "Occupied";
             DataReconciler.ReconcileTableStatusesWithOrders(db);
 
-            if (requiresImmediateDeduction)
+            if (deductNewLinesNow)
             {
-                string? invErr;
-                if (db.Database.IsInMemory())
+                var deductOutcome = DatabaseResilientTransaction.Execute<(bool Ok, string? Error)>(db, () =>
                 {
-                    OrderInventoryDeduction.MarkExistingLinesAsDeducted(openOrder, newItems);
-                    invErr = OrderInventoryDeduction.TryApplyForAdditionalItems(db, openOrder, newItems);
-                    if (invErr is not null)
-                        return BadRequest(new { message = invErr });
-                }
-                else
-                {
+                    if (IsInMemoryDatabase(db))
+                    {
+                        var invErrMem = OrderInventoryAppendHelper.TryDeductNewLinesForAppend(db, openOrder, newItems);
+                        return invErrMem is null ? (true, null) : (false, invErrMem);
+                    }
+
                     using var tx = db.Database.BeginTransaction();
                     try
                     {
-                        OrderInventoryDeduction.MarkExistingLinesAsDeducted(openOrder, newItems);
-                        invErr = OrderInventoryDeduction.TryApplyForAdditionalItems(db, openOrder, newItems);
+                        var invErr = OrderInventoryAppendHelper.TryDeductNewLinesForAppend(db, openOrder, newItems);
                         if (invErr is not null)
                         {
                             tx.Rollback();
-                            return BadRequest(new { message = invErr });
+                            return (false, invErr);
                         }
 
                         db.SaveChanges();
                         tx.Commit();
+                        return (true, null);
                     }
                     catch
                     {
                         tx.Rollback();
                         throw;
                     }
-                }
+                });
+
+                if (!deductOutcome.Ok)
+                    return BadRequest(new { message = deductOutcome.Error });
             }
 
             db.SaveChanges();
             if (request.RestaurantClientId is int appendClientId && appendClientId > 0)
                 new ClientAccountService(db).TryLinkNewOrder(openOrder.Id, appendClientId);
 
-            if (OrderWorkflow.IsPendingCashier(openOrder.Status) || OrderWorkflow.IsPendingApproval(openOrder.Status))
+            if (OrderWorkflow.IsPendingApproval(openOrder.Status)
+                || OrderWorkflow.IsPendingCashier(openOrder.Status))
             {
                 await OrderHubBroadcasts.NotifyCashierOrderBoardChangedAsync(
                     orderHub, db, openOrder.Id, "server-order-submitted");
+            }
+            else
+            {
+                await OrderHubBroadcasts.NotifyKitchenQueueChangedAsync(
+                    orderHub, db, openOrder.Id, "server-order-appended");
             }
 
             var code = string.IsNullOrWhiteSpace(openOrder.UniqueId) ? $"#{openOrder.Id:000}" : openOrder.UniqueId;
@@ -618,9 +613,13 @@ public sealed class ServerPortalController(
                 Mode: "Append",
                 OrderId: code,
                 LinesAdded: newItems.Count,
-                Message: $"Added {newItems.Count} line(s) to open check {code}. Sent back to cashier for release to kitchen.",
+                Message: $"Added {newItems.Count} line(s) to open check {code}. Sent to kitchen.",
                 CreatedAtUtc: DateTime.UtcNow));
         }
+
+        var newOrderStatus = isDelivery
+            ? OrderWorkflow.PendingApproval
+            : InStoreOrderPlacement.KitchenWaitingStatus;
 
         var order = new OrderRecord
         {
@@ -630,7 +629,7 @@ public sealed class ServerPortalController(
             TableName = string.IsNullOrWhiteSpace(table.Name) ? $"Table {table.TableNumber}" : table.Name,
             ServerId = ticketServerId,
             ServerName = ticketServerName,
-            Status = OrderWorkflow.PendingCashier,
+            Status = newOrderStatus,
             CustomerNotes = (request.CustomerNotes ?? string.Empty).Trim(),
             AllergyNotes = (request.AllergyNotes ?? string.Empty).Trim(),
             DiscountMode = discountMode,
@@ -650,20 +649,77 @@ public sealed class ServerPortalController(
         order.DeliveryFeeUsd = isDelivery ? Math.Round(merchSubtotal * 0.20m, 2) : 0m;
 
         OrderSubmissionHelper.SyncPaymentFields(order, products);
-        db.Orders.Add(order);
-        table.Status = "Occupied";
-        DataReconciler.ReconcileTableStatusesWithOrders(db);
-        db.SaveChanges();
+
+        if (isDelivery)
+        {
+            db.Orders.Add(order);
+            table.Status = "Occupied";
+            DataReconciler.ReconcileTableStatusesWithOrders(db);
+            db.SaveChanges();
+            new ClientAccountService(db).TryLinkNewOrder(order.Id, request.RestaurantClientId);
+
+            await OrderHubBroadcasts.NotifyCashierOrderBoardChangedAsync(
+                orderHub, db, order.Id, "server-order-submitted");
+
+            return Ok(new ServerCreateOrderResponse(
+                Mode: "Create",
+                OrderId: order.UniqueId,
+                LinesAdded: newItems.Count,
+                Message: $"Order {order.UniqueId} sent for cashier approval.",
+                CreatedAtUtc: DateTime.UtcNow));
+        }
+
+        var placementOutcome = DatabaseResilientTransaction.Execute<(bool Ok, string? Error)>(db, () =>
+        {
+            if (IsInMemoryDatabase(db))
+            {
+                db.Orders.Add(order);
+                table.Status = "Occupied";
+                DataReconciler.ReconcileTableStatusesWithOrders(db);
+                var invErrMem = InStoreOrderPlacement.TryPlaceNewInStoreOrder(db, order);
+                if (invErrMem is not null)
+                    return (false, invErrMem);
+                db.SaveChanges();
+                return (true, null);
+            }
+
+            using var tx = db.Database.BeginTransaction();
+            try
+            {
+                db.Orders.Add(order);
+                table.Status = "Occupied";
+                DataReconciler.ReconcileTableStatusesWithOrders(db);
+                var invErr = InStoreOrderPlacement.TryPlaceNewInStoreOrder(db, order);
+                if (invErr is not null)
+                {
+                    tx.Rollback();
+                    return (false, invErr);
+                }
+
+                db.SaveChanges();
+                tx.Commit();
+                return (true, null);
+            }
+            catch
+            {
+                tx.Rollback();
+                throw;
+            }
+        });
+
+        if (!placementOutcome.Ok)
+            return BadRequest(new { message = placementOutcome.Error });
+
         new ClientAccountService(db).TryLinkNewOrder(order.Id, request.RestaurantClientId);
 
-        await OrderHubBroadcasts.NotifyCashierOrderBoardChangedAsync(
+        await OrderHubBroadcasts.NotifyKitchenQueueChangedAsync(
             orderHub, db, order.Id, "server-order-submitted");
 
         return Ok(new ServerCreateOrderResponse(
             Mode: "Create",
             OrderId: order.UniqueId,
             LinesAdded: newItems.Count,
-            Message: $"Order {order.UniqueId} sent to cashier.",
+            Message: $"Order {order.UniqueId} sent to kitchen.",
             CreatedAtUtc: DateTime.UtcNow));
     }
 
@@ -956,20 +1012,6 @@ public sealed class ServerPortalController(
 
         var bytes = System.IO.File.ReadAllBytes(absolutePath);
         return File(bytes, contentType);
-    }
-
-    private static List<(int ProductId, int Quantity)> MergeOrderItemsWithNewLines(
-        ICollection<OrderItem> existing,
-        IReadOnlyList<ServerOrderLineRequest> additional)
-    {
-        var map = existing.GroupBy(i => i.ProductId).ToDictionary(g => g.Key, g => g.Sum(i => i.Quantity));
-        foreach (var l in additional)
-        {
-            if (!map.TryAdd(l.ProductId, l.Quantity))
-                map[l.ProductId] += l.Quantity;
-        }
-
-        return map.Select(kv => (kv.Key, kv.Value)).ToList();
     }
 
     private static string? ResolveGuestCustomerName(OrderRecord order)
@@ -1306,5 +1348,8 @@ public sealed class ServerPortalController(
         var cloud = menuSettings.GetDefault();
         return MenuTaxonomyHelper.ResolveEffective(cloud?.MenuTaxonomyJson, SettingsManager.Load().MenuTaxonomy);
     }
+
+    private static bool IsInMemoryDatabase(AppDbContext context) =>
+        context.Database.ProviderName?.Contains("InMemory", StringComparison.OrdinalIgnoreCase) == true;
 
 }

@@ -6,11 +6,13 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
+using EliteRestaurant.Core.Employees;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Utils;
 using EliteRestaurantPro.ApiClients;
 using EliteRestaurantPro.Localization;
 using EliteRestaurantPro.Services;
+using EliteRestaurantPro.Views;
 using Microsoft.Win32;
 
 namespace EliteRestaurantPro.ViewModels;
@@ -29,7 +31,7 @@ public class EmployeesViewModel : AdminBaseViewModel
     private readonly AdminDataApiClient _data = new();
     private const string PendingSalaryReferencePrefix = "Pending salary accrual:";
     private static readonly string[] RoleCanonical =
-        ["Admin", "Manager", "Cashier", "Server", "Chef", "Barman", "Sous Chef", "Front desk"];
+        ["Admin", "Manager", "Cashier", "Server", "Chef", "Barman", "Sous Chef", "Front desk", "Other"];
     private static readonly string[] EmploymentCanonical = ["Active", "On Leave", "Inactive"];
     private static readonly string[] ShiftCanonical = ["Off", "Morning Shift", "Night Shift", "Full Day"];
     private int? _editingEmployeeId;
@@ -37,6 +39,7 @@ public class EmployeesViewModel : AdminBaseViewModel
     private string _dialogTitle = "Add New Employee";
     private string _employeeName = string.Empty;
     private string _selectedRole = "Admin";
+    private string _customRoleTitle = string.Empty;
     private string _pinCode = string.Empty;
     private string _signInId = string.Empty;
     private string _phoneNumber = string.Empty;
@@ -82,6 +85,8 @@ public class EmployeesViewModel : AdminBaseViewModel
 
     public string EmpEmployeeNameLabel => Loc.Admin("empFieldEmployeeName", "EMPLOYEE NAME");
     public string EmpRoleLabel => Loc.Admin("empFieldRole", "ROLE");
+    public string EmpCustomRoleTitleLabel => Loc.Admin("empFieldCustomRoleTitle", "JOB TITLE");
+    public string EmpCustomRoleTitleHint => Loc.Admin("empFieldCustomRoleTitleHint", "e.g. Janitor, Security, Maintenance");
     public string EmpSignInIdLabel => Loc.Admin("empSignInIdLabel", "Sign-in ID");
     public string EmpSignInIdHint => Loc.Admin("empFieldSignInIdHint", "(required for floor + kitchen tablets)");
     public string EmpSignInIdTooltip => Loc.Admin("empFieldSignInIdTooltip", "Short ID for tablet login with PIN (letters, numbers, - or _). Not the long system Unique ID.");
@@ -160,8 +165,22 @@ public class EmployeesViewModel : AdminBaseViewModel
                 return;
             _selectedRole = value.Value;
             OnPropertyChanged(nameof(SelectedRole));
+            OnPropertyChanged(nameof(IsOtherRoleSelected));
+            OnPropertyChanged(nameof(IsPortalLoginVisible));
         }
     }
+
+    public string CustomRoleTitle
+    {
+        get => _customRoleTitle;
+        set => SetField(ref _customRoleTitle, value);
+    }
+
+    public bool IsOtherRoleSelected =>
+        EmployeeRoleHelper.IsOtherRole(SelectedRole);
+
+    public bool IsPortalLoginVisible =>
+        EmployeeRoleHelper.AllowsPortalCredentials(SelectedRole);
 
     public string SelectedRole
     {
@@ -171,6 +190,8 @@ public class EmployeesViewModel : AdminBaseViewModel
             if (!SetField(ref _selectedRole, value))
                 return;
             SyncSelectOption(ref _selectedRoleOption, RoleOptions, value, nameof(SelectedRoleOption));
+            OnPropertyChanged(nameof(IsOtherRoleSelected));
+            OnPropertyChanged(nameof(IsPortalLoginVisible));
         }
     }
 
@@ -599,6 +620,7 @@ public class EmployeesViewModel : AdminBaseViewModel
 
         return Hit(e.Name)
                || Hit(e.Role)
+               || Hit(e.CustomRoleTitle)
                || Hit(e.SignInId)
                || Hit(e.EmploymentStatus)
                || Hit(e.UniqueId)
@@ -626,6 +648,7 @@ public class EmployeesViewModel : AdminBaseViewModel
         FridayShift = "Off";
         SaturdayShift = "Off";
         SundayShift = "Off";
+        CustomRoleTitle = string.Empty;
         PinStoredOnAccount = false;
         IsDialogOpen = true;
     }
@@ -638,6 +661,7 @@ public class EmployeesViewModel : AdminBaseViewModel
         DialogTitle = Loc.Admin("empEditDialog", "Edit Employee");
         EmployeeName = employee.Name;
         SelectedRole = employee.Role;
+        CustomRoleTitle = employee.CustomRoleTitle ?? string.Empty;
         PinCode = string.Empty;
         SignInId = employee.SignInId;
         PhoneNumber = employee.PhoneNumber;
@@ -668,6 +692,7 @@ public class EmployeesViewModel : AdminBaseViewModel
         var normalizedStatus = SelectedEmploymentStatus.Trim();
         var normalizedImage = ProfileImagePath.Trim();
         var normalizedNotes = EmployeeNotes.Trim();
+        var normalizedCustomRoleTitle = CustomRoleTitle.Trim();
         var mondayShift = MondayShift.Trim();
         var tuesdayShift = TuesdayShift.Trim();
         var wednesdayShift = WednesdayShift.Trim();
@@ -676,7 +701,8 @@ public class EmployeesViewModel : AdminBaseViewModel
         var saturdayShift = SaturdayShift.Trim();
         var sundayShift = SundayShift.Trim();
 
-        var pinRequired = !_editingEmployeeId.HasValue;
+        var isOtherRole = EmployeeRoleHelper.IsOtherRole(normalizedRole);
+        var pinRequired = !_editingEmployeeId.HasValue && !isOtherRole;
         if (string.IsNullOrWhiteSpace(normalizedName) ||
             string.IsNullOrWhiteSpace(normalizedRole) ||
             (pinRequired && string.IsNullOrWhiteSpace(normalizedPin)) ||
@@ -685,9 +711,19 @@ public class EmployeesViewModel : AdminBaseViewModel
         {
             MessageBox.Show(
                 pinRequired
-                    ? "Name, role, PIN, join date, and status are required."
-                    : "Name, role, join date, and status are required. Enter a new PIN only if you want to change it.",
-                "Validation",
+                    ? Loc.Admin("empValidationRequiredWithPin", "Name, role, PIN, join date, and status are required.")
+                    : Loc.Admin("empValidationRequired", "Name, role, join date, and status are required. Enter a new PIN only if you want to change it."),
+                Loc.Admin("empValidationTitle", "Validation"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        if (isOtherRole && string.IsNullOrWhiteSpace(normalizedCustomRoleTitle))
+        {
+            MessageBox.Show(
+                Loc.Admin("empValidationCustomRoleTitle", "Enter a job title for the Other role (e.g. Janitor, Security)."),
+                Loc.Admin("empValidationTitle", "Validation"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
             return;
@@ -711,13 +747,7 @@ public class EmployeesViewModel : AdminBaseViewModel
             return;
         }
 
-        var isStaffPortalRole = normalizedRole.Equals("Server", StringComparison.OrdinalIgnoreCase)
-                                || normalizedRole.Equals("Cashier", StringComparison.OrdinalIgnoreCase)
-                                || normalizedRole.Equals("Front desk", StringComparison.OrdinalIgnoreCase)
-                                || normalizedRole.Equals("Chef", StringComparison.OrdinalIgnoreCase)
-                                || normalizedRole.Equals("Barman", StringComparison.OrdinalIgnoreCase)
-                                || normalizedRole.Equals("Bartender", StringComparison.OrdinalIgnoreCase)
-                                || normalizedRole.Equals("Sous Chef", StringComparison.OrdinalIgnoreCase);
+        var isStaffPortalRole = EmployeeRoleHelper.RequiresTabletPortalSignInId(normalizedRole);
         if (isStaffPortalRole && string.IsNullOrWhiteSpace(normalizedSignIn))
         {
             MessageBox.Show(
@@ -756,6 +786,21 @@ public class EmployeesViewModel : AdminBaseViewModel
         }
 
         var allEmployees = await _data.GetEmployeesAsync().ConfigureAwait(true);
+
+        if (_editingEmployeeId is int editingId && !isOtherRole && string.IsNullOrWhiteSpace(normalizedPin))
+        {
+            var existingForPin = allEmployees.FirstOrDefault(e => e.Id == editingId);
+            if (existingForPin is not null && string.IsNullOrWhiteSpace(existingForPin.PinCode))
+            {
+                MessageBox.Show(
+                    Loc.Admin("empValidationPinRequiredForRole", "Enter a PIN for this role. Staff in the Other role have no sign-in PIN until you assign a portal or admin role."),
+                    Loc.Admin("empValidationTitle", "Validation"),
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+        }
+
         if (!string.IsNullOrWhiteSpace(normalizedPin))
         {
             var duplicatePinExists = allEmployees
@@ -812,10 +857,13 @@ public class EmployeesViewModel : AdminBaseViewModel
                     UniqueId = shell.UniqueId,
                     Name = normalizedName,
                     Role = normalizedRole,
-                    PinCode = !string.IsNullOrWhiteSpace(normalizedPin)
-                        ? EmployeePinHasher.HashForStorage(normalizedPin)
-                        : shell.PinCode,
-                    SignInId = isStaffPortalRole ? normalizedSignIn : string.Empty,
+                    CustomRoleTitle = isOtherRole ? normalizedCustomRoleTitle : null,
+                    PinCode = isOtherRole
+                        ? string.Empty
+                        : !string.IsNullOrWhiteSpace(normalizedPin)
+                            ? EmployeePinHasher.HashForStorage(normalizedPin)
+                            : shell.PinCode,
+                    SignInId = EmployeeRoleHelper.ResolveSignInIdForSave(isOtherRole, normalizedSignIn, shell.SignInId),
                     PhoneNumber = normalizedPhone,
                     HourlyRate = 0m,
                     MonthlySalaryUSD = monthlySalaryUsd,
@@ -849,10 +897,13 @@ public class EmployeesViewModel : AdminBaseViewModel
                 var newEmployee = new Employee
                 {
                     UniqueId = UniqueIdGenerator.NewId("EMP"),
-                    SignInId = isStaffPortalRole ? normalizedSignIn : string.Empty,
+                    SignInId = EmployeeRoleHelper.ResolveSignInIdForSave(isOtherRole, normalizedSignIn, null),
                     Name = normalizedName,
                     Role = normalizedRole,
-                    PinCode = EmployeePinHasher.HashForStorage(normalizedPin),
+                    CustomRoleTitle = isOtherRole ? normalizedCustomRoleTitle : null,
+                    PinCode = isOtherRole
+                        ? string.Empty
+                        : EmployeePinHasher.HashForStorage(normalizedPin),
                     PhoneNumber = normalizedPhone,
                     HourlyRate = 0m,
                     MonthlySalaryUSD = monthlySalaryUsd,
@@ -890,26 +941,118 @@ public class EmployeesViewModel : AdminBaseViewModel
     {
         if (employee is null) return;
 
-        var confirmDelete = MessageBox.Show(
-            $"Delete employee '{employee.Name}'?",
-            "Confirm Delete Employee",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning);
-
-        if (confirmDelete != MessageBoxResult.Yes)
+        if (employee.Role.Equals("AdminWeb", StringComparison.OrdinalIgnoreCase))
+        {
+            MessageBox.Show(
+                Loc.Admin("empDeleteAdminWebBlocked", "The read-only admin web account cannot be deleted here. Change it in Appearance settings."),
+                Loc.Admin("empDeleteTitle", "Delete employee"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
             return;
+        }
+
+        var owner = Application.Current.MainWindow;
+        var passcode = EmployeeDeletePasscodeDialog.Prompt(
+            owner,
+            Loc.Admin("empDeletePasscodeTitle", "Employee delete passcode"),
+            Loc.Admin("empDeletePasscodeBody", "Enter the employee delete passcode to remove {{name}}.", new Dictionary<string, string> { ["name"] = employee.Name }),
+            Loc.Admin("empDeleteConfirm", "Delete employee"),
+            Loc.Common("back", "Back"),
+            Loc.Admin("empDeletePasscodeEmpty", "Enter the employee delete passcode."));
+
+        if (passcode is null)
+            return;
+
+        var configuredPasscode = SettingsManager.Load().BusinessProfile.EmployeeDeletePasscode.Trim();
+        if (string.IsNullOrEmpty(configuredPasscode))
+        {
+            MessageBox.Show(
+                Loc.Admin("empDeletePasscodeNotConfigured", "Employee delete passcode is not configured. Set it in Appearance → Business profile, then push to cloud."),
+                Loc.Admin("empDeleteTitle", "Delete employee"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        if (!string.Equals(passcode.Trim(), configuredPasscode, StringComparison.Ordinal))
+        {
+            MessageBox.Show(
+                Loc.Admin("empDeletePasscodeWrong", "Incorrect employee delete passcode."),
+                Loc.Admin("empDeleteTitle", "Delete employee"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        string? confirmSignInId = null;
+        string? confirmPin = null;
+
+        if (EmployeeDeleteVerification.IsAdminDesktopRole(employee.Role))
+        {
+            var isAdmin = employee.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase);
+            var warning = isAdmin
+                ? Loc.Admin("empDeleteAdminWarning", "Deleting this Admin account may lock you out of Elite Pro if no other Admin or Manager remains. This cannot be undone.")
+                : Loc.Admin("empDeleteManagerWarning", "Deleting this Manager removes Elite Pro admin access for this person. This cannot be undone.");
+
+            if (!EmployeeDeleteAdminWarningDialog.Confirm(
+                    owner,
+                    Loc.Admin("empDeleteTitle", "Delete employee"),
+                    warning,
+                    Loc.Admin("empDeleteAnyway", "Delete anyway"),
+                    Loc.Common("back", "Back")))
+            {
+                return;
+            }
+
+            while (true)
+            {
+                (confirmSignInId, confirmPin) = EmployeeDeleteCredentialsDialog.Prompt(
+                    owner,
+                    Loc.Admin("empDeleteCredentialsTitle", "Confirm admin credentials"),
+                    Loc.Admin("empDeleteCredentialsBody", "Enter the sign-in ID and PIN for {{name}} to confirm deletion.", new Dictionary<string, string> { ["name"] = employee.Name }),
+                    Loc.Admin("proAdminIdLabel", "ADMIN ID"),
+                    Loc.Admin("proPasswordLabel", "PASSWORD"),
+                    Loc.Admin("empDeleteConfirm", "Delete employee"),
+                    Loc.Common("back", "Back"),
+                    Loc.Admin("empDeleteCredentialsEmpty", "Enter sign-in ID and PIN."));
+
+                if (confirmSignInId is null || confirmPin is null)
+                    return;
+
+                if (EmployeeDeleteVerification.CredentialsMatchEmployee(employee, confirmSignInId, confirmPin))
+                    break;
+
+                MessageBox.Show(
+                    Loc.Admin("empDeleteCredentialsWrong", "Sign-in ID or PIN does not match this employee."),
+                    Loc.Admin("empDeleteTitle", "Delete employee"),
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+        }
 
         try
         {
-            var toDelete = new Employee { Id = employee.Id, UniqueId = employee.UniqueId };
-            DesktopCloudPersistence.PushDeleteBlocking(toDelete);
+            DesktopCloudPersistence.PushEmployeeDeleteBlocking(
+                employee,
+                passcode,
+                confirmSignInId,
+                confirmPin);
             _ = LoadEmployeesAsync();
         }
         catch (Exception ex)
         {
+            var message = ex.GetBaseException().Message ?? string.Empty;
+            if (message.Contains("employee delete passcode", StringComparison.OrdinalIgnoreCase)
+                || message.Contains("passcode is not configured", StringComparison.OrdinalIgnoreCase))
+            {
+                message = Loc.Admin(
+                    "empDeletePasscodeCloudMismatch",
+                    "Delete was rejected by the cloud API. Save Appearance → Business profile (employee delete passcode) and push to cloud, then try again.");
+            }
+
             MessageBox.Show(
-                ex.GetBaseException().Message,
-                "Delete employee failed",
+                message,
+                Loc.Admin("empDeleteFailed", "Delete employee failed"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning);
         }

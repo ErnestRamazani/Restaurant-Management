@@ -22,6 +22,9 @@ public sealed class UiLanguageOption
 {
     public string Code { get; init; } = "fr";
     public string DisplayName { get; init; } = string.Empty;
+
+    /// <summary>EliteComboBox closed state uses <see cref="object.ToString"/> instead of DisplayMemberPath.</summary>
+    public override string ToString() => DisplayName;
 }
 
 public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
@@ -83,6 +86,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     private string _customerMenuNotesText = string.Empty;
     private string _staffLoginPasscode = string.Empty;
     private string _orderCancelPasscode = string.Empty;
+    private string _employeeDeletePasscode = string.Empty;
     private string _adminWebSignInId = string.Empty;
     private string _adminWebPin = string.Empty;
     private string _onlinePromoTitle = string.Empty;
@@ -148,6 +152,8 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     public string SetStaffLoginPasscodeHint => Loc.Admin("setStaffLoginPasscodeHint", "Customers see the menu first. Staff must enter this code before the workplace chooser opens.");
     public string SetOrderCancelPasscodeLabel => Loc.Admin("setOrderCancelPasscode", "Order cancel passcode");
     public string SetOrderCancelPasscodeHint => Loc.Admin("setOrderCancelPasscodeHint", "Required when any staff member cancels an order from cashier, kitchen, bar, server, or desktop admin.");
+    public string SetEmployeeDeletePasscodeLabel => Loc.Admin("setEmployeeDeletePasscode", "Employee delete passcode");
+    public string SetEmployeeDeletePasscodeHint => Loc.Admin("setEmployeeDeletePasscodeHint", "Required before deleting any employee from the Employees screen.");
     public string SetAdminWebPortalLabel => Loc.Admin("setAdminWebPortal", "Admin web portal");
     public string SetAdminWebPortalHint => Loc.Admin("setAdminWebPortalHint", "Read-only owner dashboard at /admin/ on your API host. Sign-in ID and PIN are pushed to the cloud and synced to the AdminWeb employee.");
     public string SetSignInIdLabel => Loc.Admin("setSignInId", "Sign-in ID");
@@ -586,6 +592,12 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         set => SetField(ref _orderCancelPasscode, value);
     }
 
+    public string EmployeeDeletePasscode
+    {
+        get => _employeeDeletePasscode;
+        set => SetField(ref _employeeDeletePasscode, value);
+    }
+
     public string AdminWebSignInId
     {
         get => _adminWebSignInId;
@@ -1010,6 +1022,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
             nameof(SetPromoHeroImageLabel), nameof(SetOnlineOrdersTableIdLabel), nameof(SetOnlineOrdersTableIdHint),
             nameof(SetStaffLoginPasscodeLabel), nameof(SetStaffLoginPasscodeHint),
             nameof(SetOrderCancelPasscodeLabel), nameof(SetOrderCancelPasscodeHint),
+            nameof(SetEmployeeDeletePasscodeLabel), nameof(SetEmployeeDeletePasscodeHint),
             nameof(SetAdminWebPortalLabel), nameof(SetAdminWebPortalHint),
             nameof(SetSignInIdLabel), nameof(SetPinLabel), nameof(SetSaveBusinessProfileLabel),
             nameof(SetBrowseLabel), nameof(SetClearLabel), nameof(SetRefreshLabel),
@@ -1231,6 +1244,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         CustomerMenuNotesText = business.CustomerMenuNotesText ?? string.Empty;
         StaffLoginPasscode = business.StaffLoginPasscode?.Trim() ?? string.Empty;
         OrderCancelPasscode = business.OrderCancelPasscode?.Trim() ?? string.Empty;
+        EmployeeDeletePasscode = business.EmployeeDeletePasscode?.Trim() ?? string.Empty;
         AdminWebSignInId = business.AdminWebSignInId?.Trim() ?? string.Empty;
         AdminWebPin = business.AdminWebPin?.Trim() ?? string.Empty;
         OnlinePromoTitle = business.OnlinePromoTitle ?? string.Empty;
@@ -1621,6 +1635,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
             : CustomerMenuNotesText.Trim();
         _settings.BusinessProfile.StaffLoginPasscode = (StaffLoginPasscode ?? string.Empty).Trim();
         _settings.BusinessProfile.OrderCancelPasscode = (OrderCancelPasscode ?? string.Empty).Trim();
+        _settings.BusinessProfile.EmployeeDeletePasscode = (EmployeeDeletePasscode ?? string.Empty).Trim();
         _settings.BusinessProfile.AdminWebSignInId = (AdminWebSignInId ?? string.Empty).Trim();
         _settings.BusinessProfile.AdminWebPin = (AdminWebPin ?? string.Empty).Trim();
         _settings.BusinessProfile.OnlinePromoTitle = string.IsNullOrWhiteSpace(OnlinePromoTitle)

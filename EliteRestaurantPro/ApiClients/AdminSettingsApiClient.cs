@@ -35,6 +35,7 @@ public sealed class AdminSettingsApiClient(EliteApiClient? apiClient = null)
             settings.BusinessProfile.CustomerMenuTagline,
             settings.BusinessProfile.StaffLoginPasscode,
             settings.BusinessProfile.OrderCancelPasscode,
+            settings.BusinessProfile.EmployeeDeletePasscode,
             settings.BusinessProfile.AdminWebSignInId,
             settings.BusinessProfile.AdminWebPin,
             settings.BusinessProfile.TicketFooterText,

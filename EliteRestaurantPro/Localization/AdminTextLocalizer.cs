@@ -114,7 +114,8 @@ public static class AdminTextLocalizer
         ["Barman"] = "barman",
         ["Bartender"] = "bartender",
         ["Sous Chef"] = "sous_chef",
-        ["Front desk"] = "front_desk"
+        ["Front desk"] = "front_desk",
+        ["Other"] = "other"
     };
 
     public static string TranslateRole(string? role)

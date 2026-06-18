@@ -31,6 +31,9 @@ public sealed class PublicMenuSetting : IRestaurantScoped
     /// <summary>Admin passcode required to cancel orders from staff portals and desktop.</summary>
     public string OrderCancelPasscode { get; set; } = string.Empty;
 
+    /// <summary>Passcode required before deleting any employee from desktop admin.</summary>
+    public string EmployeeDeletePasscode { get; set; } = string.Empty;
+
     /// <summary>Sign-in ID for the read-only admin web portal (<c>/admin/</c>).</summary>
     public string AdminWebSignInId { get; set; } = string.Empty;
 

@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Input;
 using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Orders;
 using EliteRestaurant.Core.Utils;
 using EliteRestaurantPro.ApiClients;
 using EliteRestaurant.Contracts.Clients;
@@ -688,8 +689,8 @@ public sealed class CreateOrderViewModel : AdminBaseViewModel
                 if (IsTabletStaffOrderFlow)
                 {
                     OrderStatuses.Clear();
-                    OrderStatuses.Add(OrderWorkflow.PendingCashier);
-                    SelectedOrderStatus = OrderWorkflow.PendingCashier;
+                    OrderStatuses.Add(InStoreOrderPlacement.KitchenWaitingStatus);
+                    SelectedOrderStatus = InStoreOrderPlacement.KitchenWaitingStatus;
                 }
                 else if (!OrderStatuses.Contains(SelectedOrderStatus))
                 {

@@ -5,9 +5,11 @@ namespace EliteRestaurant.Core.Utils;
 
 public static class OrderWorkflow
 {
-    public const string PendingCashier = "Pending cashier";
     /// <summary>Online-submitted orders await cashier approval before inventory deduction and kitchen queue.</summary>
     public const string PendingApproval = "Pending approval";
+
+    /// <summary>Legacy dine-in gate (migrated to kitchen on startup). Online orders use <see cref="PendingApproval"/>.</summary>
+    public const string PendingCashier = "Pending cashier";
 
     public static bool IsPendingCashier(string? status)
     {

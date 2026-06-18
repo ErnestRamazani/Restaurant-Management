@@ -1,4 +1,6 @@
 using System.Text.Json;
+using EliteRestaurant.Core.Employees;
+using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Sync;
 using EliteRestaurantPro.ApiClients;
 
@@ -56,6 +58,32 @@ public static class DesktopCloudPersistence
     /// <summary>Blocking delete from synchronous UI handlers.</summary>
     public static void PushDeleteBlocking(object entity) =>
         Task.Run(async () => await PushDeleteAsync(entity).ConfigureAwait(false)).GetAwaiter().GetResult();
+
+    /// <summary>Blocking employee delete with passcode verification payload.</summary>
+    public static void PushEmployeeDeleteBlocking(
+        Employee employee,
+        string employeeDeletePasscode,
+        string? confirmSignInId,
+        string? confirmPin) =>
+        Task.Run(async () => await PushEmployeeDeleteAsync(
+            employee, employeeDeletePasscode, confirmSignInId, confirmPin).ConfigureAwait(false)).GetAwaiter().GetResult();
+
+    public static async Task PushEmployeeDeleteAsync(
+        Employee employee,
+        string employeeDeletePasscode,
+        string? confirmSignInId,
+        string? confirmPin,
+        CancellationToken cancellationToken = default)
+    {
+        var request = new EmployeeDeleteRequest
+        {
+            Employee = new Employee { Id = employee.Id, UniqueId = employee.UniqueId },
+            EmployeeDeletePasscode = employeeDeletePasscode,
+            ConfirmSignInId = confirmSignInId,
+            ConfirmPin = confirmPin
+        };
+        await PushAsync(nameof(Employee), "Delete", request, cancellationToken).ConfigureAwait(false);
+    }
 
     /// <summary>Blocking batch from synchronous UI handlers.</summary>
     public static void PushBatchBlocking(IReadOnlyList<CloudSyncOperation> operations) =>

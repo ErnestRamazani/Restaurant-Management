@@ -108,7 +108,11 @@ public static class OrderHubBroadcasts
             "online-order-submitted" => OrderWorkflow.IsPendingApproval(order.Status)
                 ? "pending-approval"
                 : "pending-cashier",
-            "server-order-submitted" or "admin-order-submitted" => "pending-cashier",
+            "server-order-submitted" or "admin-order-submitted" =>
+                OrderWorkflow.IsPendingApproval(order.Status)
+                    ? "pending-approval"
+                    : "released-to-kitchen",
+            "server-order-appended" or "admin-order-appended" => "released-to-kitchen",
             "released-to-kitchen" => "released-to-kitchen",
             "pending-cancelled" or "order-cancelled" => "order-cancelled",
             "order-completed" => "status-completed",
@@ -232,7 +236,9 @@ public static class OrderHubBroadcasts
 
         var stage = reason switch
         {
-            "cashier-release" or "release-pending" or "release-to-kitchen" or "hub-start-preparation" =>
+            "cashier-release" or "release-pending" or "release-to-kitchen" or "hub-start-preparation"
+                or "server-order-submitted" or "admin-order-submitted"
+                or "server-order-appended" or "admin-order-appended" or "order-placed" =>
                 "released-to-kitchen",
             "advance" => null,
             _ => "released-to-kitchen"

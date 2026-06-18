@@ -314,10 +314,11 @@ public static class OrderInventoryDeduction
     {
         EnsureAmbientTransaction(db);
 
-        if (additionalItems.Count == 0)
+        var pendingItems = additionalItems.Where(i => !i.InventoryDeductedAt.HasValue).ToList();
+        if (pendingItems.Count == 0)
             return null;
 
-        var selectedLines = additionalItems
+        var selectedLines = pendingItems
             .GroupBy(i => i.ProductId)
             .Select(g => (ProductId: g.Key, Quantity: g.Sum(i => i.Quantity)))
             .ToList();
@@ -424,7 +425,7 @@ public static class OrderInventoryDeduction
         }
 
         var deductedAt = DateTime.UtcNow;
-        foreach (var item in additionalItems)
+        foreach (var item in pendingItems)
             item.InventoryDeductedAt = deductedAt;
 
         return null;

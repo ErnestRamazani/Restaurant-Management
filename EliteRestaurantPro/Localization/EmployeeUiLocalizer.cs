@@ -1,4 +1,5 @@
 using System.Globalization;
+using EliteRestaurant.Core.Employees;
 using EliteRestaurant.Core.Models;
 
 namespace EliteRestaurantPro.Localization;
@@ -7,7 +8,11 @@ public static class EmployeeUiLocalizer
 {
     public static void Apply(Employee employee)
     {
-        employee.DisplayRole = AdminTextLocalizer.TranslateRole(employee.Role);
+        employee.CanDeleteFromEmployeesScreen = !employee.Role.Equals("AdminWeb", StringComparison.OrdinalIgnoreCase);
+        employee.DisplayRole = EmployeeRoleHelper.IsOtherRole(employee.Role)
+                               && !string.IsNullOrWhiteSpace(employee.CustomRoleTitle)
+            ? employee.CustomRoleTitle.Trim()
+            : AdminTextLocalizer.TranslateRole(employee.Role);
         employee.DisplayEmploymentStatus = AdminTextLocalizer.TranslateEmploymentStatus(employee.EmploymentStatus);
         employee.DisplayAttendanceStatus = employee.CanClockOut
             ? Loc.Admin("staffStatusActive", "Active")

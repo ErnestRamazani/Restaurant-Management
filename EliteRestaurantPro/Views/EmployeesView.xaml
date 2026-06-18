@@ -333,8 +333,18 @@
                                                         Width="120"
                                                         Content="{Binding DataContext.DeleteLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                         Command="{Binding DataContext.DeleteEmployeeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                        CommandParameter="{Binding}"
-                                                        Style="{StaticResource DangerButton}"/>
+                                                        CommandParameter="{Binding}">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button" BasedOn="{StaticResource DangerButton}">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding CanDeleteFromEmployeesScreen}" Value="False">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
                                             </Grid>
                                         </StackPanel>
                                     </Grid>
@@ -380,6 +390,16 @@
                                           Style="{StaticResource EliteComboBox}"
                                           ItemContainerStyle="{StaticResource ComboBoxItemStyle}"/>
 
+                                <StackPanel Visibility="{Binding IsOtherRoleSelected, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <TextBlock Style="{StaticResource HeadingSmall}" Margin="0,18,0,8">
+                                        <Run Text="{Binding EmpCustomRoleTitleLabel, Mode=OneWay}"/>
+                                        <Run Text="{Binding EmpCustomRoleTitleHint, Mode=OneWay}" Foreground="{StaticResource TextMutedBrush}" FontSize="10"/>
+                                    </TextBlock>
+                                    <TextBox Text="{Binding CustomRoleTitle, UpdateSourceTrigger=PropertyChanged}"
+                                             Style="{StaticResource EliteTextBox}"/>
+                                </StackPanel>
+
+                                <StackPanel Visibility="{Binding IsPortalLoginVisible, Converter={StaticResource BoolToVisibilityConverter}}">
                                 <TextBlock Style="{StaticResource HeadingSmall}" Margin="0,18,0,8">
                                     <Run Text="{Binding EmpSignInIdLabel, Mode=OneWay}"/>
                                     <Run Text="{Binding EmpSignInIdHint, Mode=OneWay}" Foreground="{StaticResource TextMutedBrush}" FontSize="10"/>
@@ -403,6 +423,7 @@
                                              BorderBrush="#55D4AF37"
                                              Foreground="{StaticResource TextPrimaryBrush}"
                                              CaretBrush="{StaticResource GoldAccentBrush}"/>
+                                </StackPanel>
 
                                 <TextBlock Text="{Binding EmpPhoneNumberLabel}" Style="{StaticResource HeadingSmall}" Margin="0,18,0,8"/>
                                 <TextBox Text="{Binding PhoneNumber, UpdateSourceTrigger=PropertyChanged}"

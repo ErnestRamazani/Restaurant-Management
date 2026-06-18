@@ -46,6 +46,7 @@ public sealed class AdminSettingsController(
             : request.CustomerMenuNotesText.Trim();
         row.StaffLoginPasscode = (request.StaffLoginPasscode ?? string.Empty).Trim();
         row.OrderCancelPasscode = (request.OrderCancelPasscode ?? string.Empty).Trim();
+        row.EmployeeDeletePasscode = (request.EmployeeDeletePasscode ?? string.Empty).Trim();
         row.ClientDebtCapUsd = request.ClientDebtCapUsd > 0 ? request.ClientDebtCapUsd : 250m;
         row.AdminWebSignInId = (request.AdminWebSignInId ?? string.Empty).Trim();
         row.AdminWebPin = (request.AdminWebPin ?? string.Empty).Trim();
@@ -108,6 +109,7 @@ public sealed class AdminSettingsController(
         settings.BusinessProfile.CustomerMenuNotesText = row.CustomerMenuNotesText;
         settings.BusinessProfile.StaffLoginPasscode = row.StaffLoginPasscode;
         settings.BusinessProfile.OrderCancelPasscode = row.OrderCancelPasscode;
+        settings.BusinessProfile.EmployeeDeletePasscode = row.EmployeeDeletePasscode;
         settings.BusinessProfile.ClientDebtCapUsd = row.ClientDebtCapUsd;
         settings.BusinessProfile.AdminWebSignInId = row.AdminWebSignInId;
         settings.BusinessProfile.AdminWebPin = row.AdminWebPin;

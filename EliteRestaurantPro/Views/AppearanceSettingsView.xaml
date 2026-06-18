@@ -219,6 +219,14 @@
                             </StackPanel>
 
                             <StackPanel Margin="0,10,0,0">
+                                <TextBlock Text="{Binding SetEmployeeDeletePasscodeLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
+                                <TextBlock Text="{Binding SetEmployeeDeletePasscodeHint, Mode=OneWay}"
+                                           Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                <TextBox Text="{Binding EmployeeDeletePasscode, UpdateSourceTrigger=PropertyChanged}"
+                                         Style="{StaticResource EliteTextBox}"/>
+                            </StackPanel>
+
+                            <StackPanel Margin="0,10,0,0">
                                 <TextBlock Text="{Binding SetAdminWebPortalLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
                                 <TextBlock Text="{Binding SetAdminWebPortalHint, Mode=OneWay}"
                                            Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,0,0,6"/>

@@ -84,7 +84,7 @@ public static class AdminOrdersSnapshotLoader
             .ToList();
 
         var pendingOrders = orders
-            .Where(o => OrderWorkflow.AwaitsCashierOrApprovalBeforeKitchen(o.Status))
+            .Where(o => OrderWorkflow.IsPendingApproval(o.Status) || OrderWorkflow.IsPendingCashier(o.Status))
             .OrderByDescending(o => o.CreatedAt)
             .ToList();
 

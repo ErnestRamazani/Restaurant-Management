@@ -3,6 +3,7 @@ using System.Text.Json;
 using EliteRestaurant.Contracts.Admin;
 using EliteRestaurant.Core.Clients;
 using EliteRestaurant.Core.Data;
+using EliteRestaurant.Core.Employees;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Reservations;
 using Microsoft.AspNetCore.Authorization;
@@ -67,19 +68,42 @@ public sealed class AdminSyncController(AppDbContext db, ClientAccountService cl
 
                 if (operation.Operation.Equals("Delete", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (isTable)
+                    if (string.Equals(operation.EntityName, nameof(Employee), StringComparison.OrdinalIgnoreCase))
                     {
-                        var incoming = operation.Payload.Deserialize(typeof(Table), JsonOptions) as Table;
-                        var existingTable = await FindExistingAsync(typeof(Table), incoming!, cancellationToken) as Table;
-                        if (existingTable is not null)
-                            await PlacementUnitProvisioner.RemoveForTableAsync(db, existingTable.Id, cancellationToken);
-                    }
+                        var deleteRequest = operation.Payload.Deserialize<EmployeeDeleteRequest>(JsonOptions)
+                                            ?? throw new InvalidOperationException("Payload could not be read.");
+                        var deleteErr = await EmployeeDeleteVerification.ValidateAsync(db, deleteRequest, cancellationToken);
+                        if (deleteErr is not null)
+                            throw new InvalidOperationException(deleteErr);
 
-                    await DeleteAsync(entityType, operation.Payload, cancellationToken);
+                        await DeleteAsync(entityType, deleteRequest.Employee, cancellationToken);
+                    }
+                    else
+                    {
+                        if (isTable)
+                        {
+                            var incoming = operation.Payload.Deserialize(typeof(Table), JsonOptions) as Table;
+                            var existingTable = await FindExistingAsync(typeof(Table), incoming!, cancellationToken) as Table;
+                            if (existingTable is not null)
+                                await PlacementUnitProvisioner.RemoveForTableAsync(db, existingTable.Id, cancellationToken);
+                        }
+
+                        await DeleteAsync(entityType, operation.Payload, cancellationToken);
+                    }
                 }
                 else
                 {
-                    await UpsertAsync(entityType, operation.Payload, cancellationToken);
+                    if (string.Equals(operation.EntityName, nameof(Employee), StringComparison.OrdinalIgnoreCase))
+                    {
+                        var incomingEmp = operation.Payload.Deserialize(typeof(Employee), JsonOptions) as Employee
+                                          ?? throw new InvalidOperationException("Payload could not be read.");
+                        NormalizeEmployeeRoleFields(incomingEmp);
+                        await UpsertAsync(entityType, incomingEmp, cancellationToken);
+                    }
+                    else
+                    {
+                        await UpsertAsync(entityType, operation.Payload, cancellationToken);
+                    }
                 }
 
                 db.SyncOutbox.Add(new SyncOutbox
@@ -87,7 +111,7 @@ public sealed class AdminSyncController(AppDbContext db, ClientAccountService cl
                     IdempotencyKey = operation.IdempotencyKey,
                     EntityName = operation.EntityName,
                     Operation = operation.Operation,
-                    PayloadJson = operation.Payload.GetRawText(),
+                    PayloadJson = SanitizeOutboxPayload(operation),
                     Status = "Synced",
                     Attempts = 1,
                     QueuedAtUtc = operation.QueuedAtUtc,
@@ -137,12 +161,32 @@ public sealed class AdminSyncController(AppDbContext db, ClientAccountService cl
     {
         var incoming = payload.Deserialize(entityType, JsonOptions)
                        ?? throw new InvalidOperationException("Payload could not be read.");
+        await UpsertAsync(entityType, incoming, cancellationToken);
+    }
+
+    private async Task UpsertAsync(Type entityType, object incoming, CancellationToken cancellationToken)
+    {
         var existing = await FindExistingAsync(entityType, incoming, cancellationToken);
         if (existing is null)
         {
             SetIntProperty(incoming, "Id", 0);
+            if (entityType == typeof(Employee) && incoming is Employee newEmployee)
+            {
+                var createErr = ValidateEmployeeUpsert(newEmployee, null);
+                if (createErr is not null)
+                    throw new InvalidOperationException(createErr);
+            }
+
             db.Add(incoming);
             return;
+        }
+
+        if (entityType == typeof(Employee) && incoming is Employee incomingEmployee && existing is Employee existingEmployee)
+        {
+            PreserveEmployeePinWhenUnset(incomingEmployee, existingEmployee);
+            var updateErr = ValidateEmployeeUpsert(incomingEmployee, existingEmployee);
+            if (updateErr is not null)
+                throw new InvalidOperationException(updateErr);
         }
 
         CopyWritableProperties(incoming, existing);
@@ -153,9 +197,79 @@ public sealed class AdminSyncController(AppDbContext db, ClientAccountService cl
     {
         var incoming = payload.Deserialize(entityType, JsonOptions)
                        ?? throw new InvalidOperationException("Payload could not be read.");
+        await DeleteAsync(entityType, incoming, cancellationToken);
+    }
+
+    private async Task DeleteAsync(Type entityType, object incoming, CancellationToken cancellationToken)
+    {
         var existing = await FindExistingAsync(entityType, incoming, cancellationToken);
         if (existing is not null)
             db.Remove(existing);
+    }
+
+    private static void NormalizeEmployeeRoleFields(Employee employee)
+    {
+        if (!EmployeeRoleHelper.IsOtherRole(employee.Role))
+        {
+            employee.CustomRoleTitle = null;
+            return;
+        }
+
+        employee.SignInId = string.Empty;
+        employee.PinCode = string.Empty;
+        employee.CustomRoleTitle = (employee.CustomRoleTitle ?? string.Empty).Trim();
+        if (employee.CustomRoleTitle.Length == 0)
+            employee.CustomRoleTitle = null;
+    }
+
+    private static void PreserveEmployeePinWhenUnset(Employee incoming, Employee existing)
+    {
+        if (!EmployeeRoleHelper.IsOtherRole(incoming.Role)
+            && string.IsNullOrWhiteSpace(incoming.PinCode)
+            && !string.IsNullOrWhiteSpace(existing.PinCode))
+        {
+            incoming.PinCode = existing.PinCode;
+        }
+    }
+
+    private static string? ValidateEmployeeUpsert(Employee employee, Employee? existing)
+    {
+        if (EmployeeRoleHelper.IsOtherRole(employee.Role)
+            && string.IsNullOrWhiteSpace(employee.CustomRoleTitle))
+        {
+            return "Job title is required when role is Other.";
+        }
+
+        if (!EmployeeRoleHelper.IsOtherRole(employee.Role)
+            && string.IsNullOrWhiteSpace(employee.PinCode)
+            && (existing is null || string.IsNullOrWhiteSpace(existing.PinCode)))
+        {
+            return "PIN is required for this role.";
+        }
+
+        return null;
+    }
+
+    private static string SanitizeOutboxPayload(AdminSyncOperationDto operation)
+    {
+        if (string.Equals(operation.EntityName, nameof(Employee), StringComparison.OrdinalIgnoreCase)
+            && operation.Operation.Equals("Delete", StringComparison.OrdinalIgnoreCase))
+        {
+            var deleteRequest = operation.Payload.Deserialize<EmployeeDeleteRequest>(JsonOptions);
+            if (deleteRequest is not null)
+            {
+                var redacted = new EmployeeDeleteRequest
+                {
+                    Employee = deleteRequest.Employee,
+                    EmployeeDeletePasscode = "[redacted]",
+                    ConfirmSignInId = string.IsNullOrWhiteSpace(deleteRequest.ConfirmSignInId) ? null : "[redacted]",
+                    ConfirmPin = string.IsNullOrWhiteSpace(deleteRequest.ConfirmPin) ? null : "[redacted]"
+                };
+                return JsonSerializer.Serialize(redacted, JsonOptions);
+            }
+        }
+
+        return operation.Payload.GetRawText();
     }
 
     private async Task<object?> FindExistingAsync(Type entityType, object incoming, CancellationToken cancellationToken)

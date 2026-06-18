@@ -1,3 +1,4 @@
+using EliteRestaurant.Core.Employees;
 using EliteRestaurant.Core.Models;
 using EliteRestaurant.Core.Utils;
 
@@ -61,6 +62,8 @@ public static class StaffPortalAuthentication
 
     public static string CanonicalPortalForEmployee(Employee employee)
     {
+        if (EmployeeRoleHelper.IsOtherRole(employee.Role))
+            return "None";
         if (employee.Role.Equals("AdminWeb", StringComparison.OrdinalIgnoreCase))
             return "AdminWeb";
         if (employee.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase)
@@ -84,6 +87,8 @@ public static class StaffPortalAuthentication
             return "Server";
 
         var r = role.Trim();
+        if (EmployeeRoleHelper.IsOtherRole(r))
+            return "None";
         if (r.Equals("AdminWeb", StringComparison.OrdinalIgnoreCase))
             return "AdminWeb";
         if (r.Equals("Admin", StringComparison.OrdinalIgnoreCase)
@@ -166,6 +171,9 @@ public static class StaffPortalAuthentication
     public static Employee? ResolvePortalCandidate(IReadOnlyList<Employee> pinMatchedCandidates, string normalizedPortal)
     {
         if (pinMatchedCandidates.Count == 0)
+            return null;
+
+        if (string.Equals(normalizedPortal, "None", StringComparison.OrdinalIgnoreCase))
             return null;
 
         if (string.Equals(normalizedPortal, "Admin", StringComparison.OrdinalIgnoreCase))

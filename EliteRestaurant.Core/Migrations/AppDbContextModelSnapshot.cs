@@ -156,6 +156,10 @@ namespace EliteRestaurant.Core.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("CustomRoleTitle")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<string>("EmploymentStatus")
                         .IsRequired()
                         .HasColumnType("text");
@@ -872,6 +876,10 @@ namespace EliteRestaurant.Core.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("OrderCancelPasscode")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("EmployeeDeletePasscode")
                         .IsRequired()
                         .HasColumnType("text");
 

@@ -54,12 +54,12 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
             return BadRequest(new AdminCreateOrderResponse(false, "Create Order", "One or more products no longer exist.", null));
 
         if (request.AppendToOpenCheck && request.OpenOrderId is int openOrderId && table is not null)
-            return AppendToExisting(request, openOrderId, table, lines, activeStaff, productById);
+            return await AppendToExistingAsync(request, openOrderId, table, lines, activeStaff, productById);
 
         return await CreateNew(request, table, lines, activeStaff, productById);
     }
 
-    private ActionResult<AdminCreateOrderResponse> AppendToExisting(
+    private async Task<ActionResult<AdminCreateOrderResponse>> AppendToExistingAsync(
         AdminCreateOrderRequest request,
         int openOrderId,
         ModelTable table,
@@ -73,25 +73,49 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
 
         var newItems = BuildOrderItems(lines, productById, activeStaff);
 
+        var newLineTuples = lines.Select(l => (l.ProductId, l.Quantity)).ToList();
         if (!request.IsTabletStaffOrderFlow)
         {
-            var newLineTuples = lines.Select(l => (l.ProductId, l.Quantity)).ToList();
+            var plan = OrderInventoryAppendHelper.ResolveAppendValidation(existing, newLineTuples);
             var inventoryPrecheck = OrderInventoryDeduction.TryValidateInventoryForProductQuantities(
                 db,
-                newLineTuples,
-                OrderInventoryDeduction.InventoryValidationKind.AdditionalLinesOnly);
+                plan.LinesToValidate,
+                plan.ValidationKind);
             if (inventoryPrecheck is not null)
                 return BadRequest(new AdminCreateOrderResponse(false, "Insufficient Inventory", inventoryPrecheck, null));
         }
 
-        if (request.IsTabletStaffOrderFlow && !RequiresImmediateInventoryDeduction(existing.Status))
+        var deductNow = OrderInventoryAppendHelper.ShouldDeductNewLinesImmediately(existing);
+
+        if (request.IsTabletStaffOrderFlow && !deductNow)
         {
             ApplyOpenCheckAppendMutations(existing, newItems, request, table);
             db.SaveChanges();
+            if (OrderWorkflow.IsPendingApproval(existing.Status))
+            {
+                await OrderHubBroadcasts.NotifyCashierOrderBoardChangedAsync(
+                    orderHub, db, existing.Id, "admin-order-submitted");
+            }
+
             return OkAppendResponse(existing, newItems.Count);
         }
 
-        return AppendWithInventoryDeduction(existing, newItems, request, table);
+        var result = AppendWithInventoryDeduction(existing, newItems, request, table);
+        if (result.Result is BadRequestObjectResult)
+            return result;
+
+        if (OrderWorkflow.IsPendingApproval(existing.Status))
+        {
+            await OrderHubBroadcasts.NotifyCashierOrderBoardChangedAsync(
+                orderHub, db, existing.Id, "admin-order-submitted");
+        }
+        else
+        {
+            await OrderHubBroadcasts.NotifyKitchenQueueChangedAsync(
+                orderHub, db, existing.Id, "admin-order-appended");
+        }
+
+        return result;
     }
 
     private ActionResult<AdminCreateOrderResponse> AppendWithInventoryDeduction(
@@ -100,7 +124,7 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
         AdminCreateOrderRequest request,
         ModelTable table)
     {
-        var deductNow = RequiresImmediateInventoryDeduction(existing.Status);
+        var deductNow = OrderInventoryAppendHelper.ShouldDeductNewLinesImmediately(existing);
 
         return DatabaseResilientTransaction.Execute<ActionResult<AdminCreateOrderResponse>>(db, () =>
         {
@@ -108,8 +132,7 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
             {
                 if (deductNow)
                 {
-                    OrderInventoryDeduction.MarkExistingLinesAsDeducted(existing, newItems);
-                    var invErrMem = OrderInventoryDeduction.TryApplyForAdditionalItems(db, existing, newItems);
+                    var invErrMem = OrderInventoryAppendHelper.TryDeductNewLinesForAppend(db, existing, newItems);
                     if (invErrMem is not null)
                         return BadRequest(new AdminCreateOrderResponse(false, "Insufficient Inventory", invErrMem, null));
                 }
@@ -124,8 +147,7 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
             {
                 if (deductNow)
                 {
-                    OrderInventoryDeduction.MarkExistingLinesAsDeducted(existing, newItems);
-                    var invErr = OrderInventoryDeduction.TryApplyForAdditionalItems(db, existing, newItems);
+                    var invErr = OrderInventoryAppendHelper.TryDeductNewLinesForAppend(db, existing, newItems);
                     if (invErr is not null)
                     {
                         tx.Rollback();
@@ -146,9 +168,6 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
         });
     }
 
-    private static bool RequiresImmediateInventoryDeduction(string? status) =>
-        !OrderWorkflow.IsPendingCashier(status) && !OrderWorkflow.IsPendingApproval(status);
-
     private void ApplyOpenCheckAppendMutations(
         OrderRecord existing,
         IReadOnlyList<OrderItem> newItems,
@@ -159,13 +178,7 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
             existing.Items.Add(item);
 
         AppendNotes(existing, request.CustomerNotes, request.AllergyNotes);
-        if (string.Equals(existing.Status, "Ready", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(existing.Status, OrderWorkflow.Served, StringComparison.OrdinalIgnoreCase)
-            || OrderWorkflow.IsKitchenQueueStatus(existing.Status))
-        {
-            existing.Status = OrderWorkflow.PendingCashier;
-            existing.CustomerFulfillmentStatus = null;
-        }
+        InStoreOrderPlacement.RequeueOpenCheckToKitchen(existing);
 
         if (OrderDiscountParser.ShouldApplyDiscount(request.DiscountMode, request.DiscountInput))
         {
@@ -213,14 +226,16 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
         var discountRaw = OrderDiscountParser.Parse(request.DiscountInput);
         var discountValue = string.Equals(request.DiscountMode, "None", StringComparison.OrdinalIgnoreCase) ? 0m : discountRaw;
         var paymentCurrency = request.SelectedPaymentCurrency;
-        var status = request.IsTabletStaffOrderFlow ? OrderWorkflow.PendingCashier : request.SelectedOrderStatus;
+        var isDeliverySource = string.Equals(request.SelectedOrderSource, "Delivery", StringComparison.OrdinalIgnoreCase);
+        var status = request.IsTabletStaffOrderFlow
+            ? (isDeliverySource ? OrderWorkflow.PendingApproval : InStoreOrderPlacement.KitchenWaitingStatus)
+            : request.SelectedOrderStatus;
 
         var merchSubtotal = lines.Sum(l =>
         {
             var price = productById[l.ProductId].Price;
             return price * l.Quantity;
         });
-        var isDeliverySource = string.Equals(request.SelectedOrderSource, "Delivery", StringComparison.OrdinalIgnoreCase);
         var deliveryFee = isDeliverySource ? Math.Round(merchSubtotal * 0.20m, 2) : 0m;
 
         var order = new OrderRecord
@@ -272,21 +287,82 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
                 request.SourceReference,
                 request.ReservationCode,
                 request.ReservationGuestName);
-            db.Orders.Add(order);
-            if (table is not null)
-                table.Status = "Occupied";
-            DataReconciler.ReconcileTableStatusesWithOrders(db);
-            db.SaveChanges();
+
+            if (isDeliverySource)
+            {
+                db.Orders.Add(order);
+                if (table is not null)
+                    table.Status = "Occupied";
+                DataReconciler.ReconcileTableStatusesWithOrders(db);
+                db.SaveChanges();
+                clientAccounts.TryLinkNewOrder(order.Id, request.RestaurantClientId);
+
+                await OrderHubBroadcasts.NotifyCashierOrderBoardChangedAsync(
+                    orderHub, db, order.Id, "admin-order-submitted");
+
+                return Ok(new AdminCreateOrderResponse(
+                    true,
+                    "Sent for approval",
+                    $"Ticket {order.UniqueId} sent for cashier approval.",
+                    order.UniqueId));
+            }
+
+            var tabletResult = DatabaseResilientTransaction.Execute<ActionResult<AdminCreateOrderResponse>>(db, () =>
+            {
+                if (IsInMemoryDatabase(db))
+                {
+                    var invErrMem = InStoreOrderPlacement.TryPlaceNewInStoreOrder(db, order);
+                    if (invErrMem is not null)
+                        return BadRequest(new AdminCreateOrderResponse(false, "Insufficient Inventory", invErrMem, null));
+
+                    db.Orders.Add(order);
+                    if (table is not null)
+                        table.Status = "Occupied";
+                    DataReconciler.ReconcileTableStatusesWithOrders(db);
+                    db.SaveChanges();
+                    return Ok(new AdminCreateOrderResponse(
+                        true,
+                        "Sent to kitchen",
+                        $"Ticket {order.UniqueId} sent to the kitchen.",
+                        order.UniqueId));
+                }
+
+                using var tx = db.Database.BeginTransaction();
+                try
+                {
+                    db.Orders.Add(order);
+                    if (table is not null)
+                        table.Status = "Occupied";
+                    DataReconciler.ReconcileTableStatusesWithOrders(db);
+                    var invErr = InStoreOrderPlacement.TryPlaceNewInStoreOrder(db, order);
+                    if (invErr is not null)
+                    {
+                        tx.Rollback();
+                        return BadRequest(new AdminCreateOrderResponse(false, "Insufficient Inventory", invErr, null));
+                    }
+
+                    db.SaveChanges();
+                    tx.Commit();
+                    return Ok(new AdminCreateOrderResponse(
+                        true,
+                        "Sent to kitchen",
+                        $"Ticket {order.UniqueId} sent to the kitchen.",
+                        order.UniqueId));
+                }
+                catch
+                {
+                    tx.Rollback();
+                    throw;
+                }
+            });
+
+            if (tabletResult.Result is BadRequestObjectResult)
+                return tabletResult;
+
             clientAccounts.TryLinkNewOrder(order.Id, request.RestaurantClientId);
-
-            await OrderHubBroadcasts.NotifyCashierOrderBoardChangedAsync(
+            await OrderHubBroadcasts.NotifyKitchenQueueChangedAsync(
                 orderHub, db, order.Id, "admin-order-submitted");
-
-            return Ok(new AdminCreateOrderResponse(
-                true,
-                "Sent to cashier",
-                $"Ticket {order.UniqueId} sent to the cashier.",
-                order.UniqueId));
+            return tabletResult;
         }
 
         return DatabaseResilientTransaction.Execute<ActionResult<AdminCreateOrderResponse>>(db, () =>
