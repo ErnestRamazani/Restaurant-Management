@@ -47,6 +47,7 @@ public static class DatabaseMigrationRunner
                 "SELECT pg_advisory_lock({0}, {1});",
                 AdvisoryLockKey1,
                 AdvisoryLockKey2);
+            EmployeeDeletePasscodeMigrationRepair.Reconcile(db);
             database.Migrate();
             TabletSessionsSchemaRepair.EnsureTableExists(db);
             Console.WriteLine(

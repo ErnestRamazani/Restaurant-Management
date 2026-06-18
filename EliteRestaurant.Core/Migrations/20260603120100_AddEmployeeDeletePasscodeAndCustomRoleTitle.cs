@@ -12,19 +12,17 @@ public class AddEmployeeDeletePasscodeAndCustomRoleTitle : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
     {
-        migrationBuilder.AddColumn<string>(
-            name: "EmployeeDeletePasscode",
-            table: "PublicMenuSettings",
-            type: "text",
-            nullable: false,
-            defaultValue: "");
+        migrationBuilder.Sql(
+            """
+            ALTER TABLE "PublicMenuSettings"
+            ADD COLUMN IF NOT EXISTS "EmployeeDeletePasscode" text NOT NULL DEFAULT '';
+            """);
 
-        migrationBuilder.AddColumn<string>(
-            name: "CustomRoleTitle",
-            table: "Employees",
-            type: "character varying(64)",
-            maxLength: 64,
-            nullable: true);
+        migrationBuilder.Sql(
+            """
+            ALTER TABLE "Employees"
+            ADD COLUMN IF NOT EXISTS "CustomRoleTitle" character varying(64);
+            """);
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)
