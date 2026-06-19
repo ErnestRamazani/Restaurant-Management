@@ -59,6 +59,7 @@ public sealed class AdminSettingsController(
         row.RoundingGrandTotal = Normalize(request.RoundingGrandTotal, "Nearest");
         row.TaxPercent = Math.Max(0, request.TaxPercent);
         row.ServicePercent = Math.Max(0, request.ServicePercent);
+        row.DeliveryFeePercent = Math.Clamp(request.DeliveryFeePercent, 0m, 100m);
         row.OnlineOrdersTableId = request.OnlineOrdersTableId;
         row.ReservationLeadDays = Math.Clamp(request.ReservationLeadDays, 0, 30);
         row.ReservationMaxMonthsAhead = Math.Clamp(request.ReservationMaxMonthsAhead, 1, 24);
@@ -125,6 +126,7 @@ public sealed class AdminSettingsController(
         settings.CurrencyPricing.RoundingGrandTotal = row.RoundingGrandTotal;
         settings.CurrencyPricing.TaxPercent = row.TaxPercent;
         settings.CurrencyPricing.ServicePercent = row.ServicePercent;
+        settings.CurrencyPricing.DeliveryFeePercent = row.DeliveryFeePercent;
         settings.CurrencyPricing.ExchangeRateLastUpdatedUtc = DateTime.UtcNow;
         settings.BusinessProfile.OnlineOrdersTableId = row.OnlineOrdersTableId;
         settings.BusinessProfile.ReservationLeadDays = Math.Clamp(request.ReservationLeadDays, 0, 30);

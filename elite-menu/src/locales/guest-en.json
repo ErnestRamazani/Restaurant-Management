@@ -180,7 +180,7 @@
       "cash": "Cash",
       "card": "Card",
       "mobileMoney": "Mobile money",
-      "deliveryFee": "Delivery fee (20%)",
+      "deliveryFee": "Delivery fee ({{percent}}%)",
       "placeOrder": "Place order",
       "sending": "Sending…",
       "clearCart": "Clear cart",

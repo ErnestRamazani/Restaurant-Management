@@ -180,7 +180,7 @@
       "cash": "Espèces",
       "card": "Carte",
       "mobileMoney": "Mobile money",
-      "deliveryFee": "Frais de livraison (20 %)",
+      "deliveryFee": "Frais de livraison ({{percent}} %)",
       "placeOrder": "Passer la commande",
       "sending": "Envoi…",
       "clearCart": "Vider le panier",

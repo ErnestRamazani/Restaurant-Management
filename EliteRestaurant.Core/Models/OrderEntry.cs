@@ -38,6 +38,14 @@ public class OrderEntry
     /// <summary>Cashier and full admin may open ticket preview.</summary>
     public bool ShowViewTicketInOrders { get; set; }
 
+    /// <summary>Past completed orders not yet refunded may issue a refund (admin/cashier).</summary>
+    public bool ShowRefundInOrders { get; set; }
+
+    /// <summary>UTC timestamp when a completed order was refunded; null if never refunded.</summary>
+    public DateTime? RefundedAtUtc { get; set; }
+
+    public bool IsRefunded => RefundedAtUtc.HasValue;
+
     /// <summary>Kitchen queue: approve/release pending ticket to Waiting.</summary>
     public bool ShowReleaseToKitchen { get; set; }
 

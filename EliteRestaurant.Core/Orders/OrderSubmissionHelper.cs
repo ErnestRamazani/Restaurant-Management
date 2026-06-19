@@ -1,6 +1,7 @@
 using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Menu;
 using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Orders;
 using EliteRestaurant.Core.Utils;
 using Microsoft.EntityFrameworkCore;
 
@@ -34,6 +35,8 @@ public static class OrderSubmissionHelper
         var items = order.Items.ToList();
         var productIds = items.Select(i => i.ProductId).Distinct().ToList();
         var prices = db.Products.AsNoTracking().Where(p => productIds.Contains(p.Id)).ToDictionary(p => p.Id, p => p.Price);
+        OrderPricingStampHelper.StampRatesIfUnset(order, db);
+        OrderPricingStampHelper.StampLinePrices(items, prices);
         ApplyComputedPaymentAmounts(order, items, prices);
     }
 
@@ -55,6 +58,8 @@ public static class OrderSubmissionHelper
         var items = order.Items.ToList();
         var prices = items.Select(i => i.ProductId).Distinct()
             .ToDictionary(id => id, id => products.TryGetValue(id, out var p) ? p.Price : 0m);
+        OrderPricingStampHelper.StampRatesIfUnset(order);
+        OrderPricingStampHelper.StampLinePrices(items, prices);
         ApplyComputedPaymentAmounts(order, items, prices, pricing);
         order.CustomerPaidUsd = 0m;
         order.CustomerPaidFc = 0m;
@@ -72,12 +77,21 @@ public static class OrderSubmissionHelper
         var subtotal = items.Sum(i => (priceByProductId.TryGetValue(i.ProductId, out var price) ? price : 0m) * i.Quantity);
         var totals = pricing is not null
             ? OrderTotalsHelper.ComputeTotalsWithDeliveryFee(
-                subtotal, order.DiscountMode, order.DiscountValue, order.DeliveryFeeUsd, pricing)
+                subtotal, order.DiscountMode, order.DiscountValue, order.DeliveryFeeUsd,
+                order.TaxPercentApplied, order.ServicePercentApplied, pricing)
             : OrderTotalsHelper.ComputeTotalsWithDeliveryFee(
-                subtotal, order.DiscountMode, order.DiscountValue, order.DeliveryFeeUsd);
+                subtotal, order.DiscountMode, order.DiscountValue, order.DeliveryFeeUsd,
+                order.TaxPercentApplied, order.ServicePercentApplied);
         var grand = totals.GrandTotal;
+        var merchGrand = pricing is not null
+            ? OrderTotalsHelper.ComputeMerchandiseGrandUsd(
+                subtotal, order.DiscountMode, order.DiscountValue,
+                order.TaxPercentApplied, order.ServicePercentApplied, pricing)
+            : OrderTotalsHelper.ComputeMerchandiseGrandUsd(
+                subtotal, order.DiscountMode, order.DiscountValue,
+                order.TaxPercentApplied, order.ServicePercentApplied);
         order.DiscountAmountUsd = totals.DiscountApplied;
-        order.MerchandiseGrandTotalUsd = Math.Round(grand, 2);
+        order.MerchandiseGrandTotalUsd = Math.Round(merchGrand, 2);
         order.PaymentAmountUsd = Math.Round(grand, 2);
         order.PaymentAmountFc = CurrencyHelper.ConvertUsdToFc(grand);
         order.PaymentAmount = string.Equals(order.PaymentCurrencyCode, CurrencyHelper.CongoleseFranc, StringComparison.OrdinalIgnoreCase)

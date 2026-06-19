@@ -121,6 +121,23 @@ public sealed class AdminSyncController(AppDbContext db, ClientAccountService cl
 
                 await db.SaveChangesAsync(cancellationToken);
 
+                if (string.Equals(operation.EntityName, nameof(OrderRecord), StringComparison.OrdinalIgnoreCase)
+                    && !operation.Operation.Equals("Delete", StringComparison.OrdinalIgnoreCase))
+                {
+                    var incomingOrder = operation.Payload.Deserialize(typeof(OrderRecord), JsonOptions) as OrderRecord;
+                    if (incomingOrder is not null)
+                    {
+                        var syncedOrder = await FindExistingAsync(typeof(OrderRecord), incomingOrder, cancellationToken) as OrderRecord;
+                        if (syncedOrder is not null
+                            && string.Equals(syncedOrder.Status, "Completed", StringComparison.OrdinalIgnoreCase)
+                            && syncedOrder.PaymentConfirmedAt is not null)
+                        {
+                            FinancialTransactionService.PostCompletedOrderLedgerEntries(db, syncedOrder.Id);
+                            await db.SaveChangesAsync(cancellationToken);
+                        }
+                    }
+                }
+
                 if (string.Equals(operation.EntityName, nameof(Employee), StringComparison.OrdinalIgnoreCase)
                     && !operation.Operation.Equals("Delete", StringComparison.OrdinalIgnoreCase))
                 {

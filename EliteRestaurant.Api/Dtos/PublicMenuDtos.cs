@@ -13,6 +13,7 @@ public sealed record PublicMenuConfigDto(
     decimal UsdToFcRate,
     decimal TaxPercent,
     decimal ServicePercent,
+    decimal DeliveryFeePercent,
     string? Phone,
     string? Address,
     string? WebsiteDomain,

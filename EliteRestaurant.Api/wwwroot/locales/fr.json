@@ -181,7 +181,11 @@
       "orderCancelMessage": "Saisissez le code d'annulation admin pour confirmer.",
       "orderCancelBack": "Retour",
       "orderCancelConfirm": "Annuler la commande",
-      "orderCancelPasscodeAria": "Code d'annulation admin"
+      "orderCancelPasscodeAria": "Code d'annulation admin",
+      "orderRefundTitle": "Émettre un remboursement",
+      "orderRefundMessage": "Saisissez le code admin pour confirmer le remboursement.",
+      "orderRefundConfirm": "Émettre un remboursement",
+      "orderRefundPasscodeAria": "Code admin de remboursement"
     },
     "server": {
       "title": "Portail Serveur",
@@ -409,6 +413,7 @@
         "ready": "Prête",
         "served": "Servie",
         "cancelled": "Annulée",
+        "refunded": "Remboursée",
         "on_account": "En compte"
       },
       "meta": {
@@ -471,6 +476,9 @@
       "releaseFailed": "Échec de l'envoi",
       "confirmCancelTicket": "Annuler ce ticket ? Le stock n'a pas été déduit.",
       "confirmCancelOrder": "Annuler cette commande ?",
+      "confirmRefundOrder": "Émettre un remboursement pour cette commande terminée ? Les écritures seront enregistrées dans Argent.",
+      "issueRefund": "Émettre un remboursement",
+      "refundFailed": "Échec du remboursement",
       "serverLabel": "Serveur",
       "orderCodeLabel": "Code",
       "couldNotLoadOrder": "Impossible de charger la commande",
@@ -498,6 +506,7 @@
         "ready": "Prête",
         "served": "Servie",
         "cancelled": "Annulée",
+        "refunded": "Remboursée",
         "on_account": "En compte"
       },
       "meta": {
@@ -701,6 +710,7 @@
         "served": "Servie",
         "completed": "Terminée",
         "cancelled": "Annulée",
+        "refunded": "Remboursée",
         "on_account": "En compte"
       },
       "invExp": {
@@ -856,6 +866,7 @@
         "served": "Servie",
         "completed": "Terminée",
         "cancelled": "Annulée",
+        "refunded": "Remboursée",
         "on_account": "En compte"
       },
       "invExp": {
@@ -1062,6 +1073,7 @@
         "ready": "Prête",
         "served": "Servie",
         "cancelled": "Annulée",
+        "refunded": "Remboursée",
         "on_account": "En compte",
         "scheduled": "Planifiée",
         "checkedin": "Enregistré"
@@ -1810,6 +1822,18 @@
       "ordAdvance": "Avancer",
       "ordComplete": "Terminer",
       "ordCancel": "Annuler",
+      "ordRefund": "Émettre un remboursement",
+      "ordConfirmRefundTitle": "Émettre un remboursement",
+      "ordConfirmRefundBody": "Émettre un remboursement pour la commande {{orderId}} ? La commande reste terminée et les écritures sont enregistrées dans Argent.",
+      "ordRefundErrorTitle": "Remboursement",
+      "ordPasscodeRequired": "Code admin requis",
+      "ordCancelPasscodeTitle": "Annuler la commande",
+      "ordCancelPasscodeBody": "Saisissez le code d'annulation admin pour annuler {{orderId}}.",
+      "ordCancelPasscodeConfirm": "Annuler la commande",
+      "ordRefundPasscodeTitle": "Émettre un remboursement",
+      "ordRefundPasscodeBody": "Saisissez le code admin pour émettre un remboursement pour {{orderId}}.",
+      "ordRefundPasscodeConfirm": "Émettre un remboursement",
+      "ordPasscodeEmpty": "Saisissez le code admin.",
       "ordViewTicket": "Voir le ticket",
       "ordPastDayCount": "({{count}} commandes)",
       "ordTodayHeader": "Aujourd'hui - {{date}}",
@@ -2535,6 +2559,7 @@
         "served": "Servie",
         "completed": "Terminée",
         "cancelled": "Annulée",
+        "refunded": "Remboursée",
         "on_account": "En compte"
       },
       "meta": {
@@ -2753,7 +2778,7 @@
       "cash": "Espèces",
       "card": "Carte",
       "mobileMoney": "Mobile money",
-      "deliveryFee": "Frais de livraison (20 %)",
+      "deliveryFee": "Frais de livraison ({{percent}} %)",
       "placeOrder": "Passer la commande",
       "sending": "Envoi…",
       "clearCart": "Vider le panier",

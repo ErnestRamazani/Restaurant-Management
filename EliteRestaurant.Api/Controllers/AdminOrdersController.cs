@@ -196,7 +196,10 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
             return price * i.Quantity;
         });
         if (string.Equals(existing.OrderSource, "Delivery", StringComparison.OrdinalIgnoreCase))
-            existing.DeliveryFeeUsd = Math.Round(merchSub * 0.20m, 2);
+        {
+            var pricing = db.PublicMenuSettings.AsNoTracking().FirstOrDefault(s => s.Key == "default");
+            existing.DeliveryFeeUsd = DeliveryFeeHelper.ResolveFeeUsd(merchSub, pricing);
+        }
 
         OrderSubmissionHelper.SyncPaymentFields(existing, fullProducts);
         OrderSubmissionHelper.ApplyReservationLink(
@@ -236,7 +239,10 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
             var price = productById[l.ProductId].Price;
             return price * l.Quantity;
         });
-        var deliveryFee = isDeliverySource ? Math.Round(merchSubtotal * 0.20m, 2) : 0m;
+        var pricingRow = db.PublicMenuSettings.AsNoTracking().FirstOrDefault(s => s.Key == "default");
+        var deliveryFee = isDeliverySource
+            ? DeliveryFeeHelper.ResolveFeeUsd(merchSubtotal, pricingRow)
+            : 0m;
 
         var order = new OrderRecord
         {
@@ -460,6 +466,15 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
         return Ok(new AdminOrderOpMessageResponse(err is null, err));
     }
 
+    [HttpPost("{orderId:int}/refund")]
+    public async Task<ActionResult<AdminOrderOpMessageResponse>> RefundCompleted(int orderId, [FromBody] OrderCancelRequest request)
+    {
+        var err = _ops.TryRefundCompletedOrder(orderId, request.Passcode);
+        if (err is null)
+            await OrderHubBroadcasts.NotifyCashierOrderBoardChangedAsync(orderHub, db, orderId, "order-refunded");
+        return Ok(new AdminOrderOpMessageResponse(err is null, err));
+    }
+
     [HttpPost("walk-in")]
     public ActionResult<AdminOrderOpMessageResponse> CreateWalkInFromDesk(AdminWalkInOrderDeskRequest request)
     {
@@ -556,10 +571,12 @@ public sealed class AdminOrdersController(AppDbContext db, IHubContext<OrderHub>
         return lines.Select(line =>
         {
             var assignee = OrderSubmissionHelper.ResolveAssignee(products, activeStaff, line.ProductId);
+            var unitPrice = products.TryGetValue(line.ProductId, out var product) ? product.Price : 0m;
             return new OrderItem
             {
                 ProductId = line.ProductId,
                 Quantity = line.Quantity,
+                UnitPriceUsd = Math.Round(Math.Max(0m, unitPrice), 2),
                 PreparedByEmployeeId = assignee.EmployeeId,
                 PreparedByRole = assignee.Role,
                 PreparedByName = assignee.Name

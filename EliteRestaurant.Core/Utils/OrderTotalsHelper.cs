@@ -1,5 +1,7 @@
-using System.Linq;
+using EliteRestaurant.Core.Data;
 using EliteRestaurant.Core.Models;
+using EliteRestaurant.Core.Utils;
+using Microsoft.EntityFrameworkCore;
 
 namespace EliteRestaurant.Core.Utils;
 
@@ -11,20 +13,29 @@ public static class OrderTotalsHelper
     public static (decimal DiscountApplied, decimal TaxableSubtotal, decimal Tax, decimal Service, decimal GrandTotal) ComputeTotals(
         decimal lineItemsSubtotal,
         string? discountMode,
-        decimal discountValue)
+        decimal discountValue) =>
+        ComputeTotals(lineItemsSubtotal, discountMode, discountValue, 0m, 0m);
+
+    public static (decimal DiscountApplied, decimal TaxableSubtotal, decimal Tax, decimal Service, decimal GrandTotal) ComputeTotals(
+        decimal lineItemsSubtotal,
+        string? discountMode,
+        decimal discountValue,
+        decimal taxPercentApplied,
+        decimal servicePercentApplied,
+        PublicMenuSetting? pricing = null)
     {
-        var settings = SettingsManager.Load().CurrencyPricing;
-        var taxRate = settings.TaxPercent > 0m ? settings.TaxPercent / 100m : DefaultTaxRate;
-        var serviceRate = settings.ServicePercent > 0m ? settings.ServicePercent / 100m : DefaultServiceRate;
+        var (taxRate, serviceRate, roundingSubtotal, roundingLine, roundingGrandTotal) =
+            ResolveRateSettings(taxPercentApplied, servicePercentApplied, pricing);
+
         return ComputeTotalsWithRates(
             lineItemsSubtotal,
             discountMode,
             discountValue,
             taxRate,
             serviceRate,
-            settings.RoundingSubtotal,
-            settings.RoundingLine,
-            settings.RoundingGrandTotal);
+            roundingSubtotal,
+            roundingLine,
+            roundingGrandTotal);
     }
 
     /// <summary>Order grand totals using stored public-menu pricing (API-safe; avoids file-based <see cref="SettingsManager"/>).</summary>
@@ -32,19 +43,106 @@ public static class OrderTotalsHelper
         decimal lineItemsSubtotal,
         string? discountMode,
         decimal discountValue,
-        PublicMenuSetting pricing)
+        PublicMenuSetting pricing) =>
+        ComputeTotals(lineItemsSubtotal, discountMode, discountValue, pricing.TaxPercent, pricing.ServicePercent, pricing);
+
+    public static (decimal DiscountApplied, decimal TaxableSubtotal, decimal Tax, decimal Service, decimal GrandTotal) ComputeTotalsWithDeliveryFee(
+        decimal lineItemsSubtotal,
+        string? discountMode,
+        decimal discountValue,
+        decimal deliveryFeeUsd) =>
+        ComputeTotalsWithDeliveryFee(lineItemsSubtotal, discountMode, discountValue, deliveryFeeUsd, 0m, 0m);
+
+    public static (decimal DiscountApplied, decimal TaxableSubtotal, decimal Tax, decimal Service, decimal GrandTotal) ComputeTotalsWithDeliveryFee(
+        decimal lineItemsSubtotal,
+        string? discountMode,
+        decimal discountValue,
+        decimal deliveryFeeUsd,
+        decimal taxPercentApplied,
+        decimal servicePercentApplied,
+        PublicMenuSetting? pricing = null)
     {
-        var taxRate = pricing.TaxPercent > 0m ? pricing.TaxPercent / 100m : DefaultTaxRate;
-        var serviceRate = pricing.ServicePercent > 0m ? pricing.ServicePercent / 100m : DefaultServiceRate;
-        return ComputeTotalsWithRates(
+        var fee = Math.Round(Math.Max(0m, deliveryFeeUsd), 2);
+        var subtotalWithFee = lineItemsSubtotal + fee;
+        return ComputeTotals(
+            subtotalWithFee,
+            discountMode,
+            discountValue,
+            taxPercentApplied,
+            servicePercentApplied,
+            pricing);
+    }
+
+    /// <summary>Delivery fee variant using resolved public-menu pricing (cloud profile + file fallback).</summary>
+    public static (decimal DiscountApplied, decimal TaxableSubtotal, decimal Tax, decimal Service, decimal GrandTotal) ComputeTotalsWithDeliveryFee(
+        decimal lineItemsSubtotal,
+        string? discountMode,
+        decimal discountValue,
+        decimal deliveryFeeUsd,
+        PublicMenuSetting pricing) =>
+        ComputeTotalsWithDeliveryFee(
             lineItemsSubtotal,
             discountMode,
             discountValue,
-            taxRate,
-            serviceRate,
-            pricing.RoundingSubtotal,
-            pricing.RoundingLine,
-            pricing.RoundingGrandTotal);
+            deliveryFeeUsd,
+            pricing.TaxPercent,
+            pricing.ServicePercent,
+            pricing);
+
+    public static decimal ComputeMerchandiseGrandUsd(
+        decimal lineItemsSubtotal,
+        string? discountMode,
+        decimal discountValue,
+        decimal taxPercentApplied = 0m,
+        decimal servicePercentApplied = 0m,
+        PublicMenuSetting? pricing = null) =>
+        ComputeTotals(
+            lineItemsSubtotal,
+            discountMode,
+            discountValue,
+            taxPercentApplied,
+            servicePercentApplied,
+            pricing).GrandTotal;
+
+    public static decimal ComputeOrderGrandTotalUsd(OrderRecord order)
+    {
+        var lineSubtotal = order.Items.Sum(i =>
+            (i.UnitPriceUsd > 0m ? i.UnitPriceUsd : i.Product?.Price ?? 0m) * i.Quantity);
+        return ComputeTotalsWithDeliveryFee(
+            lineSubtotal,
+            order.DiscountMode,
+            order.DiscountValue,
+            order.DeliveryFeeUsd,
+            order.TaxPercentApplied,
+            order.ServicePercentApplied).GrandTotal;
+    }
+
+    private static (decimal TaxRate, decimal ServiceRate, string? RoundingSubtotal, string? RoundingLine, string? RoundingGrandTotal)
+        ResolveRateSettings(decimal taxPercentApplied, decimal servicePercentApplied, PublicMenuSetting? pricing)
+    {
+        if (pricing is not null)
+        {
+            var taxRate = ResolvePercentRate(taxPercentApplied, pricing.TaxPercent, DefaultTaxRate);
+            var serviceRate = ResolvePercentRate(servicePercentApplied, pricing.ServicePercent, DefaultServiceRate);
+            return (taxRate, serviceRate, pricing.RoundingSubtotal, pricing.RoundingLine, pricing.RoundingGrandTotal);
+        }
+
+        var settings = SettingsManager.Load().CurrencyPricing;
+        return (
+            ResolvePercentRate(taxPercentApplied, settings.TaxPercent, DefaultTaxRate),
+            ResolvePercentRate(servicePercentApplied, settings.ServicePercent, DefaultServiceRate),
+            settings.RoundingSubtotal,
+            settings.RoundingLine,
+            settings.RoundingGrandTotal);
+    }
+
+    private static decimal ResolvePercentRate(decimal appliedPercent, decimal configuredPercent, decimal defaultRate)
+    {
+        if (appliedPercent > 0m)
+            return appliedPercent / 100m;
+        if (configuredPercent > 0m)
+            return configuredPercent / 100m;
+        return defaultRate;
     }
 
     private static (decimal DiscountApplied, decimal TaxableSubtotal, decimal Tax, decimal Service, decimal GrandTotal) ComputeTotalsWithRates(
@@ -76,42 +174,6 @@ public static class OrderTotalsHelper
         var service = ApplyRounding(taxable * serviceRate, roundingLine);
         var grand = ApplyRounding(taxable + tax + service, roundingGrandTotal);
         return (discountApplied, taxable, tax, service, grand);
-    }
-
-    /// <summary>Grand total for an order row, including delivery fee when applicable (matches payment completion validation).</summary>
-    public static decimal ComputeOrderGrandTotalUsd(OrderRecord order)
-    {
-        var lineSubtotal = order.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
-        return ComputeTotalsWithDeliveryFee(
-            lineSubtotal,
-            order.DiscountMode,
-            order.DiscountValue,
-            order.DeliveryFeeUsd).GrandTotal;
-    }
-
-    /// <summary>Merchandise totals plus a separate delivery fee line (USD), not included in tax/service base unless you change callers.</summary>
-    public static (decimal DiscountApplied, decimal TaxableSubtotal, decimal Tax, decimal Service, decimal GrandTotal) ComputeTotalsWithDeliveryFee(
-        decimal lineItemsSubtotal,
-        string? discountMode,
-        decimal discountValue,
-        decimal deliveryFeeUsd)
-    {
-        var core = ComputeTotals(lineItemsSubtotal, discountMode, discountValue);
-        var fee = Math.Round(Math.Max(0m, deliveryFeeUsd), 2);
-        return (core.DiscountApplied, core.TaxableSubtotal, core.Tax, core.Service, core.GrandTotal + fee);
-    }
-
-    /// <summary>Delivery fee variant using resolved public-menu pricing (cloud profile + file fallback).</summary>
-    public static (decimal DiscountApplied, decimal TaxableSubtotal, decimal Tax, decimal Service, decimal GrandTotal) ComputeTotalsWithDeliveryFee(
-        decimal lineItemsSubtotal,
-        string? discountMode,
-        decimal discountValue,
-        decimal deliveryFeeUsd,
-        PublicMenuSetting pricing)
-    {
-        var core = ComputeTotals(lineItemsSubtotal, discountMode, discountValue, pricing);
-        var fee = Math.Round(Math.Max(0m, deliveryFeeUsd), 2);
-        return (core.DiscountApplied, core.TaxableSubtotal, core.Tax, core.Service, core.GrandTotal + fee);
     }
 
     public static string FormatDiscountLabel(string? discountMode, decimal discountValue, decimal discountApplied)

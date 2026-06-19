@@ -434,6 +434,9 @@ namespace EliteRestaurant.Core.Migrations
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
 
+                    b.Property<decimal>("UnitPriceUsd")
+                        .HasColumnType("numeric");
+
                     b.HasKey("Id");
 
                     b.HasIndex("OrderRecordId");
@@ -536,6 +539,9 @@ namespace EliteRestaurant.Core.Migrations
                     b.Property<DateTime?>("PaymentConfirmedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("RefundedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("PaymentCurrencyCode")
                         .IsRequired()
                         .HasColumnType("text");
@@ -571,6 +577,12 @@ namespace EliteRestaurant.Core.Migrations
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<decimal>("ServicePercentApplied")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("TaxPercentApplied")
+                        .HasColumnType("numeric");
 
                     b.Property<string>("TableCode")
                         .IsRequired()
@@ -929,6 +941,9 @@ namespace EliteRestaurant.Core.Migrations
                         .HasColumnType("text");
 
                     b.Property<decimal>("ServicePercent")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("DeliveryFeePercent")
                         .HasColumnType("numeric");
 
                     b.Property<string>("SocialMedia")

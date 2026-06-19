@@ -64,7 +64,7 @@ public static class PayrollSupport
                 db.Products.AsNoTracking(),
                 i => i.ProductId,
                 p => p.Id,
-                (i, p) => i.Quantity * p.Price)
+                (i, p) => i.Quantity * (i.UnitPriceUsd > 0m ? i.UnitPriceUsd : p.Price))
             .ToList();
 
         return Math.Round(totals.Sum(), 2);
@@ -87,9 +87,11 @@ public static class PayrollSupport
 
             foreach (var i in o.Items)
             {
-                var price = productPriceById.TryGetValue(i.ProductId, out var p)
-                    ? p
-                    : (i.Product?.Price ?? 0m);
+                var price = i.UnitPriceUsd > 0m
+                    ? i.UnitPriceUsd
+                    : (productPriceById.TryGetValue(i.ProductId, out var p)
+                        ? p
+                        : (i.Product?.Price ?? 0m));
                 sum += price * i.Quantity;
             }
         }

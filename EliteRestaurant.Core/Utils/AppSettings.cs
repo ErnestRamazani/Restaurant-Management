@@ -219,6 +219,9 @@ public sealed class CurrencyPricingSettings
     public string RoundingGrandTotal { get; set; } = "Nearest";
     public decimal TaxPercent { get; set; } = 7m;
     public decimal ServicePercent { get; set; } = 10m;
+
+    /// <summary>Delivery fee as percent of merchandise subtotal (default 20).</summary>
+    public decimal DeliveryFeePercent { get; set; } = 20m;
 }
 
 public sealed class NavigationBackgroundSettings

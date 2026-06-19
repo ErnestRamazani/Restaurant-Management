@@ -176,16 +176,17 @@ public class FinancialLedgerTests
         db.Products.Add(product);
         db.SaveChanges();
 
+        var merchGrand = OrderTotalsHelper.ComputeMerchandiseGrandUsd(20m, "None", 0m);
         var order = new OrderRecord
         {
             UniqueId = "ORD-FC-1",
             Status = "Completed",
             PaymentCurrencyCode = CurrencyHelper.CongoleseFranc,
-            MerchandiseGrandTotalUsd = 20m,
+            MerchandiseGrandTotalUsd = merchGrand,
             // Net FC tender retained (no synthetic USD leg on the sale row).
             PaymentAmountUsd = 0m,
-            PaymentAmountFc = 45_000m,
-            PaymentAmount = 45_000m,
+            PaymentAmountFc = CurrencyHelper.ConvertUsdToFc(merchGrand),
+            PaymentAmount = CurrencyHelper.ConvertUsdToFc(merchGrand),
             PaymentConfirmedAt = DateTime.Today.AddHours(12),
             CompletedAt = DateTime.Today.AddHours(12),
             CreatedAt = DateTime.Today.AddHours(11)
@@ -200,15 +201,15 @@ public class FinancialLedgerTests
         var sale = db.Transactions.AsNoTracking()
             .Single(t => t.Type == "Revenue" && t.Category == "Sale");
         Assert.Equal(CurrencyHelper.CongoleseFranc, sale.CurrencyCode);
-        Assert.Equal(45_000m, sale.Amount);
+        Assert.Equal(CurrencyHelper.ConvertUsdToFc(merchGrand), sale.Amount);
         Assert.Equal(0m, sale.AmountUsd);
-        Assert.Equal(45_000m, sale.AmountFc);
+        Assert.Equal(CurrencyHelper.ConvertUsdToFc(merchGrand), sale.AmountFc);
 
         var txs = db.Transactions.AsNoTracking().ToList();
         Assert.Equal(0m, MoneyReportingHelpers.SumByCurrency(
             txs.Where(t => string.Equals(t.Type, "Revenue", StringComparison.OrdinalIgnoreCase)),
             CurrencyHelper.Usd));
-        Assert.Equal(45_000m, MoneyReportingHelpers.SumByCurrency(
+        Assert.Equal(CurrencyHelper.ConvertUsdToFc(merchGrand), MoneyReportingHelpers.SumByCurrency(
             txs.Where(t => string.Equals(t.Type, "Revenue", StringComparison.OrdinalIgnoreCase)),
             CurrencyHelper.CongoleseFranc));
     }
@@ -343,5 +344,137 @@ public class FinancialLedgerTests
         Assert.Single(snapshot.LedgerItems);
         Assert.Contains("$ 25.00", snapshot.LedgerItems[0].AmountText, StringComparison.Ordinal);
         Assert.Contains("FC 56,250", snapshot.LedgerItems[0].AmountText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CompletedOrder_WithDeliveryFee_PostsSeparateDeliveryRevenue()
+    {
+        using var db = BuildDb($"ledger-delivery-{Guid.NewGuid():N}");
+
+        var product = new Product
+        {
+            UniqueId = "P-DEL-1",
+            Name = "Pizza",
+            Category = "Food",
+            SubCategory = "Main",
+            Price = 100m
+        };
+        db.Products.Add(product);
+        db.PublicMenuSettings.Add(new PublicMenuSetting { Key = "default", DeliveryFeePercent = 20m });
+        db.SaveChanges();
+
+        var merchGrand = OrderTotalsHelper.ComputeMerchandiseGrandUsd(100m, "None", 0m);
+        var fullGrand = OrderTotalsHelper.ComputeTotalsWithDeliveryFee(100m, "None", 0m, 20m).GrandTotal;
+        var order = new OrderRecord
+        {
+            UniqueId = "ORD-DEL-1",
+            Status = "Completed",
+            PaymentCurrencyCode = CurrencyHelper.Usd,
+            MerchandiseGrandTotalUsd = merchGrand,
+            DeliveryFeeUsd = 20m,
+            PaymentAmountUsd = fullGrand,
+            PaymentAmount = fullGrand,
+            PaymentConfirmedAt = DateTime.UtcNow,
+            CompletedAt = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow
+        };
+        order.Items.Add(new OrderItem { ProductId = product.Id, Quantity = 1, UnitPriceUsd = 100m });
+        db.Orders.Add(order);
+        db.SaveChanges();
+
+        FinancialTransactionService.PostCompletedOrderLedgerEntries(db, order.Id);
+        db.SaveChanges();
+
+        var sale = db.Transactions.AsNoTracking().Single(t => t.Category == "Sale");
+        var delivery = db.Transactions.AsNoTracking().Single(t => t.Category == "Delivery Fee");
+        Assert.True(sale.AmountUsd > 0m);
+        Assert.True(delivery.AmountUsd > 0m);
+        Assert.Contains("Delivery fee (20%)", delivery.Justification);
+    }
+
+    [Fact]
+    public void CompletedOrder_WithZeroPayment_PostsCompExpense()
+    {
+        using var db = BuildDb($"ledger-comp-{Guid.NewGuid():N}");
+
+        var product = new Product
+        {
+            UniqueId = "P-COMP-1",
+            Name = "Comp dish",
+            Category = "Food",
+            SubCategory = "Main",
+            Price = 30m
+        };
+        db.Products.Add(product);
+        db.SaveChanges();
+
+        var order = new OrderRecord
+        {
+            UniqueId = "ORD-COMP-1",
+            Status = "Completed",
+            PaymentCurrencyCode = CurrencyHelper.Usd,
+            MerchandiseGrandTotalUsd = 30m,
+            PaymentAmountUsd = 0m,
+            PaymentAmountFc = 0m,
+            PaymentConfirmedAt = DateTime.UtcNow,
+            CompletedAt = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow
+        };
+        order.Items.Add(new OrderItem { ProductId = product.Id, Quantity = 1, UnitPriceUsd = 30m });
+        db.Orders.Add(order);
+        db.SaveChanges();
+
+        FinancialTransactionService.PostCompletedOrderLedgerEntries(db, order);
+        db.SaveChanges();
+
+        Assert.Single(db.Transactions.AsNoTracking().Where(t => t.Category == "Sale"));
+        var comp = db.Transactions.AsNoTracking().Single(t => t.Category == "Comp");
+        Assert.Equal("Expense", comp.Type);
+        Assert.Contains("|ORDER:", comp.Justification);
+    }
+
+    [Fact]
+    public void RefundCompletedOrder_PostsRefundExpenseRows()
+    {
+        using var db = BuildDb($"ledger-refund-{Guid.NewGuid():N}");
+
+        var product = new Product
+        {
+            UniqueId = "P-REF-1",
+            Name = "Refund dish",
+            Category = "Food",
+            SubCategory = "Main",
+            Price = 40m
+        };
+        db.Products.Add(product);
+        db.SaveChanges();
+
+        var merchGrand = OrderTotalsHelper.ComputeMerchandiseGrandUsd(40m, "None", 0m);
+        var order = new OrderRecord
+        {
+            UniqueId = "ORD-REF-1",
+            Status = "Completed",
+            PaymentCurrencyCode = CurrencyHelper.Usd,
+            MerchandiseGrandTotalUsd = merchGrand,
+            PaymentAmountUsd = merchGrand,
+            PaymentAmount = merchGrand,
+            PaymentConfirmedAt = DateTime.UtcNow,
+            CompletedAt = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow
+        };
+        order.Items.Add(new OrderItem { ProductId = product.Id, Quantity = 1, UnitPriceUsd = 40m });
+        db.Orders.Add(order);
+        db.SaveChanges();
+
+        FinancialTransactionService.PostCompletedOrderLedgerEntries(db, order);
+        db.SaveChanges();
+
+        order.RefundedAtUtc = DateTime.UtcNow;
+        FinancialTransactionService.PostRefundLedgerEntries(db, order);
+        db.SaveChanges();
+
+        var refunds = db.Transactions.AsNoTracking().Where(t => t.Category == "Refund").ToList();
+        Assert.NotEmpty(refunds);
+        Assert.Equal(merchGrand, refunds.Sum(t => t.AmountUsd));
     }
 }

@@ -96,12 +96,9 @@ public sealed class AdminReportAggregationService(AppDbContext db)
             var totalQty = order.Items.Sum(i => i.Quantity);
             var menu = string.Join(", ",
                 order.Items.Select(i => $"{i.Product?.Name ?? "Unknown"} ×{i.Quantity}"));
-            var subtotal = order.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
-            var totals = OrderTotalsHelper.ComputeTotals(subtotal, "None", 0m);
-            var grandUsd = totals.GrandTotal;
-            var payUsd = order.PaymentAmountUsd > 0m
-                ? order.PaymentAmountUsd
-                : (order.PaymentAmountFc <= 0m ? grandUsd : 0m);
+            var subtotal = OrderReportingTotals.ResolveLineSubtotalUsd(order);
+            var computedGrandUsd = OrderReportingTotals.ResolveGrandTotalUsd(order);
+            var payUsd = OrderReportingTotals.ResolvePaymentUsd(order, computedGrandUsd);
             var payFc = order.PaymentAmountFc;
             var paymentText = CurrencyHelper.FormatDualCurrency(payUsd, payFc);
             var anchor = OrderReportAnchor.Anchor(order);
@@ -1144,13 +1141,19 @@ public sealed class AdminReportAggregationService(AppDbContext db)
             var totalQty = order.Items.Sum(i => i.Quantity);
             var menu = string.Join("; ",
                 order.Items.Select(i => $"{i.Product?.Name ?? "Unknown"} ×{i.Quantity}"));
-            var subtotal = order.Items.Sum(i => (i.Product?.Price ?? 0m) * i.Quantity);
-            var totals = OrderTotalsHelper.ComputeTotals(subtotal, "None", 0m);
-            var grandUsd = totals.GrandTotal;
-            var payUsd = order.PaymentAmountUsd > 0m
-                ? order.PaymentAmountUsd
-                : (order.PaymentAmountFc <= 0m ? grandUsd : 0m);
+            var subtotal = OrderReportingTotals.ResolveLineSubtotalUsd(order);
+            var computedGrandUsd = OrderReportingTotals.ResolveGrandTotalUsd(order);
+            var payUsd = OrderReportingTotals.ResolvePaymentUsd(order, computedGrandUsd);
             var payFc = order.PaymentAmountFc;
+            var discountUsd = order.DiscountAmountUsd > 0m
+                ? order.DiscountAmountUsd
+                : OrderTotalsHelper.ComputeTotals(
+                    subtotal,
+                    order.DiscountMode,
+                    order.DiscountValue,
+                    order.TaxPercentApplied,
+                    order.ServicePercentApplied).DiscountApplied;
+            var deliveryFeeUsd = Math.Round(Math.Max(0m, order.DeliveryFeeUsd), 2);
             var anchor = OrderReportAnchor.Anchor(order);
 
             rows.Add(
@@ -1168,7 +1171,10 @@ public sealed class AdminReportAggregationService(AppDbContext db)
                 order.Items.Count.ToString(CultureInfo.InvariantCulture),
                 payUsd.ToString("0.00", CultureInfo.InvariantCulture),
                 payFc.ToString("0.##", CultureInfo.InvariantCulture),
-                order.PaymentCurrencyCode
+                order.PaymentCurrencyCode,
+                discountUsd.ToString("0.00", CultureInfo.InvariantCulture),
+                deliveryFeeUsd.ToString("0.00", CultureInfo.InvariantCulture),
+                computedGrandUsd.ToString("0.00", CultureInfo.InvariantCulture)
             ]);
         }
 
@@ -1190,7 +1196,10 @@ public sealed class AdminReportAggregationService(AppDbContext db)
         "Line Count",
         "Total USD",
         "Total FC",
-        "Pay Currency"
+        "Pay Currency",
+        "Discount USD",
+        "Delivery Fee USD",
+        "Computed Grand USD"
     ];
 
     private static readonly IReadOnlyList<string> AnalyticalHeaders =

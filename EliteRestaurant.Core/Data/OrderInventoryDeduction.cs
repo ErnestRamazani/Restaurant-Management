@@ -188,6 +188,63 @@ public static class OrderInventoryDeduction
     }
 
     /// <summary>
+    /// Restocks inventory for deducted lines on a cancelled order.
+    /// Caller must have opened <see cref="DatabaseFacade.BeginTransaction"/> on <paramref name="db"/>.
+    /// </summary>
+    public static string? TryRestockCancelledOrder(AppDbContext db, OrderRecord order)
+    {
+        EnsureAmbientTransaction(db);
+
+        var deductedItems = order.Items.Where(i => i.InventoryDeductedAt.HasValue).ToList();
+        if (deductedItems.Count == 0)
+            return null;
+
+        var selectedLines = deductedItems
+            .GroupBy(i => i.ProductId)
+            .Select(g => (ProductId: g.Key, Quantity: g.Sum(i => i.Quantity)))
+            .ToList();
+
+        var productIds = selectedLines.Select(s => s.ProductId).Distinct().ToList();
+        var ingredientRows = db.ProductIngredients
+            .AsNoTracking()
+            .Where(pi => productIds.Contains(pi.ProductId))
+            .ToList();
+
+        var requiredByInventory = new Dictionary<int, decimal>();
+        foreach (var line in selectedLines)
+        {
+            foreach (var ingredient in ingredientRows.Where(i => i.ProductId == line.ProductId))
+            {
+                var required = ingredient.Quantity * line.Quantity;
+                if (!requiredByInventory.TryAdd(ingredient.InventoryItemId, required))
+                    requiredByInventory[ingredient.InventoryItemId] += required;
+            }
+        }
+
+        if (requiredByInventory.Count == 0)
+            return null;
+
+        foreach (var (inventoryItemId, required) in requiredByInventory)
+        {
+            var inventoryItem = db.InventoryItems.SingleOrDefault(i => i.Id == inventoryItemId);
+            if (inventoryItem is null)
+                continue;
+
+            var restockNote =
+                $"{DateTime.UtcNow:yyyy-MM-dd HH:mm}Z - {required:0.##} {inventoryItem.Name} restocked from cancelled order {order.UniqueId}.";
+            inventoryItem.StockQuantity += required;
+            inventoryItem.Notes = string.IsNullOrWhiteSpace(inventoryItem.Notes)
+                ? restockNote
+                : $"{inventoryItem.Notes.Trim()}\n{restockNote}";
+        }
+
+        foreach (var item in deductedItems)
+            item.InventoryDeductedAt = null;
+
+        return null;
+    }
+
+    /// <summary>
     /// Marks lines already on the check (not in <paramref name="newItems"/>) as deducted so a later
     /// cashier release does not re-deduct stock when appending to in-progress orders.
     /// </summary>

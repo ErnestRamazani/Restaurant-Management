@@ -47,6 +47,7 @@ public sealed class AdminSettingsApiClient(EliteApiClient? apiClient = null)
             settings.CurrencyPricing.RoundingGrandTotal,
             settings.CurrencyPricing.TaxPercent,
             settings.CurrencyPricing.ServicePercent,
+            settings.CurrencyPricing.DeliveryFeePercent,
             logo.FileName,
             logo.ContentType,
             logo.Base64,

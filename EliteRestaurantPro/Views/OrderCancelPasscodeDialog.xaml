@@ -33,7 +33,8 @@
                         Padding="0,0,0,4"
                         Cursor="Hand"
                         MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
-                    <TextBlock Style="{StaticResource HeadingMedium}" Text="Admin passcode required"/>
+                    <TextBlock x:Name="TitleText"
+                               Style="{StaticResource HeadingMedium}" Text="Admin passcode required"/>
                 </Border>
 
                 <TextBlock x:Name="SummaryText"
@@ -50,14 +51,16 @@
                              Margin="0,0,0,16"/>
 
                 <StackPanel Grid.Row="3" Orientation="Vertical">
-                    <Button Content="Cancel order"
+                    <Button x:Name="ConfirmButton"
+                            Content="Cancel order"
                             Style="{StaticResource GoldPrimaryButton}"
                             MinWidth="280"
                             HorizontalAlignment="Stretch"
                             Margin="0,0,0,10"
                             IsDefault="True"
                             Click="Confirm_Click"/>
-                    <Button Content="Back"
+                    <Button x:Name="BackButton"
+                            Content="Back"
                             Style="{StaticResource GhostButton}"
                             MinWidth="280"
                             HorizontalAlignment="Stretch"

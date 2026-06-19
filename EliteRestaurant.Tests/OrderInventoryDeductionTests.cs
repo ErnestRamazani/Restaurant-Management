@@ -324,4 +324,52 @@ public class OrderInventoryDeductionTests
 
         Assert.False(OrderInventoryAppendHelper.ShouldDeductNewLinesImmediately(order));
     }
+
+    [Fact]
+    public void TryRestockCancelledOrder_RestoresStockForDeductedLines()
+    {
+        using var db = BuildDb($"inv-restock-{Guid.NewGuid():N}");
+        var inv = new InventoryItem
+        {
+            UniqueId = "INV-RESTOCK",
+            Name = "Flour",
+            Unit = "kg",
+            StockQuantity = 50m
+        };
+        db.InventoryItems.Add(inv);
+        var product = new Product
+        {
+            UniqueId = "P-RESTOCK",
+            Name = "Bread",
+            Category = "Food",
+            SubCategory = "Bakery",
+            Price = 5m
+        };
+        db.Products.Add(product);
+        db.ProductIngredients.Add(new ProductIngredient
+        {
+            ProductId = product.Id,
+            InventoryItemId = inv.Id,
+            Quantity = 2m
+        });
+        db.SaveChanges();
+
+        var order = new OrderRecord
+        {
+            UniqueId = "ORD-RESTOCK",
+            Status = "Waiting",
+            OrderOrigin = OrderOrigin.InStore,
+            CreatedAt = DateTime.UtcNow
+        };
+        var line = new OrderItem { ProductId = product.Id, Quantity = 3, InventoryDeductedAt = DateTime.UtcNow };
+        order.Items.Add(line);
+        db.Orders.Add(order);
+        inv.StockQuantity = 44m;
+        db.SaveChanges();
+
+        Assert.Null(OrderInventoryDeduction.TryRestockCancelledOrder(db, order));
+        db.SaveChanges();
+        Assert.Equal(50m, inv.StockQuantity);
+        Assert.Null(line.InventoryDeductedAt);
+    }
 }

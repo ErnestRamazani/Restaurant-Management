@@ -85,6 +85,40 @@ public sealed class AdminOrdersViewMapperTests
         Assert.Equal("Completed", entry.Status);
     }
 
+    [Fact]
+    public void MapOrder_CompletedNotRefunded_ShowsRefundAction()
+    {
+        var order = new OrderRecord
+        {
+            Status = "Completed",
+            Items = []
+        };
+
+        var entry = AdminOrdersViewMapper.MapOrder(order, isPast: true, showAdminAdvance: false, canViewTicket: true);
+
+        Assert.True(entry.ShowRefundInOrders);
+        Assert.Null(entry.RefundedAtUtc);
+        Assert.Equal("Completed", entry.Status);
+    }
+
+    [Fact]
+    public void MapOrder_RefundedCompleted_ShowsRefundedStatusAndHidesRefundAction()
+    {
+        var order = new OrderRecord
+        {
+            Status = "Completed",
+            RefundedAtUtc = DateTime.UtcNow,
+            Items = []
+        };
+
+        var entry = AdminOrdersViewMapper.MapOrder(order, isPast: true, showAdminAdvance: false, canViewTicket: true);
+
+        Assert.False(entry.ShowRefundInOrders);
+        Assert.NotNull(entry.RefundedAtUtc);
+        Assert.Equal(OrderDisplayStatus.Refunded, entry.Status);
+        Assert.Equal("#78909C", entry.StatusColor);
+    }
+
     [Theory]
     [InlineData(OrderOrigin.Online, "Delivery", "DELIVERY", "Online · Delivery")]
     [InlineData(OrderOrigin.Online, "Pickup", "TO GO", "Online · Pickup")]

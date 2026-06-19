@@ -17,6 +17,8 @@ public static class AdminOrdersViewMapper
         var items = string.Join(", ",
             order.Items.Select(i => $"{i.Product?.Name ?? "Unknown"} x{i.Quantity}"));
 
+        var displayStatus = OrderDisplayStatus.ForOrder(order);
+
         return new OrderEntry
         {
             Id = order.Id,
@@ -27,15 +29,20 @@ public static class AdminOrdersViewMapper
             Items = items,
             CustomerNotes = order.CustomerNotes ?? string.Empty,
             AllergyNotes = order.AllergyNotes ?? string.Empty,
-            Status = OrderDisplayStatus.ForOrder(order),
+            Status = displayStatus,
             CreatedAt = order.CreatedAt,
             Time = RestaurantTimeZone.FormatUtc(order.CreatedAt, tz, "HH:mm"),
             Total = total,
-            StatusColor = GetStatusColor(OrderDisplayStatus.ForOrder(order)),
+            StatusColor = GetStatusColor(displayStatus),
             OrderOrigin = string.IsNullOrWhiteSpace(order.OrderOrigin) ? OrderOrigin.InStore : order.OrderOrigin,
+            RefundedAtUtc = order.RefundedAtUtc,
             ShowAdvanceInOrders = !isPast && showAdminAdvance && OrderWorkflow.CanAdminAdvanceOrderStatus(order.Status),
             ShowCompleteInOrders = !isPast && OrderWorkflow.CanCashierComplete(order.Status, order.OrderOrigin),
-            ShowViewTicketInOrders = canViewTicket
+            ShowViewTicketInOrders = canViewTicket,
+            ShowRefundInOrders = isPast
+                && string.Equals(order.Status, "Completed", StringComparison.OrdinalIgnoreCase)
+                && !order.RefundedAtUtc.HasValue
+                && !OrderDisplayStatus.HasOpenOnAccountDebt(order)
         };
     }
 
@@ -47,6 +54,7 @@ public static class AdminOrdersViewMapper
         OrderWorkflow.Served => "#9C27B0",
         "Completed" => "#4CAF50",
         OrderDisplayStatus.Debt => "#F59E0B",
+        OrderDisplayStatus.Refunded => "#78909C",
         "Cancelled" => "#F44336",
         var s when string.Equals(s, OrderWorkflow.PendingCashier, StringComparison.OrdinalIgnoreCase) => "#CE93D8",
         var s when string.Equals(s, OrderWorkflow.PendingApproval, StringComparison.OrdinalIgnoreCase) => "#B39DDB",

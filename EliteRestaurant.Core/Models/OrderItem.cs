@@ -8,6 +8,9 @@ public class OrderItem
     public int ProductId { get; set; }
     public Product? Product { get; set; }
     public int Quantity { get; set; } = 1;
+
+    /// <summary>Unit menu price (USD) at order time; falls back to current product price when unset.</summary>
+    public decimal UnitPriceUsd { get; set; }
     public int? PreparedByEmployeeId { get; set; }
     public string PreparedByRole { get; set; } = string.Empty;
     public string PreparedByName { get; set; } = string.Empty;

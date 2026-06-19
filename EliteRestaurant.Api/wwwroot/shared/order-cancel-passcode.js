@@ -77,9 +77,15 @@
       msgEl.textContent = options && options.message
         ? options.message
         : t("portals.common.orderCancelMessage", "Enter the admin cancel passcode to confirm cancellation.");
-      btnCancel.textContent = t("portals.common.orderCancelBack", "Back");
-      btnConfirm.textContent = t("portals.common.orderCancelConfirm", "Cancel order");
-      input.setAttribute("aria-label", t("portals.common.orderCancelPasscodeAria", "Admin cancel passcode"));
+      btnCancel.textContent = options && options.backLabel
+        ? options.backLabel
+        : t("portals.common.orderCancelBack", "Back");
+      btnConfirm.textContent = options && options.confirmLabel
+        ? options.confirmLabel
+        : t("portals.common.orderCancelConfirm", "Cancel order");
+      input.setAttribute("aria-label", options && options.passcodeAria
+        ? options.passcodeAria
+        : t("portals.common.orderCancelPasscodeAria", "Admin cancel passcode"));
       input.value = "";
 
       function close(result) {
@@ -136,9 +142,38 @@
     return { ok: true };
   }
 
+  async function refundStaffOrder(orderId, postRefund, options) {
+    var opts = options || {};
+
+    var passcode = await promptPasscode({
+      title: opts.modalTitle || t("portals.common.orderRefundTitle", "Issue refund"),
+      message: opts.modalMessage || t("portals.common.orderRefundMessage", "Enter the admin passcode to confirm the refund."),
+      confirmLabel: t("portals.common.orderRefundConfirm", "Issue refund"),
+      passcodeAria: t("portals.common.orderRefundPasscodeAria", "Admin refund passcode")
+    });
+    if (passcode === null || passcode === "") {
+      return { ok: false, userCancelled: true };
+    }
+
+    var result = await postRefund(orderId, passcode);
+    if (!result || !result.ok) {
+      var msg = (result && result.body && (result.body.message || result.body.Message))
+        || (result && result.error)
+        || (opts.failureMessage || "Refund failed.");
+      global.alert(msg);
+      return { ok: false, error: msg };
+    }
+
+    if (typeof opts.onSuccess === "function") {
+      await opts.onSuccess(orderId);
+    }
+    return { ok: true };
+  }
+
   global.EliteOrderCancel = {
     canCancelStatus: canCancelStatus,
     cancelStaffOrder: cancelStaffOrder,
+    refundStaffOrder: refundStaffOrder,
     promptPasscode: promptPasscode
   };
 })(typeof window !== "undefined" ? window : globalThis);

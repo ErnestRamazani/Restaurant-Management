@@ -60,7 +60,11 @@ public class MoneyViewModel : AdminBaseViewModel
     [
         "Sale",
         "Salary",
-        "Fixed Cost"
+        "Fixed Cost",
+        "Comp",
+        "Refund",
+        "Delivery Fee",
+        "Sale Change"
     ];
 
     private static readonly HashSet<string> JustificationRequiredCategories =

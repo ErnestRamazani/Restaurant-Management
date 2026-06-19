@@ -513,6 +513,7 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
 
                                 <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,10,10">
@@ -583,6 +584,13 @@
                                                  Style="{StaticResource EliteTextBox}"
                                                  IsEnabled="{Binding CanEditTaxService}"/>
                                     </Grid>
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Margin="0,10,0,0">
+                                    <TextBlock Text="{Binding SetDeliveryFeePercentLabel, Mode=OneWay}" Style="{StaticResource HeadingSmall}"/>
+                                    <TextBox Text="{Binding DeliveryFeePercent, UpdateSourceTrigger=PropertyChanged}"
+                                             Style="{StaticResource EliteTextBox}"
+                                             IsEnabled="{Binding CanEditTaxService}"/>
                                 </StackPanel>
                             </Grid>
 

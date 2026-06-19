@@ -18,6 +18,7 @@ public static class AdminTextLocalizer
         ["served"] = "Served",
         ["completed"] = "Completed",
         ["cancelled"] = "Cancelled",
+        ["refunded"] = "Refunded",
         ["pending"] = "Pending",
         ["on_account"] = "On account"
     };
@@ -32,6 +33,7 @@ public static class AdminTextLocalizer
         ["served"] = "Servie",
         ["completed"] = "Terminée",
         ["cancelled"] = "Annulée",
+        ["refunded"] = "Remboursée",
         ["pending"] = "En attente",
         ["on_account"] = "En compte"
     };
@@ -98,6 +100,7 @@ public static class AdminTextLocalizer
             "ready" => "ready",
             "served" => "served",
             "completed" => "completed",
+            "refunded" => "refunded",
             "cancelled" or "canceled" => "cancelled",
             "pending" => "pending",
             "on account" or "debt" => "on_account",
@@ -232,6 +235,8 @@ public static class AdminTextLocalizer
             _ when raw.Equals("Other", StringComparison.OrdinalIgnoreCase) => Loc.Admin("moneyCatOther", "Other"),
             _ when raw.Equals("Delivery Fee", StringComparison.OrdinalIgnoreCase) => Loc.Admin("moneyCatDeliveryFee", "Delivery Fee"),
             _ when raw.Equals("Sale Change", StringComparison.OrdinalIgnoreCase) => Loc.Admin("moneyCatSaleChange", "Sale Change"),
+            _ when raw.Equals("Comp", StringComparison.OrdinalIgnoreCase) => Loc.Admin("moneyCatComp", "Comp"),
+            _ when raw.Equals("Refund", StringComparison.OrdinalIgnoreCase) => Loc.Admin("moneyCatRefund", "Refund"),
             _ => raw
         };
     }

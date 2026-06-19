@@ -40,6 +40,17 @@ public sealed class AdminOrderCloudOperations
         return r.Ok ? null : r.Message;
     }
 
+    public async Task<string?> TryRefundCompletedOrderAsync(
+        int orderId,
+        string passcode,
+        CancellationToken cancellationToken = default)
+    {
+        var r = await _ordersApi.RefundCompletedOrderAsync(orderId, passcode, cancellationToken).ConfigureAwait(false);
+        if (r is null)
+            return "Empty response from API.";
+        return r.Ok ? null : r.Message;
+    }
+
     /// <summary>Same contract as <see cref="AdminOrderOperationsService.TryAdvanceOrder"/>: null = advanced, Empty = missing, else error.</summary>
     public async Task<string?> TryAdvanceOrderAsync(int orderId, CancellationToken cancellationToken = default)
     {

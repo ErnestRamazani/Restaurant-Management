@@ -552,7 +552,9 @@ public sealed class ServerPortalController(
             openOrder.PaymentCurrencyCode = CurrencyHelper.NormalizeCurrencyCode(request.PaymentCurrencyCode);
             var appendMerch = openOrder.Items.Sum(i =>
                 products.TryGetValue(i.ProductId, out var p) ? p.Price * i.Quantity : 0m);
-            openOrder.DeliveryFeeUsd = isDelivery ? Math.Round(appendMerch * 0.20m, 2) : 0m;
+            openOrder.DeliveryFeeUsd = isDelivery
+                ? DeliveryFeeHelper.ResolveFeeUsd(appendMerch, menuSettings.GetDefault())
+                : 0m;
             OrderSubmissionHelper.SyncPaymentFields(openOrder, products);
             table.Status = "Occupied";
             DataReconciler.ReconcileTableStatusesWithOrders(db);
@@ -646,7 +648,9 @@ public sealed class ServerPortalController(
 
         var merchSubtotal = order.Items.Sum(i =>
             products.TryGetValue(i.ProductId, out var p) ? p.Price * i.Quantity : 0m);
-        order.DeliveryFeeUsd = isDelivery ? Math.Round(merchSubtotal * 0.20m, 2) : 0m;
+        order.DeliveryFeeUsd = isDelivery
+            ? DeliveryFeeHelper.ResolveFeeUsd(merchSubtotal, menuSettings.GetDefault())
+            : 0m;
 
         OrderSubmissionHelper.SyncPaymentFields(order, products);
 
@@ -1330,10 +1334,12 @@ public sealed class ServerPortalController(
         foreach (var line in lines)
         {
             var assignee = OrderSubmissionHelper.ResolveAssignee(products, activeStaff, line.ProductId);
+            var unitPrice = products.TryGetValue(line.ProductId, out var product) ? product.Price : 0m;
             items.Add(new OrderItem
             {
                 ProductId = line.ProductId,
                 Quantity = line.Quantity,
+                UnitPriceUsd = Math.Round(Math.Max(0m, unitPrice), 2),
                 PreparedByEmployeeId = assignee.EmployeeId,
                 PreparedByRole = assignee.Role,
                 PreparedByName = assignee.Name

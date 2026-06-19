@@ -64,19 +64,33 @@ public static class FinancialTransactionService
             db.SaveChanges();
     }
 
-    public static void RecordCompletedOrderRevenue(AppDbContext db, int orderId)
+    public static void RecordCompletedOrderRevenue(AppDbContext db, int orderId) =>
+        PostCompletedOrderLedgerEntries(db, orderId);
+
+    public static void PostCompletedOrderLedgerEntries(AppDbContext db, int orderId)
     {
-        var order = db.Orders.AsNoTracking().SingleOrDefault(o => o.Id == orderId);
-        if (order is null || order.Status != "Completed" || order.PaymentConfirmedAt is null)
+        var order = db.Orders.AsNoTracking()
+            .Include(o => o.Items)
+            .ThenInclude(i => i.Product)
+            .SingleOrDefault(o => o.Id == orderId);
+        if (order is null)
+            return;
+
+        PostCompletedOrderLedgerEntries(db, order);
+    }
+
+    public static void PostCompletedOrderLedgerEntries(AppDbContext db, OrderRecord order)
+    {
+        if (order.Status != "Completed" || order.PaymentConfirmedAt is null)
             return;
 
         if (ClientSettlement.IsOnAccount(order.ClientSettlement)
             && order.ClientDebtSettledUsd < order.AmountOnAccountUsd - 0.01m)
             return;
 
-        var deliveryFee = Math.Round(Math.Max(0m, order.DeliveryFeeUsd), 2);
         var merchGrandUsd = ResolveMerchandiseGrandUsd(db, order);
-        if (merchGrandUsd <= 0m && deliveryFee <= 0m)
+        var deliveryFeeUsd = ResolveDeliveryRevenueUsd(db, order, merchGrandUsd);
+        if (merchGrandUsd <= 0m && deliveryFeeUsd <= 0m)
             return;
 
         var reference = BuildOrderReference(order);
@@ -90,7 +104,8 @@ public static class FinancialTransactionService
             : order.ExchangeRateUsed;
         var originType = string.IsNullOrWhiteSpace(order.OrderOrigin) ? OrderOrigin.InStore : order.OrderOrigin.Trim();
 
-        var totalPartsUsd = merchGrandUsd + deliveryFee;
+        var totalPartsUsd = merchGrandUsd + deliveryFeeUsd;
+        var deliveryPct = ResolveDeliveryFeePercent(db);
 
         if (merchGrandUsd > 0m && !HasPostedMerchandiseSale(db, order.Id, reference))
         {
@@ -112,9 +127,9 @@ public static class FinancialTransactionService
             });
         }
 
-        if (deliveryFee > 0m && !HasPostedDeliveryFeeSale(db, order.Id))
+        if (deliveryFeeUsd > 0m && !HasPostedDeliveryFeeSale(db, order.Id))
         {
-            var (amt, usd, fc) = ResolvePostedAmounts(order, deliveryFee, totalPartsUsd, paymentCurrency, exchangeRate);
+            var (amt, usd, fc) = ResolvePostedAmounts(order, deliveryFeeUsd, totalPartsUsd, paymentCurrency, exchangeRate);
             db.Transactions.Add(new MoneyTransaction
             {
                 RelatedOrderId = order.Id,
@@ -128,12 +143,179 @@ public static class FinancialTransactionService
                 CurrencyCode = paymentCurrency,
                 ExchangeRateUsed = exchangeRate,
                 IsFixed = true,
-                Justification = $"Delivery fee (20%) — {reference} {DeliveryMarker(order.Id)}"
+                Justification = $"Delivery fee ({deliveryPct:0.##}%) — {reference} {DeliveryMarker(order.Id)}"
+            });
+        }
+
+        var netPaymentUsd = Math.Round(order.PaymentAmountUsd, 2);
+        var netPaymentFc = Math.Round(order.PaymentAmountFc, 2);
+        var netPaymentApproxUsd = Math.Round(
+            netPaymentUsd + (exchangeRate > 0m ? netPaymentFc / exchangeRate : 0m),
+            2);
+        var fullGrandUsd = Math.Round(merchGrandUsd + deliveryFeeUsd, 2);
+        if (fullGrandUsd > 0.01m
+            && netPaymentApproxUsd <= 0.01m
+            && netPaymentUsd <= 0.01m
+            && netPaymentFc <= 0.01m
+            && !HasPostedCompExpense(db, order.Id))
+        {
+            var (amt, usd, fc) = ResolvePostedAmounts(order, fullGrandUsd, fullGrandUsd, paymentCurrency, exchangeRate);
+            db.Transactions.Add(new MoneyTransaction
+            {
+                RelatedOrderId = order.Id,
+                OrderOriginType = originType,
+                Amount = amt,
+                AmountUsd = usd,
+                AmountFc = fc,
+                Date = ledgerDate,
+                Type = "Expense",
+                Category = "Comp",
+                CurrencyCode = paymentCurrency,
+                ExchangeRateUsed = exchangeRate,
+                IsFixed = true,
+                Justification = $"Complimentary order — {reference} {CompMarker(order.Id)}"
             });
         }
     }
 
+    public static void PostRefundLedgerEntries(AppDbContext db, OrderRecord order)
+    {
+        if (order.RefundedAtUtc is null)
+            return;
+
+        var reference = BuildOrderReference(order);
+        var ledgerDate = order.RefundedAtUtc.Value;
+        var paymentCurrency = string.IsNullOrWhiteSpace(order.PaymentCurrencyCode)
+            ? CurrencyHelper.Usd
+            : order.PaymentCurrencyCode;
+        var exchangeRate = order.ExchangeRateUsed <= 0m
+            ? CurrencyHelper.FcPerUsd
+            : order.ExchangeRateUsed;
+        var originType = string.IsNullOrWhiteSpace(order.OrderOrigin) ? OrderOrigin.InStore : order.OrderOrigin.Trim();
+
+        if (HasPostedRefundExpense(db, order.Id))
+            return;
+
+        var saleRows = db.Transactions.AsNoTracking()
+            .Where(t => t.RelatedOrderId == order.Id && t.Type == "Revenue")
+            .ToList();
+        if (saleRows.Count == 0)
+        {
+            var merchGrandUsd = ResolveMerchandiseGrandUsd(db, order);
+            var deliveryFeeUsd = ResolveDeliveryRevenueUsd(db, order, merchGrandUsd);
+            var totalPartsUsd = merchGrandUsd + deliveryFeeUsd;
+            if (merchGrandUsd > 0m)
+            {
+                var (amt, usd, fc) = MerchandiseRevenueAmounts(order, merchGrandUsd, paymentCurrency, exchangeRate);
+                db.Transactions.Add(BuildRefundExpense(order.Id, originType, amt, usd, fc, ledgerDate, paymentCurrency, exchangeRate,
+                    $"Refund merchandise — {reference} {RefundMarker(order.Id)}"));
+            }
+
+            if (deliveryFeeUsd > 0m)
+            {
+                var (amt, usd, fc) = ResolvePostedAmounts(order, deliveryFeeUsd, totalPartsUsd, paymentCurrency, exchangeRate);
+                db.Transactions.Add(BuildRefundExpense(order.Id, originType, amt, usd, fc, ledgerDate, paymentCurrency, exchangeRate,
+                    $"Refund delivery fee — {reference} {RefundMarker(order.Id)}"));
+            }
+
+            return;
+        }
+
+        foreach (var row in saleRows)
+        {
+            db.Transactions.Add(BuildRefundExpense(
+                order.Id,
+                originType,
+                row.Amount,
+                row.AmountUsd,
+                row.AmountFc,
+                ledgerDate,
+                row.CurrencyCode,
+                row.ExchangeRateUsed,
+                $"Refund {row.Category.ToLowerInvariant()} — {reference} {RefundMarker(order.Id)}"));
+        }
+    }
+
+    private static MoneyTransaction BuildRefundExpense(
+        int orderId,
+        string originType,
+        decimal amount,
+        decimal amountUsd,
+        decimal amountFc,
+        DateTime ledgerDate,
+        string currencyCode,
+        decimal exchangeRate,
+        string justification) =>
+        new()
+        {
+            RelatedOrderId = orderId,
+            OrderOriginType = originType,
+            Amount = amount,
+            AmountUsd = amountUsd,
+            AmountFc = amountFc,
+            Date = ledgerDate,
+            Type = "Expense",
+            Category = "Refund",
+            CurrencyCode = currencyCode,
+            ExchangeRateUsed = exchangeRate,
+            IsFixed = true,
+            Justification = justification
+        };
+
     private static string DeliveryMarker(int orderId) => $"|ORDER:{orderId}:DELIVERY|";
+
+    private static string CompMarker(int orderId) => $"|ORDER:{orderId}:COMP|";
+
+    private static string RefundMarker(int orderId) => $"|ORDER:{orderId}:REFUND|";
+
+    private static decimal ResolveDeliveryFeePercent(AppDbContext db)
+    {
+        var row = db.PublicMenuSettings.AsNoTracking().FirstOrDefault(s => s.Key == "default");
+        return DeliveryFeeHelper.ResolvePercent(row);
+    }
+
+    private static decimal ResolveDeliveryRevenueUsd(AppDbContext db, OrderRecord order, decimal merchGrandUsd)
+    {
+        var stored = Math.Round(Math.Max(0m, order.DeliveryFeeUsd), 2);
+        if (stored > 0m)
+            return stored;
+
+        var lineSub = ResolveLineSubtotalUsd(db, order);
+        if (lineSub <= 0m)
+            return 0m;
+
+        var fullGrand = OrderTotalsHelper.ComputeTotalsWithDeliveryFee(
+            lineSub,
+            order.DiscountMode,
+            order.DiscountValue,
+            order.DeliveryFeeUsd,
+            order.TaxPercentApplied,
+            order.ServicePercentApplied).GrandTotal;
+
+        return Math.Round(Math.Max(0m, fullGrand - merchGrandUsd), 2);
+    }
+
+    private static decimal ResolveLineSubtotalUsd(AppDbContext db, OrderRecord order)
+    {
+        var items = order.Items.Count > 0
+            ? order.Items
+            : db.OrderItems.AsNoTracking().Where(i => i.OrderRecordId == order.Id).ToList();
+        if (items.Count == 0)
+            return 0m;
+
+        var productIds = items.Select(i => i.ProductId).Distinct().ToList();
+        var prices = db.Products.AsNoTracking()
+            .Where(p => productIds.Contains(p.Id))
+            .ToDictionary(p => p.Id, p => p.Price);
+
+        return items.Sum(i =>
+        {
+            var unit = i.UnitPriceUsd > 0m
+                ? i.UnitPriceUsd
+                : (prices.TryGetValue(i.ProductId, out var price) ? price : i.Product?.Price ?? 0m);
+            return unit * i.Quantity;
+        });
+    }
 
     private static decimal ResolveMerchandiseGrandUsd(AppDbContext db, OrderRecord order)
     {
@@ -148,26 +330,32 @@ public static class FinancialTransactionService
         {
             var fromNetAndChange = Math.Round(order.PaymentAmountUsd + changeUsd + changeFcAsUsd, 2);
             if (fromNetAndChange > 0m)
-                return fromNetAndChange;
+            {
+                var deliveryStored = Math.Round(Math.Max(0m, order.DeliveryFeeUsd), 2);
+                return deliveryStored > 0m
+                    ? Math.Round(Math.Max(0m, fromNetAndChange - deliveryStored), 2)
+                    : fromNetAndChange;
+            }
         }
 
         if (order.PaymentAmountUsd > 0m)
-            return Math.Round(order.PaymentAmountUsd, 2);
+        {
+            var deliveryStored = Math.Round(Math.Max(0m, order.DeliveryFeeUsd), 2);
+            return deliveryStored > 0m
+                ? Math.Round(Math.Max(0m, order.PaymentAmountUsd - deliveryStored), 2)
+                : Math.Round(order.PaymentAmountUsd, 2);
+        }
 
-        var items = db.OrderItems.AsNoTracking().Where(i => i.OrderRecordId == order.Id).ToList();
-        if (items.Count == 0)
+        var lineSub = ResolveLineSubtotalUsd(db, order);
+        if (lineSub <= 0m)
             return 0m;
 
-        var productIds = items.Select(i => i.ProductId).Distinct().ToList();
-        var prices = db.Products.AsNoTracking()
-            .Where(p => productIds.Contains(p.Id))
-            .ToDictionary(p => p.Id, p => p.Price);
-        var lineSub = items.Sum(i => (prices.TryGetValue(i.ProductId, out var price) ? price : 0m) * i.Quantity);
-        return OrderTotalsHelper.ComputeTotalsWithDeliveryFee(
+        return OrderTotalsHelper.ComputeMerchandiseGrandUsd(
             lineSub,
             order.DiscountMode,
             order.DiscountValue,
-            order.DeliveryFeeUsd).GrandTotal;
+            order.TaxPercentApplied,
+            order.ServicePercentApplied);
     }
 
     private static (decimal Amount, decimal AmountUsd, decimal AmountFc) MerchandiseRevenueAmounts(
@@ -224,6 +412,35 @@ public static class FinancialTransactionService
 
         return db.Transactions.AsNoTracking().Any(t =>
             t.RelatedOrderId == orderId && t.Type == "Revenue" && t.Category == "Delivery Fee");
+    }
+
+    private static bool HasPostedCompExpense(AppDbContext db, int orderId)
+    {
+        var marker = CompMarker(orderId);
+        if (db.Transactions.Local.Any(t =>
+                t.Type == "Expense"
+                && t.Category == "Comp"
+                && (t.RelatedOrderId == orderId
+                    || (t.Justification ?? string.Empty).Contains(marker, StringComparison.Ordinal))))
+            return true;
+
+        // RelatedOrderId is always set on comp rows; avoid StringComparison.Contains in SQL (not translatable).
+        return db.Transactions.AsNoTracking().Any(t =>
+            t.RelatedOrderId == orderId && t.Type == "Expense" && t.Category == "Comp");
+    }
+
+    private static bool HasPostedRefundExpense(AppDbContext db, int orderId)
+    {
+        var marker = RefundMarker(orderId);
+        if (db.Transactions.Local.Any(t =>
+                t.Type == "Expense"
+                && t.Category == "Refund"
+                && (t.RelatedOrderId == orderId
+                    || (t.Justification ?? string.Empty).Contains(marker, StringComparison.Ordinal))))
+            return true;
+
+        return db.Transactions.AsNoTracking().Any(t =>
+            t.RelatedOrderId == orderId && t.Type == "Expense" && t.Category == "Refund");
     }
 
     /// <summary>Split stored payment across merchandise vs delivery fee by USD grand sub-parts.</summary>
@@ -851,64 +1068,119 @@ public static class FinancialTransactionService
         });
     }
 
-    /// <summary>Creates a Sale revenue row for a completed order if missing (HTTP/sync clients).</summary>
-    public static MoneyTransaction? BuildAutoSaleRevenueIfMissing(
+    /// <summary>Creates ledger rows for a completed order if missing (HTTP/sync clients).</summary>
+    public static IReadOnlyList<MoneyTransaction> BuildAutoLedgerEntriesIfMissing(
         OrderRecord order,
         IReadOnlyList<OrderItem> items,
         IReadOnlyDictionary<int, decimal> productPrices,
-        IReadOnlyList<MoneyTransaction> existingTransactions)
+        IReadOnlyList<MoneyTransaction> existingTransactions,
+        PublicMenuSetting? pricing = null)
     {
+        var list = new List<MoneyTransaction>();
         if (!string.Equals(order.Status, "Completed", StringComparison.OrdinalIgnoreCase))
-            return null;
+            return list;
         if (order.PaymentConfirmedAt is null)
-            return null;
+            return list;
+        if (items.Count == 0)
+            return list;
 
         var reference = BuildOrderReference(order);
-        if (existingTransactions.Any(t =>
-                string.Equals(t.Type, "Revenue", StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(t.Category, "Sale", StringComparison.OrdinalIgnoreCase) &&
-                (t.RelatedOrderId == order.Id || string.Equals(t.Justification, reference, StringComparison.Ordinal))))
-            return null;
-
-        if (items.Count == 0)
-            return null;
-
-        var merchSubtotal = items.Sum(item =>
-            (productPrices.TryGetValue(item.ProductId, out var price) ? price : 0m) * item.Quantity);
-        var totals = OrderTotalsHelper.ComputeTotals(merchSubtotal, order.DiscountMode, order.DiscountValue);
-        var merchGrandUsd = totals.GrandTotal;
-        if (merchGrandUsd <= 0m)
-            return null;
-
         var paymentCurrency = string.IsNullOrWhiteSpace(order.PaymentCurrencyCode)
             ? CurrencyHelper.Usd
             : order.PaymentCurrencyCode;
         var exchangeRate = order.ExchangeRateUsed <= 0m
             ? CurrencyHelper.FcPerUsd
             : order.ExchangeRateUsed;
-        var deliveryFee = Math.Round(Math.Max(0m, order.DeliveryFeeUsd), 2);
-        var totalParts = merchGrandUsd + deliveryFee;
-        var (amount, amountUsd, amountFc) = ResolvePostedAmounts(order, merchGrandUsd, totalParts, paymentCurrency, exchangeRate);
-
         var ledgerDate = order.PaymentConfirmedAt ?? order.CompletedAt ?? order.CreatedAt;
         var originType = string.IsNullOrWhiteSpace(order.OrderOrigin) ? OrderOrigin.InStore : order.OrderOrigin.Trim();
+        var deliveryPct = DeliveryFeeHelper.ResolvePercent(pricing);
 
-        return new MoneyTransaction
+        var lineSubtotal = items.Sum(item =>
+            (item.UnitPriceUsd > 0m
+                ? item.UnitPriceUsd
+                : (productPrices.TryGetValue(item.ProductId, out var price) ? price : 0m)) * item.Quantity);
+        var merchGrandUsd = OrderTotalsHelper.ComputeMerchandiseGrandUsd(
+            lineSubtotal,
+            order.DiscountMode,
+            order.DiscountValue,
+            order.TaxPercentApplied,
+            order.ServicePercentApplied,
+            pricing);
+        var deliveryFeeUsd = Math.Round(Math.Max(0m, order.DeliveryFeeUsd), 2);
+        if (deliveryFeeUsd <= 0m)
         {
-            RelatedOrderId = order.Id,
-            OrderOriginType = originType,
-            Amount = amount,
-            AmountUsd = amountUsd,
-            AmountFc = amountFc,
-            Date = ledgerDate,
-            Type = "Revenue",
-            Category = "Sale",
-            CurrencyCode = paymentCurrency,
-            ExchangeRateUsed = exchangeRate,
-            IsFixed = true,
-            Justification = reference
-        };
+            var fullGrand = OrderTotalsHelper.ComputeTotalsWithDeliveryFee(
+                lineSubtotal,
+                order.DiscountMode,
+                order.DiscountValue,
+                order.DeliveryFeeUsd,
+                order.TaxPercentApplied,
+                order.ServicePercentApplied,
+                pricing).GrandTotal;
+            deliveryFeeUsd = Math.Round(Math.Max(0m, fullGrand - merchGrandUsd), 2);
+        }
+
+        var totalParts = merchGrandUsd + deliveryFeeUsd;
+
+        if (merchGrandUsd > 0m
+            && !existingTransactions.Any(t =>
+                string.Equals(t.Type, "Revenue", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(t.Category, "Sale", StringComparison.OrdinalIgnoreCase)
+                && (t.RelatedOrderId == order.Id || string.Equals(t.Justification, reference, StringComparison.Ordinal))))
+        {
+            var (amount, amountUsd, amountFc) = MerchandiseRevenueAmounts(order, merchGrandUsd, paymentCurrency, exchangeRate);
+            list.Add(new MoneyTransaction
+            {
+                RelatedOrderId = order.Id,
+                OrderOriginType = originType,
+                Amount = amount,
+                AmountUsd = amountUsd,
+                AmountFc = amountFc,
+                Date = ledgerDate,
+                Type = "Revenue",
+                Category = "Sale",
+                CurrencyCode = paymentCurrency,
+                ExchangeRateUsed = exchangeRate,
+                IsFixed = true,
+                Justification = reference
+            });
+        }
+
+        if (deliveryFeeUsd > 0m
+            && !existingTransactions.Any(t =>
+                t.RelatedOrderId == order.Id
+                && string.Equals(t.Type, "Revenue", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(t.Category, "Delivery Fee", StringComparison.OrdinalIgnoreCase)))
+        {
+            var (amount, amountUsd, amountFc) = ResolvePostedAmounts(order, deliveryFeeUsd, totalParts, paymentCurrency, exchangeRate);
+            list.Add(new MoneyTransaction
+            {
+                RelatedOrderId = order.Id,
+                OrderOriginType = originType,
+                Amount = amount,
+                AmountUsd = amountUsd,
+                AmountFc = amountFc,
+                Date = ledgerDate,
+                Type = "Revenue",
+                Category = "Delivery Fee",
+                CurrencyCode = paymentCurrency,
+                ExchangeRateUsed = exchangeRate,
+                IsFixed = true,
+                Justification = $"Delivery fee ({deliveryPct:0.##}%) — {reference} {DeliveryMarker(order.Id)}"
+            });
+        }
+
+        return list;
     }
+
+    /// <summary>Creates a Sale revenue row for a completed order if missing (HTTP/sync clients).</summary>
+    public static MoneyTransaction? BuildAutoSaleRevenueIfMissing(
+        OrderRecord order,
+        IReadOnlyList<OrderItem> items,
+        IReadOnlyDictionary<int, decimal> productPrices,
+        IReadOnlyList<MoneyTransaction> existingTransactions) =>
+        BuildAutoLedgerEntriesIfMissing(order, items, productPrices, existingTransactions)
+            .FirstOrDefault(t => string.Equals(t.Category, "Sale", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Creates Sale Change expense rows when absent (HTTP/sync clients).</summary>
     public static IReadOnlyList<MoneyTransaction> BuildSaleChangeExpensesIfMissing(

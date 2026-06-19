@@ -33,6 +33,7 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
         AdvanceOrderCommand = new RelayCommand(order => AdvanceOrder(order as OrderEntry));
         CompleteOrderCommand = new RelayCommand(order => CompleteOrder(order as OrderEntry));
         CancelOrderCommand = new RelayCommand(order => CancelOrder(order as OrderEntry));
+        RefundOrderCommand = new RelayCommand(order => RefundOrder(order as OrderEntry));
         PrintTicketCommand = new RelayCommand(order => OpenTicketPreview(order as OrderEntry));
         CloseTicketPreviewCommand = new RelayCommand(_ => IsTicketPreviewOpen = false);
         ExportTicketPdfCommand = new RelayCommand(_ => PrintPaymentReceipt());
@@ -526,6 +527,57 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
         catch (Exception ex)
         {
             MessageBox.Show(ex.GetBaseException().Message, "Orders", MessageBoxButton.OK, MessageBoxImage.Warning);
+            await LoadOrdersAsync();
+        }
+    }
+
+    private void RefundOrder(OrderEntry? entry)
+    {
+        if (entry is null || !entry.ShowRefundInOrders)
+            return;
+
+        var confirmRefund = MessageBox.Show(
+            Loc.Admin("ordConfirmRefundBody", "Issue a refund for order {{orderId}}? The order stays completed and refund entries are posted to Money.",
+                new Dictionary<string, string> { ["orderId"] = entry.OrderId }),
+            Loc.Admin("ordConfirmRefundTitle", "Issue refund"),
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+
+        if (confirmRefund != MessageBoxResult.Yes)
+            return;
+
+        var passcode = OrderCancelPasscodeDialog.PromptForRefund(Application.Current.MainWindow, entry.OrderId);
+        if (passcode is null)
+            return;
+
+        _ = RefundOrderCoreAsync(entry, passcode);
+    }
+
+    private async Task RefundOrderCoreAsync(OrderEntry entry, string passcode)
+    {
+        try
+        {
+            var err = await _cloudOps.TryRefundCompletedOrderAsync(entry.Id, passcode);
+            if (err is not null)
+            {
+                MessageBox.Show(
+                    err,
+                    Loc.Admin("ordRefundErrorTitle", "Refund"),
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                await LoadOrdersAsync();
+                return;
+            }
+
+            await LoadOrdersAsync();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                ex.GetBaseException().Message,
+                Loc.Admin("ordRefundErrorTitle", "Refund"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
             await LoadOrdersAsync();
         }
     }

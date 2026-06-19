@@ -29,7 +29,7 @@ public class OrderRecord : IRestaurantScoped
     public decimal PaymentAmount { get; set; }
     public decimal PaymentAmountUsd { get; set; }
     public decimal PaymentAmountFc { get; set; }
-    /// <summary>Merchandise + tax + service grand (USD), preserved when net cash overwrites <see cref="PaymentAmountUsd"/> on complete.</summary>
+    /// <summary>Merchandise + tax + service grand (USD), excluding delivery fee line.</summary>
     public decimal MerchandiseGrandTotalUsd { get; set; }
     public decimal CustomerPaidUsd { get; set; }
     public decimal CustomerPaidFc { get; set; }
@@ -55,6 +55,15 @@ public class OrderRecord : IRestaurantScoped
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     /// <summary>When the order was marked Completed (payment recorded). Used for money ledger date.</summary>
     public DateTime? CompletedAt { get; set; }
+
+    /// <summary>Tax percent in effect when totals were computed (0 = legacy, use settings fallback).</summary>
+    public decimal TaxPercentApplied { get; set; }
+
+    /// <summary>Service percent in effect when totals were computed (0 = legacy, use settings fallback).</summary>
+    public decimal ServicePercentApplied { get; set; }
+
+    /// <summary>Set when a completed order receives a ledger refund reversal.</summary>
+    public DateTime? RefundedAtUtc { get; set; }
     public int? RestaurantClientId { get; set; }
     public RestaurantClient? RestaurantClient { get; set; }
     /// <summary><see cref="Models.ClientSettlement"/> code.</summary>

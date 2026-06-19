@@ -72,6 +72,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     private string _roundingGrandTotal = "Nearest";
     private string _taxPercent = "7";
     private string _servicePercent = "10";
+    private string _deliveryFeePercent = "20";
     private string _databaseProvider = "PostgreSql";
     private string _databaseHost = string.Empty;
     private string _databasePort = "5432";
@@ -213,6 +214,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
     public string SetRoundingLineSubtotalLabel => Loc.Admin("setRoundingLineSubtotal", "Rounding: line / subtotal");
     public string SetRoundingGrandTotalLabel => Loc.Admin("setRoundingGrandTotal", "Rounding: grand total");
     public string SetTaxServicePercentLabel => Loc.Admin("setTaxServicePercent", "Tax % / Service % (admin only)");
+    public string SetDeliveryFeePercentLabel => Loc.Admin("setDeliveryFeePercent", "Delivery fee % (merchandise subtotal)");
     public string SetSaveCurrencyPricingLabel => Loc.Admin("setSaveCurrencyPricing", "Save Currency & Pricing");
     public string SetAttendanceTitle => Loc.Admin("setAttendanceTitle", "Attendance & shifts");
     public string SetAttendanceLead => Loc.Admin("setAttendanceLead", "Define shift windows (local time). Morning and night set partial shifts; Full Day on an employee schedule uses morning start through night end. Used for attendance, late grace, payroll hours, and auto-absence on this PC.");
@@ -766,6 +768,12 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         set => SetField(ref _servicePercent, value);
     }
 
+    public string DeliveryFeePercent
+    {
+        get => _deliveryFeePercent;
+        set => SetField(ref _deliveryFeePercent, value);
+    }
+
     public string DatabaseProvider
     {
         get => _databaseProvider;
@@ -1046,6 +1054,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
             nameof(SetCurrencyTitle), nameof(SetCurrencyLead), nameof(SetDefaultCurrencyDisplayLabel),
             nameof(SetExchangeRateLabel), nameof(SetExchangeRateUpdatedLabel),
             nameof(SetRoundingLineSubtotalLabel), nameof(SetRoundingGrandTotalLabel), nameof(SetTaxServicePercentLabel),
+            nameof(SetDeliveryFeePercentLabel),
             nameof(SetSaveCurrencyPricingLabel),
             nameof(SetAttendanceTitle), nameof(SetAttendanceLead),
             nameof(SetMorningStartLabel), nameof(SetMorningEndLabel), nameof(SetNightStartLabel), nameof(SetNightEndLabel),
@@ -1268,6 +1277,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         RoundingGrandTotal = pricing.RoundingGrandTotal;
         TaxPercent = pricing.TaxPercent.ToString("0.##");
         ServicePercent = pricing.ServicePercent.ToString("0.##");
+        DeliveryFeePercent = pricing.DeliveryFeePercent.ToString("0.##");
         LoadAttendanceSettings();
         LoadSalarySettings();
         LoadTicketReceiptLayout();
@@ -1744,6 +1754,12 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
             return false;
         }
 
+        if (!TryParseDecimalInput(DeliveryFeePercent, out var deliveryFee) || deliveryFee < 0 || deliveryFee > 100)
+        {
+            errorMessage = Loc.Admin("setDeliveryFeePercentInvalid", "Enter a delivery fee percent between 0 and 100.");
+            return false;
+        }
+
         _settings.CurrencyPricing.DefaultCurrencyDisplayMode = DefaultCurrencyDisplayMode;
         _settings.CurrencyPricing.UsdToFcRate = rate;
         _settings.CurrencyPricing.ExchangeRateLastUpdatedUtc = DateTime.UtcNow;
@@ -1752,6 +1768,7 @@ public sealed class AppearanceSettingsViewModel : AdminBaseViewModel
         _settings.CurrencyPricing.RoundingGrandTotal = RoundingGrandTotal;
         _settings.CurrencyPricing.TaxPercent = tax;
         _settings.CurrencyPricing.ServicePercent = service;
+        _settings.CurrencyPricing.DeliveryFeePercent = deliveryFee;
         errorMessage = string.Empty;
         return true;
     }

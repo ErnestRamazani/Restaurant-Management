@@ -33,6 +33,7 @@
       "completed": "completed",
       "cancelled": "cancelled",
       "canceled": "cancelled",
+      "refunded": "refunded",
       "pending": "pending",
       "on account": "on_account",
       "debt": "on_account"
@@ -49,6 +50,7 @@
     served: "Served",
     completed: "Completed",
     cancelled: "Cancelled",
+    refunded: "Refunded",
     pending: "Pending",
     on_account: "On account"
   };
@@ -62,6 +64,7 @@
     served: "Servie",
     completed: "Terminée",
     cancelled: "Annulée",
+    refunded: "Remboursée",
     pending: "En attente",
     on_account: "En compte"
   };
@@ -75,6 +78,7 @@
     served: "orders.served",
     completed: "orders.completed",
     cancelled: "orders.cancelled",
+    refunded: "orders.refunded",
     pending: "orders.pending"
   };
 
@@ -776,7 +780,8 @@
         "</button>" +
         "<div class='order-card__actions'>" +
         "<button type='button' class='btn btn-ghost btn-sm' data-print-ticket='" + id + "' data-print-status='" + escapeHtml(st) + "'>" + escapeHtml(t("printTicket", "Print ticket")) + "</button>" +
-        "</div></div>");
+        "</div></div>"
+      );
     }).join("");
     el.querySelectorAll("[data-open-pt]").forEach(b => b.onclick = () => openOrderDetail(Number(b.getAttribute("data-open-pt"))));
     el.querySelectorAll("[data-print-ticket]").forEach(b => b.onclick = () =>

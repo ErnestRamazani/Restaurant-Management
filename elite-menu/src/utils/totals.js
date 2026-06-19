@@ -15,15 +15,31 @@ export function computeTotals(subtotal, taxPercent, servicePercent) {
   return { subtotal: s, tax, service, grand }
 }
 
-/** Merchandise tax+service/grand plus a delivery fee line (matches server OrderTotalsHelper pattern). */
-export function computeTotalsWithDelivery(subtotal, taxPercent, servicePercent, deliveryFeeUsd) {
-  const core = computeTotals(subtotal, taxPercent, servicePercent)
+/**
+ * Delivery fee is included in the taxable base before tax/service (matches server OrderTotalsHelper).
+ * @param {number} merchandiseSubtotal
+ * @param {number} taxPercent
+ * @param {number} servicePercent
+ * @param {number} deliveryFeeUsd
+ */
+export function computeTotalsWithDelivery(merchandiseSubtotal, taxPercent, servicePercent, deliveryFeeUsd) {
+  const merch = round2(Math.max(0, Number(merchandiseSubtotal)))
   const fee = round2(Math.max(0, Number(deliveryFeeUsd)))
+  const subtotalWithFee = round2(merch + fee)
+  const core = computeTotals(subtotalWithFee, taxPercent, servicePercent)
   return {
-    subtotal: core.subtotal,
+    subtotal: merch,
     tax: core.tax,
     service: core.service,
     deliveryFee: fee,
-    grand: round2(core.grand + fee),
+    grand: core.grand,
   }
+}
+
+/** merchandiseSubtotal × percent / 100, rounded (matches DeliveryFeeHelper). */
+export function resolveDeliveryFeeUsd(merchandiseSubtotal, deliveryFeePercent) {
+  const subtotal = round2(Math.max(0, Number(merchandiseSubtotal)))
+  if (subtotal <= 0) return 0
+  const pct = Math.min(100, Math.max(0, Number(deliveryFeePercent) || 20))
+  return round2(subtotal * pct / 100)
 }

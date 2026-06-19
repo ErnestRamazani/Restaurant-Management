@@ -72,6 +72,15 @@ public sealed class AdminOrdersApiClient(EliteApiClient? apiClient = null)
             new OrderCancelRequest(passcode),
             cancellationToken);
 
+    public Task<AdminOrderOpMessageResponse?> RefundCompletedOrderAsync(
+        int orderId,
+        string passcode,
+        CancellationToken cancellationToken = default) =>
+        _apiClient.PostAsync<OrderCancelRequest, AdminOrderOpMessageResponse>(
+            $"api/admin/orders/{orderId}/refund",
+            new OrderCancelRequest(passcode),
+            cancellationToken);
+
     public Task<AdminOrderOpMessageResponse?> CreateWalkInFromDeskAsync(
         AdminWalkInOrderDeskRequest request,
         CancellationToken cancellationToken = default) =>

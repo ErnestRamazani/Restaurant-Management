@@ -118,6 +118,7 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
     public string OrdAdvanceLabel => Loc.Admin("ordAdvance", "Advance");
     public string OrdCompleteLabel => Loc.Admin("ordComplete", "Complete");
     public string OrdCancelLabel => Loc.Admin("ordCancel", "Cancel");
+    public string OrdRefundLabel => Loc.Admin("ordRefund", "Issue refund");
     public string OrdViewTicketLabel => Loc.Admin("ordViewTicket", "View ticket");
 
     public string OrdLoadingLabel => Loc.Admin("ordLoading", "Loading orders...");
@@ -635,6 +636,7 @@ public partial class AdminOrdersViewModel : AdminBaseViewModel
     public ICommand AdvanceOrderCommand { get; }
     public ICommand CompleteOrderCommand { get; }
     public ICommand CancelOrderCommand { get; }
+    public ICommand RefundOrderCommand { get; }
     public ICommand PrintTicketCommand { get; }
     public ICommand CloseTicketPreviewCommand { get; }
     public ICommand ExportTicketPdfCommand { get; }

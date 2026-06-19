@@ -6,7 +6,8 @@ import { useNavigate, useOutletContext } from 'react-router-dom'
 import { submitOnlineOrder } from '../../utils/api'
 import { formatUsd } from '../../utils/format'
 import { formatRestaurantDateTime } from '../../utils/restaurantDateTime'
-import { computeTotalsWithDelivery } from '../../utils/totals'
+import { computeTotalsWithDelivery, resolveDeliveryFeeUsd } from '../../utils/totals'
+import { deliveryFeePercentFromConfig } from '../../utils/guestMenuConfig'
 import { GoldDivider } from '../ui/GoldDivider'
 import { QuantityControl } from '../ui/QuantityControl'
 
@@ -64,7 +65,9 @@ export function OnlineOrderCheckoutScreen() {
   }, [])
 
   const merch = cart.subtotal
-  const deliveryFee = fulfillment === 'Delivery' ? Math.round(merch * 0.2 * 100) / 100 : 0
+  const deliveryPct = deliveryFeePercentFromConfig(config)
+  const deliveryFee =
+    fulfillment === 'Delivery' ? resolveDeliveryFeeUsd(merch, deliveryPct) : 0
   const totals = useMemo(
     () => computeTotalsWithDelivery(merch, cart.taxPercent, cart.servicePercent, deliveryFee),
     [merch, cart.taxPercent, cart.servicePercent, deliveryFee],

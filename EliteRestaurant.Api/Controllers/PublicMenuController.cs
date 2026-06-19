@@ -57,6 +57,7 @@ public sealed class PublicMenuController(
         var effectivePricing = PricingResolver.ResolveEffectiveRestaurantPricing(cloudSettings);
         var tax = effectivePricing.TaxPercent;
         var service = effectivePricing.ServicePercent;
+        var deliveryFeePercent = DeliveryFeeHelper.ResolvePercent(cloudSettings);
         var name = PublicMenuBrandingMerge.RestaurantDisplayName(cloudSettings, business);
         var mode = string.IsNullOrWhiteSpace(cloudSettings?.DefaultCurrencyDisplayMode)
             ? (string.IsNullOrWhiteSpace(pricing.DefaultCurrencyDisplayMode) ? "Dual" : pricing.DefaultCurrencyDisplayMode.Trim())
@@ -136,6 +137,7 @@ public sealed class PublicMenuController(
             rate,
             tax,
             service,
+            deliveryFeePercent,
             phone,
             address,
             website,
@@ -726,10 +728,12 @@ public sealed class PublicMenuController(
         foreach (var line in normalized)
         {
             var assignee = OrderSubmissionHelper.ResolveAssignee(dbProducts, activeStaff, line.ProductId);
+            var unitPrice = dbProducts.TryGetValue(line.ProductId, out var product) ? product.Price : 0m;
             order.Items.Add(new OrderItem
             {
                 ProductId = line.ProductId,
                 Quantity = line.Quantity,
+                UnitPriceUsd = Math.Round(Math.Max(0m, unitPrice), 2),
                 PreparedByEmployeeId = assignee.EmployeeId,
                 PreparedByRole = assignee.Role,
                 PreparedByName = assignee.Name
@@ -880,7 +884,11 @@ public sealed class PublicMenuController(
 
         var merchSubtotal = normalized.Sum(x =>
             dbProducts.TryGetValue(x.ProductId, out var p) ? p.Price * x.Quantity : 0m);
-        var deliveryFee = isDelivery ? Math.Round(merchSubtotal * 0.20m, 2) : 0m;
+        var menuPricing = PricingResolver.ResolveEffectiveRestaurantPricing(
+            await menuSettings.GetDefaultAsync());
+        var deliveryFee = isDelivery
+            ? DeliveryFeeHelper.ResolveFeeUsd(merchSubtotal, menuPricing)
+            : 0m;
         var orderSource = isDelivery ? "Delivery" : "TakeOut";
 
         var notesParts = new List<string> { $"Guest: {name}", $"Online · {(isDelivery ? "Delivery" : "Pickup")}", $"Phone: {phone}" };
@@ -954,18 +962,18 @@ public sealed class PublicMenuController(
         foreach (var line in normalized)
         {
             var assignee = OrderSubmissionHelper.ResolveAssignee(dbProducts, activeStaff, line.ProductId);
+            var unitPrice = dbProducts.TryGetValue(line.ProductId, out var product) ? product.Price : 0m;
             order.Items.Add(new OrderItem
             {
                 ProductId = line.ProductId,
                 Quantity = line.Quantity,
+                UnitPriceUsd = Math.Round(Math.Max(0m, unitPrice), 2),
                 PreparedByEmployeeId = assignee.EmployeeId,
                 PreparedByRole = assignee.Role,
                 PreparedByName = assignee.Name
             });
         }
 
-        var menuPricing = PricingResolver.ResolveEffectiveRestaurantPricing(
-            await menuSettings.GetDefaultAsync());
         OrderSubmissionHelper.SyncPaymentFields(order, dbProducts, menuPricing);
         db.Orders.Add(order);
         orderTable.Status = "Occupied";

@@ -337,6 +337,12 @@
                                                                         CommandParameter="{Binding}"
                                                                         Style="{StaticResource GhostButton}"
                                                                         Visibility="{Binding ShowViewTicketInOrders, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                                <Button Margin="0,8,0,0"
+                                                                        Content="{Binding DataContext.OrdRefundLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                        Command="{Binding DataContext.RefundOrderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Style="{StaticResource DangerButton}"
+                                                                        Visibility="{Binding ShowRefundInOrders, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                                             </StackPanel>
                                                         </Border>
                                                     </DataTemplate>

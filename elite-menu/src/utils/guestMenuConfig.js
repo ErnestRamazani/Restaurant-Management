@@ -42,6 +42,14 @@ export function pricingPercentsFromConfig(config) {
   return { taxPercent: tax, servicePercent: service }
 }
 
+/** Delivery fee % from GET /api/public/menu/config (default 20 when missing). */
+export function deliveryFeePercentFromConfig(config) {
+  if (!config) return 20
+  const raw = Number(config.deliveryFeePercent ?? config.DeliveryFeePercent)
+  if (!Number.isFinite(raw) || raw < 0) return 20
+  return Math.min(100, raw)
+}
+
 /** Split plain-text settings into paragraphs for display. */
 export function textParagraphs(text) {
   const raw = String(text ?? '').trim()

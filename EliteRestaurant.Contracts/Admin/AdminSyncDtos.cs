@@ -62,6 +62,7 @@ public sealed record AdminCloudSettingsRequest(
     string RoundingGrandTotal,
     decimal TaxPercent,
     decimal ServicePercent,
+    decimal DeliveryFeePercent,
     string? LogoFileName,
     string? LogoContentType,
     string? LogoBase64,

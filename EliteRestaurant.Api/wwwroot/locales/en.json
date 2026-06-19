@@ -181,7 +181,11 @@
       "orderCancelMessage": "Enter the admin cancel passcode to confirm cancellation.",
       "orderCancelBack": "Back",
       "orderCancelConfirm": "Cancel order",
-      "orderCancelPasscodeAria": "Admin cancel passcode"
+      "orderCancelPasscodeAria": "Admin cancel passcode",
+      "orderRefundTitle": "Issue refund",
+      "orderRefundMessage": "Enter the admin passcode to confirm the refund.",
+      "orderRefundConfirm": "Issue refund",
+      "orderRefundPasscodeAria": "Admin refund passcode"
     },
     "server": {
       "title": "Server Portal",
@@ -409,6 +413,7 @@
         "ready": "Ready",
         "served": "Served",
         "cancelled": "Cancelled",
+        "refunded": "Refunded",
         "on_account": "On account"
       },
       "meta": {
@@ -471,6 +476,9 @@
       "releaseFailed": "Release failed",
       "confirmCancelTicket": "Cancel this ticket? Stock has not been deducted.",
       "confirmCancelOrder": "Cancel this order?",
+      "confirmRefundOrder": "Issue a refund for this completed order? Refund entries will be posted to Money.",
+      "issueRefund": "Issue refund",
+      "refundFailed": "Refund failed",
       "serverLabel": "Server",
       "orderCodeLabel": "Code",
       "couldNotLoadOrder": "Could not load order",
@@ -498,6 +506,7 @@
         "ready": "Ready",
         "served": "Served",
         "cancelled": "Cancelled",
+        "refunded": "Refunded",
         "on_account": "On account"
       },
       "meta": {
@@ -701,6 +710,7 @@
         "served": "Served",
         "completed": "Completed",
         "cancelled": "Cancelled",
+        "refunded": "Refunded",
         "on_account": "On account"
       },
       "invExp": {
@@ -856,6 +866,7 @@
         "served": "Served",
         "completed": "Completed",
         "cancelled": "Cancelled",
+        "refunded": "Refunded",
         "on_account": "On account"
       },
       "invExp": {
@@ -1062,6 +1073,7 @@
         "ready": "Ready",
         "served": "Served",
         "cancelled": "Cancelled",
+        "refunded": "Refunded",
         "on_account": "On account",
         "scheduled": "Scheduled",
         "checkedin": "Checked in"
@@ -1810,6 +1822,18 @@
       "ordAdvance": "Advance",
       "ordComplete": "Complete",
       "ordCancel": "Cancel",
+      "ordRefund": "Issue refund",
+      "ordConfirmRefundTitle": "Issue refund",
+      "ordConfirmRefundBody": "Issue a refund for order {{orderId}}? The order stays completed and refund entries are posted to Money.",
+      "ordRefundErrorTitle": "Refund",
+      "ordPasscodeRequired": "Admin passcode required",
+      "ordCancelPasscodeTitle": "Cancel order",
+      "ordCancelPasscodeBody": "Enter the admin cancel passcode to cancel {{orderId}}.",
+      "ordCancelPasscodeConfirm": "Cancel order",
+      "ordRefundPasscodeTitle": "Issue refund",
+      "ordRefundPasscodeBody": "Enter the admin passcode to issue a refund for {{orderId}}.",
+      "ordRefundPasscodeConfirm": "Issue refund",
+      "ordPasscodeEmpty": "Enter the admin passcode.",
       "ordViewTicket": "View ticket",
       "ordPastDayCount": "({{count}} orders)",
       "ordTodayHeader": "Today - {{date}}",
@@ -2535,6 +2559,7 @@
         "served": "Served",
         "completed": "Completed",
         "cancelled": "Cancelled",
+        "refunded": "Refunded",
         "on_account": "On account"
       },
       "meta": {
@@ -2753,7 +2778,7 @@
       "cash": "Cash",
       "card": "Card",
       "mobileMoney": "Mobile money",
-      "deliveryFee": "Delivery fee (20%)",
+      "deliveryFee": "Delivery fee ({{percent}}%)",
       "placeOrder": "Place order",
       "sending": "Sending…",
       "clearCart": "Clear cart",
